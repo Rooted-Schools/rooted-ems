@@ -32,6 +32,12 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
+  // Public routes — skip auth checks
+  const publicRoutes = ["/", "/login", "/staff-login", "/auth/callback", "/auth/verify"];
+  if (publicRoutes.includes(pathname)) {
+    return supabaseResponse;
+  }
+
   // Protected routes: /family/* requires any auth
   if (pathname.startsWith("/family") && !user) {
     const url = request.nextUrl.clone();
