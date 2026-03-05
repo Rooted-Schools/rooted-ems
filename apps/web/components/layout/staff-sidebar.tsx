@@ -28,11 +28,17 @@ export function StaffSidebar() {
   return (
     <aside className="w-64 bg-white border-r border-gray-200 min-h-screen flex flex-col">
       <div className="p-4 border-b border-gray-200">
-        <Link href="/staff/dashboard" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-md bg-rooted-green flex items-center justify-center text-white font-bold text-sm">
-            R
+        <Link
+          href="/staff/dashboard"
+          className="inline-flex flex-col no-underline hover:opacity-90 transition-opacity"
+        >
+          <div className="inline-flex items-baseline gap-1 text-sm font-medium tracking-wide">
+            <span className="text-rooted-green">rooted school</span>
+            <span className="text-gray-800">foundation</span>
           </div>
-          <span className="font-semibold text-gray-900">Rooted EMS</span>
+          <span className="text-[10px] text-gray-400 tracking-wide">
+            Enrollment Management
+          </span>
         </Link>
       </div>
 
