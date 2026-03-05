@@ -1,15 +1,19 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
+import type { EmailOtpType } from "@supabase/supabase-js";
 
 /**
  * Handles OTP verification for family login.
- * Verifies the token sent via email or phone.
+ * Verifies the token_hash sent via email magic link or OTP.
+ *
+ * Note: token_hash-based verification is always email-originated.
+ * SMS OTP verification uses a code entry form (not a URL callback).
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const tokenHash = searchParams.get("token_hash");
-  const type = searchParams.get("type") as "email" | "sms" | null;
+  const type = searchParams.get("type") as EmailOtpType | null;
   const next = searchParams.get("next") ?? "/family/dashboard";
 
   if (!tokenHash || !type) {
@@ -25,10 +29,10 @@ export async function GET(request: NextRequest) {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: Array<{ name: string; value: string; options?: Record<string, unknown> }>) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, options as never)
             );
           } catch {
             // Ignore errors in Server Components
@@ -40,7 +44,7 @@ export async function GET(request: NextRequest) {
 
   const { error } = await supabase.auth.verifyOtp({
     token_hash: tokenHash,
-    type: type === "email" ? "email" : "sms",
+    type,
   });
 
   if (error) {

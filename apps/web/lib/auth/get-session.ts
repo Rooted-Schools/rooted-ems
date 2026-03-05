@@ -1,4 +1,4 @@
-import { createServerClient } from "@rooted-ems/database";
+import { createServerClient } from "@rooted-ems/database/server";
 import type { AuthSession, CampusRoleMap } from "@rooted-ems/types";
 import { StaffRole } from "@rooted-ems/types";
 
