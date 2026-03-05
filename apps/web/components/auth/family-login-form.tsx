@@ -71,7 +71,15 @@ export function FamilyLoginForm() {
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="bg-white rounded-lg shadow-md p-8">
-        <h2 className="text-2xl font-bold text-center mb-6">Family Portal</h2>
+        <div className="flex justify-center mb-6">
+          <div className="inline-flex flex-col items-center">
+            <div className="inline-flex items-baseline gap-2 text-xl font-medium tracking-wide">
+              <span className="text-rooted-green">rooted school</span>
+              <span className="text-gray-800">foundation</span>
+            </div>
+          </div>
+        </div>
+        <h2 className="text-2xl font-bold text-center mb-2">Family Portal</h2>
         <p className="text-center text-gray-600 mb-6">
           Sign in to manage your enrollment applications
         </p>

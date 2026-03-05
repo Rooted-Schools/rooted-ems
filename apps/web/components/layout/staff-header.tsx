@@ -29,6 +29,13 @@ export function StaffHeader({
   return (
     <header className="h-14 border-b border-gray-200 bg-white flex items-center justify-between px-6">
       <div className="flex items-center gap-4">
+        <a
+          href="/staff/dashboard"
+          className="inline-flex items-baseline gap-1 text-sm font-medium tracking-wide no-underline hover:opacity-90 transition-opacity mr-2"
+        >
+          <span className="text-rooted-green">rooted school</span>
+          <span className="text-gray-800">foundation</span>
+        </a>
         {campuses.length > 1 && (
           <div className="flex items-center gap-2">
             <label

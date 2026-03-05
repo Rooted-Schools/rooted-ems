@@ -21,12 +21,12 @@ export function FamilyHeader({ userEmail, userPhone }: FamilyHeaderProps) {
       <div className="max-w-5xl mx-auto h-full flex items-center justify-between px-4">
         <Link
           href="/family/dashboard"
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 no-underline hover:opacity-90 transition-opacity"
         >
-          <div className="w-8 h-8 rounded-md bg-rooted-green flex items-center justify-center text-white font-bold text-sm">
-            R
+          <div className="inline-flex items-baseline gap-1 text-sm font-medium tracking-wide">
+            <span className="text-rooted-green">rooted school</span>
+            <span className="text-gray-800">foundation</span>
           </div>
-          <span className="font-semibold text-gray-900">Rooted EMS</span>
         </Link>
 
         <nav className="flex items-center gap-6">
