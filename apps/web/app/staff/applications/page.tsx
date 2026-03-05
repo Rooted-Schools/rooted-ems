@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,21 +48,23 @@ function ApplicationRow({ app }: { app: MockApplication }) {
   const statusConfig = getStatusConfig(app.status);
 
   return (
-    <TableRow className="cursor-pointer">
-      <TableCell className="font-medium">{app.studentName}</TableCell>
-      <TableCell className="text-gray-500">{app.guardianName}</TableCell>
-      <TableCell>{getGradeLabel(app.grade)}</TableCell>
-      <TableCell>{app.campus}</TableCell>
-      <TableCell>
-        <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
-      </TableCell>
-      <TableCell className="text-gray-500">
-        {formatDate(app.submittedAt)}
-      </TableCell>
-      <TableCell className="text-gray-500">
-        {formatDate(app.updatedAt)}
-      </TableCell>
-    </TableRow>
+    <Link href={`/staff/applications/${app.id}`} className="contents">
+      <TableRow className="cursor-pointer hover:bg-gray-50">
+        <TableCell className="font-medium">{app.studentName}</TableCell>
+        <TableCell className="text-gray-500">{app.guardianName}</TableCell>
+        <TableCell>{getGradeLabel(app.grade)}</TableCell>
+        <TableCell>{app.campus}</TableCell>
+        <TableCell>
+          <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
+        </TableCell>
+        <TableCell className="text-gray-500">
+          {formatDate(app.submittedAt)}
+        </TableCell>
+        <TableCell className="text-gray-500">
+          {formatDate(app.updatedAt)}
+        </TableCell>
+      </TableRow>
+    </Link>
   );
 }
 

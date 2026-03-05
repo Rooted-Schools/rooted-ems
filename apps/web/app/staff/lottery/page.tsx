@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -67,39 +68,41 @@ export default function StaffLotteryPage() {
             const overSubscribed = run.applicants > run.seats;
 
             return (
-              <Card key={run.id} className="hover:border-gray-300 transition-colors cursor-pointer">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-base">{run.name}</CardTitle>
-                      <CardDescription className="mt-1">
-                        {run.campus} · {run.grade}
-                      </CardDescription>
+              <Link key={run.id} href={`/staff/lottery/${run.id}`}>
+                <Card className="hover:border-gray-300 transition-colors cursor-pointer">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle className="text-base">{run.name}</CardTitle>
+                        <CardDescription className="mt-1">
+                          {run.campus} · {run.grade}
+                        </CardDescription>
+                      </div>
+                      <Badge variant={s.variant}>{s.label}</Badge>
                     </div>
-                    <Badge variant={s.variant}>{s.label}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-6 text-sm">
-                    <div>
-                      <span className="text-gray-500">Applicants:</span>{" "}
-                      <span className="font-medium">{run.applicants}</span>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-6 text-sm">
+                      <div>
+                        <span className="text-gray-500">Applicants:</span>{" "}
+                        <span className="font-medium">{run.applicants}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Seats:</span>{" "}
+                        <span className="font-medium">{run.seats}</span>
+                      </div>
+                      {overSubscribed && (
+                        <Badge variant="warning">
+                          {run.applicants - run.seats} over capacity
+                        </Badge>
+                      )}
+                      <div className="ml-auto text-gray-400 text-xs">
+                        Created {run.createdAt}
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-gray-500">Seats:</span>{" "}
-                      <span className="font-medium">{run.seats}</span>
-                    </div>
-                    {overSubscribed && (
-                      <Badge variant="warning">
-                        {run.applicants - run.seats} over capacity
-                      </Badge>
-                    )}
-                    <div className="ml-auto text-gray-400 text-xs">
-                      Created {run.createdAt}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </Link>
             );
           })}
         </div>
