@@ -3,7 +3,7 @@
 
 -- Seat offers
 CREATE TABLE offer (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   application_id UUID NOT NULL REFERENCES application(id),
   lottery_entry_id UUID REFERENCES lottery_entry(id),
   campus_id UUID NOT NULL REFERENCES campus(id),
@@ -21,7 +21,7 @@ CREATE TABLE offer (
 
 -- Acceptances (separate from offers for audit trail)
 CREATE TABLE acceptance (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   offer_id UUID NOT NULL REFERENCES offer(id) UNIQUE,
   application_id UUID NOT NULL REFERENCES application(id),
   accepted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -34,7 +34,7 @@ CREATE TABLE acceptance (
 
 -- Waitlists (per campus/grade/year)
 CREATE TABLE waitlist (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   campus_id UUID NOT NULL REFERENCES campus(id),
   grade_level_id UUID NOT NULL REFERENCES grade_level(id),
   school_year_id UUID NOT NULL REFERENCES school_year(id),
@@ -47,7 +47,7 @@ CREATE TABLE waitlist (
 
 -- Waitlist positions
 CREATE TABLE waitlist_position (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   waitlist_id UUID NOT NULL REFERENCES waitlist(id),
   application_id UUID NOT NULL REFERENCES application(id),
   position_number INTEGER NOT NULL,

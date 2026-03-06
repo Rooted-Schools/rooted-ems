@@ -3,7 +3,7 @@
 
 -- Lottery rule sets (named/versioned configurations)
 CREATE TABLE lottery_rule_set (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   campus_id UUID NOT NULL REFERENCES campus(id),
   name TEXT NOT NULL,
   version INTEGER NOT NULL DEFAULT 1,
@@ -19,7 +19,7 @@ CREATE TABLE lottery_rule_set (
 
 -- Lottery runs (execution records)
 CREATE TABLE lottery_run (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   enrollment_window_id UUID NOT NULL REFERENCES enrollment_window(id),
   lottery_rule_set_id UUID NOT NULL REFERENCES lottery_rule_set(id),
   campus_id UUID NOT NULL REFERENCES campus(id),
@@ -39,7 +39,7 @@ CREATE TABLE lottery_run (
 
 -- Lottery entries (per-application assignment)
 CREATE TABLE lottery_entry (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   lottery_run_id UUID NOT NULL REFERENCES lottery_run(id),
   application_id UUID NOT NULL REFERENCES application(id),
   priority_tier INTEGER NOT NULL DEFAULT 0,
@@ -53,7 +53,7 @@ CREATE TABLE lottery_entry (
 
 -- Lottery entry snapshots (immutable after official run)
 CREATE TABLE lottery_entry_snapshot (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   lottery_run_id UUID NOT NULL REFERENCES lottery_run(id),
   lottery_entry_id UUID NOT NULL REFERENCES lottery_entry(id),
   application_id UUID NOT NULL REFERENCES application(id),

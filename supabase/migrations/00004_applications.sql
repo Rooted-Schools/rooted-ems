@@ -4,7 +4,7 @@
 
 -- Enrollment windows (per-campus enrollment periods)
 CREATE TABLE enrollment_window (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   campus_id UUID NOT NULL REFERENCES campus(id),
   school_year_id UUID NOT NULL REFERENCES school_year(id),
   name TEXT NOT NULL,
@@ -20,7 +20,7 @@ CREATE TABLE enrollment_window (
 
 -- Dynamic form templates
 CREATE TABLE form_template (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   campus_id UUID REFERENCES campus(id),
   name TEXT NOT NULL,
   description TEXT,
@@ -34,7 +34,7 @@ CREATE TABLE form_template (
 
 -- Applications
 CREATE TABLE application (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   enrollment_window_id UUID NOT NULL REFERENCES enrollment_window(id),
   student_id UUID NOT NULL REFERENCES student(id),
   campus_id UUID NOT NULL REFERENCES campus(id),
@@ -56,7 +56,7 @@ CREATE TABLE application (
 
 -- Application answers (EAV pattern for dynamic form responses)
 CREATE TABLE application_answer (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   application_id UUID NOT NULL REFERENCES application(id) ON DELETE CASCADE,
   field_key TEXT NOT NULL,
   value JSONB,
@@ -67,7 +67,7 @@ CREATE TABLE application_answer (
 
 -- Uploaded documents
 CREATE TABLE document (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   application_id UUID REFERENCES application(id) ON DELETE SET NULL,
   student_id UUID REFERENCES student(id),
   document_type TEXT NOT NULL,
@@ -86,7 +86,7 @@ CREATE TABLE document (
 
 -- Application status history (immutable log)
 CREATE TABLE application_status_history (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   application_id UUID NOT NULL REFERENCES application(id) ON DELETE CASCADE,
   from_status application_status,
   to_status application_status NOT NULL,
@@ -97,7 +97,7 @@ CREATE TABLE application_status_history (
 
 -- E-signatures
 CREATE TABLE signature (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   application_id UUID NOT NULL REFERENCES application(id) ON DELETE CASCADE,
   signer_id UUID NOT NULL REFERENCES guardian(id),
   signature_type TEXT NOT NULL,
@@ -109,7 +109,7 @@ CREATE TABLE signature (
 
 -- Verification checklist items
 CREATE TABLE verification_item (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   application_id UUID NOT NULL REFERENCES application(id) ON DELETE CASCADE,
   item_name TEXT NOT NULL,
   is_required BOOLEAN NOT NULL DEFAULT true,

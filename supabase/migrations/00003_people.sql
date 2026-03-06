@@ -17,7 +17,7 @@ CREATE TABLE user_profile (
 
 -- Staff role assignments (campus-scoped)
 CREATE TABLE user_campus_role (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES user_profile(id) ON DELETE CASCADE,
   campus_id UUID NOT NULL REFERENCES campus(id),
   role staff_role NOT NULL,
@@ -30,7 +30,7 @@ CREATE TABLE user_campus_role (
 
 -- Household (family unit)
 CREATE TABLE household (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES user_profile(id),
   address_line1 TEXT,
   address_line2 TEXT,
@@ -44,7 +44,7 @@ CREATE TABLE household (
 
 -- Guardian (parent/caregiver)
 CREATE TABLE guardian (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id UUID NOT NULL REFERENCES household(id),
   user_id UUID REFERENCES user_profile(id),
   first_name TEXT NOT NULL,
@@ -62,7 +62,7 @@ CREATE TABLE guardian (
 
 -- Student
 CREATE TABLE student (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id UUID NOT NULL REFERENCES household(id),
   first_name TEXT NOT NULL,
   middle_name TEXT,
@@ -95,7 +95,7 @@ CREATE TABLE student (
 
 -- Guardian-Student relationship (many-to-many)
 CREATE TABLE guardian_student (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   guardian_id UUID NOT NULL REFERENCES guardian(id) ON DELETE CASCADE,
   student_id UUID NOT NULL REFERENCES student(id) ON DELETE CASCADE,
   relationship guardian_relationship NOT NULL,

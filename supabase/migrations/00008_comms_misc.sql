@@ -2,7 +2,7 @@
 
 -- Message templates
 CREATE TABLE message_template (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   campus_id UUID REFERENCES campus(id),
   name TEXT NOT NULL,
   subject TEXT,
@@ -17,7 +17,7 @@ CREATE TABLE message_template (
 
 -- Communication log (sent messages)
 CREATE TABLE communication_log (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   campus_id UUID REFERENCES campus(id),
   template_id UUID REFERENCES message_template(id),
   recipient_user_id UUID REFERENCES user_profile(id),
@@ -36,7 +36,7 @@ CREATE TABLE communication_log (
 
 -- In-app notifications
 CREATE TABLE notification (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES user_profile(id),
   title TEXT NOT NULL,
   body TEXT,
@@ -48,7 +48,7 @@ CREATE TABLE notification (
 
 -- Career pathway interests (per spec Module 6)
 CREATE TABLE pathway_interest (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id UUID NOT NULL REFERENCES student(id),
   campus_id UUID NOT NULL REFERENCES campus(id),
   pathway_name TEXT NOT NULL,
@@ -60,7 +60,7 @@ CREATE TABLE pathway_interest (
 
 -- Staff notes (polymorphic via entity_type + entity_id)
 CREATE TABLE note (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   entity_type TEXT NOT NULL,
   entity_id UUID NOT NULL,
   campus_id UUID REFERENCES campus(id),
@@ -73,7 +73,7 @@ CREATE TABLE note (
 
 -- Tags for categorization
 CREATE TABLE tag (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   campus_id UUID REFERENCES campus(id),
   name TEXT NOT NULL,
   color VARCHAR(7),
@@ -83,7 +83,7 @@ CREATE TABLE tag (
 
 -- Application-Tag junction
 CREATE TABLE application_tag (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   application_id UUID NOT NULL REFERENCES application(id) ON DELETE CASCADE,
   tag_id UUID NOT NULL REFERENCES tag(id) ON DELETE CASCADE,
   created_by UUID REFERENCES user_profile(id),
@@ -93,7 +93,7 @@ CREATE TABLE application_tag (
 
 -- Audit event log (INSERT-only, immutable)
 CREATE TABLE audit_event (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   table_name TEXT NOT NULL,
   record_id UUID,
   action audit_action NOT NULL,
@@ -108,7 +108,7 @@ CREATE TABLE audit_event (
 
 -- Key-value settings (per campus or global)
 CREATE TABLE setting (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   campus_id UUID REFERENCES campus(id),
   key TEXT NOT NULL,
   value JSONB NOT NULL,

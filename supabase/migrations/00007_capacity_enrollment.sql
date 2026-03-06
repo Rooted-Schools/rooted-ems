@@ -2,7 +2,7 @@
 
 -- Capacity plans (seats per campus/grade/year)
 CREATE TABLE capacity_plan (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   campus_id UUID NOT NULL REFERENCES campus(id),
   grade_level_id UUID NOT NULL REFERENCES grade_level(id),
   school_year_id UUID NOT NULL REFERENCES school_year(id),
@@ -20,7 +20,7 @@ CREATE TABLE capacity_plan (
 
 -- Final enrollment records
 CREATE TABLE enrollment (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id UUID NOT NULL REFERENCES student(id),
   campus_id UUID NOT NULL REFERENCES campus(id),
   grade_level_id UUID NOT NULL REFERENCES grade_level(id),

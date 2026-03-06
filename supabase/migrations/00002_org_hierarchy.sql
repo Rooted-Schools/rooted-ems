@@ -2,11 +2,10 @@
 -- Organization > Region > Campus > Program, SchoolYear, GradeLevel
 
 -- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Network-level organization
 CREATE TABLE organization (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   legal_name TEXT,
   ein TEXT,
@@ -18,7 +17,7 @@ CREATE TABLE organization (
 
 -- Geographic regions
 CREATE TABLE region (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL REFERENCES organization(id),
   name TEXT NOT NULL,
   state_code CHAR(2) NOT NULL,
@@ -28,7 +27,7 @@ CREATE TABLE region (
 
 -- Individual school campuses
 CREATE TABLE campus (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL REFERENCES organization(id),
   region_id UUID NOT NULL REFERENCES region(id),
   name TEXT NOT NULL,
@@ -48,7 +47,7 @@ CREATE TABLE campus (
 
 -- Academic programs offered at a campus
 CREATE TABLE program (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   campus_id UUID NOT NULL REFERENCES campus(id),
   name TEXT NOT NULL,
   description TEXT,
@@ -59,7 +58,7 @@ CREATE TABLE program (
 
 -- School years
 CREATE TABLE school_year (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL REFERENCES organization(id),
   name TEXT NOT NULL,
   start_date DATE NOT NULL,
@@ -72,7 +71,7 @@ CREATE TABLE school_year (
 
 -- Grade levels offered at a campus for a school year
 CREATE TABLE grade_level (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   campus_id UUID NOT NULL REFERENCES campus(id),
   school_year_id UUID NOT NULL REFERENCES school_year(id),
   grade grade_level_code NOT NULL,
