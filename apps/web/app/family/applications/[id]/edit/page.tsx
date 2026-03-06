@@ -8,7 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { CAMPUSES, GRADE_LABELS } from "@/lib/application-helpers";
+import { GRADE_LABELS } from "@/lib/application-helpers";
+
+const CAMPUSES = [
+  { id: "campus-vancouver", name: "Rooted School Vancouver" },
+  { id: "campus-columbia", name: "C.R. Neal Academy (Columbia)" },
+  { id: "campus-cleveland", name: "Rooted School Cleveland" },
+];
 
 /* ───────────── step definitions ───────────── */
 
