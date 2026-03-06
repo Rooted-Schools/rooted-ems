@@ -1,3 +1,5 @@
+export const runtime = "edge";
+
 import { createServerClient } from "@rooted-ems/database/server";
 import { redirect, notFound } from "next/navigation";
 import { getApplicationDetail } from "@/lib/queries";

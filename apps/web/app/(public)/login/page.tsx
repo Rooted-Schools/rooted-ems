@@ -1,6 +1,7 @@
 import { FamilyLoginForm } from "@/components/auth/family-login-form";
 
 export const dynamic = "force-dynamic";
+export const runtime = "edge";
 
 export const metadata = {
   title: "Family Login | Rooted EMS",

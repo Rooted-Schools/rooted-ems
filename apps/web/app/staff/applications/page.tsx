@@ -1,3 +1,5 @@
+export const runtime = "edge";
+
 import { getStaffApplications, getApplicationStats, getCampuses } from "@/lib/queries";
 import { StaffApplicationsClient } from "./applications-client";
 

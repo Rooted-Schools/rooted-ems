@@ -1,6 +1,7 @@
 import { StaffLoginForm } from "@/components/auth/staff-login-form";
 
 export const dynamic = "force-dynamic";
+export const runtime = "edge";
 
 export const metadata = {
   title: "Staff Login | Rooted EMS",
