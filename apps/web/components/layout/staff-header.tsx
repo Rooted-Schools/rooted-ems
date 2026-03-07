@@ -26,51 +26,87 @@ export function StaffHeader({
     window.location.href = "/staff-login";
   }
 
+  const selectedCampusName =
+    campuses.find((c) => c.id === selectedCampus)?.name ?? "All Campuses";
+
   return (
-    <header className="h-14 border-b border-gray-200 bg-white flex items-center justify-between px-6">
-      <div className="flex items-center gap-4">
-        <a
-          href="/staff/dashboard"
-          className="inline-flex items-baseline gap-1 text-sm font-medium tracking-wide no-underline hover:opacity-90 transition-opacity mr-2"
-        >
-          <span className="text-rooted-green">rooted school</span>
-          <span className="text-gray-800">foundation</span>
-        </a>
-        {campuses.length > 1 && (
-          <div className="flex items-center gap-2">
-            <label
-              htmlFor="campus-select"
-              className="text-sm text-gray-500 font-medium"
-            >
-              Campus:
-            </label>
-            <Select
-              id="campus-select"
-              value={selectedCampus}
-              onChange={(e) => setSelectedCampus(e.target.value)}
-              className="w-48 h-8 text-sm"
-            >
-              {campuses.map((campus) => (
-                <option key={campus.id} value={campus.id}>
-                  {campus.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-        )}
+    <>
+      {/* Top green branded bar */}
+      <div className="h-10 bg-rooted-green flex items-center justify-between px-6">
+        <div className="flex items-center gap-3">
+          <span className="text-white/90 text-xs font-semibold tracking-wide uppercase">
+            Rooted Enrollment Management System
+          </span>
+          <span className="text-white/40 text-xs">|</span>
+          <span className="text-white/60 text-xs">
+            {selectedCampusName}
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          {userEmail && (
+            <span className="text-white/70 text-xs">{userEmail}</span>
+          )}
+          <button
+            onClick={handleLogout}
+            className="text-white/60 hover:text-white text-xs transition-colors"
+          >
+            Sign out
+          </button>
+        </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        {userEmail && (
-          <span className="text-sm text-gray-500">{userEmail}</span>
-        )}
-        <button
-          onClick={handleLogout}
-          className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-        >
-          Sign out
-        </button>
-      </div>
-    </header>
+      {/* Action bar */}
+      <header className="h-12 border-b border-gray-200 bg-white flex items-center justify-between px-6">
+        <div className="flex items-center gap-4">
+          {campuses.length > 1 && (
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="campus-select"
+                className="text-xs text-gray-500 font-medium"
+              >
+                Campus:
+              </label>
+              <Select
+                id="campus-select"
+                value={selectedCampus}
+                onChange={(e) => setSelectedCampus(e.target.value)}
+                className="w-52 h-8 text-sm"
+              >
+                <option value="">All Campuses</option>
+                {campuses.map((campus) => (
+                  <option key={campus.id} value={campus.id}>
+                    {campus.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Search */}
+          <div className="relative">
+            <input
+              type="search"
+              placeholder="Search students..."
+              className="h-8 w-56 rounded-lg border border-gray-200 bg-gray-50 px-3 pr-8 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-rooted-green/30 focus:border-rooted-green"
+            />
+            <svg
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          </div>
+        </div>
+      </header>
+    </>
   );
 }

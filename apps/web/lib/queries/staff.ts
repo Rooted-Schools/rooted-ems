@@ -1,5 +1,19 @@
 import { createServerClient } from "@rooted-ems/database/server";
 
+// ─── Student Types ─────────────────────────────────────
+
+export interface StudentRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+  grade: string;
+  campus_name: string;
+  status: string;
+  guardian_name: string;
+  guardian_email: string;
+  application_id: string | null;
+}
+
 // ─── Lottery Types ──────────────────────────────────────
 
 export interface LotteryRunRow {
@@ -436,6 +450,225 @@ export async function getStaffEnrollmentWindows(
     }),
     status: row.status as string,
   }));
+}
+
+// ─── Work Queue Types ──────────────────────────────────
+
+export interface WorkQueueItem {
+  id: string;
+  type: "new_submission" | "needs_info" | "pending_verification" | "expiring_offer" | "pending_enrollment";
+  title: string;
+  description: string;
+  campus_name: string;
+  created_at: string;
+  link: string;
+  priority: "high" | "medium" | "low";
+}
+
+// ─── Work Queue Queries ────────────────────────────────
+
+export async function getStaffWorkQueue(): Promise<WorkQueueItem[]> {
+  const supabase = await createServerClient();
+  const items: WorkQueueItem[] = [];
+
+  // 1. New submissions needing review
+  const { data: submitted } = await supabase
+    .from("application")
+    .select(`
+      id, created_at,
+      student:student_id (first_name, last_name),
+      campus:campus_id (name),
+      grade_level:grade_level_id (grade)
+    `)
+    .eq("status", "submitted")
+    .order("created_at", { ascending: true })
+    .limit(20);
+
+  for (const row of (submitted ?? []) as Record<string, unknown>[]) {
+    const student = row.student as unknown as Record<string, string> | null;
+    const campus = row.campus as Record<string, string> | null;
+    const grade = row.grade_level as Record<string, string> | null;
+    items.push({
+      id: `sub-${row.id}`,
+      type: "new_submission",
+      title: `Review application: ${student?.first_name} ${student?.last_name}`,
+      description: `${grade?.grade ? `Grade ${grade.grade}` : ""} application needs initial review.`,
+      campus_name: campus?.name ?? "",
+      created_at: row.created_at as string,
+      link: `/staff/applications/${row.id}`,
+      priority: "high",
+    });
+  }
+
+  // 2. Applications needing info follow-up
+  const { data: needsInfo } = await supabase
+    .from("application")
+    .select(`
+      id, updated_at,
+      student:student_id (first_name, last_name),
+      campus:campus_id (name)
+    `)
+    .eq("status", "needs_info")
+    .order("updated_at", { ascending: true })
+    .limit(20);
+
+  for (const row of (needsInfo ?? []) as Record<string, unknown>[]) {
+    const student = row.student as unknown as Record<string, string> | null;
+    const campus = row.campus as Record<string, string> | null;
+    items.push({
+      id: `info-${row.id}`,
+      type: "needs_info",
+      title: `Follow up: ${student?.first_name} ${student?.last_name}`,
+      description: "Waiting on additional information from family.",
+      campus_name: campus?.name ?? "",
+      created_at: row.updated_at as string,
+      link: `/staff/applications/${row.id}`,
+      priority: "medium",
+    });
+  }
+
+  // 3. Verified apps ready for next step
+  const { data: verified } = await supabase
+    .from("application")
+    .select(`
+      id, reviewed_at,
+      student:student_id (first_name, last_name),
+      campus:campus_id (name)
+    `)
+    .eq("status", "verified")
+    .order("reviewed_at", { ascending: true })
+    .limit(20);
+
+  for (const row of (verified ?? []) as Record<string, unknown>[]) {
+    const student = row.student as unknown as Record<string, string> | null;
+    const campus = row.campus as Record<string, string> | null;
+    items.push({
+      id: `ver-${row.id}`,
+      type: "pending_verification",
+      title: `Assign to lottery: ${student?.first_name} ${student?.last_name}`,
+      description: "Verified and ready for lottery assignment or direct offer.",
+      campus_name: campus?.name ?? "",
+      created_at: (row.reviewed_at as string) ?? "",
+      link: `/staff/applications/${row.id}`,
+      priority: "medium",
+    });
+  }
+
+  // 4. Offers expiring soon (within 7 days)
+  const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: expiringOffers } = await supabase
+    .from("offer")
+    .select(`
+      id, expires_at,
+      application:application_id (
+        id,
+        student:student_id (first_name, last_name),
+        campus:campus_id (name)
+      )
+    `)
+    .eq("status", "pending")
+    .lte("expires_at", sevenDaysFromNow)
+    .order("expires_at", { ascending: true })
+    .limit(20);
+
+  for (const row of (expiringOffers ?? []) as Record<string, unknown>[]) {
+    const app = row.application as unknown as Record<string, unknown> | null;
+    const student = app?.student as unknown as Record<string, string> | null;
+    const campus = app?.campus as Record<string, string> | null;
+    const expiresAt = new Date(row.expires_at as string);
+    const daysLeft = Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    items.push({
+      id: `exp-${row.id}`,
+      type: "expiring_offer",
+      title: `Offer expiring: ${student?.first_name} ${student?.last_name}`,
+      description: `Offer expires ${daysLeft <= 0 ? "today" : `in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`}.`,
+      campus_name: campus?.name ?? "",
+      created_at: row.expires_at as string,
+      link: "/staff/offers",
+      priority: daysLeft <= 2 ? "high" : "medium",
+    });
+  }
+
+  // 5. Accepted apps pending enrollment
+  const { data: pendingEnroll } = await supabase
+    .from("application")
+    .select(`
+      id, updated_at,
+      student:student_id (first_name, last_name),
+      campus:campus_id (name)
+    `)
+    .eq("status", "accepted")
+    .order("updated_at", { ascending: true })
+    .limit(20);
+
+  for (const row of (pendingEnroll ?? []) as Record<string, unknown>[]) {
+    const student = row.student as unknown as Record<string, string> | null;
+    const campus = row.campus as Record<string, string> | null;
+    items.push({
+      id: `enr-${row.id}`,
+      type: "pending_enrollment",
+      title: `Complete enrollment: ${student?.first_name} ${student?.last_name}`,
+      description: "Offer accepted — ready for registration.",
+      campus_name: campus?.name ?? "",
+      created_at: row.updated_at as string,
+      link: `/staff/applications/${row.id}`,
+      priority: "medium",
+    });
+  }
+
+  // Sort by priority then date
+  const priorityOrder = { high: 0, medium: 1, low: 2 };
+  items.sort((a, b) => {
+    const p = priorityOrder[a.priority] - priorityOrder[b.priority];
+    if (p !== 0) return p;
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  });
+
+  return items;
+}
+
+// ─── Student Queries ───────────────────────────────────
+
+export async function getStaffStudents(): Promise<StudentRow[]> {
+  const supabase = await createServerClient();
+
+  const { data, error } = await supabase
+    .from("application")
+    .select(`
+      id, status,
+      student:student_id (id, first_name, last_name),
+      campus:campus_id (name),
+      grade_level:grade_level_id (grade),
+      guardian:guardian_id (first_name, last_name, email)
+    `)
+    .not("status", "eq", "draft")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("[getStaffStudents]", error.message);
+    return [];
+  }
+
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const student = row.student as unknown as Record<string, string> | null;
+    const campus = row.campus as Record<string, string> | null;
+    const grade = row.grade_level as Record<string, string> | null;
+    const guardian = row.guardian as unknown as Record<string, string> | null;
+
+    return {
+      id: student?.id ?? "",
+      first_name: student?.first_name ?? "",
+      last_name: student?.last_name ?? "",
+      grade: grade?.grade ? `Grade ${grade.grade}` : "",
+      campus_name: campus?.name ?? "",
+      status: row.status as string,
+      guardian_name: guardian
+        ? `${guardian.first_name} ${guardian.last_name}`
+        : "",
+      guardian_email: guardian?.email ?? "",
+      application_id: row.id as string,
+    };
+  });
 }
 
 export async function getStaffUsers(campusId?: string): Promise<StaffUserRow[]> {

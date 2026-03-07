@@ -61,6 +61,8 @@ export {
   getStaffCommunications,
   getStaffEnrollmentWindows,
   getStaffUsers,
+  getStaffStudents,
+  getStaffWorkQueue,
   type LotteryRunRow,
   type OfferRow,
   type OfferStats,
@@ -72,6 +74,8 @@ export {
   type CommunicationStats,
   type EnrollmentWindowRow,
   type StaffUserRow,
+  type StudentRow,
+  type WorkQueueItem,
 } from "./staff";
 
 // Shared utilities

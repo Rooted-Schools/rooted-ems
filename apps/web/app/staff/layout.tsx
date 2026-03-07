@@ -1,20 +1,32 @@
 import { StaffSidebar } from "@/components/layout/staff-sidebar";
 import { StaffHeader } from "@/components/layout/staff-header";
+import { getSession } from "@/lib/auth/get-session";
+import { getCampuses } from "@/lib/queries";
 
 export const metadata = {
   title: "Staff Console | Rooted EMS",
 };
 
-export default function StaffLayout({
+export default async function StaffLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const [session, campuses] = await Promise.all([
+    getSession(),
+    getCampuses(),
+  ]);
+
+  const headerCampuses = campuses.map((c) => ({ id: c.id, name: c.name }));
+
   return (
     <div className="flex min-h-screen bg-rooted-gray">
       <StaffSidebar />
       <div className="flex-1 flex flex-col">
-        <StaffHeader />
+        <StaffHeader
+          userEmail={session?.email}
+          campuses={headerCampuses}
+        />
         <main className="flex-1 p-6">{children}</main>
       </div>
     </div>
