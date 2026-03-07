@@ -120,3 +120,62 @@ export function resolveActiveCampus(
 
   return undefined; // "All campuses"
 }
+
+/* ------------------------------------------------------------------ */
+/*  Role hierarchy helpers                                             */
+/* ------------------------------------------------------------------ */
+const ROLE_LEVEL: Record<string, number> = {
+  compliance_auditor: 1,
+  enrollment_staff: 2,
+  enrollment_manager: 3,
+  system_admin: 4,
+};
+
+/**
+ * Compute the user's highest role across all assigned campuses.
+ */
+export function getHighestRole(session: AuthSession): string {
+  let best = "compliance_auditor";
+  let bestLevel = 1;
+  for (const roles of Object.values(session.campus_roles)) {
+    for (const r of roles) {
+      const lvl = ROLE_LEVEL[r as string] ?? 0;
+      if (lvl > bestLevel) {
+        best = r as string;
+        bestLevel = lvl;
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Check if the user meets a minimum role level (across any campus).
+ */
+export function hasMinRole(session: AuthSession, minRole: string): boolean {
+  const requiredLevel = ROLE_LEVEL[minRole] ?? 0;
+  const userLevel = ROLE_LEVEL[getHighestRole(session)] ?? 0;
+  return userLevel >= requiredLevel;
+}
+
+/**
+ * Require a minimum role level, or throw FORBIDDEN.
+ */
+export async function requireMinRole(minRole: string): Promise<AuthSession> {
+  const session = await requireStaffSession();
+  if (!hasMinRole(session, minRole)) {
+    throw new Error("FORBIDDEN");
+  }
+  return session;
+}
+
+/**
+ * Require CMO-level access (system_admin on 2+ campuses).
+ */
+export async function requireCMOAccess(): Promise<AuthSession> {
+  const session = await requireStaffSession();
+  if (!isCMOAdmin(session)) {
+    throw new Error("FORBIDDEN");
+  }
+  return session;
+}

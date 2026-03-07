@@ -1,35 +1,12 @@
 import { Suspense } from "react";
 import { StaffSidebar } from "@/components/layout/staff-sidebar";
 import { StaffHeader } from "@/components/layout/staff-header";
-import { getSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
+import { getSession, getAccessibleCampusIds, getHighestRole } from "@/lib/auth/get-session";
 import { getCampuses } from "@/lib/queries";
 
 export const metadata = {
   title: "Staff Console | Rooted EMS",
 };
-
-/* Role hierarchy — must match staff-sidebar.tsx */
-const ROLE_LEVEL: Record<string, number> = {
-  compliance_auditor: 1,
-  enrollment_staff: 2,
-  enrollment_manager: 3,
-  system_admin: 4,
-};
-
-function computeHighestRole(campusRoles: Record<string, string[]>): string {
-  let best = "compliance_auditor";
-  let bestLevel = 1;
-  for (const roles of Object.values(campusRoles)) {
-    for (const r of roles) {
-      const lvl = ROLE_LEVEL[r] ?? 0;
-      if (lvl > bestLevel) {
-        best = r;
-        bestLevel = lvl;
-      }
-    }
-  }
-  return best;
-}
 
 export default async function StaffLayout({
   children,
@@ -50,9 +27,7 @@ export default async function StaffLayout({
   const headerCampuses = campuses.map((c) => ({ id: c.id, name: c.name }));
 
   // Compute the user's highest role across all campuses for nav filtering
-  const highestRole = session?.campus_roles
-    ? computeHighestRole(session.campus_roles as Record<string, string[]>)
-    : "compliance_auditor";
+  const highestRole = session ? getHighestRole(session) : "compliance_auditor";
 
   return (
     <div className="flex min-h-screen bg-rooted-gray">

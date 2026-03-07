@@ -46,12 +46,42 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Protected routes: /staff/* requires staff auth
-  if (pathname.startsWith("/staff") && !user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/staff-login";
-    url.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(url);
+  // Protected routes: /staff/* requires staff auth + campus assignment
+  if (pathname.startsWith("/staff")) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/staff-login";
+      url.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(url);
+    }
+
+    // Verify user is staff with at least one campus role assignment
+    const { data: profile } = await supabase
+      .from("user_profile")
+      .select("is_staff")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.is_staff) {
+      // Authenticated but not a staff member — redirect to family portal
+      const url = request.nextUrl.clone();
+      url.pathname = "/family/dashboard";
+      return NextResponse.redirect(url);
+    }
+
+    // Check user has at least one campus role assignment
+    const { count } = await supabase
+      .from("user_campus_role")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id);
+
+    if (!count || count === 0) {
+      // Staff user with no campus assignments — show access denied
+      const url = request.nextUrl.clone();
+      url.pathname = "/staff-login";
+      url.searchParams.set("error", "no_campus_access");
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

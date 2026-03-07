@@ -1,13 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@rooted-ems/database";
+
+const ERROR_MESSAGES: Record<string, string> = {
+  no_campus_access:
+    "Your account is not assigned to any school campus. Please contact your school administrator to request access.",
+};
 
 export function StaffLoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
 
   const supabase = createBrowserClient();
+
+  // Show error from URL params (e.g. middleware redirect)
+  useEffect(() => {
+    const errCode = searchParams.get("error");
+    if (errCode && ERROR_MESSAGES[errCode]) {
+      setError(ERROR_MESSAGES[errCode]);
+    }
+  }, [searchParams]);
 
   async function handleGoogleLogin() {
     setLoading(true);

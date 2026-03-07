@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { StaffLoginForm } from "@/components/auth/staff-login-form";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,9 @@ export const metadata = {
 export default function StaffLoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-rooted-gray px-4">
-      <StaffLoginForm />
+      <Suspense fallback={<div className="w-full max-w-md h-80" />}>
+        <StaffLoginForm />
+      </Suspense>
     </div>
   );
 }
