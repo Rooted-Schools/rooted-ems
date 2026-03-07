@@ -6,6 +6,8 @@ import {
   updateEnrollmentWindowStatus,
   assignStaffRole,
   removeStaffRole,
+  updatePacketRequirement,
+  bulkUpdatePacketRequirements,
   type CreateEnrollmentWindowInput,
   type AssignStaffRoleInput,
 } from "@/lib/mutations/settings";
@@ -41,6 +43,30 @@ export async function staffRemoveRole(roleId: string) {
   const result = await removeStaffRole(roleId);
   if (!result.error) {
     revalidatePath("/staff/settings");
+  }
+  return result;
+}
+
+export async function staffUpdatePacketRequirement(
+  requirementId: string,
+  updates: { is_active?: boolean; is_required?: boolean }
+) {
+  const result = await updatePacketRequirement(requirementId, updates);
+  if (!result.error) {
+    revalidatePath("/staff/settings");
+    revalidatePath("/family/registration");
+  }
+  return result;
+}
+
+export async function staffBulkUpdatePacketRequirements(
+  requirementIds: string[],
+  updates: { is_active?: boolean; is_required?: boolean }
+) {
+  const result = await bulkUpdatePacketRequirements(requirementIds, updates);
+  if (!result.error) {
+    revalidatePath("/staff/settings");
+    revalidatePath("/family/registration");
   }
   return result;
 }

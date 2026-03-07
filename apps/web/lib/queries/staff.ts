@@ -1032,3 +1032,47 @@ export async function getStaffUsers(campusId?: string): Promise<StaffUserRow[]> 
     };
   });
 }
+
+// ─── Packet Requirement Types ─────────────────────────
+
+export interface PacketRequirementRow {
+  id: string;
+  campus_id: string;
+  school_year_id: string;
+  item_type: string;
+  name: string;
+  description: string | null;
+  is_required: boolean;
+  sort_order: number;
+  is_active: boolean;
+}
+
+// ─── Get Packet Requirements ──────────────────────────
+
+export async function getStaffPacketRequirements(
+  campusId?: string,
+  schoolYearId?: string
+): Promise<PacketRequirementRow[]> {
+  const supabase = await createServerClient();
+
+  let query = supabase
+    .from("packet_requirement")
+    .select("id, campus_id, school_year_id, item_type, name, description, is_required, sort_order, is_active")
+    .order("sort_order", { ascending: true });
+
+  if (campusId) {
+    query = query.eq("campus_id", campusId);
+  }
+  if (schoolYearId) {
+    query = query.eq("school_year_id", schoolYearId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("[getStaffPacketRequirements]", error.message);
+    return [];
+  }
+
+  return (data ?? []) as PacketRequirementRow[];
+}

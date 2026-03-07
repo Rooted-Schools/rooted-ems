@@ -133,3 +133,49 @@ export async function removeStaffRole(
     return { data: null, error: "Failed to remove staff role" };
   }
 }
+
+// ─── Packet Requirement Mutations ──────────────────────
+
+export async function updatePacketRequirement(
+  requirementId: string,
+  updates: { is_active?: boolean; is_required?: boolean }
+): Promise<MutationResult> {
+  try {
+    const supabase = await createServerClient();
+
+    const { error } = await supabase
+      .from("packet_requirement")
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", requirementId);
+
+    if (error) return { data: null, error: error.message };
+    return { data: null, error: null };
+  } catch (err) {
+    return { data: null, error: "Failed to update packet requirement" };
+  }
+}
+
+export async function bulkUpdatePacketRequirements(
+  requirementIds: string[],
+  updates: { is_active?: boolean; is_required?: boolean }
+): Promise<MutationResult> {
+  try {
+    const supabase = await createServerClient();
+
+    const { error } = await supabase
+      .from("packet_requirement")
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .in("id", requirementIds);
+
+    if (error) return { data: null, error: error.message };
+    return { data: null, error: null };
+  } catch (err) {
+    return { data: null, error: "Failed to update packet requirements" };
+  }
+}

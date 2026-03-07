@@ -16,12 +16,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import type { CampusRow, EnrollmentWindowRow, StaffUserRow } from "@/lib/queries";
+import type { CampusRow, EnrollmentWindowRow, StaffUserRow, PacketRequirementRow } from "@/lib/queries";
 import {
   staffCreateEnrollmentWindow,
   staffUpdateWindowStatus,
   staffAssignRole,
   staffRemoveRole,
+  staffUpdatePacketRequirement,
 } from "./actions";
 
 const roleLabels: Record<string, string> = {
@@ -48,6 +49,7 @@ interface SettingsClientProps {
   campuses: CampusRow[];
   windows: EnrollmentWindowRow[];
   users: StaffUserRow[];
+  packetRequirements: PacketRequirementRow[];
   schoolYears: SchoolYear[];
   staffUserId: string;
 }
@@ -56,6 +58,7 @@ export function SettingsClient({
   campuses,
   windows,
   users,
+  packetRequirements,
   schoolYears,
   staffUserId,
 }: SettingsClientProps) {
@@ -64,7 +67,7 @@ export function SettingsClient({
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Manage campus configuration, enrollment windows, and system preferences.
+          Manage campus configuration, enrollment windows, registration requirements, and staff access.
         </p>
       </div>
 
@@ -72,6 +75,7 @@ export function SettingsClient({
         <TabsList>
           <TabsTrigger value="campus">Campuses</TabsTrigger>
           <TabsTrigger value="enrollment">Enrollment Windows</TabsTrigger>
+          <TabsTrigger value="registration">Registration</TabsTrigger>
           <TabsTrigger value="users">Staff Users</TabsTrigger>
         </TabsList>
 
@@ -82,6 +86,14 @@ export function SettingsClient({
         <TabsContent value="enrollment">
           <EnrollmentWindowsTab
             windows={windows}
+            campuses={campuses}
+            schoolYears={schoolYears}
+          />
+        </TabsContent>
+
+        <TabsContent value="registration">
+          <RegistrationRequirementsTab
+            requirements={packetRequirements}
             campuses={campuses}
             schoolYears={schoolYears}
           />
@@ -372,6 +384,276 @@ function EnrollmentWindowsTab({
                     >
                       {cfg.label}
                     </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Registration Requirements Tab ──────────────────────
+
+const ITEM_ICONS: Record<string, string> = {
+  emergency_contact: "🚨",
+  medical_info: "🏥",
+  medication_auth: "💊",
+  food_allergy_plan: "🥜",
+  tech_policy: "💻",
+  handbook_ack: "📖",
+  discipline_policy: "📋",
+  media_release: "📷",
+  field_trip: "🚌",
+  internet_safety: "🔒",
+  anti_bullying: "🤝",
+  uniform_policy: "👔",
+  ferpa_consent: "📝",
+  pickup_auth: "🚗",
+  immunization_records: "💉",
+  proof_of_residency: "🏠",
+  proof_of_age: "📄",
+  lthc_form: "⚕️",
+  sc_health_exam: "🩺",
+  sc_dental_screen: "🦷",
+  oh_custody_affidavit: "⚖️",
+  income_verification: "💰",
+  iep_records: "📚",
+  "504_plan": "♿",
+  home_language_survey: "🌐",
+  mckinney_vento: "🏘️",
+  previous_school_records: "🎓",
+  frl_app: "🍽️",
+  military_family: "🎖️",
+  transport: "🚌",
+  before_after_care: "🕐",
+  parent_id: "🪪",
+  custody_docs: "⚖️",
+  student_photo: "📸",
+  sports_physical: "🏃",
+  wa_health_exam: "🩺",
+};
+
+const CATEGORY_LABELS: Record<number, string> = {
+  1: "Core Forms",
+  20: "Document Uploads",
+  30: "Special Services & Compliance",
+  40: "Federal Programs",
+  50: "Transportation & Extended Day",
+  60: "Parent/Guardian Verification",
+  70: "State-Specific",
+  80: "Athletics",
+};
+
+function getCategoryForSort(sortOrder: number): string {
+  if (sortOrder >= 80) return "Athletics";
+  if (sortOrder >= 70) return "State-Specific";
+  if (sortOrder >= 60) return "Parent/Guardian Verification";
+  if (sortOrder >= 50) return "Transportation & Extended Day";
+  if (sortOrder >= 40) return "Federal Programs";
+  if (sortOrder >= 30) return "Special Services & Compliance";
+  if (sortOrder >= 20) return "Document Uploads";
+  return "Core Forms";
+}
+
+function RegistrationRequirementsTab({
+  requirements,
+  campuses,
+  schoolYears,
+}: {
+  requirements: PacketRequirementRow[];
+  campuses: CampusRow[];
+  schoolYears: SchoolYear[];
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [selectedCampus, setSelectedCampus] = useState(campuses[0]?.id ?? "");
+  const [selectedYear, setSelectedYear] = useState(
+    schoolYears.find((sy) => sy.is_current)?.id ?? schoolYears[0]?.id ?? ""
+  );
+  const [showInactive, setShowInactive] = useState(false);
+
+  // Filter requirements by selected campus/year
+  const filtered = requirements.filter(
+    (r) => r.campus_id === selectedCampus && r.school_year_id === selectedYear
+  );
+
+  // Group by category
+  const grouped = filtered.reduce<Record<string, PacketRequirementRow[]>>((acc, req) => {
+    const cat = getCategoryForSort(req.sort_order);
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(req);
+    return acc;
+  }, {});
+
+  // Stats
+  const activeCount = filtered.filter((r) => r.is_active).length;
+  const requiredCount = filtered.filter((r) => r.is_active && r.is_required).length;
+  const totalCount = filtered.length;
+
+  function handleToggle(reqId: string, field: "is_active" | "is_required", newValue: boolean) {
+    setFeedback(null);
+    startTransition(async () => {
+      const result = await staffUpdatePacketRequirement(reqId, { [field]: newValue });
+      if (result.error) {
+        setFeedback({ type: "error", message: result.error });
+      } else {
+        router.refresh();
+      }
+    });
+  }
+
+  const campusName = campuses.find((c) => c.id === selectedCampus)?.name ?? "Campus";
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-base">Registration Requirements</CardTitle>
+            <CardDescription>
+              Configure which registration items are required for each campus and school year.
+              Active items will appear in family registration packets.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-4 mb-6">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Campus</label>
+            <select
+              value={selectedCampus}
+              onChange={(e) => { setSelectedCampus(e.target.value); setFeedback(null); }}
+              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+            >
+              {campuses.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">School Year</label>
+            <select
+              value={selectedYear}
+              onChange={(e) => { setSelectedYear(e.target.value); setFeedback(null); }}
+              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+            >
+              {schoolYears.map((sy) => (
+                <option key={sy.id} value={sy.id}>{sy.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2 mt-4">
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-rooted-green/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rooted-green" />
+            </label>
+            <span className="text-sm text-gray-600">Show inactive items</span>
+          </div>
+        </div>
+
+        {/* Stats bar */}
+        <div className="flex gap-4 mb-5 pb-4 border-b border-gray-200">
+          <div className="text-center">
+            <p className="text-2xl font-bold text-rooted-green">{activeCount}</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide">Active</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-bold text-red-600">{requiredCount}</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide">Required</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-bold text-gray-400">{totalCount - activeCount}</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide">Inactive</p>
+          </div>
+        </div>
+
+        {feedback && (
+          <div className={`mb-4 p-3 rounded-lg text-sm ${
+            feedback.type === "success"
+              ? "bg-green-50 border border-green-200 text-green-800"
+              : "bg-red-50 border border-red-200 text-red-800"
+          }`}>
+            {feedback.message}
+          </div>
+        )}
+
+        {filtered.length === 0 ? (
+          <EmptyState
+            icon="📋"
+            title="No requirements configured"
+            description={`No registration requirements found for ${campusName}. Run the packet requirements seed migration to populate items.`}
+          />
+        ) : (
+          <div className="space-y-6">
+            {Object.entries(grouped).map(([category, items]) => {
+              const visibleItems = showInactive ? items : items.filter((r) => r.is_active);
+              if (visibleItems.length === 0) return null;
+
+              return (
+                <div key={category}>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    {category}
+                  </h3>
+                  <div className="space-y-1">
+                    {visibleItems.map((req) => (
+                      <div
+                        key={req.id}
+                        className={`flex items-center justify-between p-3 rounded-md border transition-colors ${
+                          !req.is_active
+                            ? "border-gray-100 bg-gray-50/50 opacity-60"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <span className="text-lg flex-shrink-0">
+                            {ITEM_ICONS[req.item_type] ?? "📄"}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{req.name}</p>
+                            {req.description && (
+                              <p className="text-xs text-gray-500 truncate">{req.description}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0 ml-4">
+                          {/* Required toggle */}
+                          <label className="flex items-center gap-1.5 cursor-pointer" title="Required">
+                            <input
+                              type="checkbox"
+                              checked={req.is_required}
+                              disabled={isPending || !req.is_active}
+                              onChange={(e) => handleToggle(req.id, "is_required", e.target.checked)}
+                              className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500 disabled:opacity-40"
+                            />
+                            <span className={`text-[10px] font-medium ${req.is_required && req.is_active ? "text-red-600" : "text-gray-400"}`}>
+                              Required
+                            </span>
+                          </label>
+                          {/* Active toggle */}
+                          <label className="relative inline-flex items-center cursor-pointer" title={req.is_active ? "Active" : "Inactive"}>
+                            <input
+                              type="checkbox"
+                              checked={req.is_active}
+                              disabled={isPending}
+                              onChange={(e) => handleToggle(req.id, "is_active", e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-rooted-green/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rooted-green peer-disabled:opacity-50" />
+                          </label>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               );

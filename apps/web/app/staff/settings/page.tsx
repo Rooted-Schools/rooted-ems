@@ -2,7 +2,7 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 import { createServerClient } from "@rooted-ems/database/server";
-import { getStaffEnrollmentWindows, getStaffUsers, getCampuses } from "@/lib/queries";
+import { getStaffEnrollmentWindows, getStaffUsers, getCampuses, getStaffPacketRequirements } from "@/lib/queries";
 import { SettingsClient } from "./settings-client";
 import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 
@@ -16,11 +16,12 @@ export default async function StaffSettingsPage({
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const supabase = await createServerClient();
 
-  const [allCampuses, windows, users, { data: schoolYears }] = await Promise.all([
+  const [allCampuses, windows, users, { data: schoolYears }, packetRequirements] = await Promise.all([
     getCampuses(),
     getStaffEnrollmentWindows(activeCampus),
     getStaffUsers(activeCampus),
     supabase.from("school_year").select("id, name, is_current").order("start_date", { ascending: false }),
+    getStaffPacketRequirements(),
   ]);
 
   // Scope campuses to accessible ones
@@ -33,6 +34,7 @@ export default async function StaffSettingsPage({
       campuses={campuses}
       windows={windows}
       users={users}
+      packetRequirements={packetRequirements}
       schoolYears={(schoolYears ?? []).map((sy: Record<string, unknown>) => ({
         id: sy.id as string,
         name: sy.name as string,
