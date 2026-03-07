@@ -1,7 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { sendOffer, acceptOffer, declineOffer, revokeOffer, expireOffer } from "@/lib/mutations";
+import {
+  sendOffer,
+  acceptOffer,
+  declineOffer,
+  revokeOffer,
+  expireOffer,
+  createEnrollment,
+  initializeRegistrationPacket,
+} from "@/lib/mutations";
 
 export async function staffSendOffer(
   applicationId: string,
@@ -75,6 +83,41 @@ export async function staffDeclineOfferOnBehalf(offerId: string) {
     revalidatePath("/staff/offers");
     revalidatePath("/staff/waitlist");
     revalidatePath("/staff/applications");
+  }
+
+  return result;
+}
+
+/**
+ * Convert an accepted offer to an enrollment (fallback if auto-enrollment didn't fire).
+ */
+export async function staffConvertToEnrollment(
+  studentId: string,
+  campusId: string,
+  gradeLevelId: string,
+  schoolYearId: string,
+  applicationId: string
+) {
+  const result = await createEnrollment({
+    student_id: studentId,
+    campus_id: campusId,
+    grade_level_id: gradeLevelId,
+    school_year_id: schoolYearId,
+    application_id: applicationId,
+  });
+
+  if (!result.error && result.data) {
+    // Initialize registration packet
+    await initializeRegistrationPacket({
+      enrollment_id: result.data.id,
+      campus_id: campusId,
+      school_year_id: schoolYearId,
+    });
+
+    revalidatePath("/staff/offers");
+    revalidatePath("/staff/enrollment");
+    revalidatePath("/staff/applications");
+    revalidatePath("/staff/dashboard");
   }
 
   return result;

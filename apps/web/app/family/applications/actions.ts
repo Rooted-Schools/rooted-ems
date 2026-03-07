@@ -83,6 +83,9 @@ export async function familyAcceptOffer(
     revalidatePath("/family/applications");
     revalidatePath(`/family/applications/${applicationId}`);
     revalidatePath("/family/dashboard");
+    revalidatePath("/family/registration");
+    revalidatePath("/staff/enrollment");
+    revalidatePath("/staff/offers");
   }
 
   return result;

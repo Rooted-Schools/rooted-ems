@@ -74,6 +74,16 @@ export {
   type CreateEnrollmentInput,
 } from "./enrollment";
 
+// Registration mutations
+export {
+  initializeRegistrationPacket,
+  completeRegistrationItem,
+  submitRegistrationPacket,
+  verifyRegistrationItem,
+  type InitializePacketInput,
+  type CompleteRegistrationItemInput,
+} from "./registration";
+
 // Settings mutations
 export {
   createEnrollmentWindow,

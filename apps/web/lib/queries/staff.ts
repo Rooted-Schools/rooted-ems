@@ -37,6 +37,13 @@ export interface OfferRow {
   status: string;
   offered_at: string;
   expires_at: string;
+  // IDs for enrollment conversion
+  application_id: string;
+  campus_id: string;
+  grade_level_id: string;
+  student_id: string;
+  school_year_id: string;
+  has_enrollment: boolean;
 }
 
 export interface OfferStats {
@@ -326,7 +333,10 @@ export async function getStaffOffers(campusIds?: string[]): Promise<{ offers: Of
     .from("offer")
     .select(`
       id, status, offered_at, expires_at,
+      application_id, campus_id, grade_level_id,
       application:application_id (
+        student_id,
+        school_year_id,
         student:student_id (first_name, last_name)
       ),
       campus:campus_id (name),
@@ -346,6 +356,20 @@ export async function getStaffOffers(campusIds?: string[]): Promise<{ offers: Of
   }
 
   const rows = data ?? [];
+
+  // Check which accepted offers already have enrollments
+  const acceptedAppIds = rows
+    .filter((r: Record<string, unknown>) => r.status === "accepted")
+    .map((r: Record<string, unknown>) => r.application_id as string);
+
+  let enrolledAppIds = new Set<string>();
+  if (acceptedAppIds.length > 0) {
+    const { data: enrollments } = await supabase
+      .from("enrollment")
+      .select("application_id")
+      .in("application_id", acceptedAppIds);
+    enrolledAppIds = new Set((enrollments ?? []).map((e: Record<string, unknown>) => e.application_id as string));
+  }
 
   const offers: OfferRow[] = rows.map((row: Record<string, unknown>) => {
     const app = row.application as unknown as Record<string, unknown> | null;
@@ -371,6 +395,12 @@ export async function getStaffOffers(campusIds?: string[]): Promise<{ offers: Of
         day: "numeric",
         year: "numeric",
       }),
+      application_id: row.application_id as string,
+      campus_id: row.campus_id as string,
+      grade_level_id: row.grade_level_id as string,
+      student_id: (app?.student_id as string) ?? "",
+      school_year_id: (app?.school_year_id as string) ?? "",
+      has_enrollment: enrolledAppIds.has(row.application_id as string),
     };
   });
 

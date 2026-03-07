@@ -1,8 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  familyCompleteRegistrationItem,
+  familySubmitRegistrationPacket,
+} from "./actions";
 
 interface RegistrationItem {
   id: string;
@@ -55,7 +60,10 @@ const ITEM_ICONS: Record<string, string> = {
   before_after_care: "🕐",
 };
 
-const STATUS_DISPLAY: Record<string, { label: string; color: string }> = {
+const STATUS_DISPLAY: Record<
+  string,
+  { label: string; color: string }
+> = {
   pending: { label: "Not Started", color: "bg-gray-100 text-gray-600" },
   submitted: { label: "Submitted", color: "bg-blue-100 text-blue-800" },
   verified: { label: "Verified", color: "bg-green-100 text-green-800" },
@@ -63,6 +71,10 @@ const STATUS_DISPLAY: Record<string, { label: string; color: string }> = {
 
 export function RegistrationClient({ enrollments }: RegistrationClientProps) {
   const [activeEnrollment, setActiveEnrollment] = useState(0);
+  const [loadingItem, setLoadingItem] = useState<string | null>(null);
+  const [submittingPacket, setSubmittingPacket] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   if (enrollments.length === 0) {
     return (
@@ -76,13 +88,60 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
   const completedCount = enrollment.items.filter(
     (i) => i.status === "submitted" || i.status === "verified"
   ).length;
-  const totalRequired = enrollment.requirements.filter((r) => r.is_required).length;
+  const totalRequired = enrollment.requirements.filter(
+    (r) => r.is_required
+  ).length;
   const totalItems = enrollment.requirements.length;
 
   // Map items by type for lookup
   const itemsByType: Record<string, RegistrationItem> = {};
   for (const item of enrollment.items) {
     itemsByType[item.item_type] = item;
+  }
+
+  // Check if all items are completed
+  const allItemsComplete = enrollment.requirements.every((req) => {
+    const item = itemsByType[req.item_type];
+    return item && (item.status === "submitted" || item.status === "verified");
+  });
+
+  const packetSubmitted =
+    enrollment.packet?.status === "submitted" ||
+    enrollment.packet?.status === "complete";
+
+  async function handleCompleteItem(itemId: string, itemName: string) {
+    setLoadingItem(itemId);
+    setError(null);
+    setSuccess(null);
+
+    const result = await familyCompleteRegistrationItem(itemId, {
+      acknowledged: true,
+      completed_at: new Date().toISOString(),
+    });
+
+    if (result.error) {
+      setError(result.error);
+    } else {
+      setSuccess(`"${itemName}" has been completed.`);
+    }
+    setLoadingItem(null);
+  }
+
+  async function handleSubmitPacket() {
+    setSubmittingPacket(true);
+    setError(null);
+    setSuccess(null);
+
+    const result = await familySubmitRegistrationPacket(
+      enrollment.enrollment_id
+    );
+
+    if (result.error) {
+      setError(result.error);
+    } else {
+      setSuccess("Registration packet submitted successfully!");
+    }
+    setSubmittingPacket(false);
   }
 
   return (
@@ -97,13 +156,29 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
         </p>
       </div>
 
+      {/* Feedback banners */}
+      {error && (
+        <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="rounded-md bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+          {success}
+        </div>
+      )}
+
       {/* Student Selector (if multiple enrollments) */}
       {enrollments.length > 1 && (
         <div className="flex gap-2">
           {enrollments.map((enr, idx) => (
             <button
               key={enr.enrollment_id}
-              onClick={() => setActiveEnrollment(idx)}
+              onClick={() => {
+                setActiveEnrollment(idx);
+                setError(null);
+                setSuccess(null);
+              }}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 idx === activeEnrollment
                   ? "bg-rooted-green text-white"
@@ -131,12 +206,20 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
             </div>
             <Badge
               variant={
-                enrollment.packet?.status === "complete"
+                packetSubmitted
                   ? "default"
-                  : "secondary"
+                  : allItemsComplete
+                    ? "success"
+                    : "secondary"
               }
             >
-              {enrollment.packet?.status ?? "Not Started"}
+              {packetSubmitted
+                ? enrollment.packet?.status === "complete"
+                  ? "Complete"
+                  : "Submitted"
+                : allItemsComplete
+                  ? "Ready to Submit"
+                  : enrollment.packet?.status ?? "Not Started"}
             </Badge>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2.5 mt-3">
@@ -169,6 +252,7 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
             const item = itemsByType[req.item_type];
             const status = item?.status ?? "pending";
             const statusCfg = STATUS_DISPLAY[status] ?? STATUS_DISPLAY.pending;
+            const isLoading = loadingItem === item?.id;
 
             return (
               <Card
@@ -176,7 +260,9 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
                 className={`transition-shadow hover:shadow-md ${
                   status === "verified"
                     ? "border-green-200 bg-green-50/30"
-                    : ""
+                    : status === "submitted"
+                      ? "border-blue-200 bg-blue-50/20"
+                      : ""
                 }`}
               >
                 <CardContent className="py-4">
@@ -215,14 +301,37 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
                       <Badge className={`text-[10px] ${statusCfg.color}`}>
                         {statusCfg.label}
                       </Badge>
-                      {status === "pending" && (
-                        <button
-                          className="text-sm px-3 py-1.5 bg-rooted-green text-white rounded-md hover:bg-rooted-green-dark transition-colors"
-                          disabled
-                          title="Coming soon"
+                      {status === "pending" && item && (
+                        <Button
+                          size="sm"
+                          disabled={isLoading}
+                          onClick={() =>
+                            handleCompleteItem(item.id, req.name)
+                          }
+                          className="bg-rooted-green hover:bg-rooted-green/90 text-white"
                         >
-                          Complete
-                        </button>
+                          {isLoading ? "Saving..." : "Complete"}
+                        </Button>
+                      )}
+                      {status === "pending" && !item && (
+                        <span className="text-xs text-gray-400 italic">
+                          Awaiting setup
+                        </span>
+                      )}
+                      {status === "submitted" && (
+                        <svg
+                          className="w-5 h-5 text-blue-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
                       )}
                       {status === "verified" && (
                         <svg
@@ -247,6 +356,47 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
           })
         )}
       </div>
+
+      {/* Submit Packet Button */}
+      {allItemsComplete && !packetSubmitted && (
+        <Card className="border-rooted-green/30 bg-green-50/30">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  All items completed!
+                </p>
+                <p className="text-xs text-gray-500">
+                  Submit your registration packet to finalize enrollment.
+                </p>
+              </div>
+              <Button
+                disabled={submittingPacket}
+                onClick={handleSubmitPacket}
+                className="bg-rooted-green hover:bg-rooted-green/90 text-white"
+              >
+                {submittingPacket ? "Submitting..." : "Submit Packet"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Submitted confirmation */}
+      {packetSubmitted && (
+        <Card className="border-green-300 bg-green-50">
+          <CardContent className="py-4 text-center">
+            <p className="text-green-800 font-medium">
+              Registration packet {enrollment.packet?.status === "complete" ? "verified" : "submitted"} successfully!
+            </p>
+            <p className="text-xs text-green-600 mt-1">
+              {enrollment.packet?.status === "complete"
+                ? "All items have been verified by staff. Your enrollment is complete."
+                : "Staff will review your submitted items. You'll be notified when everything is verified."}
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

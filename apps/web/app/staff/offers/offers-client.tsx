@@ -13,7 +13,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { staffRevokeOffer, staffExpireOffer } from "./actions";
+import {
+  staffRevokeOffer,
+  staffExpireOffer,
+  staffConvertToEnrollment,
+} from "./actions";
 
 interface OfferRow {
   id: string;
@@ -23,6 +27,12 @@ interface OfferRow {
   campus_name: string;
   offered_at: string;
   expires_at: string;
+  application_id: string;
+  campus_id: string;
+  grade_level_id: string;
+  student_id: string;
+  school_year_id: string;
+  has_enrollment: boolean;
 }
 
 interface OfferStats {
@@ -32,7 +42,10 @@ interface OfferStats {
   declined_or_expired: number;
 }
 
-const offerStatusConfig: Record<string, { label: string; variant: "default" | "success" | "destructive" | "warning" | "outline" }> = {
+const offerStatusConfig: Record<
+  string,
+  { label: string; variant: "default" | "success" | "destructive" | "warning" | "outline" }
+> = {
   pending: { label: "Pending", variant: "warning" },
   accepted: { label: "Accepted", variant: "success" },
   declined: { label: "Declined", variant: "destructive" },
@@ -51,20 +64,41 @@ export function OffersClient({
 }) {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   async function handleRevoke(offerId: string) {
     setLoading(offerId);
     setError(null);
+    setSuccess(null);
     const result = await staffRevokeOffer(offerId, staffUserId, "Revoked by staff.");
     if (result.error) setError(result.error);
+    else setSuccess("Offer revoked.");
     setLoading(null);
   }
 
   async function handleExpire(offerId: string) {
     setLoading(offerId);
     setError(null);
+    setSuccess(null);
     const result = await staffExpireOffer(offerId);
     if (result.error) setError(result.error);
+    else setSuccess("Offer expired.");
+    setLoading(null);
+  }
+
+  async function handleEnroll(offer: OfferRow) {
+    setLoading(offer.id);
+    setError(null);
+    setSuccess(null);
+    const result = await staffConvertToEnrollment(
+      offer.student_id,
+      offer.campus_id,
+      offer.grade_level_id,
+      offer.school_year_id,
+      offer.application_id
+    );
+    if (result.error) setError(result.error);
+    else setSuccess(`${offer.student_name} has been enrolled.`);
     setLoading(null);
   }
 
@@ -80,7 +114,14 @@ export function OffersClient({
       </div>
 
       {error && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</div>
+        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">
+          {success}
+        </div>
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -121,7 +162,9 @@ export function OffersClient({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-gray-400">{stats.declined_or_expired}</p>
+            <p className="text-2xl font-bold text-gray-400">
+              {stats.declined_or_expired}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -148,45 +191,72 @@ export function OffersClient({
                   <TableHead>Status</TableHead>
                   <TableHead>Offered</TableHead>
                   <TableHead>Expires</TableHead>
-                  <TableHead className="w-32">Actions</TableHead>
+                  <TableHead className="w-44">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {offers.map((offer) => {
-                  const cfg = offerStatusConfig[offer.status] ?? offerStatusConfig.pending;
+                  const cfg =
+                    offerStatusConfig[offer.status] ?? offerStatusConfig.pending;
                   const isPending = offer.status === "pending";
+                  const isAccepted = offer.status === "accepted";
                   const isLoading = loading === offer.id;
                   return (
                     <TableRow key={offer.id}>
-                      <TableCell className="font-medium">{offer.student_name}</TableCell>
+                      <TableCell className="font-medium">
+                        {offer.student_name}
+                      </TableCell>
                       <TableCell>{offer.grade}</TableCell>
                       <TableCell>{offer.campus_name}</TableCell>
                       <TableCell>
-                        <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                          {isAccepted && offer.has_enrollment && (
+                            <Badge variant="outline" className="text-[10px]">
+                              Enrolled
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-gray-500">{offer.offered_at}</TableCell>
-                      <TableCell className="text-gray-500">{offer.expires_at}</TableCell>
+                      <TableCell className="text-gray-500">
+                        {offer.offered_at}
+                      </TableCell>
+                      <TableCell className="text-gray-500">
+                        {offer.expires_at}
+                      </TableCell>
                       <TableCell>
-                        {isPending && (
-                          <div className="flex gap-1">
+                        <div className="flex gap-1">
+                          {isPending && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isLoading}
+                                onClick={() => handleRevoke(offer.id)}
+                              >
+                                {isLoading ? "..." : "Revoke"}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isLoading}
+                                onClick={() => handleExpire(offer.id)}
+                              >
+                                Expire
+                              </Button>
+                            </>
+                          )}
+                          {isAccepted && !offer.has_enrollment && (
                             <Button
-                              variant="outline"
                               size="sm"
                               disabled={isLoading}
-                              onClick={() => handleRevoke(offer.id)}
+                              onClick={() => handleEnroll(offer)}
+                              className="bg-rooted-green hover:bg-rooted-green/90 text-white"
                             >
-                              {isLoading ? "..." : "Revoke"}
+                              {isLoading ? "..." : "Enroll"}
                             </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={isLoading}
-                              onClick={() => handleExpire(offer.id)}
-                            >
-                              Expire
-                            </Button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

@@ -1,5 +1,7 @@
 import { createServerClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
+import { createEnrollment } from "./enrollment";
+import { initializeRegistrationPacket } from "./registration";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -59,7 +61,8 @@ export async function sendOffer(
 
 /**
  * Accept an offer (called by family or staff on behalf of family).
- * Creates an acceptance record and transitions app status to "accepted".
+ * Creates an acceptance record, transitions app status to "accepted",
+ * then auto-creates enrollment + registration packet.
  */
 export async function acceptOffer(
   offerId: string,
@@ -67,10 +70,10 @@ export async function acceptOffer(
 ): Promise<MutationResult> {
   const supabase = await createServerClient();
 
-  // Get the offer
+  // Get the offer with full application details for enrollment creation
   const { data: offer, error: fetchError } = await supabase
     .from("offer")
-    .select("id, application_id, status")
+    .select("id, application_id, campus_id, grade_level_id, status")
     .eq("id", offerId)
     .single();
 
@@ -96,14 +99,16 @@ export async function acceptOffer(
   }
 
   // Create acceptance record
-  const { error: acceptError } = await supabase
+  const { data: acceptance, error: acceptError } = await supabase
     .from("acceptance")
     .insert({
       offer_id: offerId,
       application_id: offer.application_id,
       accepted_by: guardianId,
       accepted_at: new Date().toISOString(),
-    });
+    })
+    .select("id")
+    .single();
 
   if (acceptError) {
     console.error("[acceptOffer] acceptance record", acceptError.message);
@@ -117,6 +122,36 @@ export async function acceptOffer(
 
   if (statusError) {
     console.error("[acceptOffer] app status", statusError.message);
+  }
+
+  // ── Auto-create enrollment ──────────────────────────────
+  // Fetch application for student_id and school_year
+  const { data: app } = await supabase
+    .from("application")
+    .select("student_id, school_year_id")
+    .eq("id", offer.application_id)
+    .single();
+
+  if (app?.student_id) {
+    const enrollResult = await createEnrollment({
+      student_id: app.student_id,
+      campus_id: offer.campus_id,
+      grade_level_id: offer.grade_level_id,
+      school_year_id: app.school_year_id,
+      acceptance_id: acceptance?.id,
+      application_id: offer.application_id,
+    });
+
+    if (!enrollResult.error && enrollResult.data) {
+      // Initialize registration packet for the new enrollment
+      await initializeRegistrationPacket({
+        enrollment_id: enrollResult.data.id,
+        campus_id: offer.campus_id,
+        school_year_id: app.school_year_id,
+      });
+    } else if (enrollResult.error) {
+      console.error("[acceptOffer] auto-enrollment", enrollResult.error);
+    }
   }
 
   return { data: null, error: null };
