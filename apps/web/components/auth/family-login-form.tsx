@@ -1,9 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { createClient } from "@supabase/supabase-js";
 import { createBrowserClient } from "@rooted-ems/database";
 
 type LoginMethod = "email" | "phone";
+
+/**
+ * Create a plain Supabase client (implicit flow, no PKCE) for OTP operations.
+ * The @supabase/ssr createBrowserClient uses PKCE by default, which adds a
+ * code_challenge to signInWithOtp. This causes verifyOtp to fail with
+ * "Token has expired or is invalid" because the PKCE code_verifier exchange
+ * doesn't work correctly for direct OTP code entry.
+ *
+ * After successful OTP verification, we transfer the session to the SSR
+ * browser client so that cookies are set for server-side rendering.
+ */
+function createOtpClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        flowType: "implicit",
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    }
+  );
+}
 
 export function FamilyLoginForm() {
   const [method, setMethod] = useState<LoginMethod>("email");
@@ -13,7 +39,8 @@ export function FamilyLoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const supabase = createBrowserClient();
+  // Keep a stable reference to the OTP client across renders
+  const otpClientRef = useRef(createOtpClient());
 
   async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
@@ -21,18 +48,15 @@ export function FamilyLoginForm() {
     setError(null);
 
     try {
+      const otpClient = otpClientRef.current;
+
       const signInOptions =
         method === "email"
-          ? {
-              email: value,
-              options: {
-                emailRedirectTo: `${window.location.origin}/auth/verify`,
-              },
-            }
+          ? { email: value }
           : { phone: value };
 
       const { error: authError } =
-        await supabase.auth.signInWithOtp(signInOptions);
+        await otpClient.auth.signInWithOtp(signInOptions);
 
       if (authError) {
         if (
@@ -64,17 +88,28 @@ export function FamilyLoginForm() {
     setError(null);
 
     try {
+      const otpClient = otpClientRef.current;
+
       const verifyOptions =
         method === "email"
           ? { email: value, token: otp, type: "email" as const }
           : { phone: value, token: otp, type: "sms" as const };
 
-      const { error: authError } =
-        await supabase.auth.verifyOtp(verifyOptions);
+      const { data, error: authError } =
+        await otpClient.auth.verifyOtp(verifyOptions);
 
       if (authError) {
         setError(authError.message);
         return;
+      }
+
+      // Transfer session to the SSR browser client (sets cookies for SSR)
+      if (data.session) {
+        const ssrClient = createBrowserClient();
+        await ssrClient.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
       }
 
       // Redirect to family dashboard on success
