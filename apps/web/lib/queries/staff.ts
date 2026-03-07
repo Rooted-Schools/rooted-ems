@@ -541,7 +541,99 @@ export async function getStaffEnrollments(campusIds?: string[]): Promise<{
   return { enrollments, stats };
 }
 
+// ─── Message Template Types ─────────────────────────────
+
+export interface MessageTemplateRow {
+  id: string;
+  name: string;
+  subject: string | null;
+  body: string;
+  channel: string;
+  merge_fields: string[];
+  is_active: boolean;
+}
+
 // ─── Communication Queries ──────────────────────────────
+
+export async function getStaffMessageTemplates(): Promise<MessageTemplateRow[]> {
+  const supabase = await createServerClient();
+
+  const { data, error } = await supabase
+    .from("message_template")
+    .select("id, name, subject, body, channel, merge_fields, is_active")
+    .eq("is_active", true)
+    .order("name");
+
+  if (error) {
+    console.error("[getStaffMessageTemplates]", error.message);
+    return [];
+  }
+
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    name: row.name as string,
+    subject: (row.subject as string) ?? null,
+    body: row.body as string,
+    channel: row.channel as string,
+    merge_fields: (row.merge_fields as string[]) ?? [],
+    is_active: (row.is_active as boolean) ?? true,
+  }));
+}
+
+export async function getNotificationRecipients(
+  campusIds?: string[],
+  statusFilter?: string
+): Promise<{ userId: string; name: string; email: string; status: string; campus: string }[]> {
+  const supabase = await createServerClient();
+  const hasCampusFilter = campusIds && campusIds.length > 0;
+
+  // Get all families with active applications (those who have a user_profile via guardian)
+  let query = supabase
+    .from("application")
+    .select(`
+      status,
+      guardian:guardian_id (
+        user_id,
+        first_name,
+        last_name,
+        email
+      ),
+      campus:campus_id (name)
+    `)
+    .not("status", "eq", "draft");
+
+  if (hasCampusFilter) query = query.in("campus_id", campusIds);
+  if (statusFilter && statusFilter !== "all") query = query.eq("status", statusFilter);
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("[getNotificationRecipients]", error.message);
+    return [];
+  }
+
+  // Deduplicate by user_id
+  const seen = new Set<string>();
+  const recipients: { userId: string; name: string; email: string; status: string; campus: string }[] = [];
+
+  for (const row of (data ?? []) as Record<string, unknown>[]) {
+    const guardian = row.guardian as unknown as Record<string, string> | null;
+    const campus = row.campus as Record<string, string> | null;
+    const userId = guardian?.user_id;
+    if (!userId || seen.has(userId)) continue;
+    seen.add(userId);
+
+    recipients.push({
+      userId,
+      name: `${guardian?.first_name ?? ""} ${guardian?.last_name ?? ""}`.trim(),
+      email: guardian?.email ?? "",
+      status: row.status as string,
+      campus: campus?.name ?? "",
+    });
+  }
+
+  return recipients;
+}
 
 export async function getStaffCommunications(): Promise<{
   messages: CommunicationRow[];

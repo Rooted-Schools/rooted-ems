@@ -83,3 +83,14 @@ export {
   type CreateEnrollmentWindowInput,
   type AssignStaffRoleInput,
 } from "./settings";
+
+// Communication mutations
+export {
+  sendNotification,
+  createMessageTemplate,
+  updateMessageTemplate,
+  deleteMessageTemplate,
+  type SendNotificationInput,
+  type CreateTemplateInput,
+  type UpdateTemplateInput,
+} from "./communications";
