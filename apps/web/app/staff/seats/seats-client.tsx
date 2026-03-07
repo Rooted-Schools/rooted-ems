@@ -1,0 +1,340 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { staffUpdateCapacity } from "./actions";
+
+interface SeatRow {
+  id: string;
+  campus_name: string;
+  grade: string;
+  total_seats: number;
+  seats_offered: number;
+  seats_accepted: number;
+  seats_registered: number;
+  available: number;
+  fill_pct: number;
+}
+
+interface SeatsClientProps {
+  rows: SeatRow[];
+}
+
+export function SeatsClient({ rows }: SeatsClientProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<number>(0);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // Summary KPIs
+  const totalSeats = rows.reduce((a, r) => a + r.total_seats, 0);
+  const totalOffered = rows.reduce((a, r) => a + r.seats_offered, 0);
+  const totalAccepted = rows.reduce((a, r) => a + r.seats_accepted, 0);
+  const totalRegistered = rows.reduce((a, r) => a + r.seats_registered, 0);
+  const totalAvailable = rows.reduce((a, r) => a + r.available, 0);
+
+  // Group by campus
+  const campusMap: Record<string, SeatRow[]> = {};
+  for (const row of rows) {
+    if (!campusMap[row.campus_name]) campusMap[row.campus_name] = [];
+    campusMap[row.campus_name].push(row);
+  }
+
+  function handleEdit(row: SeatRow) {
+    setEditingId(row.id);
+    setEditValue(row.total_seats);
+    setFeedback(null);
+  }
+
+  function handleCancel() {
+    setEditingId(null);
+    setEditValue(0);
+  }
+
+  function handleSave(rowId: string) {
+    if (editValue < 0) return;
+    startTransition(async () => {
+      const result = await staffUpdateCapacity(rowId, editValue);
+      if (result.error) {
+        setFeedback({ type: "error", message: result.error });
+      } else {
+        setFeedback({ type: "success", message: "Capacity updated." });
+        setEditingId(null);
+        router.refresh();
+      }
+    });
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Seat Management</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Capacity planning and real-time seat availability across all campuses
+        </p>
+      </div>
+
+      {feedback && (
+        <div
+          className={`p-3 rounded-lg text-sm ${
+            feedback.type === "success"
+              ? "bg-green-50 border border-green-200 text-green-800"
+              : "bg-red-50 border border-red-200 text-red-800"
+          }`}
+        >
+          {feedback.message}
+        </div>
+      )}
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Total Seats
+            </p>
+            <p className="text-3xl font-bold mt-1">{totalSeats}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Offered
+            </p>
+            <p className="text-3xl font-bold text-blue-600 mt-1">
+              {totalOffered}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Accepted
+            </p>
+            <p className="text-3xl font-bold text-amber-600 mt-1">
+              {totalAccepted}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Registered
+            </p>
+            <p className="text-3xl font-bold text-rooted-green mt-1">
+              {totalRegistered}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Available
+            </p>
+            <p className="text-3xl font-bold text-emerald-600 mt-1">
+              {totalAvailable}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Capacity by Campus */}
+      {Object.entries(campusMap).map(([campusName, campusRows]) => {
+        const campusTotal = campusRows.reduce((a, r) => a + r.total_seats, 0);
+        const campusReg = campusRows.reduce(
+          (a, r) => a + r.seats_registered,
+          0
+        );
+        const campusFill =
+          campusTotal > 0 ? Math.round((campusReg / campusTotal) * 100) : 0;
+
+        return (
+          <Card key={campusName}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">{campusName}</CardTitle>
+                  <CardDescription>
+                    {campusTotal} total seats &middot; {campusFill}% filled
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-32 h-3 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${
+                        campusFill >= 90
+                          ? "bg-red-500"
+                          : campusFill >= 70
+                          ? "bg-amber-500"
+                          : "bg-rooted-green"
+                      }`}
+                      style={{ width: `${campusFill}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-gray-600">
+                    {campusFill}%
+                  </span>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-2 text-xs font-medium text-gray-500">
+                        Grade
+                      </th>
+                      <th className="text-right py-2 text-xs font-medium text-gray-500">
+                        Total
+                      </th>
+                      <th className="text-right py-2 text-xs font-medium text-gray-500">
+                        Offered
+                      </th>
+                      <th className="text-right py-2 text-xs font-medium text-gray-500">
+                        Accepted
+                      </th>
+                      <th className="text-right py-2 text-xs font-medium text-gray-500">
+                        Registered
+                      </th>
+                      <th className="text-right py-2 text-xs font-medium text-gray-500">
+                        Available
+                      </th>
+                      <th className="text-right py-2 text-xs font-medium text-gray-500">
+                        Fill
+                      </th>
+                      <th className="text-right py-2 text-xs font-medium text-gray-500 w-20">
+                        Edit
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {campusRows.map((row) => (
+                      <tr
+                        key={row.id}
+                        className="border-b border-gray-100 last:border-0"
+                      >
+                        <td className="py-2.5 font-medium text-gray-900">
+                          Grade {row.grade}
+                        </td>
+                        <td className="py-2.5 text-right">
+                          {editingId === row.id ? (
+                            <input
+                              type="number"
+                              value={editValue}
+                              onChange={(e) =>
+                                setEditValue(parseInt(e.target.value) || 0)
+                              }
+                              min={0}
+                              max={999}
+                              className="w-16 px-2 py-1 text-right border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleSave(row.id);
+                                if (e.key === "Escape") handleCancel();
+                              }}
+                            />
+                          ) : (
+                            <span className="text-gray-600">
+                              {row.total_seats}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 text-right text-blue-600">
+                          {row.seats_offered}
+                        </td>
+                        <td className="py-2.5 text-right text-amber-600">
+                          {row.seats_accepted}
+                        </td>
+                        <td className="py-2.5 text-right text-rooted-green">
+                          {row.seats_registered}
+                        </td>
+                        <td className="py-2.5 text-right">
+                          <Badge
+                            variant={
+                              row.available <= 0
+                                ? "destructive"
+                                : row.available <= 5
+                                ? "warning"
+                                : "success"
+                            }
+                          >
+                            {row.available}
+                          </Badge>
+                        </td>
+                        <td className="py-2.5 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${
+                                  row.fill_pct >= 90
+                                    ? "bg-red-500"
+                                    : row.fill_pct >= 70
+                                    ? "bg-amber-500"
+                                    : "bg-rooted-green"
+                                }`}
+                                style={{ width: `${row.fill_pct}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-gray-500 w-8 text-right">
+                              {row.fill_pct}%
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 text-right">
+                          {editingId === row.id ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleCancel}
+                                disabled={isPending}
+                                className="h-7 px-2 text-xs"
+                              >
+                                ✕
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleSave(row.id)}
+                                disabled={isPending}
+                                className="h-7 px-2 text-xs"
+                              >
+                                {isPending ? "…" : "✓"}
+                              </Button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleEdit(row)}
+                              className="text-xs text-gray-400 hover:text-rooted-green transition-colors"
+                              title="Edit total seats"
+                            >
+                              ✏️
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+
+      {rows.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-gray-400">
+              No capacity plans configured. Add capacity plans in Settings.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
