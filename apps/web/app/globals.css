@@ -4,11 +4,36 @@
 
 @layer base {
   :root {
+    /* ── RSF Brand Book — Core Palette ── */
     --rooted-green: #81A780;
     --rooted-green-dark: #5E8A5D;
     --rooted-green-light: #A8C5A7;
+    --deep-green: #3D6B4E;
+    --ink: #111111;
+    --warm-white: #FAF9F7;
+    --stone: #A8A29E;
+
+    /* Legacy aliases */
     --rooted-gray: #ECECEC;
     --rooted-gray-dark: #D4D4D4;
     --rooted-gray-light: #F5F5F5;
+
+    /* ── Regional Campus Accent Colors ── */
+    --campus-vancouver: #4A8C7F;   /* Pacific Teal */
+    --campus-cleveland: #B45A2B;   /* Rust Belt Orange */
+    --campus-neal: #7B2D3B;        /* Carolina Garnet (Columbia, SC) */
+    --campus-nola: #C4A84D;        /* NOLA Gold (future) */
+    --campus-indy: #3B5998;        /* Indy Blue (future) */
+  }
+
+  body {
+    color: var(--ink);
+    background-color: var(--warm-white);
+    line-height: 1.6;
+  }
+
+  /* Brand book: bold for emphasis, never underline (links excluded) */
+  strong, b {
+    font-weight: 700;
   }
 }

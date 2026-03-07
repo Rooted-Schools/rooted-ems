@@ -89,9 +89,9 @@ export function StaffSidebar({ highestRole = "compliance_auditor" }: StaffSideba
   const userLevel = ROLE_LEVEL[highestRole] ?? 1;
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 min-h-screen flex flex-col">
+    <aside className="w-64 bg-white border-r border-stone/20 min-h-screen flex flex-col">
       {/* Brand */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-stone/20">
         <Link
           href={buildHref("/staff/dashboard")}
           className="inline-flex items-center gap-2.5 no-underline hover:opacity-90 transition-opacity"
@@ -117,10 +117,10 @@ export function StaffSidebar({ highestRole = "compliance_auditor" }: StaffSideba
             </svg>
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-semibold text-gray-900 leading-tight">
+            <span className="text-sm font-semibold text-ink leading-tight">
               Rooted EMS
             </span>
-            <span className="text-[10px] text-gray-400 tracking-wide">
+            <span className="text-[10px] text-stone tracking-wide">
               Enrollment Management
             </span>
           </div>
@@ -141,7 +141,7 @@ export function StaffSidebar({ highestRole = "compliance_auditor" }: StaffSideba
             <div key={sIdx} className={cn(sIdx > 0 && "mt-2")}>
               {section.title && (
                 <div className="px-4 py-1.5">
-                  <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                  <span className="text-[10px] font-semibold text-stone uppercase tracking-wider">
                     {section.title}
                   </span>
                 </div>
@@ -159,8 +159,8 @@ export function StaffSidebar({ highestRole = "compliance_auditor" }: StaffSideba
                       className={cn(
                         "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors",
                         isActive
-                          ? "bg-rooted-green/10 text-rooted-green-dark border border-rooted-green/20"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent"
+                          ? "bg-rooted-green/10 text-deep-green border border-rooted-green/20"
+                          : "text-ink/60 hover:bg-rooted-gray-light hover:text-ink border border-transparent"
                       )}
                     >
                       <span className="text-sm" aria-hidden="true">
@@ -172,7 +172,7 @@ export function StaffSidebar({ highestRole = "compliance_auditor" }: StaffSideba
                 })}
               </div>
               {section.title && sIdx < NAV_SECTIONS.length - 1 && (
-                <div className="mx-4 mt-2 border-b border-gray-100" />
+                <div className="mx-4 mt-2 border-b border-stone/10" />
               )}
             </div>
           );
@@ -180,8 +180,8 @@ export function StaffSidebar({ highestRole = "compliance_auditor" }: StaffSideba
       </nav>
 
       {/* Version footer */}
-      <div className="p-3 border-t border-gray-100">
-        <span className="text-[10px] text-gray-300 block text-center">
+      <div className="p-3 border-t border-stone/10">
+        <span className="text-[10px] text-stone/50 block text-center">
           Rooted EMS v1.0
         </span>
       </div>

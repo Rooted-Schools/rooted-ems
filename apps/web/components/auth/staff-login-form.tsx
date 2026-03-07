@@ -57,12 +57,12 @@ export function StaffLoginForm() {
           <div className="inline-flex flex-col items-center">
             <div className="inline-flex items-baseline text-xl tracking-wide">
               <span className="text-rooted-green font-bold">rooted</span>
-              <span className="text-gray-800 font-medium">schools</span>
+              <span className="text-ink font-medium">schools</span>
             </div>
           </div>
         </div>
         <h2 className="text-2xl font-bold text-center mb-2">Staff Console</h2>
-        <p className="text-center text-gray-600 mb-6">
+        <p className="text-center text-ink/60 mb-6">
           Sign in with your school Google account
         </p>
 
@@ -75,7 +75,7 @@ export function StaffLoginForm() {
         <button
           onClick={handleGoogleLogin}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white border border-gray-300 rounded-md font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white border border-stone/30 rounded-md font-medium text-ink hover:bg-rooted-gray-light disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
             <path

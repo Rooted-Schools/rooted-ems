@@ -13,6 +13,28 @@ function formatCloseDate(dateStr: string): string {
   return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 }
 
+/* Campus accent color classes keyed by matchKey */
+const campusAccent: Record<string, { border: string; bg: string; text: string; hoverBorder: string }> = {
+  vancouver: {
+    border: "border-campus-vancouver/40",
+    bg: "bg-campus-vancouver/10",
+    text: "text-campus-vancouver",
+    hoverBorder: "hover:border-campus-vancouver/60",
+  },
+  neal: {
+    border: "border-campus-neal/40",
+    bg: "bg-campus-neal/10",
+    text: "text-campus-neal",
+    hoverBorder: "hover:border-campus-neal/60",
+  },
+  cleveland: {
+    border: "border-campus-cleveland/40",
+    bg: "bg-campus-cleveland/10",
+    text: "text-campus-cleveland",
+    hoverBorder: "hover:border-campus-cleveland/60",
+  },
+};
+
 export default async function HomePage() {
   // Fetch enrollment windows from DB
   const windows = await getActiveEnrollmentWindows();
@@ -59,9 +81,9 @@ export default async function HomePage() {
   const anyOpen = schools.some((s) => s.isOpen);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-warm-white">
       {/* ─── Header ─── */}
-      <header className="bg-white border-b border-gray-100">
+      <header className="bg-white border-b border-rooted-gray">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -72,13 +94,13 @@ export default async function HomePage() {
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors px-3 py-2"
+              className="text-sm font-medium text-ink/60 hover:text-ink transition-colors px-3 py-2"
             >
               Family Login
             </Link>
             <Link
               href="/staff-login"
-              className="text-sm font-medium text-white bg-rooted-green hover:bg-rooted-green/90 transition-colors px-4 py-2 rounded-lg"
+              className="text-sm font-medium text-white bg-rooted-green hover:bg-deep-green transition-colors px-4 py-2 rounded-lg"
             >
               Staff Login
             </Link>
@@ -87,16 +109,16 @@ export default async function HomePage() {
       </header>
 
       {/* ─── Hero ─── */}
-      <section className="bg-gradient-to-b from-rooted-green/5 to-white py-16 md:py-24">
+      <section className="bg-gradient-to-b from-rooted-green/5 to-warm-white py-16 md:py-24">
         <div className="max-w-4xl mx-auto px-6 text-center">
-          <h1 className="text-3xl md:text-5xl text-gray-900 leading-tight">
+          <h1 className="text-3xl md:text-5xl text-ink leading-tight">
             Enroll at a{" "}
             <span className="text-rooted-green">
               <span className="font-bold">rooted</span>
               <span className="font-normal">school</span>
             </span>
           </h1>
-          <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
+          <p className="mt-4 text-lg text-ink/60 max-w-2xl mx-auto">
             Career-connected learning that prepares students for economic
             mobility.{" "}
             {anyOpen
@@ -107,7 +129,7 @@ export default async function HomePage() {
             {anyOpen ? (
               <Link
                 href="/login"
-                className="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-white bg-rooted-green hover:bg-rooted-green/90 rounded-lg transition-colors shadow-sm w-full sm:w-auto"
+                className="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-white bg-rooted-green hover:bg-deep-green rounded-lg transition-colors shadow-sm w-full sm:w-auto"
               >
                 Apply Now
               </Link>
@@ -116,8 +138,8 @@ export default async function HomePage() {
               href="/inquiry"
               className={`inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-lg transition-colors w-full sm:w-auto ${
                 anyOpen
-                  ? "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
-                  : "text-white bg-rooted-green hover:bg-rooted-green/90 shadow-sm font-semibold"
+                  ? "text-ink/70 bg-white border border-stone/40 hover:bg-rooted-gray-light"
+                  : "text-white bg-rooted-green hover:bg-deep-green shadow-sm font-semibold"
               }`}
             >
               Express Interest
@@ -129,10 +151,10 @@ export default async function HomePage() {
       {/* ─── Our Schools ─── */}
       <section className="py-16 bg-white">
         <div className="max-w-5xl mx-auto px-6">
-          <h2 className="text-2xl font-bold text-gray-900 text-center mb-3">
+          <h2 className="text-2xl font-bold text-ink text-center mb-3">
             Our Schools
           </h2>
-          <p className="text-gray-500 text-center mb-10 max-w-xl mx-auto">
+          <p className="text-stone text-center mb-10 max-w-xl mx-auto">
             <span className="font-bold">rooted</span>schools operates career-connected schools across
             the country.{" "}
             {anyOpen
@@ -141,83 +163,86 @@ export default async function HomePage() {
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {schools.map((school) => (
-              <div
-                key={school.name}
-                className={`group border-2 rounded-xl p-6 flex flex-col items-center text-center transition-all hover:shadow-lg ${
-                  school.isOpen
-                    ? "border-gray-100 hover:border-rooted-green/40"
-                    : "border-gray-100 hover:border-gray-200"
-                }`}
-              >
-                <div className="h-28 flex items-center justify-center mb-4">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={school.logo}
-                    alt={school.name}
-                    className="max-h-28 max-w-full object-contain group-hover:scale-105 transition-transform"
-                  />
-                </div>
-                <p className="text-sm text-gray-500">{school.location}</p>
-                <p className="text-xs text-gray-400 mt-1">{school.grades}</p>
-
-                {/* Enrollment Status Badge */}
-                {school.isOpen ? (
-                  <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rooted-green/10 border border-rooted-green/20">
-                    <span className="w-2 h-2 rounded-full bg-rooted-green animate-pulse" />
-                    <span className="text-xs font-semibold text-rooted-green">
-                      Open Enrollment
-                    </span>
+            {schools.map((school) => {
+              const accent = campusAccent[school.matchKey];
+              return (
+                <div
+                  key={school.name}
+                  className={`group border-2 rounded-xl p-6 flex flex-col items-center text-center transition-all hover:shadow-lg ${
+                    school.isOpen
+                      ? `border-rooted-gray ${accent?.hoverBorder ?? "hover:border-rooted-green/40"}`
+                      : "border-rooted-gray hover:border-stone/40"
+                  }`}
+                >
+                  <div className="h-28 flex items-center justify-center mb-4">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={school.logo}
+                      alt={school.name}
+                      className="max-h-28 max-w-full object-contain group-hover:scale-105 transition-transform"
+                    />
                   </div>
-                ) : (
-                  <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 border border-gray-200">
-                    <span className="w-2 h-2 rounded-full bg-gray-400" />
-                    <span className="text-xs font-medium text-gray-500">
-                      Enrollment Closed
-                    </span>
-                  </div>
-                )}
+                  <p className="text-sm text-stone">{school.location}</p>
+                  <p className="text-xs text-stone/70 mt-1">{school.grades}</p>
 
-                {/* Close date info */}
-                {school.isOpen && school.closeDate && (
-                  <p className="text-[11px] text-gray-500 mt-1.5">
-                    Closes {formatCloseDate(school.closeDate)}
-                    {school.daysRemaining !== null && school.daysRemaining <= 14 && (
-                      <span className="text-amber-600 font-semibold">
-                        {" "}({school.daysRemaining} day{school.daysRemaining !== 1 ? "s" : ""} left)
-                      </span>
-                    )}
-                  </p>
-                )}
-
-                {/* CTAs */}
-                <div className="mt-4 flex gap-2">
+                  {/* Enrollment Status Badge — campus accent color */}
                   {school.isOpen ? (
-                    <>
-                      <Link
-                        href="/login"
-                        className="inline-flex items-center text-sm font-medium text-white bg-rooted-green hover:bg-rooted-green/90 px-4 py-2 rounded-lg transition-colors"
-                      >
-                        Apply Now
-                      </Link>
+                    <div className={`mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full ${accent?.bg ?? "bg-rooted-green/10"} border ${accent?.border ?? "border-rooted-green/20"}`}>
+                      <span className={`w-2 h-2 rounded-full ${accent?.text ? accent.text.replace("text-", "bg-") : "bg-rooted-green"} animate-pulse`} />
+                      <span className={`text-xs font-semibold ${accent?.text ?? "text-rooted-green"}`}>
+                        Open Enrollment
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rooted-gray border border-rooted-gray-dark">
+                      <span className="w-2 h-2 rounded-full bg-stone" />
+                      <span className="text-xs font-medium text-stone">
+                        Enrollment Closed
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Close date info */}
+                  {school.isOpen && school.closeDate && (
+                    <p className="text-[11px] text-stone mt-1.5">
+                      Closes {formatCloseDate(school.closeDate)}
+                      {school.daysRemaining !== null && school.daysRemaining <= 14 && (
+                        <span className="text-amber-600 font-semibold">
+                          {" "}({school.daysRemaining} day{school.daysRemaining !== 1 ? "s" : ""} left)
+                        </span>
+                      )}
+                    </p>
+                  )}
+
+                  {/* CTAs */}
+                  <div className="mt-4 flex gap-2">
+                    {school.isOpen ? (
+                      <>
+                        <Link
+                          href="/login"
+                          className="inline-flex items-center text-sm font-medium text-white bg-rooted-green hover:bg-deep-green px-4 py-2 rounded-lg transition-colors"
+                        >
+                          Apply Now
+                        </Link>
+                        <Link
+                          href="/inquiry"
+                          className="inline-flex items-center text-sm font-medium text-rooted-green border border-rooted-green/30 hover:bg-rooted-green/5 px-4 py-2 rounded-lg transition-colors"
+                        >
+                          Learn More
+                        </Link>
+                      </>
+                    ) : (
                       <Link
                         href="/inquiry"
-                        className="inline-flex items-center text-sm font-medium text-rooted-green border border-rooted-green/30 hover:bg-rooted-green/5 px-4 py-2 rounded-lg transition-colors"
+                        className="inline-flex items-center text-sm font-medium text-white bg-rooted-green hover:bg-deep-green px-4 py-2 rounded-lg transition-colors"
                       >
-                        Learn More
+                        Express Interest
                       </Link>
-                    </>
-                  ) : (
-                    <Link
-                      href="/inquiry"
-                      className="inline-flex items-center text-sm font-medium text-white bg-rooted-green hover:bg-rooted-green/90 px-4 py-2 rounded-lg transition-colors"
-                    >
-                      Express Interest
-                    </Link>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -228,10 +253,10 @@ export default async function HomePage() {
           <p className="text-sm font-semibold text-rooted-green uppercase tracking-wider mb-2">
             {anyOpen ? "Not ready to apply?" : "Stay Connected"}
           </p>
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3">
+          <h2 className="text-2xl md:text-3xl font-bold text-ink mb-3">
             Express Your Interest
           </h2>
-          <p className="text-gray-600 max-w-xl mx-auto mb-8">
+          <p className="text-ink/60 max-w-xl mx-auto mb-8">
             {anyOpen
               ? <>Complete a short form and our team will share more information about our schools, upcoming enrollment windows, and how{" "}<span className="font-bold">rooted</span>schools prepares students for economic mobility.</>
               : <>Enrollment is currently closed. Fill out a quick form and we&apos;ll notify you when enrollment opens for the next school year at any of our <span className="font-bold">rooted</span>schools campuses.</>
@@ -239,20 +264,20 @@ export default async function HomePage() {
           </p>
           <Link
             href="/inquiry"
-            className="inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold text-white bg-rooted-green hover:bg-rooted-green/90 rounded-lg transition-colors shadow-sm"
+            className="inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold text-white bg-rooted-green hover:bg-deep-green rounded-lg transition-colors shadow-sm"
           >
             Express Interest &rarr;
           </Link>
-          <p className="text-xs text-gray-400 mt-4">
+          <p className="text-xs text-stone mt-4">
             No commitment required. We&apos;ll follow up to answer your questions.
           </p>
         </div>
       </section>
 
       {/* ─── How It Works ─── */}
-      <section className="py-16 bg-gray-50">
+      <section className="py-16 bg-rooted-gray-light">
         <div className="max-w-4xl mx-auto px-6">
-          <h2 className="text-2xl font-bold text-gray-900 text-center mb-10">
+          <h2 className="text-2xl font-bold text-ink text-center mb-10">
             How Enrollment Works
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -284,13 +309,13 @@ export default async function HomePage() {
               },
             ].map((s) => (
               <div key={s.step} className="text-center">
-                <div className="w-10 h-10 rounded-full bg-rooted-green text-white flex items-center justify-center text-sm font-bold mx-auto mb-3">
+                <div className="w-10 h-10 rounded-full bg-deep-green text-white flex items-center justify-center text-sm font-bold mx-auto mb-3">
                   {s.step}
                 </div>
-                <p className="text-sm font-semibold text-gray-900">
+                <p className="text-sm font-semibold text-ink">
                   {s.title}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">{s.desc}</p>
+                <p className="text-xs text-stone mt-1">{s.desc}</p>
               </div>
             ))}
           </div>
@@ -298,22 +323,19 @@ export default async function HomePage() {
       </section>
 
       {/* ─── Footer ─── */}
-      <footer className="py-8 bg-white border-t border-gray-100">
+      <footer className="py-8 bg-deep-green">
         <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo.svg"
-            alt="rootedschools"
-            className="h-6 opacity-60"
-          />
-          <div className="flex items-center gap-6 text-xs text-gray-400">
-            <Link href="/inquiry" className="hover:text-gray-600">
+          <span className="text-sm tracking-wide">
+            <span className="text-white font-bold">rooted</span><span className="text-white/70 font-medium">schools</span>
+          </span>
+          <div className="flex items-center gap-6 text-xs text-white/60">
+            <Link href="/inquiry" className="hover:text-white transition-colors">
               Express Interest
             </Link>
-            <Link href="/login" className="hover:text-gray-600">
+            <Link href="/login" className="hover:text-white transition-colors">
               Family Portal
             </Link>
-            <Link href="/staff-login" className="hover:text-gray-600">
+            <Link href="/staff-login" className="hover:text-white transition-colors">
               Staff Portal
             </Link>
             <span>

@@ -130,7 +130,7 @@ export function InquiryForm({ campuses }: InquiryFormProps) {
     <div className="bg-white rounded-lg shadow-md p-8">
       <div className="flex justify-center mb-6">
         <span className="text-xl tracking-wide">
-          <span className="text-rooted-green font-bold">rooted</span><span className="text-gray-800 font-medium">schools</span>
+          <span className="text-rooted-green font-bold">rooted</span><span className="text-ink font-medium">schools</span>
         </span>
       </div>
       <h2 className="text-2xl font-bold text-center mb-2">

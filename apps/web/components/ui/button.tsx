@@ -14,13 +14,13 @@ export interface ButtonProps
 }
 
 const buttonVariants = {
-  default: "bg-rooted-green text-white hover:bg-rooted-green-dark",
+  default: "bg-rooted-green text-white hover:bg-deep-green",
   destructive: "bg-red-600 text-white hover:bg-red-700",
   outline:
-    "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
-  secondary: "bg-gray-100 text-gray-900 hover:bg-gray-200",
-  ghost: "text-gray-700 hover:bg-gray-100",
-  link: "text-rooted-green underline-offset-4 hover:underline",
+    "border border-stone/30 bg-white text-ink hover:bg-rooted-gray-light",
+  secondary: "bg-rooted-gray-light text-ink hover:bg-rooted-gray",
+  ghost: "text-ink hover:bg-rooted-gray-light",
+  link: "text-rooted-green hover:text-deep-green",
 };
 
 const buttonSizes = {

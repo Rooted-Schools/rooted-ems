@@ -10,7 +10,7 @@ export const metadata = {
 
 export default function StaffLoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-rooted-gray px-4">
+    <div className="min-h-screen flex items-center justify-center bg-warm-white px-4">
       <Suspense fallback={<div className="w-full max-w-md h-80" />}>
         <StaffLoginForm />
       </Suspense>

@@ -16,9 +16,9 @@ export function EmptyState({ icon, title, description, children, className }: Em
           {icon}
         </span>
       )}
-      <h3 className="text-lg font-semibold text-gray-900 mb-1">{title}</h3>
+      <h3 className="text-lg font-semibold text-ink mb-1">{title}</h3>
       {description && (
-        <p className="text-sm text-gray-500 max-w-sm mb-4">{description}</p>
+        <p className="text-sm text-stone max-w-sm mb-4">{description}</p>
       )}
       {children}
     </div>

@@ -44,10 +44,10 @@ export function StaffHeader({
   return (
     <>
       {/* Top green branded bar */}
-      <div className="h-10 bg-rooted-green flex items-center justify-between px-6">
+      <div className="h-10 bg-deep-green flex items-center justify-between px-6">
         <div className="flex items-center gap-3">
           <span className="text-white/90 text-xs tracking-wide uppercase">
-            <span className="font-bold">rooted</span><span className="font-semibold">schools</span> Enrollment Management System
+            <span className="font-bold">rooted</span><span className="font-normal">schools</span> Enrollment Management System
           </span>
           <span className="text-white/40 text-xs">|</span>
           <span className="text-white/60 text-xs">
@@ -68,13 +68,13 @@ export function StaffHeader({
       </div>
 
       {/* Action bar */}
-      <header className="h-12 border-b border-gray-200 bg-white flex items-center justify-between px-6">
+      <header className="h-12 border-b border-stone/20 bg-white flex items-center justify-between px-6">
         <div className="flex items-center gap-4">
           {campuses.length > 1 && (
             <div className="flex items-center gap-2">
               <label
                 htmlFor="campus-select"
-                className="text-xs text-gray-500 font-medium"
+                className="text-xs text-stone font-medium"
               >
                 Campus:
               </label>
@@ -110,10 +110,10 @@ export function StaffHeader({
               name="q"
               type="search"
               placeholder="Search students..."
-              className="h-8 w-56 rounded-lg border border-gray-200 bg-gray-50 px-3 pr-8 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-rooted-green/30 focus:border-rooted-green"
+              className="h-8 w-56 rounded-lg border border-stone/20 bg-rooted-gray-light px-3 pr-8 text-sm text-ink placeholder:text-stone focus:outline-none focus:ring-2 focus:ring-rooted-green/30 focus:border-rooted-green"
             />
             <svg
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

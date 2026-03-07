@@ -145,12 +145,12 @@ export function FamilyLoginForm() {
           <div className="inline-flex flex-col items-center">
             <div className="inline-flex items-baseline text-xl tracking-wide">
               <span className="text-rooted-green font-bold">rooted</span>
-              <span className="text-gray-800 font-medium">schools</span>
+              <span className="text-ink font-medium">schools</span>
             </div>
           </div>
         </div>
         <h2 className="text-2xl font-bold text-center mb-2">Family Portal</h2>
-        <p className="text-center text-gray-600 mb-6">
+        <p className="text-center text-ink/60 mb-6">
           Sign in to manage your enrollment applications
         </p>
 
@@ -167,7 +167,7 @@ export function FamilyLoginForm() {
                 className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                   method === "email"
                     ? "bg-rooted-green text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    : "bg-rooted-gray text-ink/70 hover:bg-rooted-gray-dark/30"
                 }`}
               >
                 Email
@@ -182,7 +182,7 @@ export function FamilyLoginForm() {
                 className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                   method === "phone"
                     ? "bg-rooted-green text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    : "bg-rooted-gray text-ink/70 hover:bg-rooted-gray-dark/30"
                 }`}
               >
                 Phone
@@ -192,7 +192,7 @@ export function FamilyLoginForm() {
             <div>
               <label
                 htmlFor="login-value"
-                className="block text-sm font-medium text-gray-700 mb-1"
+                className="block text-sm font-medium text-ink/70 mb-1"
               >
                 {method === "email" ? "Email Address" : "Phone Number"}
               </label>
@@ -207,7 +207,7 @@ export function FamilyLoginForm() {
                     : "+1 (555) 123-4567"
                 }
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
+                className="w-full px-4 py-2 border border-stone/30 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
               />
             </div>
 
@@ -220,7 +220,7 @@ export function FamilyLoginForm() {
             <button
               type="submit"
               disabled={loading || !value || cooldown > 0}
-              className="w-full py-2 px-4 bg-rooted-green text-white rounded-md font-medium hover:bg-rooted-green-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full py-2 px-4 bg-rooted-green text-white rounded-md font-medium hover:bg-deep-green disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading
                 ? "Sending..."
@@ -231,13 +231,13 @@ export function FamilyLoginForm() {
           </form>
         ) : (
           <form onSubmit={handleVerifyOtp} className="space-y-4">
-            <p className="text-sm text-gray-600 text-center">
+            <p className="text-sm text-ink/60 text-center">
               We sent a verification{" "}
               {method === "email" ? "email" : "code"} to{" "}
               <strong>{value}</strong>
             </p>
             {method === "email" && (
-              <p className="text-xs text-gray-400 text-center">
+              <p className="text-xs text-stone text-center">
                 Enter the code from the email, or click the link in the
                 email to sign in directly.
               </p>
@@ -246,7 +246,7 @@ export function FamilyLoginForm() {
             <div>
               <label
                 htmlFor="otp-code"
-                className="block text-sm font-medium text-gray-700 mb-1"
+                className="block text-sm font-medium text-ink/70 mb-1"
               >
                 Verification Code
               </label>
@@ -257,7 +257,7 @@ export function FamilyLoginForm() {
                 onChange={(e) => setOtp(e.target.value)}
                 placeholder="Enter code"
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md text-center text-lg tracking-wide focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
+                className="w-full px-4 py-2 border border-stone/30 rounded-md text-center text-lg tracking-wide focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
               />
             </div>
 
@@ -270,7 +270,7 @@ export function FamilyLoginForm() {
             <button
               type="submit"
               disabled={loading || otp.length < 1}
-              className="w-full py-2 px-4 bg-rooted-green text-white rounded-md font-medium hover:bg-rooted-green-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full py-2 px-4 bg-rooted-green text-white rounded-md font-medium hover:bg-deep-green disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? "Verifying..." : "Verify Code"}
             </button>
@@ -298,7 +298,7 @@ export function FamilyLoginForm() {
                   }
                   setLoading(false);
                 }}
-                className="w-full text-sm text-rooted-green hover:text-rooted-green-dark disabled:text-gray-400 disabled:cursor-not-allowed"
+                className="w-full text-sm text-rooted-green hover:text-rooted-green-dark disabled:text-stone disabled:cursor-not-allowed"
               >
                 {cooldown > 0
                   ? `Resend code in ${cooldown}s`
@@ -312,7 +312,7 @@ export function FamilyLoginForm() {
                   setError(null);
                   setCooldown(0);
                 }}
-                className="w-full text-sm text-gray-500 hover:text-gray-700"
+                className="w-full text-sm text-stone hover:text-ink"
               >
                 Use a different {method === "email" ? "email" : "phone number"}
               </button>
@@ -323,7 +323,7 @@ export function FamilyLoginForm() {
         <div className="mt-6 text-center">
           <a
             href="/staff-login"
-            className="text-sm text-gray-400 hover:text-gray-600 hover:underline"
+            className="text-sm text-stone hover:text-ink/60 hover:underline"
           >
             Staff login
           </a>
