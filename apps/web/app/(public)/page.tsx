@@ -80,7 +80,7 @@ export default function HomePage() {
               {
                 name: "Rooted School Vancouver",
                 location: "Vancouver, WA",
-                grades: "Grades 6-12",
+                grades: "Grades 9-12",
                 logo: "/logos/rooted-vancouver.png",
               },
               {
