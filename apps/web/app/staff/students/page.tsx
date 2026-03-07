@@ -1,152 +1,192 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { createServerClient } from "@rooted-ems/database/server";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/ui/empty-state";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { getStaffStudents } from "@/lib/queries";
+import Link from "next/link";
 
-const statusConfig: Record<string, { label: string; variant: "default" | "success" | "warning" | "destructive" | "outline" | "secondary" }> = {
-  submitted: { label: "Submitted", variant: "default" },
-  needs_info: { label: "Needs Info", variant: "warning" },
-  verified: { label: "Verified", variant: "success" },
-  lottery_assigned: { label: "In Lottery", variant: "secondary" },
-  offered: { label: "Offered", variant: "default" },
-  accepted: { label: "Accepted", variant: "success" },
-  registered: { label: "Registered", variant: "success" },
-  waitlisted: { label: "Waitlisted", variant: "outline" },
-  declined: { label: "Declined", variant: "destructive" },
-  expired: { label: "Expired", variant: "outline" },
-  withdrawn: { label: "Withdrawn", variant: "destructive" },
-};
+interface StudentRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+  grade: string;
+  campus_name: string;
+  status: string;
+  application_id: string;
+  guardian_name: string;
+  race_ethnicity: string[];
+}
 
 export default async function StaffStudentsPage() {
-  const students = await getStaffStudents();
+  const supabase = await createServerClient();
 
-  const totalStudents = students.length;
-  const activeCount = students.filter((s) =>
-    ["submitted", "verified", "offered", "accepted", "registered"].includes(s.status)
-  ).length;
+  const { data: apps } = await supabase
+    .from("application")
+    .select(
+      `
+      id, status,
+      student:student_id (id, first_name, last_name, race_ethnicity, date_of_birth),
+      campus:campus_id (name),
+      grade_level:grade_level_id (grade),
+      guardian:guardian_id (first_name, last_name)
+    `
+    )
+    .neq("status", "draft")
+    .order("created_at", { ascending: false });
+
+  const students: StudentRow[] = (apps ?? []).map(
+    (row: Record<string, unknown>) => {
+      const student = row.student as Record<string, unknown> | null;
+      const campus = row.campus as Record<string, string> | null;
+      const grade = row.grade_level as Record<string, string> | null;
+      const guardian = row.guardian as Record<string, string> | null;
+
+      return {
+        id: (student?.id as string) ?? "",
+        first_name: (student?.first_name as string) ?? "",
+        last_name: (student?.last_name as string) ?? "",
+        grade: grade?.grade ?? "",
+        campus_name: campus?.name ?? "",
+        status: row.status as string,
+        application_id: row.id as string,
+        guardian_name: guardian
+          ? `${guardian.first_name} ${guardian.last_name}`
+          : "",
+        race_ethnicity: (student?.race_ethnicity as string[]) ?? [],
+      };
+    }
+  );
+
+  const statusConfig: Record<string, { label: string; variant: string }> = {
+    submitted: { label: "Submitted", variant: "default" },
+    needs_info: { label: "Needs Info", variant: "warning" },
+    verified: { label: "Verified", variant: "success" },
+    lottery_assigned: { label: "Lottery", variant: "secondary" },
+    offered: { label: "Offered", variant: "default" },
+    accepted: { label: "Accepted", variant: "success" },
+    registered: { label: "Registered", variant: "success" },
+    declined: { label: "Declined", variant: "destructive" },
+    withdrawn: { label: "Withdrawn", variant: "secondary" },
+    expired: { label: "Expired", variant: "secondary" },
+  };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Students</h1>
         <p className="text-sm text-gray-500 mt-1">
-          All students who have applied to a Rooted School campus.
+          {students.length} student record{students.length !== 1 ? "s" : ""}{" "}
+          with active applications
         </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Total Applicants
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{totalStudents}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Active in Pipeline
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-rooted-green">{activeCount}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Registered
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">
-              {students.filter((s) => s.status === "registered").length}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {students.length === 0 ? (
-        <Card>
-          <CardContent className="py-8">
-            <EmptyState
-              icon="👤"
-              title="No student records"
-              description="Students will appear here once families submit applications."
-            />
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">All Students</CardTitle>
-            <CardDescription>
-              Click a student name to view their application details.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Grade</TableHead>
-                  <TableHead>Campus</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Guardian</TableHead>
-                  <TableHead>Contact</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {students.map((student) => {
-                  const cfg = statusConfig[student.status] ?? { label: student.status, variant: "outline" as const };
-                  return (
-                    <TableRow key={`${student.id}-${student.application_id}`}>
-                      <TableCell className="font-medium">
-                        {student.application_id ? (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Student Records</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {students.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-400">No student records found</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-2.5 text-xs font-medium text-gray-500">
+                      Student
+                    </th>
+                    <th className="text-left py-2.5 text-xs font-medium text-gray-500">
+                      Campus
+                    </th>
+                    <th className="text-left py-2.5 text-xs font-medium text-gray-500">
+                      Grade
+                    </th>
+                    <th className="text-left py-2.5 text-xs font-medium text-gray-500">
+                      Guardian
+                    </th>
+                    <th className="text-left py-2.5 text-xs font-medium text-gray-500">
+                      Demographics
+                    </th>
+                    <th className="text-left py-2.5 text-xs font-medium text-gray-500">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((s) => {
+                    const config = statusConfig[s.status] ?? {
+                      label: s.status,
+                      variant: "secondary",
+                    };
+                    return (
+                      <tr
+                        key={s.application_id}
+                        className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="py-3">
                           <Link
-                            href={`/staff/applications/${student.application_id}`}
-                            className="text-rooted-green hover:underline"
+                            href={`/staff/applications/${s.application_id}`}
+                            className="no-underline"
                           >
-                            {student.first_name} {student.last_name}
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full bg-rooted-green/10 flex items-center justify-center">
+                                <span className="text-xs font-bold text-rooted-green">
+                                  {s.first_name[0]}
+                                  {s.last_name[0]}
+                                </span>
+                              </div>
+                              <span className="text-sm font-medium text-gray-900 hover:text-rooted-green-dark">
+                                {s.first_name} {s.last_name}
+                              </span>
+                            </div>
                           </Link>
-                        ) : (
-                          <span>{student.first_name} {student.last_name}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>{student.grade}</TableCell>
-                      <TableCell>{student.campus_name}</TableCell>
-                      <TableCell>
-                        <Badge variant={cfg.variant}>{cfg.label}</Badge>
-                      </TableCell>
-                      <TableCell className="text-gray-600">
-                        {student.guardian_name}
-                      </TableCell>
-                      <TableCell className="text-gray-500 text-sm">
-                        {student.guardian_email}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+                        </td>
+                        <td className="py-3 text-gray-600">{s.campus_name}</td>
+                        <td className="py-3 text-gray-600">
+                          Grade {s.grade}
+                        </td>
+                        <td className="py-3 text-gray-600">
+                          {s.guardian_name}
+                        </td>
+                        <td className="py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {s.race_ethnicity.map((eth) => (
+                              <Badge
+                                key={eth}
+                                variant="secondary"
+                                className="text-[10px]"
+                              >
+                                {eth}
+                              </Badge>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="py-3">
+                          <Badge
+                            variant={
+                              config.variant as
+                                | "default"
+                                | "secondary"
+                                | "success"
+                                | "warning"
+                                | "destructive"
+                            }
+                          >
+                            {config.label}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
