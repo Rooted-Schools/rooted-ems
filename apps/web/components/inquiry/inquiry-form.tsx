@@ -6,7 +6,7 @@ import { GRADE_LABELS } from "@/lib/application-helpers";
 interface Campus {
   id: string;
   name: string;
-  grades: string;
+  gradeCodes: string[];
 }
 
 interface InquiryFormProps {
@@ -15,6 +15,7 @@ interface InquiryFormProps {
 
 export function InquiryForm({ campuses }: InquiryFormProps) {
   const [submitted, setSubmitted] = useState(false);
+  const [submittedCampusName, setSubmittedCampusName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,17 +28,33 @@ export function InquiryForm({ campuses }: InquiryFormProps) {
   const [guardianPhone, setGuardianPhone] = useState("");
   const [source, setSource] = useState("website");
 
+  // Get the selected campus and its available grades
+  const selectedCampus = campuses.find((c) => c.id === campusId);
+  const availableGrades = selectedCampus?.gradeCodes ?? [];
+
+  function handleCampusChange(newCampusId: string) {
+    setCampusId(newCampusId);
+    // Reset grade when campus changes (selected grade may not be valid for new campus)
+    setGrade("");
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    if (!campusId) {
+      setError("Please select a school.");
+      setLoading(false);
+      return;
+    }
 
     try {
       const res = await fetch("/api/inquiry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          campus_id: campusId || null,
+          campus_id: campusId,
           student_first_name: studentFirst,
           student_last_name: studentLast,
           grade_applying: grade,
@@ -55,6 +72,7 @@ export function InquiryForm({ campuses }: InquiryFormProps) {
         return;
       }
 
+      setSubmittedCampusName(selectedCampus?.name ?? "");
       setSubmitted(true);
     } catch {
       setError("Unable to submit. Please check your connection and try again.");
@@ -85,8 +103,10 @@ export function InquiryForm({ campuses }: InquiryFormProps) {
           Thank You!
         </h2>
         <p className="text-gray-600 mb-6">
-          We&apos;ve received your interest form. A member of our enrollment team
-          will reach out to you soon with next steps.
+          We&apos;ve received your interest form.
+          {submittedCampusName
+            ? ` The enrollment team at ${submittedCampusName} will reach out to you soon with next steps.`
+            : " Our enrollment team will reach out to you soon with next steps."}
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <a
@@ -120,29 +140,30 @@ export function InquiryForm({ campuses }: InquiryFormProps) {
         Express Your Interest
       </h2>
       <p className="text-center text-gray-600 mb-6">
-        Interested in enrolling? Fill out this quick form and our team
-        will follow up with you.
+        Interested in enrolling? Fill out this quick form and your
+        school&apos;s enrollment team will follow up with you.
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Campus Selection */}
+        {/* Campus Selection — Required */}
         <div>
           <label
             htmlFor="campus"
             className="block text-sm font-medium text-gray-700 mb-1"
           >
-            Which school are you interested in?
+            Which school are you interested in? *
           </label>
           <select
             id="campus"
             value={campusId}
-            onChange={(e) => setCampusId(e.target.value)}
+            onChange={(e) => handleCampusChange(e.target.value)}
+            required
             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent bg-white"
           >
-            <option value="">Not sure yet</option>
+            <option value="">Select a school</option>
             {campuses.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name} — {c.grades}
+                {c.name}
               </option>
             ))}
           </select>
@@ -194,20 +215,30 @@ export function InquiryForm({ campuses }: InquiryFormProps) {
             >
               Grade Applying For *
             </label>
-            <select
-              id="grade"
-              value={grade}
-              onChange={(e) => setGrade(e.target.value)}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent bg-white"
-            >
-              <option value="">Select grade</option>
-              {Object.entries(GRADE_LABELS).map(([code, label]) => (
-                <option key={code} value={code}>
-                  {label}
-                </option>
-              ))}
-            </select>
+            {campusId ? (
+              <select
+                id="grade"
+                value={grade}
+                onChange={(e) => setGrade(e.target.value)}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent bg-white"
+              >
+                <option value="">Select grade</option>
+                {availableGrades.map((code) => (
+                  <option key={code} value={code}>
+                    {GRADE_LABELS[code] ?? `Grade ${code}`}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select
+                id="grade"
+                disabled
+                className="w-full px-4 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-400 cursor-not-allowed"
+              >
+                <option>Select a school first</option>
+              </select>
+            )}
           </div>
         </fieldset>
 

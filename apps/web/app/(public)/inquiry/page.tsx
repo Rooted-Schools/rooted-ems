@@ -11,28 +11,56 @@ export const metadata = {
 async function getPublicCampuses() {
   const supabase = createServiceClient();
 
-  const { data, error } = await supabase
+  // Fetch campuses
+  const { data: campusData, error: campusError } = await supabase
     .from("campus")
     .select("id, name, short_code")
+    .eq("is_active", true)
     .order("name", { ascending: true });
 
-  if (error) {
-    console.error("[inquiry/getPublicCampuses]", error.message);
+  if (campusError) {
+    console.error("[inquiry/getPublicCampuses]", campusError.message);
     return [];
   }
 
-  // Map grade ranges per campus (based on known programs)
-  const gradeMap: Record<string, string> = {
-    RSV: "Grades 9-12",
-    CRN: "Grades 6-12",
-    RSC: "Grades 6-12",
+  // Fetch grade levels for current school year
+  const { data: gradeData, error: gradeError } = await supabase
+    .from("grade_level")
+    .select("campus_id, grade, school_year:school_year_id(is_current)")
+    .order("grade", { ascending: true });
+
+  if (gradeError) {
+    console.error("[inquiry/getGradeLevels]", gradeError.message);
+  }
+
+  // Build grade codes per campus (only current school year)
+  const gradesByCampus: Record<string, string[]> = {};
+  for (const row of gradeData ?? []) {
+    const sy = row.school_year as unknown as { is_current: boolean } | null;
+    if (!sy?.is_current) continue;
+    const cid = row.campus_id as string;
+    if (!gradesByCampus[cid]) gradesByCampus[cid] = [];
+    gradesByCampus[cid].push(row.grade as string);
+  }
+
+  // Fallback grade ranges by short_code (in case no grade_level rows yet)
+  const fallbackGrades: Record<string, string[]> = {
+    RSV: ["9", "10", "11", "12"],
+    CRN: ["6", "7", "8", "9", "10", "11", "12"],
+    RSC: ["6", "7", "8", "9", "10", "11", "12"],
   };
 
-  return (data ?? []).map((row) => ({
-    id: row.id as string,
-    name: row.name as string,
-    grades: gradeMap[(row.short_code as string) ?? ""] ?? "Grades 6-12",
-  }));
+  return (campusData ?? []).map((row) => {
+    const id = row.id as string;
+    const shortCode = row.short_code as string;
+    const gradeCodes = gradesByCampus[id] ?? fallbackGrades[shortCode] ?? ["6", "7", "8", "9", "10", "11", "12"];
+
+    return {
+      id,
+      name: row.name as string,
+      gradeCodes,
+    };
+  });
 }
 
 export default async function InquiryPage() {
