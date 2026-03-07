@@ -5,6 +5,7 @@ import { createServerClient } from "@rooted-ems/database/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 
 interface StudentRow {
   id: string;
@@ -19,9 +20,11 @@ interface StudentRow {
 }
 
 export default async function StaffStudentsPage() {
+  const session = await requireStaffSession();
+  const campusIds = getAccessibleCampusIds(session);
   const supabase = await createServerClient();
 
-  const { data: apps } = await supabase
+  let appQuery = supabase
     .from("application")
     .select(
       `
@@ -34,6 +37,12 @@ export default async function StaffStudentsPage() {
     )
     .neq("status", "draft")
     .order("created_at", { ascending: false });
+
+  if (campusIds.length > 0) {
+    appQuery = appQuery.in("campus_id", campusIds);
+  }
+
+  const { data: apps } = await appQuery;
 
   const students: StudentRow[] = (apps ?? []).map(
     (row: Record<string, unknown>) => {

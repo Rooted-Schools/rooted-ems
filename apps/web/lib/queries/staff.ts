@@ -119,10 +119,10 @@ export interface StaffUserRow {
 
 // ─── Lottery Queries ────────────────────────────────────
 
-export async function getStaffLotteryRuns(): Promise<LotteryRunRow[]> {
+export async function getStaffLotteryRuns(campusIds?: string[]): Promise<LotteryRunRow[]> {
   const supabase = await createServerClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("lottery_run")
     .select(`
       id, status, total_applicants, total_seats, created_at,
@@ -131,6 +131,12 @@ export async function getStaffLotteryRuns(): Promise<LotteryRunRow[]> {
       enrollment_window:enrollment_window_id (name)
     `)
     .order("created_at", { ascending: false });
+
+  if (campusIds && campusIds.length > 0) {
+    query = query.in("campus_id", campusIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("[getStaffLotteryRuns]", error.message);
@@ -313,10 +319,10 @@ export async function getStaffLotteryDetail(
 
 // ─── Offer Queries ──────────────────────────────────────
 
-export async function getStaffOffers(): Promise<{ offers: OfferRow[]; stats: OfferStats }> {
+export async function getStaffOffers(campusIds?: string[]): Promise<{ offers: OfferRow[]; stats: OfferStats }> {
   const supabase = await createServerClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("offer")
     .select(`
       id, status, offered_at, expires_at,
@@ -327,6 +333,12 @@ export async function getStaffOffers(): Promise<{ offers: OfferRow[]; stats: Off
       grade_level:grade_level_id (grade)
     `)
     .order("offered_at", { ascending: false });
+
+  if (campusIds && campusIds.length > 0) {
+    query = query.in("campus_id", campusIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("[getStaffOffers]", error.message);
@@ -376,17 +388,19 @@ export async function getStaffOffers(): Promise<{ offers: OfferRow[]; stats: Off
 
 // ─── Waitlist Queries ───────────────────────────────────
 
-export async function getStaffWaitlist(): Promise<{
+export async function getStaffWaitlist(campusIds?: string[]): Promise<{
   entries: WaitlistEntry[];
   campusCounts: WaitlistCampusCount[];
 }> {
   const supabase = await createServerClient();
 
+  // Waitlist is nested via waitlist → campus_id, so we filter post-fetch
   const { data, error } = await supabase
     .from("waitlist_position")
     .select(`
       id, position_number, added_at,
       waitlist:waitlist_id (
+        campus_id,
         campus:campus_id (name),
         grade_level:grade_level_id (grade)
       ),
@@ -404,7 +418,16 @@ export async function getStaffWaitlist(): Promise<{
 
   const rows = data ?? [];
 
-  const entries: WaitlistEntry[] = rows.map((row: Record<string, unknown>) => {
+  // Filter by campus if campusIds provided
+  const filteredRows = campusIds && campusIds.length > 0
+    ? rows.filter((row: Record<string, unknown>) => {
+        const wl = row.waitlist as unknown as Record<string, unknown> | null;
+        const cid = wl?.campus_id as string | undefined;
+        return cid ? campusIds.includes(cid) : false;
+      })
+    : rows;
+
+  const entries: WaitlistEntry[] = filteredRows.map((row: Record<string, unknown>) => {
     const wl = row.waitlist as unknown as Record<string, unknown> | null;
     const campus = wl?.campus as unknown as Record<string, string> | null;
     const grade = wl?.grade_level as unknown as Record<string, string> | null;
@@ -433,11 +456,12 @@ export async function getStaffWaitlist(): Promise<{
     countMap[e.campus_name] = (countMap[e.campus_name] ?? 0) + 1;
   }
 
-  // Get all campuses so we show zeros too
-  const { data: campuses } = await supabase
-    .from("campus")
-    .select("name")
-    .order("name");
+  // Get accessible campuses so we show zeros too
+  let campusQuery = supabase.from("campus").select("name").order("name");
+  if (campusIds && campusIds.length > 0) {
+    campusQuery = campusQuery.in("id", campusIds);
+  }
+  const { data: campuses } = await campusQuery;
 
   const campusCounts: WaitlistCampusCount[] = (campuses ?? []).map(
     (c: Record<string, string>) => ({
@@ -451,13 +475,13 @@ export async function getStaffWaitlist(): Promise<{
 
 // ─── Enrollment Queries ─────────────────────────────────
 
-export async function getStaffEnrollments(): Promise<{
+export async function getStaffEnrollments(campusIds?: string[]): Promise<{
   enrollments: EnrollmentRow[];
   stats: EnrollmentStats;
 }> {
   const supabase = await createServerClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("enrollment")
     .select(`
       id, status, enrolled_at, sis_student_id,
@@ -466,6 +490,12 @@ export async function getStaffEnrollments(): Promise<{
       grade_level:grade_level_id (grade)
     `)
     .order("enrolled_at", { ascending: false, nullsFirst: false });
+
+  if (campusIds && campusIds.length > 0) {
+    query = query.in("campus_id", campusIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("[getStaffEnrollments]", error.message);
@@ -619,12 +649,13 @@ export interface WorkQueueItem {
 
 // ─── Work Queue Queries ────────────────────────────────
 
-export async function getStaffWorkQueue(): Promise<WorkQueueItem[]> {
+export async function getStaffWorkQueue(campusIds?: string[]): Promise<WorkQueueItem[]> {
   const supabase = await createServerClient();
   const items: WorkQueueItem[] = [];
+  const hasCampusFilter = campusIds && campusIds.length > 0;
 
   // 1. New submissions needing review
-  const { data: submitted } = await supabase
+  let submittedQuery = supabase
     .from("application")
     .select(`
       id, created_at,
@@ -635,6 +666,8 @@ export async function getStaffWorkQueue(): Promise<WorkQueueItem[]> {
     .eq("status", "submitted")
     .order("created_at", { ascending: true })
     .limit(20);
+  if (hasCampusFilter) submittedQuery = submittedQuery.in("campus_id", campusIds);
+  const { data: submitted } = await submittedQuery;
 
   for (const row of (submitted ?? []) as Record<string, unknown>[]) {
     const student = row.student as unknown as Record<string, string> | null;
@@ -653,7 +686,7 @@ export async function getStaffWorkQueue(): Promise<WorkQueueItem[]> {
   }
 
   // 2. Applications needing info follow-up
-  const { data: needsInfo } = await supabase
+  let needsInfoQuery = supabase
     .from("application")
     .select(`
       id, updated_at,
@@ -663,6 +696,8 @@ export async function getStaffWorkQueue(): Promise<WorkQueueItem[]> {
     .eq("status", "needs_info")
     .order("updated_at", { ascending: true })
     .limit(20);
+  if (hasCampusFilter) needsInfoQuery = needsInfoQuery.in("campus_id", campusIds);
+  const { data: needsInfo } = await needsInfoQuery;
 
   for (const row of (needsInfo ?? []) as Record<string, unknown>[]) {
     const student = row.student as unknown as Record<string, string> | null;
@@ -680,7 +715,7 @@ export async function getStaffWorkQueue(): Promise<WorkQueueItem[]> {
   }
 
   // 3. Verified apps ready for next step
-  const { data: verified } = await supabase
+  let verifiedQuery = supabase
     .from("application")
     .select(`
       id, reviewed_at,
@@ -690,6 +725,8 @@ export async function getStaffWorkQueue(): Promise<WorkQueueItem[]> {
     .eq("status", "verified")
     .order("reviewed_at", { ascending: true })
     .limit(20);
+  if (hasCampusFilter) verifiedQuery = verifiedQuery.in("campus_id", campusIds);
+  const { data: verified } = await verifiedQuery;
 
   for (const row of (verified ?? []) as Record<string, unknown>[]) {
     const student = row.student as unknown as Record<string, string> | null;
@@ -708,7 +745,7 @@ export async function getStaffWorkQueue(): Promise<WorkQueueItem[]> {
 
   // 4. Offers expiring soon (within 7 days)
   const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { data: expiringOffers } = await supabase
+  let offersQuery = supabase
     .from("offer")
     .select(`
       id, expires_at,
@@ -722,6 +759,8 @@ export async function getStaffWorkQueue(): Promise<WorkQueueItem[]> {
     .lte("expires_at", sevenDaysFromNow)
     .order("expires_at", { ascending: true })
     .limit(20);
+  if (hasCampusFilter) offersQuery = offersQuery.in("campus_id", campusIds);
+  const { data: expiringOffers } = await offersQuery;
 
   for (const row of (expiringOffers ?? []) as Record<string, unknown>[]) {
     const app = row.application as unknown as Record<string, unknown> | null;
@@ -742,7 +781,7 @@ export async function getStaffWorkQueue(): Promise<WorkQueueItem[]> {
   }
 
   // 5. Accepted apps pending enrollment
-  const { data: pendingEnroll } = await supabase
+  let pendingEnrollQuery = supabase
     .from("application")
     .select(`
       id, updated_at,
@@ -752,6 +791,8 @@ export async function getStaffWorkQueue(): Promise<WorkQueueItem[]> {
     .eq("status", "accepted")
     .order("updated_at", { ascending: true })
     .limit(20);
+  if (hasCampusFilter) pendingEnrollQuery = pendingEnrollQuery.in("campus_id", campusIds);
+  const { data: pendingEnroll } = await pendingEnrollQuery;
 
   for (const row of (pendingEnroll ?? []) as Record<string, unknown>[]) {
     const student = row.student as unknown as Record<string, string> | null;
@@ -781,10 +822,10 @@ export async function getStaffWorkQueue(): Promise<WorkQueueItem[]> {
 
 // ─── Student Queries ───────────────────────────────────
 
-export async function getStaffStudents(): Promise<StudentRow[]> {
+export async function getStaffStudents(campusIds?: string[]): Promise<StudentRow[]> {
   const supabase = await createServerClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("application")
     .select(`
       id, status,
@@ -795,6 +836,12 @@ export async function getStaffStudents(): Promise<StudentRow[]> {
     `)
     .not("status", "eq", "draft")
     .order("created_at", { ascending: false });
+
+  if (campusIds && campusIds.length > 0) {
+    query = query.in("campus_id", campusIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("[getStaffStudents]", error.message);

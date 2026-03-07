@@ -18,13 +18,14 @@ import {
   getUpcomingDeadlines,
   getRecentActivity,
 } from "@/lib/queries";
+import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 
 export const dynamic = "force-dynamic";
 
-// Work queue counts
-async function getWorkQueueCounts() {
+// Work queue counts (campus-scoped)
+async function getWorkQueueCounts(campusIds?: string[]) {
   const supabase = await createServerClient();
-  const { data } = await supabase
+  let query = supabase
     .from("application")
     .select("status")
     .in("status", [
@@ -34,6 +35,12 @@ async function getWorkQueueCounts() {
       "offered",
       "accepted",
     ]);
+
+  if (campusIds && campusIds.length > 0) {
+    query = query.in("campus_id", campusIds);
+  }
+
+  const { data } = await query;
 
   const counts: Record<string, number> = {};
   for (const row of data ?? []) {
@@ -107,13 +114,16 @@ const QUEUE_ITEMS = [
 ];
 
 export default async function StaffDashboardPage() {
+  const session = await requireStaffSession();
+  const campusIds = getAccessibleCampusIds(session);
+
   const [stats, appStats, deadlines, recentActivity, queueCounts] =
     await Promise.all([
-      getStaffDashboardStats(),
-      getApplicationStats(),
-      getUpcomingDeadlines(),
-      getRecentActivity(),
-      getWorkQueueCounts(),
+      getStaffDashboardStats(campusIds.length === 1 ? campusIds[0] : undefined),
+      getApplicationStats(campusIds.length === 1 ? campusIds[0] : undefined),
+      getUpcomingDeadlines(campusIds.length === 1 ? campusIds[0] : undefined),
+      getRecentActivity({ campusId: campusIds.length === 1 ? campusIds[0] : undefined }),
+      getWorkQueueCounts(campusIds),
     ]);
 
   const pipeline = buildPipeline(appStats);

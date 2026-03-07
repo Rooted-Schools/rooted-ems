@@ -5,6 +5,7 @@ import { createServerClient } from "@rooted-ems/database/server";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 
 interface PipelineStudent {
   id: string;
@@ -28,9 +29,11 @@ const PIPELINE_COLUMNS = [
 ];
 
 export default async function PipelinePage() {
+  const session = await requireStaffSession();
+  const campusIds = getAccessibleCampusIds(session);
   const supabase = await createServerClient();
 
-  const { data: apps } = await supabase
+  let appQuery = supabase
     .from("application")
     .select(
       `
@@ -41,6 +44,12 @@ export default async function PipelinePage() {
     `
     )
     .order("updated_at", { ascending: false });
+
+  if (campusIds.length > 0) {
+    appQuery = appQuery.in("campus_id", campusIds);
+  }
+
+  const { data: apps } = await appQuery;
 
   const allApps: PipelineStudent[] = (apps ?? []).map(
     (row: Record<string, unknown>) => {

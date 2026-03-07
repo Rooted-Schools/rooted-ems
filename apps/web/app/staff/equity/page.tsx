@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { createServerClient } from "@rooted-ems/database/server";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 
 interface DemographicRow {
   group: string;
@@ -21,10 +22,12 @@ interface FunnelStage {
 }
 
 export default async function EquityDashboardPage() {
+  const session = await requireStaffSession();
+  const campusIds = getAccessibleCampusIds(session);
   const supabase = await createServerClient();
 
-  // Fetch all applications with student demographics
-  const { data: apps } = await supabase
+  // Fetch all applications with student demographics (campus-scoped)
+  let appQuery = supabase
     .from("application")
     .select(
       `
@@ -34,6 +37,12 @@ export default async function EquityDashboardPage() {
     `
     )
     .neq("status", "draft");
+
+  if (campusIds.length > 0) {
+    appQuery = appQuery.in("campus_id", campusIds);
+  }
+
+  const { data: apps } = await appQuery;
 
   const allApps = (apps ?? []) as Array<Record<string, unknown>>;
 

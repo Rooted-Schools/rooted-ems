@@ -1,6 +1,6 @@
 import { StaffSidebar } from "@/components/layout/staff-sidebar";
 import { StaffHeader } from "@/components/layout/staff-header";
-import { getSession } from "@/lib/auth/get-session";
+import { getSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 import { getCampuses } from "@/lib/queries";
 
 export const metadata = {
@@ -12,10 +12,16 @@ export default async function StaffLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [session, campuses] = await Promise.all([
+  const [session, allCampuses] = await Promise.all([
     getSession(),
     getCampuses(),
   ]);
+
+  // Scope campus list to what the user can access
+  const accessibleIds = session ? getAccessibleCampusIds(session) : [];
+  const campuses = accessibleIds.length > 0
+    ? allCampuses.filter((c) => accessibleIds.includes(c.id))
+    : allCampuses;
 
   const headerCampuses = campuses.map((c) => ({ id: c.id, name: c.name }));
 

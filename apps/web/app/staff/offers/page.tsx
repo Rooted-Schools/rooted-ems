@@ -1,20 +1,20 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-import { createServerClient } from "@rooted-ems/database/server";
 import { getStaffOffers } from "@/lib/queries";
 import { OffersClient } from "./offers-client";
+import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 
 export default async function StaffOffersPage() {
-  const supabase = await createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const { offers, stats } = await getStaffOffers();
+  const session = await requireStaffSession();
+  const campusIds = getAccessibleCampusIds(session);
+  const { offers, stats } = await getStaffOffers(campusIds);
 
   return (
     <OffersClient
       offers={offers}
       stats={stats}
-      staffUserId={user?.id ?? ""}
+      staffUserId={session.user_id}
     />
   );
 }

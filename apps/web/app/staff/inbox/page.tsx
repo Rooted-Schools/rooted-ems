@@ -5,6 +5,7 @@ import { createServerClient } from "@rooted-ems/database/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 
 interface WorkItem {
   id: string;
@@ -60,9 +61,11 @@ const QUEUE_CATEGORIES = [
 ];
 
 export default async function StaffInboxPage() {
+  const session = await requireStaffSession();
+  const campusIds = getAccessibleCampusIds(session);
   const supabase = await createServerClient();
 
-  const { data: applications } = await supabase
+  let appQuery = supabase
     .from("application")
     .select(
       `
@@ -80,6 +83,12 @@ export default async function StaffInboxPage() {
       "accepted",
     ])
     .order("updated_at", { ascending: true });
+
+  if (campusIds.length > 0) {
+    appQuery = appQuery.in("campus_id", campusIds);
+  }
+
+  const { data: applications } = await appQuery;
 
   const items: WorkItem[] = (applications ?? []).map(
     (row: Record<string, unknown>) => {

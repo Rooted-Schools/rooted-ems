@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { createServerClient } from "@rooted-ems/database/server";
 import { ReportsClient } from "./reports-client";
+import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 
 export interface ReportData {
   pipeline: { status: string; count: number }[];
@@ -33,7 +34,43 @@ export interface ReportData {
 }
 
 export default async function StaffReportsPage() {
+  const session = await requireStaffSession();
+  const campusIds = getAccessibleCampusIds(session);
   const supabase = await createServerClient();
+  const hasCampusFilter = campusIds.length > 0;
+
+  // Build campus-scoped queries
+  let appQuery = supabase
+    .from("application")
+    .select(`
+      id, status,
+      student:student_id (race_ethnicity)
+    `)
+    .neq("status", "draft");
+  if (hasCampusFilter) appQuery = appQuery.in("campus_id", campusIds);
+
+  let capacityQuery = supabase
+    .from("capacity_plan")
+    .select(`
+      total_seats, seats_offered, seats_accepted, seats_registered,
+      campus:campus_id (name),
+      grade_level:grade_level_id (grade)
+    `)
+    .order("campus_id")
+    .order("grade_level_id");
+  if (hasCampusFilter) capacityQuery = capacityQuery.in("campus_id", campusIds);
+
+  let enrollQuery = supabase
+    .from("enrollment")
+    .select(`
+      status, enrolled_at, sis_student_id,
+      student:student_id (first_name, last_name),
+      campus:campus_id (name),
+      grade_level:grade_level_id (grade)
+    `)
+    .order("enrolled_at", { ascending: false, nullsFirst: false })
+    .limit(500);
+  if (hasCampusFilter) enrollQuery = enrollQuery.in("campus_id", campusIds);
 
   // Fetch data for all reports in parallel
   const [
@@ -42,32 +79,9 @@ export default async function StaffReportsPage() {
     { data: enrollmentRows },
     { data: auditRows },
   ] = await Promise.all([
-    supabase
-      .from("application")
-      .select(`
-        id, status,
-        student:student_id (race_ethnicity)
-      `)
-      .neq("status", "draft"),
-    supabase
-      .from("capacity_plan")
-      .select(`
-        total_seats, seats_offered, seats_accepted, seats_registered,
-        campus:campus_id (name),
-        grade_level:grade_level_id (grade)
-      `)
-      .order("campus_id")
-      .order("grade_level_id"),
-    supabase
-      .from("enrollment")
-      .select(`
-        status, enrolled_at, sis_student_id,
-        student:student_id (first_name, last_name),
-        campus:campus_id (name),
-        grade_level:grade_level_id (grade)
-      `)
-      .order("enrolled_at", { ascending: false, nullsFirst: false })
-      .limit(500),
+    appQuery,
+    capacityQuery,
+    enrollQuery,
     supabase
       .from("audit_event")
       .select("action, table_name, created_at, changes")
