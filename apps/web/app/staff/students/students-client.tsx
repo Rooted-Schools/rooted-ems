@@ -32,10 +32,11 @@ const statusConfig: Record<string, { label: string; variant: string }> = {
 
 interface StudentsClientProps {
   students: StudentRow[];
+  initialSearch?: string;
 }
 
-export function StudentsClient({ students }: StudentsClientProps) {
-  const [search, setSearch] = useState("");
+export function StudentsClient({ students, initialSearch = "" }: StudentsClientProps) {
+  const [search, setSearch] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState("all");
   const [gradeFilter, setGradeFilter] = useState("all");
 

@@ -97,8 +97,17 @@ export function StaffHeader({
 
         <div className="flex items-center gap-2">
           {/* Search */}
-          <div className="relative">
+          <form
+            className="relative"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const input = (e.target as HTMLFormElement).elements.namedItem("q") as HTMLInputElement;
+              const q = input?.value?.trim();
+              if (q) router.push(`/staff/students?search=${encodeURIComponent(q)}`);
+            }}
+          >
             <input
+              name="q"
               type="search"
               placeholder="Search students..."
               className="h-8 w-56 rounded-lg border border-gray-200 bg-gray-50 px-3 pr-8 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-rooted-green/30 focus:border-rooted-green"
@@ -116,7 +125,7 @@ export function StaffHeader({
                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
               />
             </svg>
-          </div>
+          </form>
         </div>
       </header>
     </>

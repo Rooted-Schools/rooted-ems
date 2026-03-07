@@ -8,7 +8,7 @@ import { StudentsClient } from "./students-client";
 export default async function StaffStudentsPage({
   searchParams,
 }: {
-  searchParams: { campus?: string };
+  searchParams: { campus?: string; search?: string };
 }) {
   const session = await requireStaffSession();
   const accessibleIds = getAccessibleCampusIds(session);
@@ -57,5 +57,5 @@ export default async function StaffStudentsPage({
     };
   });
 
-  return <StudentsClient students={students} />;
+  return <StudentsClient students={students} initialSearch={searchParams?.search ?? ""} />;
 }
