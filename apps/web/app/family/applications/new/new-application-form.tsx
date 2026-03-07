@@ -1217,7 +1217,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
                 />
                 <label htmlFor="data-sharing-consent" className="text-sm text-gray-600">
                   I consent to the sharing of my child&apos;s educational records with
-                  Rooted School Foundation for the purpose of enrollment processing.
+                  <span className="font-bold">rooted</span>schools for the purpose of enrollment processing.
                 </label>
               </div>
               <div className="flex items-start gap-2">

@@ -30,7 +30,7 @@ function getStatusExplanation(status: string): { title: string; explanation: str
     case "waitlisted":
       return { title: "Waitlisted", explanation: "Your student is on the waitlist. We will notify you if a seat becomes available.", icon: "📋" };
     case "registered":
-      return { title: "Registered", explanation: "Your student is fully enrolled and registered. Welcome to the Rooted School family!", icon: "🎓" };
+      return { title: "Registered", explanation: "Your student is fully enrolled and registered. Welcome to the rootedschools family!", icon: "🎓" };
     case "withdrawn":
       return { title: "Withdrawn", explanation: "This application has been withdrawn.", icon: "🚫" };
     default:
@@ -87,7 +87,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
       if (result.error) {
         setFeedback({ type: "error", message: result.error });
       } else {
-        setFeedback({ type: "success", message: "Offer accepted! Welcome to the Rooted School family." });
+        setFeedback({ type: "success", message: "Offer accepted! Welcome to the rootedschools family." });
         router.refresh();
       }
     });

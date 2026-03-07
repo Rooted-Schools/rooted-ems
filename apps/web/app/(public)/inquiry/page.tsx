@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "edge";
 
 export const metadata = {
-  title: "Express Interest | Rooted Schools",
+  title: "Express Interest | rootedschools",
 };
 
 async function getPublicCampuses() {

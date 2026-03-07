@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "edge";
 
 export const metadata = {
-  title: "Rooted School Foundation | Enrollment Management",
+  title: "rootedschools | Enrollment Management",
 };
 
 export default function HomePage() {
@@ -16,7 +16,7 @@ export default function HomePage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.svg"
-            alt="Rooted School Foundation"
+            alt="rootedschools"
             className="h-8"
           />
           <div className="flex items-center gap-3">
@@ -39,9 +39,10 @@ export default function HomePage() {
       {/* ─── Hero ─── */}
       <section className="bg-gradient-to-b from-rooted-green/5 to-white py-16 md:py-24">
         <div className="max-w-4xl mx-auto px-6 text-center">
-          <h1 className="text-3xl md:text-5xl font-bold text-gray-900 leading-tight">
+          <h1 className="text-3xl md:text-5xl text-gray-900 leading-tight">
             Enroll at a{" "}
-            <span className="text-rooted-green">Rooted School</span>
+            <span className="text-rooted-green font-bold">rooted</span>
+            <span className="text-rooted-green font-normal">school</span>
           </h1>
           <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
             Career-connected learning that prepares students for economic
@@ -71,14 +72,14 @@ export default function HomePage() {
             Our Schools
           </h2>
           <p className="text-gray-500 text-center mb-10 max-w-xl mx-auto">
-            Rooted School Foundation operates career-connected schools across
+            <span className="font-bold">rooted</span>schools operates career-connected schools across
             the country. Click a campus to start your application.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               {
-                name: "Rooted School Vancouver",
+                name: "rootedschool vancouver",
                 location: "Vancouver, WA",
                 grades: "Grades 9-12",
                 logo: "/logos/rooted-vancouver.png",
@@ -90,7 +91,7 @@ export default function HomePage() {
                 logo: "/logos/cr-neal-academy.png",
               },
               {
-                name: "Rooted Schools Cleveland",
+                name: "rootedschool cleveland",
                 location: "Cleveland, OH",
                 grades: "Grades 6-12",
                 logo: "/logos/rooted-cleveland.png",
@@ -172,7 +173,7 @@ export default function HomePage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.svg"
-            alt="Rooted School Foundation"
+            alt="rootedschools"
             className="h-6 opacity-60"
           />
           <div className="flex items-center gap-6 text-xs text-gray-400">
@@ -186,7 +187,7 @@ export default function HomePage() {
               Staff Portal
             </Link>
             <span>
-              &copy; {new Date().getFullYear()} Rooted School Foundation
+              &copy; {new Date().getFullYear()} <span className="font-bold">rooted</span>schools
             </span>
           </div>
         </div>

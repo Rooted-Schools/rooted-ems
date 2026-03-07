@@ -73,7 +73,7 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
         <EmptyState
           icon="📝"
           title="No applications yet"
-          description="Start a new application to enroll your child at a Rooted School campus."
+          description="Start a new application to enroll your child at a rootedschool campus."
         >
           <Link href="/family/applications/new">
             <Button>Start New Application</Button>

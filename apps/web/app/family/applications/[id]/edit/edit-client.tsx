@@ -714,7 +714,7 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
             <div className="space-y-3">
               <div className="flex items-start gap-2">
                 <input type="checkbox" id="data-sharing-consent-edit" checked={form.dataSharingConsent} onChange={(e) => update({ dataSharingConsent: e.target.checked })} className="mt-1 h-4 w-4 rounded border-gray-300 text-rooted-green focus:ring-rooted-green" />
-                <label htmlFor="data-sharing-consent-edit" className="text-sm text-gray-600">I consent to the sharing of my child&apos;s educational records with Rooted School Foundation for the purpose of enrollment processing.</label>
+                <label htmlFor="data-sharing-consent-edit" className="text-sm text-gray-600">I consent to the sharing of my child&apos;s educational records with <span className="font-bold">rooted</span>schools for the purpose of enrollment processing.</label>
               </div>
               <div className="flex items-start gap-2">
                 <input type="checkbox" id="agree-terms-edit" checked={form.agreeTerms} onChange={(e) => update({ agreeTerms: e.target.checked })} className="mt-1 h-4 w-4 rounded border-gray-300 text-rooted-green focus:ring-rooted-green" />

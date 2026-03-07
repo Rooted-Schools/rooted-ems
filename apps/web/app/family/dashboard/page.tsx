@@ -96,7 +96,7 @@ export default async function FamilyDashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
             {
-              name: "Rooted School Vancouver",
+              name: "rootedschool vancouver",
               location: "Vancouver, WA",
               logo: "/logos/rooted-vancouver.png",
               shortCode: "RSV",
@@ -108,7 +108,7 @@ export default async function FamilyDashboardPage() {
               shortCode: "CRN",
             },
             {
-              name: "Rooted Schools Cleveland",
+              name: "rootedschool cleveland",
               location: "Cleveland, OH",
               logo: "/logos/rooted-cleveland.png",
               shortCode: "RSC",
