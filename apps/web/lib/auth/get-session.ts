@@ -76,3 +76,47 @@ export async function requireStaffSession(): Promise<AuthSession> {
   }
   return session;
 }
+
+/**
+ * Get the list of campus IDs this staff user can access.
+ * CMO / system_admin users with 3+ campus roles see all.
+ * School-level staff see only their assigned campus(es).
+ */
+export function getAccessibleCampusIds(session: AuthSession): string[] {
+  return Object.keys(session.campus_roles);
+}
+
+/**
+ * Check if user is a CMO-level admin (system_admin on 2+ campuses).
+ */
+export function isCMOAdmin(session: AuthSession): boolean {
+  const campusIds = Object.keys(session.campus_roles);
+  if (campusIds.length < 2) return false;
+  // Must have system_admin on at least 2 campuses
+  const adminCount = campusIds.filter((id) =>
+    session.campus_roles[id]?.includes("system_admin" as StaffRole)
+  ).length;
+  return adminCount >= 2;
+}
+
+/**
+ * Filter a selected campus ID against accessible campuses.
+ * Returns undefined if "all" or if the user has CMO-level access.
+ * Returns the specific campus ID if user only has single-campus access.
+ */
+export function resolveActiveCampus(
+  session: AuthSession,
+  selectedCampusId?: string
+): string | undefined {
+  const accessible = getAccessibleCampusIds(session);
+
+  // Single-campus staff always see only their campus
+  if (accessible.length === 1) return accessible[0];
+
+  // Multi-campus staff: use selection, or undefined for "all"
+  if (selectedCampusId && accessible.includes(selectedCampusId)) {
+    return selectedCampusId;
+  }
+
+  return undefined; // "All campuses"
+}
