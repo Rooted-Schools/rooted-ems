@@ -1020,9 +1020,10 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
                 </Button>
               </div>
             ))}
-            <p className="text-xs text-gray-400">
-              File upload will be available soon. You can submit your application
-              now and upload documents later.
+            <p className="text-xs text-gray-500">
+              You can submit your application now and upload documents from
+              the <Link href="/family/documents" className="text-rooted-green hover:underline font-medium">Documents</Link> page
+              after saving. Required documents must be uploaded before enrollment is finalized.
             </p>
           </CardContent>
         </Card>

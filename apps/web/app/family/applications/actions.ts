@@ -8,6 +8,7 @@ import {
   withdrawApplication,
   acceptOffer,
   declineOffer,
+  createDocumentRecord,
   type CreateApplicationInput,
   type UpdateApplicationInput,
 } from "@/lib/mutations";
@@ -99,6 +100,28 @@ export async function familyDeclineOffer(
     revalidatePath("/family/applications");
     revalidatePath(`/family/applications/${applicationId}`);
     revalidatePath("/family/dashboard");
+  }
+
+  return result;
+}
+
+// ─── Upload Document Record ──────────────────────────
+
+export async function familyCreateDocumentRecord(input: {
+  application_id: string;
+  student_id: string;
+  document_type: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  storage_path: string;
+}) {
+  const result = await createDocumentRecord(input);
+
+  if (!result.error) {
+    revalidatePath("/family/documents");
+    revalidatePath("/family/applications");
+    revalidatePath(`/family/applications/${input.application_id}`);
   }
 
   return result;

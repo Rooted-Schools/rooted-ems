@@ -9,6 +9,7 @@ export interface FamilyDocumentRow {
   file_name: string;
   status: string;
   file_size: number | null;
+  storage_path: string;
   created_at: string;
   verified_at: string | null;
   application_id: string | null;
@@ -275,7 +276,7 @@ export async function getFamilyDocuments(
   // Fetch documents for these applications
   const { data: docs, error } = await supabase
     .from("document")
-    .select("id, document_type, file_name, file_size, status, created_at, verified_at, application_id")
+    .select("id, document_type, file_name, file_size, storage_path, status, created_at, verified_at, application_id")
     .in("application_id", appIds)
     .order("created_at", { ascending: false });
 
@@ -290,6 +291,7 @@ export async function getFamilyDocuments(
     file_name: d.file_name as string,
     status: d.status as string,
     file_size: d.file_size as number | null,
+    storage_path: (d.storage_path as string) ?? "",
     created_at: d.created_at as string,
     verified_at: d.verified_at as string | null,
     application_id: d.application_id as string | null,
