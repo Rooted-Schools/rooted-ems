@@ -33,14 +33,14 @@ async function getPublicCampuses() {
     console.error("[inquiry/getGradeLevels]", gradeError.message);
   }
 
-  // Build grade codes per campus (only current school year)
-  const gradesByCampus: Record<string, string[]> = {};
+  // Build grade codes per campus (only current school year, deduplicated)
+  const gradesByCampus: Record<string, Set<string>> = {};
   for (const row of gradeData ?? []) {
     const sy = row.school_year as unknown as { is_current: boolean } | null;
     if (!sy?.is_current) continue;
     const cid = row.campus_id as string;
-    if (!gradesByCampus[cid]) gradesByCampus[cid] = [];
-    gradesByCampus[cid].push(row.grade as string);
+    if (!gradesByCampus[cid]) gradesByCampus[cid] = new Set();
+    gradesByCampus[cid].add(row.grade as string);
   }
 
   // Fallback grade ranges by short_code (in case no grade_level rows yet)
@@ -53,7 +53,8 @@ async function getPublicCampuses() {
   return (campusData ?? []).map((row) => {
     const id = row.id as string;
     const shortCode = row.short_code as string;
-    const gradeCodes = gradesByCampus[id] ?? fallbackGrades[shortCode] ?? ["6", "7", "8", "9", "10", "11", "12"];
+    const gradeSet = gradesByCampus[id];
+    const gradeCodes = gradeSet ? Array.from(gradeSet) : (fallbackGrades[shortCode] ?? ["6", "7", "8", "9", "10", "11", "12"]);
 
     return {
       id,

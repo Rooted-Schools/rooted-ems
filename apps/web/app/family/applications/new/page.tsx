@@ -14,10 +14,16 @@ export default async function NewApplicationPage() {
   if (!user) redirect("/login");
 
   // Fetch data needed by the form
-  const [windows, campuses] = await Promise.all([
+  const [windows, allCampuses] = await Promise.all([
     getActiveEnrollmentWindows(),
     getCampuses(),
   ]);
+
+  // Only show campuses that have an open enrollment window
+  const openCampusIds = new Set(
+    windows.filter((w) => w.is_open).map((w) => w.campus_id)
+  );
+  const campuses = allCampuses.filter((c) => openCampusIds.has(c.id));
 
   // Fetch grade levels
   const { data: gradeLevels } = await supabase

@@ -23,12 +23,9 @@ export function FamilyHeader({ userEmail, userPhone }: FamilyHeaderProps) {
           href="/family/dashboard"
           className="flex items-center gap-2 no-underline hover:opacity-90 transition-opacity"
         >
-          <div className="inline-flex items-baseline gap-1 text-sm tracking-wide">
-            <span>
-              <span className="text-rooted-green font-bold">rooted</span>
-              <span className="text-gray-800 font-medium">schools</span>
-            </span>
-          </div>
+          <span className="text-sm tracking-wide">
+            <span className="text-rooted-green font-bold">rooted</span><span className="text-gray-800 font-medium">schools</span>
+          </span>
         </Link>
 
         <nav className="flex items-center gap-6">
