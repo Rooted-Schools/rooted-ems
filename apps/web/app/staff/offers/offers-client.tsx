@@ -1,10 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -14,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  staffSendOffer,
   staffRevokeOffer,
   staffExpireOffer,
   staffConvertToEnrollment,
@@ -42,6 +53,17 @@ interface OfferStats {
   declined_or_expired: number;
 }
 
+interface EligibleApplicant {
+  application_id: string;
+  student_name: string;
+  campus_id: string;
+  campus_name: string;
+  grade_level_id: string;
+  grade: string;
+  status: string;
+  school_year_id: string;
+}
+
 const offerStatusConfig: Record<
   string,
   { label: string; variant: "default" | "success" | "destructive" | "warning" | "outline" }
@@ -57,14 +79,23 @@ export function OffersClient({
   offers,
   stats,
   staffUserId,
+  eligibleApplicants = [],
 }: {
   offers: OfferRow[];
   stats: OfferStats;
   staffUserId: string;
+  eligibleApplicants?: EligibleApplicant[];
 }) {
+  const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Create Offer form state
+  const [selectedAppId, setSelectedAppId] = useState("");
+  const [expiresIn, setExpiresIn] = useState("14"); // days
+  const [creatingOffer, setCreatingOffer] = useState(false);
 
   async function handleRevoke(offerId: string) {
     setLoading(offerId);
@@ -102,24 +133,139 @@ export function OffersClient({
     setLoading(null);
   }
 
+  async function handleCreateOffer() {
+    if (!selectedAppId || !expiresIn) return;
+
+    const applicant = eligibleApplicants.find((a) => a.application_id === selectedAppId);
+    if (!applicant) return;
+
+    setCreatingOffer(true);
+    setError(null);
+    setSuccess(null);
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + parseInt(expiresIn, 10));
+
+    const result = await staffSendOffer(
+      applicant.application_id,
+      applicant.campus_id,
+      applicant.grade_level_id,
+      expiresAt.toISOString(),
+      staffUserId
+    );
+
+    if (result.error) {
+      setError(result.error);
+    } else {
+      setSuccess(`Offer sent to ${applicant.student_name}.`);
+      setDialogOpen(false);
+      setSelectedAppId("");
+      setExpiresIn("14");
+      router.refresh();
+    }
+    setCreatingOffer(false);
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Offers</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Manage seat offers sent to accepted applicants.
+            Manage seat offers sent to applicants.
           </p>
         </div>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button disabled={eligibleApplicants.length === 0}>
+              Send Offer
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Send Offer</DialogTitle>
+              <DialogDescription>
+                Send a seat offer to a verified applicant. They will have the specified number of days to respond.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Applicant
+                </label>
+                <select
+                  value={selectedAppId}
+                  onChange={(e) => setSelectedAppId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                >
+                  <option value="">Select an applicant...</option>
+                  {eligibleApplicants.map((a) => (
+                    <option key={a.application_id} value={a.application_id}>
+                      {a.student_name} — {a.campus_name} Grade {a.grade} ({a.status === "verified" ? "Verified" : "Lottery Assigned"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Response Deadline
+                </label>
+                <select
+                  value={expiresIn}
+                  onChange={(e) => setExpiresIn(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                >
+                  <option value="7">7 days</option>
+                  <option value="10">10 days</option>
+                  <option value="14">14 days</option>
+                  <option value="21">21 days</option>
+                  <option value="30">30 days</option>
+                </select>
+              </div>
+              {selectedAppId && (() => {
+                const a = eligibleApplicants.find((x) => x.application_id === selectedAppId);
+                if (!a) return null;
+                const expDate = new Date();
+                expDate.setDate(expDate.getDate() + parseInt(expiresIn, 10));
+                return (
+                  <div className="rounded-lg bg-gray-50 p-3 text-sm">
+                    <p className="font-medium text-gray-900">{a.student_name}</p>
+                    <p className="text-gray-500">
+                      {a.campus_name} · Grade {a.grade}
+                    </p>
+                    <p className="text-gray-500 mt-1">
+                      Offer expires: {expDate.toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                );
+              })()}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateOffer}
+                disabled={creatingOffer || !selectedAppId}
+              >
+                {creatingOffer ? "Sending..." : "Send Offer"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {error && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+        <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
           {error}
         </div>
       )}
       {success && (
-        <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">
+        <div className="rounded-md bg-green-50 border border-green-200 p-3 text-sm text-green-700">
           {success}
         </div>
       )}
@@ -175,7 +321,11 @@ export function OffersClient({
             <EmptyState
               icon="🎫"
               title="No offers yet"
-              description="Offers will appear here after a lottery is run and seats are assigned."
+              description={
+                eligibleApplicants.length > 0
+                  ? `You have ${eligibleApplicants.length} eligible applicant${eligibleApplicants.length !== 1 ? "s" : ""} ready for offers. Click "Send Offer" to get started.`
+                  : "Offers will appear here after applicants are verified and seats are assigned."
+              }
             />
           </CardContent>
         </Card>

@@ -90,6 +90,8 @@ export {
   updateEnrollmentWindowStatus,
   assignStaffRole,
   removeStaffRole,
+  updatePacketRequirement,
+  bulkUpdatePacketRequirements,
   type CreateEnrollmentWindowInput,
   type AssignStaffRoleInput,
 } from "./settings";
