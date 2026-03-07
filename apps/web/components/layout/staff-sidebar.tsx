@@ -46,6 +46,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: "Equity Dashboard", href: "/staff/equity", icon: "⚖️" },
       { label: "Reports", href: "/staff/reports", icon: "📈" },
+      { label: "Audit Trail", href: "/staff/audit", icon: "🔒" },
     ],
   },
   {

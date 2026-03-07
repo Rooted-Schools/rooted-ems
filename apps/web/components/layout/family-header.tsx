@@ -56,6 +56,12 @@ export function FamilyHeader({ userEmail, userPhone }: FamilyHeaderProps) {
           >
             Messages
           </Link>
+          <Link
+            href="/family/registration"
+            className="text-sm text-gray-700 hover:text-rooted-green transition-colors"
+          >
+            Registration
+          </Link>
 
           <div className="flex items-center gap-3 ml-4 pl-4 border-l border-gray-200">
             <span className="text-sm text-gray-500">
