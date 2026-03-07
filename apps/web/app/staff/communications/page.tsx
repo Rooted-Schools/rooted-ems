@@ -1,8 +1,10 @@
 export const runtime = "edge";
+export const dynamic = "force-dynamic";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
   TableBody,
@@ -11,43 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-export const dynamic = "force-dynamic";
-
-const MOCK_MESSAGES = [
-  {
-    id: "msg-001",
-    subject: "Application Received — Confirmation",
-    channel: "email",
-    recipients: 12,
-    status: "delivered",
-    sentAt: "2026-03-03",
-  },
-  {
-    id: "msg-002",
-    subject: "Missing Documents Required",
-    channel: "email",
-    recipients: 3,
-    status: "delivered",
-    sentAt: "2026-03-02",
-  },
-  {
-    id: "msg-003",
-    subject: "Lottery Results Notification",
-    channel: "email",
-    recipients: 62,
-    status: "queued",
-    sentAt: null,
-  },
-  {
-    id: "msg-004",
-    subject: "Enrollment Deadline Reminder",
-    channel: "sms",
-    recipients: 8,
-    status: "sent",
-    sentAt: "2026-03-01",
-  },
-];
+import { getStaffCommunications } from "@/lib/queries";
 
 const channelIcons: Record<string, string> = {
   email: "📧",
@@ -63,7 +29,9 @@ const statusConfig: Record<string, { label: string; variant: "default" | "succes
   bounced: { label: "Bounced", variant: "warning" },
 };
 
-export default function StaffCommunicationsPage() {
+export default async function StaffCommunicationsPage() {
+  const { messages, stats } = await getStaffCommunications();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -74,8 +42,8 @@ export default function StaffCommunicationsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">Message Templates</Button>
-          <Button>New Message</Button>
+          <Button variant="outline" disabled>Message Templates</Button>
+          <Button disabled>New Message</Button>
         </div>
       </div>
 
@@ -87,7 +55,7 @@ export default function StaffCommunicationsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">85</p>
+            <p className="text-2xl font-bold">{stats.total_sent}</p>
           </CardContent>
         </Card>
         <Card>
@@ -97,7 +65,7 @@ export default function StaffCommunicationsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-600">79</p>
+            <p className="text-2xl font-bold text-green-600">{stats.delivered}</p>
           </CardContent>
         </Card>
         <Card>
@@ -107,7 +75,9 @@ export default function StaffCommunicationsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-amber-600">1</p>
+            <p className={`text-2xl font-bold ${stats.queued > 0 ? "text-amber-600" : "text-gray-300"}`}>
+              {stats.queued}
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -117,52 +87,64 @@ export default function StaffCommunicationsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-gray-300">0</p>
+            <p className={`text-2xl font-bold ${stats.failed > 0 ? "text-red-600" : "text-gray-300"}`}>
+              {stats.failed}
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recent Messages</CardTitle>
-          <CardDescription>All messages sent from the enrollment system.</CardDescription>
-        </CardHeader>
-        <CardContent className="px-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Channel</TableHead>
-                <TableHead>Subject</TableHead>
-                <TableHead>Recipients</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Sent</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {MOCK_MESSAGES.map((msg) => {
-                const cfg = statusConfig[msg.status] ?? statusConfig.queued;
-                return (
-                  <TableRow key={msg.id} className="cursor-pointer">
-                    <TableCell>
-                      <span className="text-lg" aria-hidden="true">
-                        {channelIcons[msg.channel] ?? "📧"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="font-medium">{msg.subject}</TableCell>
-                    <TableCell>{msg.recipients}</TableCell>
-                    <TableCell>
-                      <Badge variant={cfg.variant}>{cfg.label}</Badge>
-                    </TableCell>
-                    <TableCell className="text-gray-500">
-                      {msg.sentAt ?? "—"}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {messages.length === 0 ? (
+        <Card>
+          <CardContent className="py-8">
+            <EmptyState
+              icon="📧"
+              title="No messages sent yet"
+              description="Messages sent to families will appear here once the communications system is active."
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Recent Messages</CardTitle>
+            <CardDescription>All messages sent from the enrollment system.</CardDescription>
+          </CardHeader>
+          <CardContent className="px-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Channel</TableHead>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Sent</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {messages.map((msg) => {
+                  const cfg = statusConfig[msg.status] ?? statusConfig.queued;
+                  return (
+                    <TableRow key={msg.id}>
+                      <TableCell>
+                        <span className="text-lg" aria-hidden="true">
+                          {channelIcons[msg.channel] ?? "📧"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-medium">{msg.subject ?? "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                      </TableCell>
+                      <TableCell className="text-gray-500">
+                        {msg.sent_at ?? "—"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -1,11 +1,14 @@
 "use client";
 
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationDetail } from "@/lib/queries";
+import { familyWithdrawApplication } from "../actions";
 
 /* ─── Status guide — what happens at each stage ─── */
 function getStatusExplanation(status: string): { title: string; explanation: string; icon: string } {
@@ -28,6 +31,8 @@ function getStatusExplanation(status: string): { title: string; explanation: str
       return { title: "Waitlisted", explanation: "Your student is on the waitlist. We will notify you if a seat becomes available.", icon: "📋" };
     case "registered":
       return { title: "Registered", explanation: "Your student is fully enrolled and registered. Welcome to the Rooted School family!", icon: "🎓" };
+    case "withdrawn":
+      return { title: "Withdrawn", explanation: "This application has been withdrawn.", icon: "🚫" };
     default:
       return { title: status, explanation: "", icon: "📄" };
   }
@@ -57,16 +62,36 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+const WITHDRAWABLE = ["draft", "submitted", "needs_info", "verified", "lottery_assigned", "waitlisted"];
+
 interface FamilyApplicationDetailClientProps {
   detail: ApplicationDetail;
 }
 
 export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetailClientProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
   const statusCfg = getStatusConfig(detail.status);
   const statusExplanation = getStatusExplanation(detail.status);
   const isDraft = detail.status === "draft";
   const isOffered = detail.status === "offered";
   const needsAction = isDraft || detail.status === "needs_info" || isOffered;
+  const canWithdraw = WITHDRAWABLE.includes(detail.status);
+
+  function handleWithdraw() {
+    if (!confirm("Are you sure you want to withdraw this application? This cannot be undone.")) return;
+    startTransition(async () => {
+      const result = await familyWithdrawApplication(detail.id);
+      if (result.error) {
+        setFeedback({ type: "error", message: result.error });
+      } else {
+        setFeedback({ type: "success", message: "Application withdrawn successfully." });
+        router.refresh();
+      }
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -74,6 +99,19 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
       <Link href="/family/applications" className="text-sm text-rooted-green hover:underline">
         ← Back to My Applications
       </Link>
+
+      {/* Feedback banner */}
+      {feedback && (
+        <div
+          className={`px-4 py-2 rounded-md text-sm font-medium ${
+            feedback.type === "success"
+              ? "bg-green-50 text-green-800 border border-green-200"
+              : "bg-red-50 text-red-800 border border-red-200"
+          }`}
+        >
+          {feedback.message}
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-start justify-between">
@@ -86,17 +124,29 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
             {getGradeLabel(detail.grade)} &middot; {detail.campus_name} &middot; {detail.enrollment_window_name}
           </p>
         </div>
-        {isDraft && (
-          <Link href={`/family/applications/${detail.id}/edit`}>
-            <Button>Continue Application</Button>
-          </Link>
-        )}
-        {isOffered && (
-          <div className="flex gap-2">
-            <Button>Accept Offer</Button>
-            <Button variant="outline">Decline</Button>
-          </div>
-        )}
+        <div className="flex gap-2">
+          {isDraft && (
+            <Link href={`/family/applications/${detail.id}/edit`}>
+              <Button>Continue Application</Button>
+            </Link>
+          )}
+          {isOffered && (
+            <>
+              <Button disabled={isPending}>Accept Offer</Button>
+              <Button variant="outline" disabled={isPending}>Decline</Button>
+            </>
+          )}
+          {canWithdraw && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isPending}
+              onClick={handleWithdraw}
+            >
+              {isPending ? "Withdrawing..." : "Withdraw"}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Status explanation card */}
@@ -148,7 +198,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
               </CardDescription>
             </div>
             {(isDraft || detail.status === "needs_info") && (
-              <Button variant="outline" size="sm">Upload Document</Button>
+              <Button variant="outline" size="sm" disabled>Upload Document</Button>
             )}
           </div>
         </CardHeader>
@@ -158,7 +208,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
               <p className="text-sm text-gray-500">No documents uploaded yet.</p>
               {isDraft && (
                 <p className="text-xs text-gray-400 mt-1">
-                  Documents will be required before submitting your application.
+                  Documents can be uploaded after file upload is enabled.
                 </p>
               )}
             </div>

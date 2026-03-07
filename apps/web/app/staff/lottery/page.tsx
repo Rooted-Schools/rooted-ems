@@ -1,35 +1,12 @@
 export const runtime = "edge";
+export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-
-export const dynamic = "force-dynamic";
-
-const MOCK_LOTTERY_RUNS = [
-  {
-    id: "lot-001",
-    name: "2026–27 Grade 6 Lottery",
-    campus: "Vancouver WA",
-    grade: "6th Grade",
-    status: "draft",
-    applicants: 45,
-    seats: 30,
-    createdAt: "2026-03-01",
-  },
-  {
-    id: "lot-002",
-    name: "2026–27 Grade 9 Lottery",
-    campus: "Columbia SC",
-    grade: "9th Grade",
-    status: "official",
-    applicants: 62,
-    seats: 40,
-    createdAt: "2026-02-15",
-  },
-];
+import { getStaffLotteryRuns } from "@/lib/queries";
 
 const statusVariants: Record<string, { label: string; variant: "default" | "secondary" | "success" | "warning" }> = {
   draft: { label: "Draft", variant: "secondary" },
@@ -38,7 +15,9 @@ const statusVariants: Record<string, { label: string; variant: "default" | "seco
   archived: { label: "Archived", variant: "default" },
 };
 
-export default function StaffLotteryPage() {
+export default async function StaffLotteryPage() {
+  const runs = await getStaffLotteryRuns();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -48,26 +27,26 @@ export default function StaffLotteryPage() {
             Configure and run enrollment lotteries when demand exceeds capacity.
           </p>
         </div>
-        <Button>New Lottery Run</Button>
+        <Button disabled>New Lottery Run</Button>
       </div>
 
-      {MOCK_LOTTERY_RUNS.length === 0 ? (
+      {runs.length === 0 ? (
         <Card>
-          <CardContent>
+          <CardContent className="py-8">
             <EmptyState
               icon="🎲"
               title="No lottery runs yet"
               description="Create a lottery run when you have more applicants than available seats for a grade level."
             >
-              <Button>Create First Lottery</Button>
+              <Button disabled>Create First Lottery</Button>
             </EmptyState>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4">
-          {MOCK_LOTTERY_RUNS.map((run) => {
+          {runs.map((run) => {
             const s = statusVariants[run.status] ?? statusVariants.draft;
-            const overSubscribed = run.applicants > run.seats;
+            const overSubscribed = run.total_applicants > run.total_seats;
 
             return (
               <Link key={run.id} href={`/staff/lottery/${run.id}`}>
@@ -77,7 +56,7 @@ export default function StaffLotteryPage() {
                       <div>
                         <CardTitle className="text-base">{run.name}</CardTitle>
                         <CardDescription className="mt-1">
-                          {run.campus} · {run.grade}
+                          {run.campus_name} · {run.grade}
                         </CardDescription>
                       </div>
                       <Badge variant={s.variant}>{s.label}</Badge>
@@ -87,19 +66,19 @@ export default function StaffLotteryPage() {
                     <div className="flex items-center gap-6 text-sm">
                       <div>
                         <span className="text-gray-500">Applicants:</span>{" "}
-                        <span className="font-medium">{run.applicants}</span>
+                        <span className="font-medium">{run.total_applicants}</span>
                       </div>
                       <div>
                         <span className="text-gray-500">Seats:</span>{" "}
-                        <span className="font-medium">{run.seats}</span>
+                        <span className="font-medium">{run.total_seats}</span>
                       </div>
                       {overSubscribed && (
                         <Badge variant="warning">
-                          {run.applicants - run.seats} over capacity
+                          {run.total_applicants - run.total_seats} over capacity
                         </Badge>
                       )}
                       <div className="ml-auto text-gray-400 text-xs">
-                        Created {run.createdAt}
+                        Created {run.created_at}
                       </div>
                     </div>
                   </CardContent>

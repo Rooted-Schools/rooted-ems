@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,19 +10,31 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { GRADE_LABELS } from "@/lib/application-helpers";
+import type { EnrollmentWindowInfo, CampusRow, DraftApplicationData } from "@/lib/queries";
+import { familyUpdateApplication, familySubmitApplication } from "../../actions";
 
-const CAMPUSES = [
-  { id: "campus-vancouver", name: "Rooted School Vancouver" },
-  { id: "campus-columbia", name: "C.R. Neal Academy (Columbia)" },
-  { id: "campus-cleveland", name: "Rooted School Cleveland" },
-];
+/* ───────────── Props ───────────── */
+
+interface GradeLevel {
+  id: string;
+  grade: string;
+  campus_id: string;
+}
+
+interface EditApplicationClientProps {
+  draft: DraftApplicationData;
+  windows: EnrollmentWindowInfo[];
+  campuses: CampusRow[];
+  gradeLevels: GradeLevel[];
+}
 
 /* ───────────── step definitions ───────────── */
 
 const STEPS = [
   { id: "campus", label: "Campus & Grade" },
   { id: "student", label: "Student Info" },
-  { id: "guardian", label: "Parent / Guardian" },
+  { id: "guardian", label: "Guardian & Household" },
+  { id: "preferences", label: "Preferences & Services" },
   { id: "documents", label: "Documents" },
   { id: "review", label: "Review & Submit" },
 ] as const;
@@ -31,20 +45,28 @@ type StepId = (typeof STEPS)[number]["id"];
 
 interface FormData {
   campusId: string;
+  enrollmentWindowId: string;
+  gradeLevelId: string;
   gradeLevel: string;
   firstName: string;
   middleName: string;
   lastName: string;
+  suffix: string;
   dateOfBirth: string;
   gender: string;
   raceEthnicity: string;
   primaryLanguage: string;
+  homeLanguage: string;
   previousSchool: string;
+  previousSchoolPhone: string;
   guardianFirstName: string;
   guardianLastName: string;
   guardianRelationship: string;
   guardianEmail: string;
   guardianPhone: string;
+  guardianPhoneSecondary: string;
+  guardianEmployer: string;
+  guardianSmsConsent: boolean;
   address: string;
   city: string;
   state: string;
@@ -52,81 +74,78 @@ interface FormData {
   emergencyContactName: string;
   emergencyContactPhone: string;
   emergencyContactRelationship: string;
+  incomeBracket: string;
+  householdMembersCount: string;
+  frlEligible: string;
+  mckinneyVento: string;
+  militaryConnected: string;
+  fosterCare: string;
+  hasSiblingEnrolled: string;
+  siblingName: string;
+  transportationNeeds: string;
+  beforeAfterCare: string;
   hasIEP: string;
-  specialServices: string;
+  has504: string;
+  isELL: string;
+  isGiftedTalented: string;
+  specialServicesNotes: string;
+  dataSharingConsent: boolean;
   agreeTerms: boolean;
+  signatureName: string;
 }
 
-/* ─── Mock saved draft data keyed by application ID ─── */
-const DRAFT_DATA: Record<string, Partial<FormData>> = {
-  "app-004": {
-    campusId: "campus-vancouver",
-    gradeLevel: "7",
-    firstName: "Ava",
-    middleName: "",
-    lastName: "Johnson",
-    dateOfBirth: "2014-08-22",
-    gender: "female",
-    raceEthnicity: "",
-    primaryLanguage: "english",
-    previousSchool: "",
-    guardianFirstName: "Tanya",
-    guardianLastName: "Johnson",
-    guardianRelationship: "mother",
-    guardianEmail: "tanya.johnson@email.com",
-    guardianPhone: "(360) 555-0142",
-    address: "1234 Elm Street",
-    city: "Vancouver",
-    state: "WA",
-    zip: "98660",
-    emergencyContactName: "",
-    emergencyContactPhone: "",
-    emergencyContactRelationship: "",
-    hasIEP: "",
-    specialServices: "",
+function draftToFormData(d: DraftApplicationData): FormData {
+  return {
+    campusId: d.campus_id,
+    enrollmentWindowId: d.enrollment_window_id,
+    gradeLevelId: d.grade_level_id,
+    gradeLevel: d.grade,
+    firstName: d.student.first_name,
+    middleName: d.student.middle_name ?? "",
+    lastName: d.student.last_name,
+    suffix: d.student.suffix ?? "",
+    dateOfBirth: d.student.date_of_birth ?? "",
+    gender: d.student.gender ?? "",
+    raceEthnicity: d.student.race_ethnicity?.[0] ?? "",
+    primaryLanguage: d.student.primary_language ?? "",
+    homeLanguage: d.student.home_language ?? "",
+    previousSchool: d.student.previous_school_name ?? "",
+    previousSchoolPhone: d.student.previous_school_phone ?? "",
+    guardianFirstName: d.guardian.first_name,
+    guardianLastName: d.guardian.last_name,
+    guardianRelationship: d.guardian.relationship,
+    guardianEmail: d.guardian.email ?? "",
+    guardianPhone: d.guardian.phone ?? "",
+    guardianPhoneSecondary: d.guardian.phone_secondary ?? "",
+    guardianEmployer: d.guardian.employer ?? "",
+    guardianSmsConsent: d.guardian.sms_consent,
+    address: d.household.address_line1 ?? "",
+    city: d.household.city ?? "",
+    state: d.household.state ?? "",
+    zip: d.household.zip ?? "",
+    emergencyContactName: d.student.emergency_contact_1_name ?? "",
+    emergencyContactPhone: d.student.emergency_contact_1_phone ?? "",
+    emergencyContactRelationship: d.student.emergency_contact_1_relationship ?? "",
+    incomeBracket: d.answers.income_bracket ?? "",
+    householdMembersCount: d.answers.household_members_count ?? "",
+    frlEligible: d.answers.frl_eligible ?? "",
+    mckinneyVento: d.answers.mckinney_vento ?? "",
+    militaryConnected: d.answers.military_connected ?? "",
+    fosterCare: d.answers.foster_care ?? "",
+    hasSiblingEnrolled: d.has_sibling_enrolled ? "yes" : "",
+    siblingName: d.answers.sibling_name ?? "",
+    transportationNeeds: d.answers.transportation_needs ?? "",
+    beforeAfterCare: d.answers.before_after_care ?? "",
+    hasIEP: d.student.has_iep ? "yes" : "",
+    has504: d.student.has_504 ? "yes" : "",
+    isELL: d.answers.ell ?? "",
+    isGiftedTalented: d.answers.gifted_talented ?? "",
+    specialServicesNotes: d.student.special_services_notes ?? "",
+    dataSharingConsent: false,
     agreeTerms: false,
-  },
-};
-
-const INITIAL: FormData = {
-  campusId: "",
-  gradeLevel: "",
-  firstName: "",
-  middleName: "",
-  lastName: "",
-  dateOfBirth: "",
-  gender: "",
-  raceEthnicity: "",
-  primaryLanguage: "",
-  previousSchool: "",
-  guardianFirstName: "",
-  guardianLastName: "",
-  guardianRelationship: "",
-  guardianEmail: "",
-  guardianPhone: "",
-  address: "",
-  city: "",
-  state: "",
-  zip: "",
-  emergencyContactName: "",
-  emergencyContactPhone: "",
-  emergencyContactRelationship: "",
-  hasIEP: "",
-  specialServices: "",
-  agreeTerms: false,
-};
-
-/* ─── Mock uploaded documents for draft ─── */
-interface DraftDocument {
-  name: string;
-  fileName: string;
-  uploadedAt: string;
-  required: boolean;
+    signatureName: "",
+  };
 }
-
-const DRAFT_DOCUMENTS: Record<string, DraftDocument[]> = {
-  "app-004": [],
-};
 
 /* ───────────── field helper ───────────── */
 
@@ -180,36 +199,18 @@ function StepIndicator({
                 `}
               >
                 {isComplete ? (
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={3}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M5 13l4 4L19 7"
-                    />
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 ) : (
                   i + 1
                 )}
               </div>
-              <span
-                className={`text-xs hidden sm:inline ${
-                  isCurrent ? "font-semibold text-gray-900" : "text-gray-400"
-                }`}
-              >
+              <span className={`text-xs hidden sm:inline ${isCurrent ? "font-semibold text-gray-900" : "text-gray-400"}`}>
                 {step.label}
               </span>
               {i < steps.length - 1 && (
-                <div
-                  className={`w-6 h-px ${
-                    isComplete ? "bg-rooted-green" : "bg-gray-200"
-                  }`}
-                />
+                <div className={`w-6 h-px ${isComplete ? "bg-rooted-green" : "bg-gray-200"}`} />
               )}
             </li>
           );
@@ -219,45 +220,81 @@ function StepIndicator({
   );
 }
 
+/* ───────────── helpers to build mutation input ───────────── */
+
+function buildUpdateInput(applicationId: string, form: FormData) {
+  const answers: Record<string, string | boolean> = {};
+  if (form.incomeBracket) answers.income_bracket = form.incomeBracket;
+  if (form.householdMembersCount) answers.household_members_count = form.householdMembersCount;
+  if (form.frlEligible) answers.frl_eligible = form.frlEligible;
+  if (form.mckinneyVento) answers.mckinney_vento = form.mckinneyVento;
+  if (form.militaryConnected) answers.military_connected = form.militaryConnected;
+  if (form.fosterCare) answers.foster_care = form.fosterCare;
+  if (form.transportationNeeds) answers.transportation_needs = form.transportationNeeds;
+  if (form.beforeAfterCare) answers.before_after_care = form.beforeAfterCare;
+  if (form.isELL) answers.ell = form.isELL;
+  if (form.isGiftedTalented) answers.gifted_talented = form.isGiftedTalented;
+  if (form.dataSharingConsent) answers.data_sharing_consent = true;
+  if (form.signatureName) answers.e_signature_name = form.signatureName;
+  answers.e_signature_date = new Date().toISOString().split("T")[0];
+
+  return {
+    application_id: applicationId,
+    student_first_name: form.firstName,
+    student_middle_name: form.middleName || undefined,
+    student_last_name: form.lastName,
+    student_suffix: form.suffix || undefined,
+    student_date_of_birth: form.dateOfBirth || undefined,
+    student_gender: form.gender || undefined,
+    student_race_ethnicity: form.raceEthnicity || undefined,
+    student_primary_language: form.primaryLanguage || undefined,
+    student_home_language: form.homeLanguage || undefined,
+    student_previous_school: form.previousSchool || undefined,
+    student_previous_school_phone: form.previousSchoolPhone || undefined,
+    student_has_iep: form.hasIEP === "yes",
+    student_has_504: form.has504 === "yes",
+    student_special_services_notes: form.specialServicesNotes || undefined,
+    guardian_first_name: form.guardianFirstName,
+    guardian_last_name: form.guardianLastName,
+    guardian_relationship: form.guardianRelationship || undefined,
+    guardian_email: form.guardianEmail,
+    guardian_phone: form.guardianPhone,
+    guardian_phone_secondary: form.guardianPhoneSecondary || undefined,
+    guardian_employer: form.guardianEmployer || undefined,
+    guardian_sms_consent: form.guardianSmsConsent,
+    address_line1: form.address || undefined,
+    city: form.city || undefined,
+    state: form.state || undefined,
+    zip: form.zip || undefined,
+    emergency_contact_1_name: form.emergencyContactName || undefined,
+    emergency_contact_1_phone: form.emergencyContactPhone || undefined,
+    emergency_contact_1_relationship: form.emergencyContactRelationship || undefined,
+    has_sibling_enrolled: form.hasSiblingEnrolled === "yes",
+    sibling_name: form.siblingName || undefined,
+    answers,
+  };
+}
+
 /* ───────────── page component ───────────── */
 
-export function EditApplicationClient({ id }: { id: string }) {
-  const draftData = DRAFT_DATA[id];
-
-  const [stepIndex, setStepIndex] = React.useState(0);
-  const [form, setForm] = React.useState<FormData>({
-    ...INITIAL,
-    ...(draftData ?? {}),
-  });
+export function EditApplicationClient({ draft, windows, campuses, gradeLevels }: EditApplicationClientProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [stepIndex, setStepIndex] = useState(0);
+  const [form, setForm] = useState<FormData>(() => draftToFormData(draft));
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const currentStep = STEPS[stepIndex];
-  const uploadedDocs = DRAFT_DOCUMENTS[id] ?? [];
 
-  // Not found state
-  if (!draftData) {
-    return (
-      <div className="max-w-2xl mx-auto space-y-6">
-        <Link
-          href="/family/applications"
-          className="text-sm text-rooted-green hover:underline"
-        >
-          &larr; Back to Applications
-        </Link>
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-gray-500">
-              Application not found or is no longer editable.
-            </p>
-            <Link href="/family/applications">
-              <Button variant="outline" className="mt-4">
-                View My Applications
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const campusWindows = windows.filter(
+    (w) => w.campus_id === form.campusId && w.is_open
+  );
+
+  const campusGrades = gradeLevels.filter(
+    (g) => g.campus_id === form.campusId
+  );
+
+  const studentName = [form.firstName, form.lastName].filter(Boolean).join(" ") || "Untitled";
 
   function update(partial: Partial<FormData>) {
     setForm((prev) => ({ ...prev, ...partial }));
@@ -272,39 +309,63 @@ export function EditApplicationClient({ id }: { id: string }) {
   }
 
   function handleSaveDraft() {
-    // TODO: call Supabase to save draft
-    alert("Draft saved! (Demo mode — no data was saved.)");
+    startTransition(async () => {
+      const input = buildUpdateInput(draft.id, form);
+      const result = await familyUpdateApplication(input);
+      if (result.error) {
+        setFeedback({ type: "error", message: result.error });
+      } else {
+        setFeedback({ type: "success", message: "Draft saved!" });
+        router.refresh();
+      }
+    });
   }
 
   function handleSubmit() {
-    // TODO: call Supabase to submit application
-    alert(
-      "Application submitted successfully! (Demo mode — no data was saved.)"
-    );
+    startTransition(async () => {
+      const input = buildUpdateInput(draft.id, form);
+      const updateResult = await familyUpdateApplication(input);
+      if (updateResult.error) {
+        setFeedback({ type: "error", message: updateResult.error });
+        return;
+      }
+
+      const submitResult = await familySubmitApplication(draft.id);
+      if (submitResult.error) {
+        setFeedback({ type: "error", message: submitResult.error });
+      } else {
+        router.push(`/family/applications/${draft.id}`);
+      }
+    });
   }
 
-  const studentName = [form.firstName, form.lastName].filter(Boolean).join(" ") || "Untitled";
+  const canProceedStep: Record<StepId, boolean> = {
+    campus: !!form.campusId && !!form.gradeLevelId,
+    student: !!form.firstName && !!form.lastName && !!form.dateOfBirth,
+    guardian: !!form.guardianFirstName && !!form.guardianLastName && !!form.guardianEmail && !!form.guardianPhone,
+    preferences: true,
+    documents: true,
+    review: form.agreeTerms && form.dataSharingConsent && !!form.signatureName,
+  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <Link
-          href={`/family/applications/${id}`}
-          className="text-sm text-rooted-green hover:underline"
-        >
+        <Link href={`/family/applications/${draft.id}`} className="text-sm text-rooted-green hover:underline">
           &larr; Back to Application
         </Link>
         <div className="flex items-center gap-3 mt-2">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Edit Application — {studentName}
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">Edit Application — {studentName}</h1>
           <Badge variant="secondary">Draft</Badge>
         </div>
-        <p className="text-sm text-gray-500 mt-1">
-          Continue filling out the application. Your progress is saved
-          automatically.
-        </p>
+        <p className="text-sm text-gray-500 mt-1">Continue filling out the application. Save your progress at any time.</p>
       </div>
+
+      {feedback && (
+        <div className={`px-4 py-2 rounded-md text-sm font-medium ${feedback.type === "success" ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
+          {feedback.message}
+        </div>
+      )}
 
       <StepIndicator steps={STEPS} currentIndex={stepIndex} />
 
@@ -313,35 +374,31 @@ export function EditApplicationClient({ id }: { id: string }) {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Campus & Grade Level</CardTitle>
-            <CardDescription>
-              Select the campus and grade your child will attend.
-            </CardDescription>
+            <CardDescription>Select the campus and grade your child will attend.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Field label="Campus" required>
-              <Select
-                value={form.campusId}
-                onChange={(e) => update({ campusId: e.target.value })}
-              >
+              <Select value={form.campusId} onChange={(e) => update({ campusId: e.target.value, gradeLevelId: "", enrollmentWindowId: "" })}>
                 <option value="">Select a campus...</option>
-                {CAMPUSES.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
+                {campuses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </Select>
             </Field>
+            {form.campusId && campusWindows.length === 0 && (
+              <p className="text-sm text-amber-600">No enrollment windows are currently open for this campus.</p>
+            )}
+            {campusWindows.length > 1 && (
+              <Field label="Enrollment Window" required>
+                <Select value={form.enrollmentWindowId} onChange={(e) => update({ enrollmentWindowId: e.target.value })}>
+                  <option value="">Select window...</option>
+                  {campusWindows.map((w) => <option key={w.id} value={w.id}>{w.name} (closes {w.close_date})</option>)}
+                </Select>
+              </Field>
+            )}
             <Field label="Grade Level" required>
-              <Select
-                value={form.gradeLevel}
-                onChange={(e) => update({ gradeLevel: e.target.value })}
-              >
+              <Select value={form.gradeLevelId} onChange={(e) => { const gl = campusGrades.find((g) => g.id === e.target.value); update({ gradeLevelId: e.target.value, gradeLevel: gl?.grade ?? "" }); }}>
                 <option value="">Select grade...</option>
-                {Object.entries(GRADE_LABELS).map(([code, label]) => (
-                  <option key={code} value={code}>
-                    {label}
-                  </option>
-                ))}
+                {campusGrades.map((g) => <option key={g.id} value={g.id}>{GRADE_LABELS[g.grade] ?? `Grade ${g.grade}`}</option>)}
+                {form.campusId && campusGrades.length === 0 && Object.entries(GRADE_LABELS).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
               </Select>
             </Field>
           </CardContent>
@@ -353,266 +410,147 @@ export function EditApplicationClient({ id }: { id: string }) {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Student Information</CardTitle>
-            <CardDescription>
-              Enter your child&apos;s legal name and personal details.
-            </CardDescription>
+            <CardDescription>Enter your child&apos;s legal name and personal details.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Field label="First Name" required>
-                <Input
-                  value={form.firstName}
-                  onChange={(e) => update({ firstName: e.target.value })}
-                  placeholder="First"
-                />
-              </Field>
-              <Field label="Middle Name">
-                <Input
-                  value={form.middleName}
-                  onChange={(e) => update({ middleName: e.target.value })}
-                  placeholder="Middle"
-                />
-              </Field>
-              <Field label="Last Name" required>
-                <Input
-                  value={form.lastName}
-                  onChange={(e) => update({ lastName: e.target.value })}
-                  placeholder="Last"
-                />
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <Field label="First Name" required><Input value={form.firstName} onChange={(e) => update({ firstName: e.target.value })} placeholder="First" /></Field>
+              <Field label="Middle Name"><Input value={form.middleName} onChange={(e) => update({ middleName: e.target.value })} placeholder="Middle" /></Field>
+              <Field label="Last Name" required><Input value={form.lastName} onChange={(e) => update({ lastName: e.target.value })} placeholder="Last" /></Field>
+              <Field label="Suffix">
+                <Select value={form.suffix} onChange={(e) => update({ suffix: e.target.value })}>
+                  <option value="">None</option>
+                  <option value="Jr.">Jr.</option><option value="Sr.">Sr.</option>
+                  <option value="II">II</option><option value="III">III</option><option value="IV">IV</option>
+                </Select>
               </Field>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Date of Birth" required>
-                <Input
-                  type="date"
-                  value={form.dateOfBirth}
-                  onChange={(e) => update({ dateOfBirth: e.target.value })}
-                />
-              </Field>
+              <Field label="Date of Birth" required><Input type="date" value={form.dateOfBirth} onChange={(e) => update({ dateOfBirth: e.target.value })} /></Field>
               <Field label="Gender">
-                <Select
-                  value={form.gender}
-                  onChange={(e) => update({ gender: e.target.value })}
-                >
-                  <option value="">Select...</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="non_binary">Non-binary</option>
-                  <option value="prefer_not">Prefer not to say</option>
+                <Select value={form.gender} onChange={(e) => update({ gender: e.target.value })}>
+                  <option value="">Select...</option><option value="male">Male</option><option value="female">Female</option>
+                  <option value="non_binary">Non-binary</option><option value="prefer_not">Prefer not to say</option>
                 </Select>
               </Field>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Race / Ethnicity">
-                <Select
-                  value={form.raceEthnicity}
-                  onChange={(e) => update({ raceEthnicity: e.target.value })}
-                >
-                  <option value="">Select...</option>
-                  <option value="american_indian">American Indian or Alaska Native</option>
-                  <option value="asian">Asian</option>
-                  <option value="black">Black or African American</option>
-                  <option value="hispanic">Hispanic or Latino</option>
-                  <option value="pacific_islander">Native Hawaiian or Pacific Islander</option>
-                  <option value="white">White</option>
-                  <option value="two_or_more">Two or More Races</option>
-                  <option value="prefer_not">Prefer not to say</option>
-                </Select>
-              </Field>
-              <Field label="Primary / Home Language">
-                <Select
-                  value={form.primaryLanguage}
-                  onChange={(e) => update({ primaryLanguage: e.target.value })}
-                >
-                  <option value="">Select...</option>
-                  <option value="english">English</option>
-                  <option value="spanish">Spanish</option>
-                  <option value="mandarin">Mandarin</option>
-                  <option value="arabic">Arabic</option>
-                  <option value="vietnamese">Vietnamese</option>
-                  <option value="other">Other</option>
-                </Select>
-              </Field>
-            </div>
-            <Field label="Previous School">
-              <Input
-                value={form.previousSchool}
-                onChange={(e) => update({ previousSchool: e.target.value })}
-                placeholder="Name of previous school attended"
-              />
+            <Field label="Race / Ethnicity">
+              <Select value={form.raceEthnicity} onChange={(e) => update({ raceEthnicity: e.target.value })}>
+                <option value="">Select...</option><option value="american_indian">American Indian or Alaska Native</option>
+                <option value="asian">Asian</option><option value="black">Black or African American</option>
+                <option value="hispanic">Hispanic or Latino</option><option value="pacific_islander">Native Hawaiian or Pacific Islander</option>
+                <option value="white">White</option><option value="two_or_more">Two or More Races</option><option value="prefer_not">Prefer not to say</option>
+              </Select>
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Does the student have an IEP or 504 plan?">
-                <Select
-                  value={form.hasIEP}
-                  onChange={(e) => update({ hasIEP: e.target.value })}
-                >
-                  <option value="">Select...</option>
-                  <option value="no">No</option>
-                  <option value="iep">Yes — IEP</option>
-                  <option value="504">Yes — 504 Plan</option>
+              <Field label="Primary Language">
+                <Select value={form.primaryLanguage} onChange={(e) => update({ primaryLanguage: e.target.value })}>
+                  <option value="">Select...</option><option value="english">English</option><option value="spanish">Spanish</option>
+                  <option value="mandarin">Mandarin</option><option value="arabic">Arabic</option><option value="vietnamese">Vietnamese</option><option value="other">Other</option>
                 </Select>
               </Field>
-              {(form.hasIEP === "iep" || form.hasIEP === "504") && (
-                <Field label="Special Services Description">
-                  <Input
-                    value={form.specialServices}
-                    onChange={(e) =>
-                      update({ specialServices: e.target.value })
-                    }
-                    placeholder="Briefly describe services"
-                  />
-                </Field>
-              )}
+              <Field label="Home Language">
+                <Select value={form.homeLanguage} onChange={(e) => update({ homeLanguage: e.target.value })}>
+                  <option value="">Same as primary</option><option value="english">English</option><option value="spanish">Spanish</option>
+                  <option value="mandarin">Mandarin</option><option value="arabic">Arabic</option><option value="vietnamese">Vietnamese</option><option value="other">Other</option>
+                </Select>
+              </Field>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Previous School"><Input value={form.previousSchool} onChange={(e) => update({ previousSchool: e.target.value })} placeholder="Name of previous school" /></Field>
+              <Field label="Previous School Phone"><Input type="tel" value={form.previousSchoolPhone} onChange={(e) => update({ previousSchoolPhone: e.target.value })} placeholder="(555) 555-0100" /></Field>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* ───── Step 3: Guardian ───── */}
+      {/* ───── Step 3: Guardian & Household ───── */}
       {currentStep.id === "guardian" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">
-              Parent / Guardian Information
-            </CardTitle>
-            <CardDescription>
-              Primary contact and address information for the household.
-            </CardDescription>
+            <CardTitle className="text-base">Parent / Guardian & Household</CardTitle>
+            <CardDescription>Primary contact, address, and household information.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="First Name" required>
-                <Input
-                  value={form.guardianFirstName}
-                  onChange={(e) =>
-                    update({ guardianFirstName: e.target.value })
-                  }
-                  placeholder="First"
-                />
-              </Field>
-              <Field label="Last Name" required>
-                <Input
-                  value={form.guardianLastName}
-                  onChange={(e) =>
-                    update({ guardianLastName: e.target.value })
-                  }
-                  placeholder="Last"
-                />
-              </Field>
+              <Field label="First Name" required><Input value={form.guardianFirstName} onChange={(e) => update({ guardianFirstName: e.target.value })} placeholder="First" /></Field>
+              <Field label="Last Name" required><Input value={form.guardianLastName} onChange={(e) => update({ guardianLastName: e.target.value })} placeholder="Last" /></Field>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Field label="Relationship" required>
-                <Select
-                  value={form.guardianRelationship}
-                  onChange={(e) =>
-                    update({ guardianRelationship: e.target.value })
-                  }
-                >
-                  <option value="">Select...</option>
-                  <option value="mother">Mother</option>
-                  <option value="father">Father</option>
-                  <option value="legal_guardian">Legal Guardian</option>
-                  <option value="grandparent">Grandparent</option>
-                  <option value="other">Other</option>
+                <Select value={form.guardianRelationship} onChange={(e) => update({ guardianRelationship: e.target.value })}>
+                  <option value="">Select...</option><option value="parent">Parent</option><option value="step_parent">Step-Parent</option>
+                  <option value="grandparent">Grandparent</option><option value="foster_parent">Foster Parent</option>
+                  <option value="legal_guardian">Legal Guardian</option><option value="other">Other</option>
                 </Select>
               </Field>
-              <Field label="Email" required>
-                <Input
-                  type="email"
-                  value={form.guardianEmail}
-                  onChange={(e) =>
-                    update({ guardianEmail: e.target.value })
-                  }
-                  placeholder="email@example.com"
-                />
-              </Field>
-              <Field label="Phone" required>
-                <Input
-                  type="tel"
-                  value={form.guardianPhone}
-                  onChange={(e) =>
-                    update({ guardianPhone: e.target.value })
-                  }
-                  placeholder="(555) 555-0100"
-                />
-              </Field>
+              <Field label="Email" required><Input type="email" value={form.guardianEmail} onChange={(e) => update({ guardianEmail: e.target.value })} placeholder="email@example.com" /></Field>
+              <Field label="Phone" required><Input type="tel" value={form.guardianPhone} onChange={(e) => update({ guardianPhone: e.target.value })} placeholder="(555) 555-0100" /></Field>
             </div>
-
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Alternate Phone"><Input type="tel" value={form.guardianPhoneSecondary} onChange={(e) => update({ guardianPhoneSecondary: e.target.value })} placeholder="(555) 555-0100" /></Field>
+              <Field label="Employer (optional)"><Input value={form.guardianEmployer} onChange={(e) => update({ guardianEmployer: e.target.value })} placeholder="Employer name" /></Field>
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="sms-consent-edit" checked={form.guardianSmsConsent} onChange={(e) => update({ guardianSmsConsent: e.target.checked })} className="h-4 w-4 rounded border-gray-300 text-rooted-green focus:ring-rooted-green" />
+              <label htmlFor="sms-consent-edit" className="text-sm text-gray-600">I consent to receive SMS/text messages about my child&apos;s enrollment</label>
+            </div>
             <hr className="my-2 border-gray-200" />
-
-            <Field label="Street Address" required>
-              <Input
-                value={form.address}
-                onChange={(e) => update({ address: e.target.value })}
-                placeholder="1234 Main St"
-              />
-            </Field>
+            <Field label="Street Address" required><Input value={form.address} onChange={(e) => update({ address: e.target.value })} placeholder="1234 Main St" /></Field>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="col-span-2">
-                <Field label="City" required>
-                  <Input
-                    value={form.city}
-                    onChange={(e) => update({ city: e.target.value })}
-                    placeholder="City"
-                  />
-                </Field>
-              </div>
-              <Field label="State" required>
-                <Input
-                  value={form.state}
-                  onChange={(e) => update({ state: e.target.value })}
-                  placeholder="WA"
-                  maxLength={2}
-                />
-              </Field>
-              <Field label="ZIP" required>
-                <Input
-                  value={form.zip}
-                  onChange={(e) => update({ zip: e.target.value })}
-                  placeholder="98660"
-                  maxLength={10}
-                />
+              <div className="col-span-2"><Field label="City" required><Input value={form.city} onChange={(e) => update({ city: e.target.value })} placeholder="City" /></Field></div>
+              <Field label="State" required><Input value={form.state} onChange={(e) => update({ state: e.target.value })} placeholder="WA" maxLength={2} /></Field>
+              <Field label="ZIP" required><Input value={form.zip} onChange={(e) => update({ zip: e.target.value })} placeholder="98660" maxLength={10} /></Field>
+            </div>
+            <hr className="my-2 border-gray-200" />
+            <p className="text-sm font-medium text-gray-700">Emergency Contact</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Field label="Contact Name"><Input value={form.emergencyContactName} onChange={(e) => update({ emergencyContactName: e.target.value })} placeholder="Full name" /></Field>
+              <Field label="Phone"><Input type="tel" value={form.emergencyContactPhone} onChange={(e) => update({ emergencyContactPhone: e.target.value })} placeholder="(555) 555-0100" /></Field>
+              <Field label="Relationship">
+                <Select value={form.emergencyContactRelationship} onChange={(e) => update({ emergencyContactRelationship: e.target.value })}>
+                  <option value="">Select...</option><option value="parent">Parent</option><option value="grandparent">Grandparent</option>
+                  <option value="aunt_uncle">Aunt / Uncle</option><option value="family_friend">Family Friend</option><option value="other">Other</option>
+                </Select>
               </Field>
             </div>
-
             <hr className="my-2 border-gray-200" />
-            <p className="text-sm font-medium text-gray-700">
-              Emergency Contact
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Field label="Contact Name" required>
-                <Input
-                  value={form.emergencyContactName}
-                  onChange={(e) =>
-                    update({ emergencyContactName: e.target.value })
-                  }
-                  placeholder="Full name"
-                />
+            <p className="text-sm font-medium text-gray-700">Household Information</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Household Income Bracket">
+                <Select value={form.incomeBracket} onChange={(e) => update({ incomeBracket: e.target.value })}>
+                  <option value="">Prefer not to say</option><option value="under_25k">Under $25,000</option><option value="25k_50k">$25,000 - $49,999</option>
+                  <option value="50k_75k">$50,000 - $74,999</option><option value="75k_100k">$75,000 - $99,999</option><option value="over_100k">$100,000+</option>
+                </Select>
               </Field>
-              <Field label="Phone" required>
-                <Input
-                  type="tel"
-                  value={form.emergencyContactPhone}
-                  onChange={(e) =>
-                    update({ emergencyContactPhone: e.target.value })
-                  }
-                  placeholder="(555) 555-0100"
-                />
+              <Field label="Number of Household Members">
+                <Select value={form.householdMembersCount} onChange={(e) => update({ householdMembersCount: e.target.value })}>
+                  <option value="">Select...</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
+                  <option value="5">5</option><option value="6">6</option><option value="7+">7 or more</option>
+                </Select>
               </Field>
-              <Field label="Relationship" required>
-                <Select
-                  value={form.emergencyContactRelationship}
-                  onChange={(e) =>
-                    update({ emergencyContactRelationship: e.target.value })
-                  }
-                >
-                  <option value="">Select...</option>
-                  <option value="parent">Parent</option>
-                  <option value="grandparent">Grandparent</option>
-                  <option value="aunt_uncle">Aunt / Uncle</option>
-                  <option value="family_friend">Family Friend</option>
-                  <option value="other">Other</option>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Free/Reduced Lunch Eligible?">
+                <Select value={form.frlEligible} onChange={(e) => update({ frlEligible: e.target.value })}>
+                  <option value="">Select...</option><option value="yes">Yes</option><option value="no">No</option><option value="unsure">Unsure</option>
+                </Select>
+              </Field>
+              <Field label="McKinney-Vento (Experiencing Homelessness)?">
+                <Select value={form.mckinneyVento} onChange={(e) => update({ mckinneyVento: e.target.value })}>
+                  <option value="">Select...</option><option value="yes">Yes</option><option value="no">No</option>
+                </Select>
+              </Field>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Military Connected Family?">
+                <Select value={form.militaryConnected} onChange={(e) => update({ militaryConnected: e.target.value })}>
+                  <option value="">Select...</option><option value="yes">Yes</option><option value="no">No</option>
+                </Select>
+              </Field>
+              <Field label="Foster Care Status?">
+                <Select value={form.fosterCare} onChange={(e) => update({ fosterCare: e.target.value })}>
+                  <option value="">Select...</option><option value="yes">Yes</option><option value="no">No</option>
                 </Select>
               </Field>
             </div>
@@ -620,187 +558,153 @@ export function EditApplicationClient({ id }: { id: string }) {
         </Card>
       )}
 
-      {/* ───── Step 4: Documents ───── */}
+      {/* ───── Step 4: Preferences & Services ───── */}
+      {currentStep.id === "preferences" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Preferences & Special Services</CardTitle>
+            <CardDescription>Tell us about enrollment preferences and any special services your child may need.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm font-medium text-gray-700">Enrollment Preferences</p>
+            <Field label="Does your child have a sibling currently enrolled?">
+              <Select value={form.hasSiblingEnrolled} onChange={(e) => update({ hasSiblingEnrolled: e.target.value })}>
+                <option value="">Select...</option><option value="yes">Yes</option><option value="no">No</option>
+              </Select>
+            </Field>
+            {form.hasSiblingEnrolled === "yes" && (
+              <Field label="Sibling Name"><Input value={form.siblingName} onChange={(e) => update({ siblingName: e.target.value })} placeholder="Full name of enrolled sibling" /></Field>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Transportation Needs?">
+                <Select value={form.transportationNeeds} onChange={(e) => update({ transportationNeeds: e.target.value })}>
+                  <option value="">Select...</option><option value="yes">Yes — will need transportation</option><option value="no">No — will provide own transportation</option>
+                </Select>
+              </Field>
+              <Field label="Interested in Before/After Care?">
+                <Select value={form.beforeAfterCare} onChange={(e) => update({ beforeAfterCare: e.target.value })}>
+                  <option value="">Select...</option><option value="before">Before school only</option><option value="after">After school only</option>
+                  <option value="both">Both before and after</option><option value="no">No</option>
+                </Select>
+              </Field>
+            </div>
+            <hr className="my-2 border-gray-200" />
+            <p className="text-sm font-medium text-gray-700">Special Services</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="IEP (Individualized Education Program)?">
+                <Select value={form.hasIEP} onChange={(e) => update({ hasIEP: e.target.value })}>
+                  <option value="">Select...</option><option value="yes">Yes</option><option value="no">No</option>
+                </Select>
+              </Field>
+              <Field label="504 Plan?">
+                <Select value={form.has504} onChange={(e) => update({ has504: e.target.value })}>
+                  <option value="">Select...</option><option value="yes">Yes</option><option value="no">No</option>
+                </Select>
+              </Field>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="English Language Learner (ELL)?">
+                <Select value={form.isELL} onChange={(e) => update({ isELL: e.target.value })}>
+                  <option value="">Select...</option><option value="yes">Yes</option><option value="no">No</option>
+                </Select>
+              </Field>
+              <Field label="Gifted / Talented?">
+                <Select value={form.isGiftedTalented} onChange={(e) => update({ isGiftedTalented: e.target.value })}>
+                  <option value="">Select...</option><option value="yes">Yes</option><option value="no">No</option>
+                </Select>
+              </Field>
+            </div>
+            {(form.hasIEP === "yes" || form.has504 === "yes" || form.isELL === "yes" || form.isGiftedTalented === "yes") && (
+              <Field label="Special Services Notes"><Input value={form.specialServicesNotes} onChange={(e) => update({ specialServicesNotes: e.target.value })} placeholder="Briefly describe services currently received" /></Field>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ───── Step 5: Documents ───── */}
       {currentStep.id === "documents" && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Required Documents</CardTitle>
-            <CardDescription>
-              Upload the following documents for your application. Accepted
-              formats: PDF, JPG, PNG (max 10 MB each).
-            </CardDescription>
+            <CardDescription>Upload the following documents for your application. Accepted formats: PDF, JPG, PNG (max 10 MB each).</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {[
-              {
-                name: "Birth Certificate or Proof of Age",
-                desc: "Birth certificate, passport, or baptismal record",
-                required: true,
-              },
-              {
-                name: "Proof of Residency",
-                desc: "Utility bill, lease agreement, or mortgage statement",
-                required: true,
-              },
-              {
-                name: "Immunization Records",
-                desc: "Current immunization record from your healthcare provider",
-                required: true,
-              },
-              {
-                name: "Recent Physical Exam",
-                desc: "Physical exam within the last 12 months",
-                required: false,
-              },
-              {
-                name: "Previous School Records",
-                desc: "Report cards or transcripts from prior school",
-                required: false,
-              },
-              {
-                name: "IEP / 504 Plan",
-                desc: "If applicable, upload current plan documentation",
-                required: false,
-              },
-            ].map((doc) => {
-              const uploaded = uploadedDocs.find((d) => d.name === doc.name);
-              return (
-                <div
-                  key={doc.name}
-                  className="flex items-start justify-between gap-4 p-3 border border-gray-200 rounded-md"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900">
-                      {doc.name}
-                      {doc.required && (
-                        <span className="text-red-500 ml-0.5">*</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">{doc.desc}</p>
-                    {uploaded && (
-                      <p className="text-xs text-rooted-green mt-1">
-                        ✓ Uploaded: {uploaded.fileName}
-                      </p>
-                    )}
-                  </div>
-                  <Button variant="outline" size="sm" className="shrink-0">
-                    {uploaded ? "Replace" : "Upload"}
-                  </Button>
+              { name: "Birth Certificate or Proof of Age", desc: "Birth certificate, passport, or baptismal record", required: true },
+              { name: "Proof of Residency", desc: "Utility bill, lease agreement, or mortgage statement", required: true },
+              { name: "Immunization Records", desc: "Current immunization record from your healthcare provider", required: true },
+              { name: "Previous School Records", desc: "Report cards or transcripts from prior school", required: false },
+              { name: "IEP / 504 Plan", desc: "If applicable, upload current plan documentation", required: false },
+              { name: "Custody Documentation", desc: "If applicable, upload custody or guardianship documents", required: false },
+            ].map((doc) => (
+              <div key={doc.name} className="flex items-start justify-between gap-4 p-3 border border-gray-200 rounded-md">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900">{doc.name}{doc.required && <span className="text-red-500 ml-0.5">*</span>}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{doc.desc}</p>
                 </div>
-              );
-            })}
-            <p className="text-xs text-gray-400">
-              Documents will be securely stored and only accessible by
-              authorized enrollment staff.
-            </p>
+                <Button variant="outline" size="sm" className="shrink-0" disabled>Upload</Button>
+              </div>
+            ))}
+            <p className="text-xs text-gray-400">File upload will be available soon. You can submit your application now and upload documents later.</p>
           </CardContent>
         </Card>
       )}
 
-      {/* ───── Step 5: Review ───── */}
+      {/* ───── Step 6: Review & Submit ───── */}
       {currentStep.id === "review" && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Review & Submit</CardTitle>
-            <CardDescription>
-              Please review your application details before submitting.
-            </CardDescription>
+            <CardDescription>Please review your application details before submitting.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="space-y-4">
               <ReviewSection title="Campus & Grade">
-                <ReviewRow
-                  label="Campus"
-                  value={
-                    CAMPUSES.find((c) => c.id === form.campusId)?.name || "—"
-                  }
-                />
-                <ReviewRow
-                  label="Grade"
-                  value={
-                    form.gradeLevel
-                      ? GRADE_LABELS[form.gradeLevel] || form.gradeLevel
-                      : "—"
-                  }
-                />
+                <ReviewRow label="Campus" value={campuses.find((c) => c.id === form.campusId)?.name || "—"} />
+                <ReviewRow label="Grade" value={form.gradeLevel ? GRADE_LABELS[form.gradeLevel] || `Grade ${form.gradeLevel}` : "—"} />
               </ReviewSection>
-
               <ReviewSection title="Student">
-                <ReviewRow
-                  label="Name"
-                  value={
-                    [form.firstName, form.middleName, form.lastName]
-                      .filter(Boolean)
-                      .join(" ") || "—"
-                  }
-                />
+                <ReviewRow label="Name" value={[form.firstName, form.middleName, form.lastName, form.suffix].filter(Boolean).join(" ") || "—"} />
                 <ReviewRow label="Date of Birth" value={form.dateOfBirth || "—"} />
                 <ReviewRow label="Gender" value={form.gender || "—"} />
+                <ReviewRow label="Language" value={form.primaryLanguage || "—"} />
                 <ReviewRow label="Previous School" value={form.previousSchool || "—"} />
               </ReviewSection>
-
               <ReviewSection title="Parent / Guardian">
-                <ReviewRow
-                  label="Name"
-                  value={
-                    [form.guardianFirstName, form.guardianLastName]
-                      .filter(Boolean)
-                      .join(" ") || "—"
-                  }
-                />
+                <ReviewRow label="Name" value={[form.guardianFirstName, form.guardianLastName].filter(Boolean).join(" ") || "—"} />
                 <ReviewRow label="Relationship" value={form.guardianRelationship || "—"} />
                 <ReviewRow label="Email" value={form.guardianEmail || "—"} />
                 <ReviewRow label="Phone" value={form.guardianPhone || "—"} />
-                <ReviewRow
-                  label="Address"
-                  value={
-                    [form.address, form.city, form.state, form.zip]
-                      .filter(Boolean)
-                      .join(", ") || "—"
-                  }
-                />
+                <ReviewRow label="Address" value={[form.address, form.city, form.state, form.zip].filter(Boolean).join(", ") || "—"} />
               </ReviewSection>
-
-              <ReviewSection title="Emergency Contact">
-                <ReviewRow label="Name" value={form.emergencyContactName || "—"} />
-                <ReviewRow label="Phone" value={form.emergencyContactPhone || "—"} />
-                <ReviewRow label="Relationship" value={form.emergencyContactRelationship || "—"} />
+              <ReviewSection title="Preferences">
+                <ReviewRow label="Sibling Enrolled" value={form.hasSiblingEnrolled === "yes" ? `Yes — ${form.siblingName || "—"}` : "No"} />
+                <ReviewRow label="Transportation" value={form.transportationNeeds === "yes" ? "Needs transportation" : "Own transportation"} />
+              </ReviewSection>
+              <ReviewSection title="Special Services">
+                <ReviewRow label="IEP" value={form.hasIEP === "yes" ? "Yes" : "No"} />
+                <ReviewRow label="504 Plan" value={form.has504 === "yes" ? "Yes" : "No"} />
+                <ReviewRow label="ELL" value={form.isELL === "yes" ? "Yes" : "No"} />
+                {form.specialServicesNotes && <ReviewRow label="Notes" value={form.specialServicesNotes} />}
               </ReviewSection>
             </div>
-
-            {/* Completeness warnings */}
-            {(!form.emergencyContactName || !form.emergencyContactPhone) && (
-              <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
-                <p className="text-sm text-amber-800 font-medium">
-                  ⚠️ Incomplete Fields
-                </p>
-                <p className="text-sm text-amber-700 mt-0.5">
-                  Please go back and fill in all required fields before submitting,
-                  including emergency contact information.
-                </p>
-              </div>
-            )}
-
             <hr className="border-gray-200" />
-
-            <div className="flex items-start gap-2">
-              <input
-                type="checkbox"
-                id="agree-terms"
-                checked={form.agreeTerms}
-                onChange={(e) => update({ agreeTerms: e.target.checked })}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-rooted-green focus:ring-rooted-green"
-              />
-              <label
-                htmlFor="agree-terms"
-                className="text-sm text-gray-600"
-              >
-                I certify that the information provided in this application is
-                accurate and complete to the best of my knowledge. I understand
-                that providing false information may result in the
-                disqualification of this application.
-              </label>
+            <div className="space-y-3">
+              <div className="flex items-start gap-2">
+                <input type="checkbox" id="data-sharing-consent-edit" checked={form.dataSharingConsent} onChange={(e) => update({ dataSharingConsent: e.target.checked })} className="mt-1 h-4 w-4 rounded border-gray-300 text-rooted-green focus:ring-rooted-green" />
+                <label htmlFor="data-sharing-consent-edit" className="text-sm text-gray-600">I consent to the sharing of my child&apos;s educational records with Rooted School Foundation for the purpose of enrollment processing.</label>
+              </div>
+              <div className="flex items-start gap-2">
+                <input type="checkbox" id="agree-terms-edit" checked={form.agreeTerms} onChange={(e) => update({ agreeTerms: e.target.checked })} className="mt-1 h-4 w-4 rounded border-gray-300 text-rooted-green focus:ring-rooted-green" />
+                <label htmlFor="agree-terms-edit" className="text-sm text-gray-600">I certify that the information provided in this application is accurate and complete to the best of my knowledge. I understand that providing false information may result in the disqualification of this application.</label>
+              </div>
             </div>
+            <hr className="border-gray-200" />
+            <p className="text-sm font-medium text-gray-700">Electronic Signature</p>
+            <Field label="Type your full legal name to sign" required>
+              <Input value={form.signatureName} onChange={(e) => update({ signatureName: e.target.value })} placeholder="Full legal name" />
+            </Field>
+            <p className="text-xs text-gray-400">By typing your name above, you are electronically signing this application. Date: {new Date().toLocaleDateString("en-US")}</p>
           </CardContent>
         </Card>
       )}
@@ -808,51 +712,35 @@ export function EditApplicationClient({ id }: { id: string }) {
       {/* ───── Navigation ───── */}
       <div className="flex items-center justify-between pt-2">
         <div>
-          {stepIndex > 0 && (
-            <Button variant="outline" onClick={back}>
-              Back
-            </Button>
-          )}
+          {stepIndex > 0 && <Button variant="outline" onClick={back} disabled={isPending}>Back</Button>}
         </div>
         <div className="flex gap-2">
           {stepIndex < STEPS.length - 1 && (
             <>
-              <Button variant="outline" onClick={handleSaveDraft}>
-                Save Draft
+              <Button variant="outline" onClick={handleSaveDraft} disabled={isPending}>
+                {isPending ? "Saving..." : "Save Draft"}
               </Button>
-              <Button onClick={next}>Continue</Button>
+              <Button onClick={next} disabled={!canProceedStep[currentStep.id]}>Continue</Button>
             </>
           )}
           {stepIndex === STEPS.length - 1 && (
-            <Button onClick={handleSubmit} disabled={!form.agreeTerms}>
-              Submit Application
+            <Button onClick={handleSubmit} disabled={!canProceedStep.review || isPending}>
+              {isPending ? "Submitting..." : "Submit Application"}
             </Button>
           )}
         </div>
       </div>
-
-      {/* Application ID footer */}
-      <div className="text-xs text-gray-400 pb-4">
-        Application ID: {id}
-      </div>
+      <div className="text-xs text-gray-400 pb-4">Application ID: {draft.id}</div>
     </div>
   );
 }
 
 /* ─── review helpers ─── */
 
-function ReviewSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function ReviewSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-        {title}
-      </p>
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{title}</p>
       <div className="space-y-1">{children}</div>
     </div>
   );

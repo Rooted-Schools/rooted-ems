@@ -1,7 +1,9 @@
 export const runtime = "edge";
+export const dynamic = "force-dynamic";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
   TableBody,
@@ -10,29 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-export const dynamic = "force-dynamic";
-
-const MOCK_ENROLLED = [
-  {
-    id: "enr-001",
-    studentName: "Maya Patel",
-    grade: "6th Grade",
-    campus: "Columbia SC",
-    status: "active",
-    enrolledAt: "2026-02-20",
-    sisId: "RSF-2026-0042",
-  },
-  {
-    id: "enr-002",
-    studentName: "Aisha Mohammed",
-    grade: "8th Grade",
-    campus: "Cleveland OH",
-    status: "active",
-    enrolledAt: "2026-03-01",
-    sisId: "RSF-2026-0058",
-  },
-];
+import { getStaffEnrollments } from "@/lib/queries";
 
 const enrollmentStatusConfig: Record<string, { label: string; variant: "success" | "warning" | "destructive" | "outline" }> = {
   pending: { label: "Pending", variant: "warning" },
@@ -41,7 +21,9 @@ const enrollmentStatusConfig: Record<string, { label: string; variant: "success"
   transferred: { label: "Transferred", variant: "outline" },
 };
 
-export default function StaffEnrollmentPage() {
+export default async function StaffEnrollmentPage() {
+  const { enrollments, stats } = await getStaffEnrollments();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -61,9 +43,7 @@ export default function StaffEnrollmentPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-rooted-green">
-              {MOCK_ENROLLED.length}
-            </p>
+            <p className="text-2xl font-bold text-rooted-green">{stats.total}</p>
           </CardContent>
         </Card>
         <Card>
@@ -73,9 +53,7 @@ export default function StaffEnrollmentPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">
-              {MOCK_ENROLLED.filter((e) => e.status === "active").length}
-            </p>
+            <p className="text-2xl font-bold">{stats.active}</p>
           </CardContent>
         </Card>
         <Card>
@@ -85,9 +63,7 @@ export default function StaffEnrollmentPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">
-              {MOCK_ENROLLED.filter((e) => e.sisId).length}
-            </p>
+            <p className="text-2xl font-bold">{stats.sis_synced}</p>
           </CardContent>
         </Card>
         <Card>
@@ -97,54 +73,72 @@ export default function StaffEnrollmentPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-gray-300">0</p>
+            <p className={`text-2xl font-bold ${stats.withdrawn === 0 ? "text-gray-300" : "text-red-600"}`}>
+              {stats.withdrawn}
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardContent className="pt-6 px-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student</TableHead>
-                <TableHead>Grade</TableHead>
-                <TableHead>Campus</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>SIS ID</TableHead>
-                <TableHead>Enrolled</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {MOCK_ENROLLED.map((enrollment) => {
-                const cfg =
-                  enrollmentStatusConfig[enrollment.status] ??
-                  enrollmentStatusConfig.pending;
-                return (
-                  <TableRow key={enrollment.id} className="cursor-pointer">
-                    <TableCell className="font-medium">
-                      {enrollment.studentName}
-                    </TableCell>
-                    <TableCell>{enrollment.grade}</TableCell>
-                    <TableCell>{enrollment.campus}</TableCell>
-                    <TableCell>
-                      <Badge variant={cfg.variant}>{cfg.label}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
-                        {enrollment.sisId}
-                      </code>
-                    </TableCell>
-                    <TableCell className="text-gray-500">
-                      {enrollment.enrolledAt}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {enrollments.length === 0 ? (
+        <Card>
+          <CardContent className="py-8">
+            <EmptyState
+              icon="🎓"
+              title="No enrollments yet"
+              description="Enrolled students will appear here after they accept an offer and complete registration."
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="pt-6 px-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Grade</TableHead>
+                  <TableHead>Campus</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>SIS ID</TableHead>
+                  <TableHead>Enrolled</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {enrollments.map((enrollment) => {
+                  const cfg =
+                    enrollmentStatusConfig[enrollment.status] ??
+                    enrollmentStatusConfig.pending;
+                  return (
+                    <TableRow key={enrollment.id}>
+                      <TableCell className="font-medium">
+                        {enrollment.student_name}
+                      </TableCell>
+                      <TableCell>{enrollment.grade}</TableCell>
+                      <TableCell>{enrollment.campus_name}</TableCell>
+                      <TableCell>
+                        <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {enrollment.sis_id ? (
+                          <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                            {enrollment.sis_id}
+                          </code>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-gray-500">
+                        {enrollment.enrolled_at ?? "—"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -1,7 +1,9 @@
 export const runtime = "edge";
+export const dynamic = "force-dynamic";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
   TableBody,
@@ -10,38 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-export const dynamic = "force-dynamic";
-
-const MOCK_OFFERS = [
-  {
-    id: "off-001",
-    studentName: "Sofia Ramirez",
-    grade: "6th Grade",
-    campus: "Columbia SC",
-    status: "pending",
-    offeredAt: "2026-03-01",
-    expiresAt: "2026-03-15",
-  },
-  {
-    id: "off-002",
-    studentName: "Devon Thompson",
-    grade: "11th Grade",
-    campus: "Columbia SC",
-    status: "accepted",
-    offeredAt: "2026-02-20",
-    expiresAt: "2026-03-06",
-  },
-  {
-    id: "off-003",
-    studentName: "Aisha Mohammed",
-    grade: "8th Grade",
-    campus: "Cleveland OH",
-    status: "accepted",
-    offeredAt: "2026-02-15",
-    expiresAt: "2026-03-01",
-  },
-];
+import { getStaffOffers } from "@/lib/queries";
 
 const offerStatusConfig: Record<string, { label: string; variant: "default" | "success" | "destructive" | "warning" | "outline" }> = {
   pending: { label: "Pending", variant: "warning" },
@@ -51,7 +22,9 @@ const offerStatusConfig: Record<string, { label: string; variant: "default" | "s
   revoked: { label: "Revoked", variant: "destructive" },
 };
 
-export default function StaffOffersPage() {
+export default async function StaffOffersPage() {
+  const { offers, stats } = await getStaffOffers();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -71,7 +44,7 @@ export default function StaffOffersPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{MOCK_OFFERS.length}</p>
+            <p className="text-2xl font-bold">{stats.total}</p>
           </CardContent>
         </Card>
         <Card>
@@ -81,9 +54,7 @@ export default function StaffOffersPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-amber-600">
-              {MOCK_OFFERS.filter((o) => o.status === "pending").length}
-            </p>
+            <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
           </CardContent>
         </Card>
         <Card>
@@ -93,9 +64,7 @@ export default function StaffOffersPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-600">
-              {MOCK_OFFERS.filter((o) => o.status === "accepted").length}
-            </p>
+            <p className="text-2xl font-bold text-green-600">{stats.accepted}</p>
           </CardContent>
         </Card>
         <Card>
@@ -105,46 +74,56 @@ export default function StaffOffersPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-gray-400">
-              {MOCK_OFFERS.filter((o) => o.status === "declined" || o.status === "expired").length}
-            </p>
+            <p className="text-2xl font-bold text-gray-400">{stats.declined_or_expired}</p>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardContent className="pt-6 px-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student</TableHead>
-                <TableHead>Grade</TableHead>
-                <TableHead>Campus</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Offered</TableHead>
-                <TableHead>Expires</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {MOCK_OFFERS.map((offer) => {
-                const cfg = offerStatusConfig[offer.status] ?? offerStatusConfig.pending;
-                return (
-                  <TableRow key={offer.id} className="cursor-pointer">
-                    <TableCell className="font-medium">{offer.studentName}</TableCell>
-                    <TableCell>{offer.grade}</TableCell>
-                    <TableCell>{offer.campus}</TableCell>
-                    <TableCell>
-                      <Badge variant={cfg.variant}>{cfg.label}</Badge>
-                    </TableCell>
-                    <TableCell className="text-gray-500">{offer.offeredAt}</TableCell>
-                    <TableCell className="text-gray-500">{offer.expiresAt}</TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {offers.length === 0 ? (
+        <Card>
+          <CardContent className="py-8">
+            <EmptyState
+              icon="🎫"
+              title="No offers yet"
+              description="Offers will appear here after a lottery is run and seats are assigned."
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="pt-6 px-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Grade</TableHead>
+                  <TableHead>Campus</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Offered</TableHead>
+                  <TableHead>Expires</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {offers.map((offer) => {
+                  const cfg = offerStatusConfig[offer.status] ?? offerStatusConfig.pending;
+                  return (
+                    <TableRow key={offer.id}>
+                      <TableCell className="font-medium">{offer.student_name}</TableCell>
+                      <TableCell>{offer.grade}</TableCell>
+                      <TableCell>{offer.campus_name}</TableCell>
+                      <TableCell>
+                        <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                      </TableCell>
+                      <TableCell className="text-gray-500">{offer.offered_at}</TableCell>
+                      <TableCell className="text-gray-500">{offer.expires_at}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

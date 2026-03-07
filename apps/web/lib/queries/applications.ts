@@ -365,6 +365,174 @@ export async function getApplicationDetail(
   };
 }
 
+// ─── Types for draft editing ───────────────────────────
+
+export interface DraftApplicationData {
+  id: string;
+  status: string;
+  campus_id: string;
+  enrollment_window_id: string;
+  grade_level_id: string;
+  grade: string;
+  has_sibling_enrolled: boolean;
+  source: string | null;
+  // Student
+  student: {
+    first_name: string;
+    middle_name: string | null;
+    last_name: string;
+    suffix: string | null;
+    date_of_birth: string | null;
+    gender: string | null;
+    race_ethnicity: string[] | null;
+    primary_language: string | null;
+    home_language: string | null;
+    previous_school_name: string | null;
+    previous_school_phone: string | null;
+    has_iep: boolean;
+    has_504: boolean;
+    special_services_notes: string | null;
+    emergency_contact_1_name: string | null;
+    emergency_contact_1_phone: string | null;
+    emergency_contact_1_relationship: string | null;
+  };
+  // Guardian
+  guardian: {
+    first_name: string;
+    last_name: string;
+    relationship: string;
+    email: string | null;
+    phone: string | null;
+    phone_secondary: string | null;
+    employer: string | null;
+    sms_consent: boolean;
+  };
+  // Household
+  household: {
+    address_line1: string | null;
+    city: string | null;
+    state: string | null;
+    zip: string | null;
+  };
+  // Application answers (EAV)
+  answers: Record<string, string>;
+}
+
+/**
+ * Fetch draft application data for the edit form.
+ */
+export async function getDraftApplicationForEdit(
+  applicationId: string
+): Promise<DraftApplicationData | null> {
+  const supabase = await createServerClient();
+
+  const { data: app, error } = await supabase
+    .from("application")
+    .select(
+      `
+      id, status, campus_id, enrollment_window_id, grade_level_id,
+      has_sibling_enrolled, source,
+      student:student_id (
+        first_name, middle_name, last_name, suffix,
+        date_of_birth, gender, race_ethnicity, primary_language, home_language,
+        previous_school_name, previous_school_phone,
+        has_iep, has_504, special_services_notes,
+        emergency_contact_1_name, emergency_contact_1_phone, emergency_contact_1_relationship
+      ),
+      guardian:guardian_id (
+        first_name, last_name, relationship, email, phone,
+        phone_secondary, employer, sms_consent, household_id
+      ),
+      grade_level:grade_level_id (grade)
+    `
+    )
+    .eq("id", applicationId)
+    .single();
+
+  if (error || !app) {
+    console.error("[getDraftApplicationForEdit]", error?.message);
+    return null;
+  }
+
+  if (app.status !== "draft") return null;
+
+  const student = app.student as unknown as Record<string, unknown> | null;
+  const guardian = app.guardian as unknown as Record<string, unknown> | null;
+  const grade = app.grade_level as unknown as Record<string, string> | null;
+
+  // Fetch household
+  const householdId = guardian?.household_id as string | undefined;
+  let household = { address_line1: null, city: null, state: null, zip: null } as {
+    address_line1: string | null; city: string | null; state: string | null; zip: string | null;
+  };
+  if (householdId) {
+    const { data: hh } = await supabase
+      .from("household")
+      .select("address_line1, city, state, zip")
+      .eq("id", householdId)
+      .single();
+    if (hh) household = hh as typeof household;
+  }
+
+  // Fetch application answers
+  const { data: answerRows } = await supabase
+    .from("application_answer")
+    .select("field_key, value")
+    .eq("application_id", applicationId);
+
+  const answers: Record<string, string> = {};
+  for (const row of answerRows ?? []) {
+    const r = row as Record<string, unknown>;
+    try {
+      answers[r.field_key as string] = JSON.parse(r.value as string);
+    } catch {
+      answers[r.field_key as string] = r.value as string;
+    }
+  }
+
+  return {
+    id: app.id,
+    status: app.status,
+    campus_id: app.campus_id,
+    enrollment_window_id: app.enrollment_window_id,
+    grade_level_id: app.grade_level_id,
+    grade: grade?.grade ?? "",
+    has_sibling_enrolled: app.has_sibling_enrolled ?? false,
+    source: app.source ?? null,
+    student: {
+      first_name: (student?.first_name as string) ?? "",
+      middle_name: (student?.middle_name as string) ?? null,
+      last_name: (student?.last_name as string) ?? "",
+      suffix: (student?.suffix as string) ?? null,
+      date_of_birth: (student?.date_of_birth as string) ?? null,
+      gender: (student?.gender as string) ?? null,
+      race_ethnicity: (student?.race_ethnicity as string[]) ?? null,
+      primary_language: (student?.primary_language as string) ?? null,
+      home_language: (student?.home_language as string) ?? null,
+      previous_school_name: (student?.previous_school_name as string) ?? null,
+      previous_school_phone: (student?.previous_school_phone as string) ?? null,
+      has_iep: (student?.has_iep as boolean) ?? false,
+      has_504: (student?.has_504 as boolean) ?? false,
+      special_services_notes: (student?.special_services_notes as string) ?? null,
+      emergency_contact_1_name: (student?.emergency_contact_1_name as string) ?? null,
+      emergency_contact_1_phone: (student?.emergency_contact_1_phone as string) ?? null,
+      emergency_contact_1_relationship: (student?.emergency_contact_1_relationship as string) ?? null,
+    },
+    guardian: {
+      first_name: (guardian?.first_name as string) ?? "",
+      last_name: (guardian?.last_name as string) ?? "",
+      relationship: (guardian?.relationship as string) ?? "",
+      email: (guardian?.email as string) ?? null,
+      phone: (guardian?.phone as string) ?? null,
+      phone_secondary: (guardian?.phone_secondary as string) ?? null,
+      employer: (guardian?.employer as string) ?? null,
+      sms_consent: (guardian?.sms_consent as boolean) ?? false,
+    },
+    household,
+    answers,
+  };
+}
+
 /**
  * Fetch applications for a specific family user.
  */

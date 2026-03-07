@@ -1,9 +1,8 @@
 export const runtime = "edge";
+export const dynamic = "force-dynamic";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-
-export const dynamic = "force-dynamic";
 
 const REPORTS = [
   {
@@ -72,10 +71,10 @@ export default function StaffReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" disabled>
                   Preview
                 </Button>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" disabled>
                   Export CSV
                 </Button>
               </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
-import type { ApplicationDetail, DocumentRow, NoteRow, TimelineEntry } from "@/lib/queries";
+import type { ApplicationDetail } from "@/lib/queries";
+import {
+  changeApplicationStatus,
+  staffWithdrawApplication,
+  addApplicationNote,
+  staffReviewDocument,
+} from "./actions";
 
 /* ─── Document status badge ─── */
 const docStatusConfig: Record<string, { label: string; variant: "success" | "warning" | "destructive" }> = {
@@ -93,18 +100,82 @@ function getAvailableActions(status: string): { label: string; variant: "default
   }
 }
 
+/* ─── Withdrawable statuses ─── */
+const WITHDRAWABLE = ["draft", "submitted", "needs_info", "verified", "lottery_assigned", "waitlisted"];
+
 /* ─── Component Props ─── */
 interface StaffApplicationDetailClientProps {
   detail: ApplicationDetail;
 }
 
 export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailClientProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [noteText, setNoteText] = useState("");
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const statusCfg = getStatusConfig(detail.status);
   const actions = getAvailableActions(detail.status);
   const verifiedDocs = detail.documents.filter((d) => d.status === "verified").length;
   const totalDocs = detail.documents.length;
+  const canWithdraw = WITHDRAWABLE.includes(detail.status);
+
+  function showFeedback(type: "success" | "error", message: string) {
+    setFeedback({ type, message });
+    setTimeout(() => setFeedback(null), 4000);
+  }
+
+  function handleStatusChange(targetStatus: string) {
+    startTransition(async () => {
+      const result = await changeApplicationStatus(detail.id, targetStatus);
+      if (result.error) {
+        showFeedback("error", result.error);
+      } else {
+        showFeedback("success", `Status updated to ${getStatusConfig(targetStatus).label}`);
+        router.refresh();
+      }
+    });
+  }
+
+  function handleWithdraw() {
+    if (!confirm("Are you sure you want to withdraw this application?")) return;
+    startTransition(async () => {
+      const result = await staffWithdrawApplication(detail.id);
+      if (result.error) {
+        showFeedback("error", result.error);
+      } else {
+        showFeedback("success", "Application withdrawn");
+        router.refresh();
+      }
+    });
+  }
+
+  function handleAddNote() {
+    const content = noteText.trim();
+    if (!content) return;
+    startTransition(async () => {
+      const result = await addApplicationNote(detail.id, detail.campus_id, content);
+      if (result.error) {
+        showFeedback("error", result.error);
+      } else {
+        setNoteText("");
+        showFeedback("success", "Note added");
+        router.refresh();
+      }
+    });
+  }
+
+  function handleDocumentReview(docId: string, decision: "verified" | "rejected") {
+    startTransition(async () => {
+      const result = await staffReviewDocument(docId, detail.id, decision);
+      if (result.error) {
+        showFeedback("error", result.error);
+      } else {
+        showFeedback("success", `Document ${decision}`);
+        router.refresh();
+      }
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -112,6 +183,19 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
       <Link href="/staff/applications" className="text-sm text-rooted-green hover:underline">
         ← Back to Applications
       </Link>
+
+      {/* Feedback banner */}
+      {feedback && (
+        <div
+          className={`px-4 py-2 rounded-md text-sm font-medium ${
+            feedback.type === "success"
+              ? "bg-green-50 text-green-800 border border-green-200"
+              : "bg-red-50 text-red-800 border border-red-200"
+          }`}
+        >
+          {feedback.message}
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-start justify-between">
@@ -130,13 +214,22 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
               key={action.targetStatus}
               variant={action.variant === "default" ? "default" : "outline"}
               size="sm"
+              disabled={isPending}
+              onClick={() => handleStatusChange(action.targetStatus)}
             >
               {action.label}
             </Button>
           ))}
-          <Button variant="outline" size="sm">
-            Withdraw
-          </Button>
+          {canWithdraw && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isPending}
+              onClick={handleWithdraw}
+            >
+              Withdraw
+            </Button>
+          )}
         </div>
       </div>
 
@@ -313,7 +406,23 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
                             <div className="flex gap-1">
                               <Button variant="outline" size="sm">View</Button>
                               {doc.status === "pending" && (
-                                <Button size="sm">Verify</Button>
+                                <>
+                                  <Button
+                                    size="sm"
+                                    disabled={isPending}
+                                    onClick={() => handleDocumentReview(doc.id, "verified")}
+                                  >
+                                    Verify
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isPending}
+                                    onClick={() => handleDocumentReview(doc.id, "rejected")}
+                                  >
+                                    Reject
+                                  </Button>
+                                </>
                               )}
                             </div>
                           </TableCell>
@@ -344,9 +453,17 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
                   placeholder="Add an internal note..."
                   value={noteText}
                   onChange={(e) => setNoteText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && noteText.trim()) handleAddNote();
+                  }}
                   className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
                 />
-                <Button disabled={!noteText.trim()}>Add Note</Button>
+                <Button
+                  disabled={!noteText.trim() || isPending}
+                  onClick={handleAddNote}
+                >
+                  Add Note
+                </Button>
               </div>
 
               {/* Notes list */}

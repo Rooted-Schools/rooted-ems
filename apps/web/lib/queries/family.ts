@@ -1,6 +1,30 @@
 import { createServerClient } from "@rooted-ems/database/server";
 import { formatRelativeTime } from "./utils";
 
+// ─── Document Types ─────────────────────────────────────
+
+export interface FamilyDocumentRow {
+  id: string;
+  document_type: string;
+  file_name: string;
+  status: string;
+  file_size: number | null;
+  created_at: string;
+  verified_at: string | null;
+  application_id: string | null;
+  student_name: string;
+}
+
+export interface FamilyMessageRow {
+  id: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  is_read: boolean;
+  created_at: string;
+  time_ago: string;
+}
+
 // ─── Types ─────────────────────────────────────────────
 
 export interface FamilyNotification {
@@ -210,4 +234,97 @@ export async function getFamilyDashboardApps(
       next_step: nextStepMap[status] ?? null,
     };
   });
+}
+
+/**
+ * Fetch all documents across a family user's applications.
+ */
+export async function getFamilyDocuments(
+  userId: string
+): Promise<FamilyDocumentRow[]> {
+  const supabase = await createServerClient();
+
+  // Find guardian IDs for this user
+  const { data: guardians } = await supabase
+    .from("guardian")
+    .select("id")
+    .eq("user_id", userId);
+
+  if (!guardians || guardians.length === 0) return [];
+
+  const guardianIds = guardians.map((g: Record<string, string>) => g.id);
+
+  // Get application IDs for these guardians
+  const { data: apps } = await supabase
+    .from("application")
+    .select("id, student:student_id (first_name, last_name)")
+    .in("guardian_id", guardianIds);
+
+  if (!apps || apps.length === 0) return [];
+
+  const appIds = apps.map((a: Record<string, unknown>) => a.id as string);
+  const appStudentMap: Record<string, string> = {};
+  for (const a of apps) {
+    const app = a as Record<string, unknown>;
+    const student = app.student as Record<string, string> | null;
+    appStudentMap[app.id as string] = student
+      ? `${student.first_name} ${student.last_name}`
+      : "Unknown";
+  }
+
+  // Fetch documents for these applications
+  const { data: docs, error } = await supabase
+    .from("document")
+    .select("id, document_type, file_name, file_size, status, created_at, verified_at, application_id")
+    .in("application_id", appIds)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("[getFamilyDocuments]", error.message);
+    return [];
+  }
+
+  return (docs ?? []).map((d: Record<string, unknown>) => ({
+    id: d.id as string,
+    document_type: d.document_type as string,
+    file_name: d.file_name as string,
+    status: d.status as string,
+    file_size: d.file_size as number | null,
+    created_at: d.created_at as string,
+    verified_at: d.verified_at as string | null,
+    application_id: d.application_id as string | null,
+    student_name: appStudentMap[d.application_id as string] ?? "Unknown",
+  }));
+}
+
+/**
+ * Fetch messages (notifications) for a family user.
+ */
+export async function getFamilyMessages(
+  userId: string,
+  limit: number = 50
+): Promise<FamilyMessageRow[]> {
+  const supabase = await createServerClient();
+
+  const { data, error } = await supabase
+    .from("notification")
+    .select("id, title, body, link, is_read, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("[getFamilyMessages]", error.message);
+    return [];
+  }
+
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    title: row.title as string,
+    body: (row.body as string) ?? null,
+    link: (row.link as string) ?? null,
+    is_read: (row.is_read as boolean) ?? false,
+    created_at: row.created_at as string,
+    time_ago: formatRelativeTime(row.created_at as string),
+  }));
 }
