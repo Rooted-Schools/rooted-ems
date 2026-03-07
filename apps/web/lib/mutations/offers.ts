@@ -125,19 +125,22 @@ export async function acceptOffer(
   }
 
   // ── Auto-create enrollment ──────────────────────────────
-  // Fetch application for student_id and school_year
+  // Fetch application for student_id and school_year (via enrollment_window)
   const { data: app } = await supabase
     .from("application")
-    .select("student_id, school_year_id")
+    .select("student_id, enrollment_window:enrollment_window_id (school_year_id)")
     .eq("id", offer.application_id)
     .single();
+
+  const schoolYearId =
+    (app?.enrollment_window as Record<string, string> | null)?.school_year_id ?? "";
 
   if (app?.student_id) {
     const enrollResult = await createEnrollment({
       student_id: app.student_id,
       campus_id: offer.campus_id,
       grade_level_id: offer.grade_level_id,
-      school_year_id: app.school_year_id,
+      school_year_id: schoolYearId,
       acceptance_id: acceptance?.id,
       application_id: offer.application_id,
     });
@@ -147,7 +150,7 @@ export async function acceptOffer(
       await initializeRegistrationPacket({
         enrollment_id: enrollResult.data.id,
         campus_id: offer.campus_id,
-        school_year_id: app.school_year_id,
+        school_year_id: schoolYearId,
       });
     } else if (enrollResult.error) {
       console.error("[acceptOffer] auto-enrollment", enrollResult.error);

@@ -336,7 +336,7 @@ export async function getStaffOffers(campusIds?: string[]): Promise<{ offers: Of
       application_id, campus_id, grade_level_id,
       application:application_id (
         student_id,
-        school_year_id,
+        enrollment_window:enrollment_window_id (school_year_id),
         student:student_id (first_name, last_name)
       ),
       campus:campus_id (name),
