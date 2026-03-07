@@ -55,6 +55,16 @@ export {
   type AddToWaitlistInput,
 } from "./waitlist";
 
+// Lottery mutations
+export {
+  createLotteryRun,
+  runLotteryPreview,
+  finalizeLotteryRun,
+  archiveLotteryRun,
+  sendOffersFromLottery,
+  type CreateLotteryRunInput,
+} from "./lottery";
+
 // Enrollment mutations
 export {
   createEnrollment,

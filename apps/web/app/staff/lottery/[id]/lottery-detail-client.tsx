@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,8 +14,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { LotteryRunDetail, LotteryEntrant } from "@/lib/queries";
+import {
+  staffRunLotteryPreview,
+  staffFinalizeLottery,
+  staffArchiveLottery,
+  staffSendLotteryOffers,
+} from "../actions";
 
 /* ─── Status Config ─── */
 const statusVariants: Record<string, { label: string; variant: "default" | "secondary" | "success" | "warning" }> = {
@@ -59,33 +66,106 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function getStatusActions(status: string) {
-  switch (status) {
-    case "draft":
-      return [{ label: "Run Preview", variant: "default" as const }];
-    case "preview":
-      return [
-        { label: "Re-run Preview", variant: "outline" as const },
-        { label: "Finalize as Official", variant: "default" as const },
-      ];
-    case "official":
-      return [
-        { label: "Send Offers", variant: "default" as const },
-        { label: "Archive", variant: "outline" as const },
-      ];
-    default:
-      return [];
-  }
-}
-
 /* ─── Component ─── */
 export function StaffLotteryDetailClient({
   run,
   entrants,
+  staffUserId,
 }: {
   run: LotteryRunDetail | null;
   entrants: LotteryEntrant[];
+  staffUserId: string;
 }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  /* ─── Action Handlers ─── */
+
+  function handleRunPreview() {
+    if (!run) return;
+    setFeedback(null);
+    startTransition(async () => {
+      const result = await staffRunLotteryPreview(run.id);
+      if (result.error) {
+        setFeedback({ type: "error", message: result.error });
+      } else {
+        setFeedback({ type: "success", message: "Preview generated successfully. Rankings are ready for review." });
+        router.refresh();
+      }
+    });
+  }
+
+  function handleFinalize() {
+    if (!run) return;
+    if (!confirm("Finalize this lottery as official? This creates an immutable record of results and cannot be undone.")) return;
+    setFeedback(null);
+    startTransition(async () => {
+      const result = await staffFinalizeLottery(run.id, staffUserId);
+      if (result.error) {
+        setFeedback({ type: "error", message: result.error });
+      } else {
+        setFeedback({ type: "success", message: "Lottery finalized as official. You can now send offers." });
+        router.refresh();
+      }
+    });
+  }
+
+  function handleArchive() {
+    if (!run) return;
+    if (!confirm("Archive this lottery run? It will be moved to archived status.")) return;
+    setFeedback(null);
+    startTransition(async () => {
+      const result = await staffArchiveLottery(run.id);
+      if (result.error) {
+        setFeedback({ type: "error", message: result.error });
+      } else {
+        setFeedback({ type: "success", message: "Lottery run archived." });
+        router.refresh();
+      }
+    });
+  }
+
+  function handleSendOffers() {
+    if (!run) return;
+    // Default offer expiration: 14 days from now
+    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+    if (!confirm("Send enrollment offers to all selected students? Offers will expire in 14 days.")) return;
+    setFeedback(null);
+    startTransition(async () => {
+      const result = await staffSendLotteryOffers(run.id, expiresAt, staffUserId);
+      if (result.error) {
+        setFeedback({ type: "error", message: result.error });
+      } else {
+        const count = result.data?.offersCreated ?? 0;
+        setFeedback({
+          type: "success",
+          message: `${count} offer${count !== 1 ? "s" : ""} sent successfully. Families will be notified.`,
+        });
+        router.refresh();
+      }
+    });
+  }
+
+  function handleActionClick(label: string) {
+    switch (label) {
+      case "Run Preview":
+      case "Re-run Preview":
+        handleRunPreview();
+        break;
+      case "Finalize as Official":
+        handleFinalize();
+        break;
+      case "Send Offers":
+        handleSendOffers();
+        break;
+      case "Archive":
+        handleArchive();
+        break;
+    }
+  }
+
+  /* ─── Early return for not-found ─── */
   if (!run) {
     return (
       <div className="space-y-6">
@@ -102,10 +182,45 @@ export function StaffLotteryDetailClient({
   }
 
   const s = statusVariants[run.status] ?? statusVariants.draft;
-  const actions = getStatusActions(run.status);
   const overSubscribed = run.applicants > run.seats;
   const offeredCount = entrants.filter((e) => e.result === "offered").length;
   const waitlistedCount = entrants.filter((e) => e.result === "waitlisted").length;
+
+  /* ─── Status-specific action buttons ─── */
+  function getActionButtons() {
+    switch (run!.status) {
+      case "draft":
+        return (
+          <Button onClick={() => handleActionClick("Run Preview")} disabled={isPending}>
+            {isPending ? "Running..." : "Run Preview"}
+          </Button>
+        );
+      case "preview":
+        return (
+          <>
+            <Button variant="outline" onClick={() => handleActionClick("Re-run Preview")} disabled={isPending}>
+              {isPending ? "Running..." : "Re-run Preview"}
+            </Button>
+            <Button onClick={() => handleActionClick("Finalize as Official")} disabled={isPending}>
+              {isPending ? "Finalizing..." : "Finalize as Official"}
+            </Button>
+          </>
+        );
+      case "official":
+        return (
+          <>
+            <Button onClick={() => handleActionClick("Send Offers")} disabled={isPending}>
+              {isPending ? "Sending..." : "Send Offers"}
+            </Button>
+            <Button variant="outline" onClick={() => handleActionClick("Archive")} disabled={isPending}>
+              {isPending ? "Archiving..." : "Archive"}
+            </Button>
+          </>
+        );
+      default:
+        return null;
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -113,6 +228,19 @@ export function StaffLotteryDetailClient({
       <Link href="/staff/lottery" className="text-sm text-rooted-green hover:underline">
         &larr; Back to Lottery
       </Link>
+
+      {/* Feedback Banner */}
+      {feedback && (
+        <div
+          className={`p-3 rounded-lg text-sm font-medium ${
+            feedback.type === "success"
+              ? "bg-green-50 text-green-800 border border-green-200"
+              : "bg-red-50 text-red-800 border border-red-200"
+          }`}
+        >
+          {feedback.message}
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-start justify-between">
@@ -125,15 +253,9 @@ export function StaffLotteryDetailClient({
             {run.campus} &middot; {run.grade}
           </p>
         </div>
-        {actions.length > 0 && (
-          <div className="flex gap-2">
-            {actions.map((action) => (
-              <Button key={action.label} variant={action.variant} disabled>
-                {action.label}
-              </Button>
-            ))}
-          </div>
-        )}
+        <div className="flex gap-2">
+          {getActionButtons()}
+        </div>
       </div>
 
       {/* Summary Cards */}
