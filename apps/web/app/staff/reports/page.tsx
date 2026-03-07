@@ -1,87 +1,167 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { createServerClient } from "@rooted-ems/database/server";
+import { ReportsClient } from "./reports-client";
 
-const REPORTS = [
-  {
-    id: "rpt-pipeline",
-    title: "Pipeline Summary",
-    description: "Application counts by status, grade, and campus with conversion rates.",
-    icon: "📊",
-  },
-  {
-    id: "rpt-demographics",
-    title: "Demographics Report",
-    description: "Applicant demographics by race/ethnicity, language, and grade level.",
-    icon: "👥",
-  },
-  {
-    id: "rpt-capacity",
-    title: "Capacity Utilization",
-    description: "Seats offered, accepted, and registered vs. total capacity by grade.",
-    icon: "📈",
-  },
-  {
-    id: "rpt-lottery",
-    title: "Lottery Audit Report",
-    description: "Full lottery results with random seeds, priority tiers, and final ranks.",
-    icon: "🎲",
-  },
-  {
-    id: "rpt-compliance",
-    title: "Compliance Export",
-    description: "State-required enrollment data in the mandated reporting format.",
-    icon: "📋",
-  },
-  {
-    id: "rpt-audit",
-    title: "Audit Trail",
-    description: "All system actions with timestamps, users, and change details.",
-    icon: "🔍",
-  },
-];
+export interface ReportData {
+  pipeline: { status: string; count: number }[];
+  demographics: { group: string; count: number }[];
+  capacity: {
+    campus: string;
+    grade: string;
+    total_seats: number;
+    seats_offered: number;
+    seats_accepted: number;
+    seats_registered: number;
+  }[];
+  enrollments: {
+    student_name: string;
+    grade: string;
+    campus: string;
+    status: string;
+    enrolled_at: string | null;
+    sis_id: string | null;
+  }[];
+  auditEvents: {
+    action: string;
+    table_name: string;
+    actor_email: string;
+    created_at: string;
+    details: string;
+  }[];
+}
 
-export default function StaffReportsPage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Generate reports for compliance, analytics, and audit purposes.
-        </p>
-      </div>
+export default async function StaffReportsPage() {
+  const supabase = await createServerClient();
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {REPORTS.map((report) => (
-          <Card key={report.id} className="hover:border-gray-300 transition-colors">
-            <CardHeader>
-              <div className="flex items-start gap-3">
-                <span className="text-2xl" aria-hidden="true">
-                  {report.icon}
-                </span>
-                <div>
-                  <CardTitle className="text-base">{report.title}</CardTitle>
-                  <CardDescription className="mt-1">
-                    {report.description}
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled>
-                  Preview
-                </Button>
-                <Button variant="outline" size="sm" disabled>
-                  Export CSV
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
+  // Fetch data for all reports in parallel
+  const [
+    { data: apps },
+    { data: capacityPlans },
+    { data: enrollmentRows },
+    { data: auditRows },
+  ] = await Promise.all([
+    supabase
+      .from("application")
+      .select(`
+        id, status,
+        student:student_id (race_ethnicity)
+      `)
+      .neq("status", "draft"),
+    supabase
+      .from("capacity_plan")
+      .select(`
+        total_seats, seats_offered, seats_accepted, seats_registered,
+        campus:campus_id (name),
+        grade_level:grade_level_id (grade)
+      `)
+      .order("campus_id")
+      .order("grade_level_id"),
+    supabase
+      .from("enrollment")
+      .select(`
+        status, enrolled_at, sis_student_id,
+        student:student_id (first_name, last_name),
+        campus:campus_id (name),
+        grade_level:grade_level_id (grade)
+      `)
+      .order("enrolled_at", { ascending: false, nullsFirst: false })
+      .limit(500),
+    supabase
+      .from("audit_event")
+      .select("action, table_name, created_at, changes")
+      .order("created_at", { ascending: false })
+      .limit(200),
+  ]);
+
+  // Pipeline counts
+  const statusCounts: Record<string, number> = {};
+  for (const app of (apps ?? []) as Record<string, unknown>[]) {
+    const st = app.status as string;
+    statusCounts[st] = (statusCounts[st] ?? 0) + 1;
+  }
+  const pipeline = Object.entries(statusCounts).map(([status, count]) => ({
+    status,
+    count,
+  }));
+
+  // Demographics
+  const demoCounts: Record<string, number> = {};
+  for (const app of (apps ?? []) as Record<string, unknown>[]) {
+    const student = app.student as unknown as Record<string, unknown> | null;
+    const ethnicities = (student?.race_ethnicity ?? []) as string[];
+    if (ethnicities.length === 0) {
+      demoCounts["Not specified"] = (demoCounts["Not specified"] ?? 0) + 1;
+    } else {
+      for (const eth of ethnicities) {
+        demoCounts[eth] = (demoCounts[eth] ?? 0) + 1;
+      }
+    }
+  }
+  const demographics = Object.entries(demoCounts)
+    .map(([group, count]) => ({ group, count }))
+    .sort((a, b) => b.count - a.count);
+
+  // Capacity
+  const capacity = (capacityPlans ?? []).map((row: Record<string, unknown>) => {
+    const campus = row.campus as Record<string, string> | null;
+    const grade = row.grade_level as Record<string, string> | null;
+    return {
+      campus: campus?.name ?? "",
+      grade: grade?.grade ? `Grade ${grade.grade}` : "",
+      total_seats: (row.total_seats as number) ?? 0,
+      seats_offered: (row.seats_offered as number) ?? 0,
+      seats_accepted: (row.seats_accepted as number) ?? 0,
+      seats_registered: (row.seats_registered as number) ?? 0,
+    };
+  });
+
+  // Enrollments for compliance
+  const enrollments = (enrollmentRows ?? []).map(
+    (row: Record<string, unknown>) => {
+      const student = row.student as unknown as Record<string, string> | null;
+      const campus = row.campus as Record<string, string> | null;
+      const grade = row.grade_level as Record<string, string> | null;
+      return {
+        student_name: student
+          ? `${student.first_name} ${student.last_name}`
+          : "Unknown",
+        grade: grade?.grade ? `Grade ${grade.grade}` : "",
+        campus: campus?.name ?? "",
+        status: row.status as string,
+        enrolled_at: row.enrolled_at
+          ? new Date(row.enrolled_at as string).toLocaleDateString("en-US")
+          : null,
+        sis_id: (row.sis_student_id as string) ?? null,
+      };
+    }
   );
+
+  // Audit events
+  const auditEvents = (auditRows ?? []).map(
+    (row: Record<string, unknown>) => ({
+      action: row.action as string,
+      table_name: row.table_name as string,
+      actor_email: "",
+      created_at: new Date(row.created_at as string).toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }),
+      details: row.changes ? JSON.stringify(row.changes).slice(0, 120) : "",
+    })
+  );
+
+  const reportData: ReportData = {
+    pipeline,
+    demographics,
+    capacity,
+    enrollments,
+    auditEvents,
+  };
+
+  return <ReportsClient data={reportData} />;
 }

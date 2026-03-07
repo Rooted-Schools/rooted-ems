@@ -55,6 +55,7 @@ export {
 // Staff management queries (lottery, offers, waitlist, enrollment, comms, settings)
 export {
   getStaffLotteryRuns,
+  getStaffLotteryDetail,
   getStaffOffers,
   getStaffWaitlist,
   getStaffEnrollments,
@@ -64,6 +65,8 @@ export {
   getStaffStudents,
   getStaffWorkQueue,
   type LotteryRunRow,
+  type LotteryRunDetail,
+  type LotteryEntrant,
   type OfferRow,
   type OfferStats,
   type WaitlistEntry,

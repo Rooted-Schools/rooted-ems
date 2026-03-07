@@ -1,6 +1,7 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
+import { getStaffLotteryDetail } from "@/lib/queries";
 import { StaffLotteryDetailClient } from "./lottery-detail-client";
 
 export default async function StaffLotteryDetailPage({
@@ -9,5 +10,7 @@ export default async function StaffLotteryDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <StaffLotteryDetailClient id={id} />;
+  const { run, entrants } = await getStaffLotteryDetail(id);
+
+  return <StaffLotteryDetailClient run={run} entrants={entrants} />;
 }

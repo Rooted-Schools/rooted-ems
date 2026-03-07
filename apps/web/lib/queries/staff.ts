@@ -159,6 +159,158 @@ export async function getStaffLotteryRuns(): Promise<LotteryRunRow[]> {
   });
 }
 
+// ─── Lottery Detail Types ───────────────────────────────
+
+export interface LotteryRunDetail {
+  id: string;
+  name: string;
+  campus: string;
+  grade: string;
+  schoolYear: string;
+  status: string;
+  applicants: number;
+  seats: number;
+  randomSeed: string | null;
+  runNumber: number;
+  executedBy: string | null;
+  executedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  ruleSet: {
+    name: string;
+    siblingPreference: boolean;
+    priorityTiers: string[];
+  };
+}
+
+export interface LotteryEntrant {
+  id: string;
+  applicationId: string;
+  studentName: string;
+  guardianName: string;
+  priorityTier: number;
+  randomNumber: number | null;
+  finalRank: number | null;
+  result: "offered" | "waitlisted" | "pending";
+  siblingInSchool: boolean;
+}
+
+// ─── Lottery Detail Query ───────────────────────────────
+
+export async function getStaffLotteryDetail(
+  runId: string
+): Promise<{ run: LotteryRunDetail | null; entrants: LotteryEntrant[] }> {
+  const supabase = await createServerClient();
+
+  // Fetch lottery run with related data
+  const { data: runData, error: runError } = await supabase
+    .from("lottery_run")
+    .select(`
+      id, status, run_number, random_seed,
+      total_applicants, total_seats,
+      executed_at, created_at, updated_at, notes,
+      campus:campus_id (name),
+      grade_level:grade_level_id (grade),
+      enrollment_window:enrollment_window_id (name),
+      rule_set:lottery_rule_set_id (name, sibling_preference, priority_tiers),
+      executor:executed_by (full_name)
+    `)
+    .eq("id", runId)
+    .single();
+
+  if (runError || !runData) {
+    console.error("[getStaffLotteryDetail]", runError?.message);
+    return { run: null, entrants: [] };
+  }
+
+  const row = runData as Record<string, unknown>;
+  const campus = row.campus as Record<string, string> | null;
+  const grade = row.grade_level as Record<string, string> | null;
+  const window = row.enrollment_window as Record<string, string> | null;
+  const ruleSet = row.rule_set as unknown as Record<string, unknown> | null;
+  const executor = row.executor as unknown as Record<string, string> | null;
+
+  const priorityTiersRaw = (ruleSet?.priority_tiers ?? []) as unknown[];
+  const priorityTiers: string[] = priorityTiersRaw.map((t) =>
+    typeof t === "string" ? t : JSON.stringify(t)
+  );
+
+  const run: LotteryRunDetail = {
+    id: row.id as string,
+    name: window?.name ?? "Lottery Run",
+    campus: campus?.name ?? "",
+    grade: grade?.grade ? `Grade ${grade.grade}` : "",
+    schoolYear: window?.name ?? "",
+    status: row.status as string,
+    applicants: (row.total_applicants as number) ?? 0,
+    seats: (row.total_seats as number) ?? 0,
+    randomSeed: (row.random_seed as string) ?? null,
+    runNumber: (row.run_number as number) ?? 0,
+    executedBy: executor?.full_name ?? null,
+    executedAt: (row.executed_at as string) ?? null,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+    ruleSet: {
+      name: (ruleSet?.name as string) ?? "Default Rules",
+      siblingPreference: (ruleSet?.sibling_preference as boolean) ?? true,
+      priorityTiers,
+    },
+  };
+
+  // Fetch lottery entries with student + guardian info
+  const { data: entryData, error: entryError } = await supabase
+    .from("lottery_entry")
+    .select(`
+      id, priority_tier, random_number, final_rank, is_selected,
+      application:application_id (
+        id,
+        student:student_id (first_name, last_name),
+        guardian:guardian_id (first_name, last_name)
+      )
+    `)
+    .eq("lottery_run_id", runId)
+    .order("final_rank", { ascending: true, nullsFirst: false });
+
+  if (entryError) {
+    console.error("[getStaffLotteryDetail:entries]", entryError.message);
+    return { run, entrants: [] };
+  }
+
+  const totalSeats = run.seats;
+  const entrants: LotteryEntrant[] = (entryData ?? []).map(
+    (e: Record<string, unknown>) => {
+      const app = e.application as unknown as Record<string, unknown> | null;
+      const student = app?.student as unknown as Record<string, string> | null;
+      const guardian = app?.guardian as unknown as Record<string, string> | null;
+      const rank = e.final_rank as number | null;
+
+      let result: "offered" | "waitlisted" | "pending" = "pending";
+      if (rank !== null) {
+        result = rank <= totalSeats ? "offered" : "waitlisted";
+      }
+      if (e.is_selected) result = "offered";
+
+      return {
+        id: e.id as string,
+        applicationId: (app?.id as string) ?? "",
+        studentName: student
+          ? `${student.first_name} ${student.last_name}`
+          : "Unknown",
+        guardianName: guardian
+          ? `${guardian.first_name} ${guardian.last_name}`
+          : "",
+        priorityTier: (e.priority_tier as number) ?? 0,
+        randomNumber: (e.random_number as number) ?? null,
+        finalRank: rank,
+        result,
+        siblingInSchool: false, // Would require additional query to determine
+      };
+    }
+  );
+
+  return { run, entrants };
+}
+
 // ─── Offer Queries ──────────────────────────────────────
 
 export async function getStaffOffers(): Promise<{ offers: OfferRow[]; stats: OfferStats }> {
