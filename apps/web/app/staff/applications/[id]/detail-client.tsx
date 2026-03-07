@@ -23,6 +23,7 @@ import {
   addApplicationNote,
   staffReviewDocument,
 } from "./actions";
+import { getSignedUrl } from "@/lib/storage/upload";
 
 /* ─── Document status badge ─── */
 const docStatusConfig: Record<string, { label: string; variant: "success" | "warning" | "destructive" }> = {
@@ -404,7 +405,19 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
-                              <Button variant="outline" size="sm">View</Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={!doc.storage_path}
+                                onClick={async () => {
+                                  if (!doc.storage_path) return;
+                                  const { url, error } = await getSignedUrl(doc.storage_path);
+                                  if (url) window.open(url, "_blank");
+                                  else if (error) setFeedback({ type: "error", message: error });
+                                }}
+                              >
+                                View
+                              </Button>
                               {doc.status === "pending" && (
                                 <>
                                   <Button

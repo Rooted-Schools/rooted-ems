@@ -39,6 +39,7 @@ export interface DocumentRow {
   id: string;
   document_type: string;
   file_name: string;
+  storage_path: string;
   status: string;
   created_at: string;
   verified_at: string | null;
@@ -259,7 +260,7 @@ export async function getApplicationDetail(
   // Fetch documents
   const { data: docs } = await supabase
     .from("document")
-    .select("id, document_type, file_name, status, created_at, verified_at")
+    .select("id, document_type, file_name, storage_path, status, created_at, verified_at")
     .eq("application_id", applicationId)
     .order("created_at", { ascending: false });
 
@@ -342,6 +343,7 @@ export async function getApplicationDetail(
       id: d.id as string,
       document_type: d.document_type as string,
       file_name: d.file_name as string,
+      storage_path: (d.storage_path as string) ?? "",
       status: d.status as string,
       created_at: d.created_at as string,
       verified_at: d.verified_at as string | null,
