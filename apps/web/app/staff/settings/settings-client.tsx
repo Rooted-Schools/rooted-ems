@@ -70,7 +70,7 @@ export function SettingsClient({ campuses, windows, users }: SettingsClientProps
                         <p className="font-medium text-sm">{campus.name}</p>
                         <p className="text-xs text-gray-500">{campus.region_name}</p>
                       </div>
-                      <Badge variant="secondary">{campus.slug || "—"}</Badge>
+                      <Badge variant="secondary">{campus.short_code || "—"}</Badge>
                     </div>
                   ))}
                 </div>

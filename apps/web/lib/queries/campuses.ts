@@ -6,7 +6,7 @@ export interface CampusRow {
   id: string;
   name: string;
   region_name: string;
-  slug: string;
+  short_code: string;
 }
 
 // ─── Queries ─────────────────────────────────────────────
@@ -23,7 +23,7 @@ export async function getCampuses(): Promise<CampusRow[]> {
     .from("campus")
     .select(
       `
-      id, name, slug,
+      id, name, short_code,
       region:region_id (name)
     `
     )
@@ -40,7 +40,7 @@ export async function getCampuses(): Promise<CampusRow[]> {
       id: row.id as string,
       name: row.name as string,
       region_name: region?.name ?? "",
-      slug: (row.slug as string) ?? "",
+      short_code: (row.short_code as string) ?? "",
     };
   });
 }
@@ -57,7 +57,7 @@ export async function getCampusById(
     .from("campus")
     .select(
       `
-      id, name, slug,
+      id, name, short_code,
       region:region_id (name)
     `
     )
@@ -74,6 +74,6 @@ export async function getCampusById(
     id: (data as Record<string, unknown>).id as string,
     name: (data as Record<string, unknown>).name as string,
     region_name: region?.name ?? "",
-    slug: ((data as Record<string, unknown>).slug as string) ?? "",
+    short_code: ((data as Record<string, unknown>).short_code as string) ?? "",
   };
 }

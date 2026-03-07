@@ -35,3 +35,31 @@ export {
   updateNote,
   deleteNote,
 } from "./notes";
+
+// Offer mutations
+export {
+  sendOffer,
+  acceptOffer,
+  declineOffer,
+  revokeOffer,
+  expireOffer,
+  type SendOfferInput,
+} from "./offers";
+
+// Waitlist mutations
+export {
+  addToWaitlist,
+  promoteFromWaitlist,
+  removeFromWaitlist,
+  ensureWaitlist,
+  type AddToWaitlistInput,
+} from "./waitlist";
+
+// Enrollment mutations
+export {
+  createEnrollment,
+  withdrawEnrollment,
+  syncEnrollmentSIS,
+  transferEnrollment,
+  type CreateEnrollmentInput,
+} from "./enrollment";
