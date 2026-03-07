@@ -22,13 +22,31 @@ export function FamilyLoginForm() {
 
     try {
       const signInOptions =
-        method === "email" ? { email: value } : { phone: value };
+        method === "email"
+          ? {
+              email: value,
+              options: {
+                emailRedirectTo: `${window.location.origin}/auth/verify`,
+              },
+            }
+          : { phone: value };
 
       const { error: authError } =
         await supabase.auth.signInWithOtp(signInOptions);
 
       if (authError) {
-        setError(authError.message);
+        if (
+          method === "phone" &&
+          (authError.message.toLowerCase().includes("provider") ||
+            authError.message.toLowerCase().includes("not supported") ||
+            authError.message.toLowerCase().includes("phone"))
+        ) {
+          setError(
+            "Phone login is not available yet. Please use email instead."
+          );
+        } else {
+          setError(authError.message);
+        }
         return;
       }
 
@@ -73,9 +91,9 @@ export function FamilyLoginForm() {
       <div className="bg-white rounded-lg shadow-md p-8">
         <div className="flex justify-center mb-6">
           <div className="inline-flex flex-col items-center">
-            <div className="inline-flex items-baseline gap-2 text-xl font-medium tracking-wide">
-              <span className="text-rooted-green">rooted school</span>
-              <span className="text-gray-800">foundation</span>
+            <div className="inline-flex items-baseline text-xl tracking-wide">
+              <span className="text-rooted-green font-bold">rooted</span>
+              <span className="text-gray-800 font-medium">schools</span>
             </div>
           </div>
         </div>
@@ -92,6 +110,7 @@ export function FamilyLoginForm() {
                 onClick={() => {
                   setMethod("email");
                   setValue("");
+                  setError(null);
                 }}
                 className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                   method === "email"
@@ -106,6 +125,7 @@ export function FamilyLoginForm() {
                 onClick={() => {
                   setMethod("phone");
                   setValue("");
+                  setError(null);
                 }}
                 className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                   method === "phone"
@@ -156,8 +176,16 @@ export function FamilyLoginForm() {
         ) : (
           <form onSubmit={handleVerifyOtp} className="space-y-4">
             <p className="text-sm text-gray-600 text-center">
-              We sent a code to <strong>{value}</strong>
+              We sent a verification{" "}
+              {method === "email" ? "email" : "code"} to{" "}
+              <strong>{value}</strong>
             </p>
+            {method === "email" && (
+              <p className="text-xs text-gray-400 text-center">
+                Enter the 6-digit code from the email, or click the link in
+                the email to sign in directly.
+              </p>
+            )}
 
             <div>
               <label
@@ -206,6 +234,15 @@ export function FamilyLoginForm() {
             </button>
           </form>
         )}
+
+        <div className="mt-6 text-center">
+          <a
+            href="/staff-login"
+            className="text-sm text-gray-400 hover:text-gray-600 hover:underline"
+          >
+            Staff login
+          </a>
+        </div>
       </div>
     </div>
   );

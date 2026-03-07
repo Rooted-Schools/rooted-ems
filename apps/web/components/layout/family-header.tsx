@@ -13,7 +13,7 @@ export function FamilyHeader({ userEmail, userPhone }: FamilyHeaderProps) {
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    window.location.href = "/login";
+    window.location.href = "/";
   }
 
   return (
@@ -23,9 +23,11 @@ export function FamilyHeader({ userEmail, userPhone }: FamilyHeaderProps) {
           href="/family/dashboard"
           className="flex items-center gap-2 no-underline hover:opacity-90 transition-opacity"
         >
-          <div className="inline-flex items-baseline gap-1 text-sm font-medium tracking-wide">
-            <span className="text-rooted-green">rooted school</span>
-            <span className="text-gray-800">foundation</span>
+          <div className="inline-flex items-baseline gap-1 text-sm tracking-wide">
+            <span>
+              <span className="text-rooted-green font-bold">rooted</span>
+              <span className="text-gray-800 font-medium">schools</span>
+            </span>
           </div>
         </Link>
 

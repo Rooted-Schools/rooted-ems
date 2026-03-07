@@ -25,9 +25,9 @@ function LogoMark({ size = "md", showSubtitle = false, className = "" }: Omit<Lo
 
   return (
     <div className={`inline-flex flex-col ${className}`}>
-      <div className={`inline-flex items-baseline ${s.gap} ${s.text} font-medium tracking-wide`}>
-        <span className="text-rooted-green">rooted school</span>
-        <span className="text-gray-800">foundation</span>
+      <div className={`inline-flex items-baseline ${s.text} tracking-wide`}>
+        <span className="text-rooted-green font-bold">rooted</span>
+        <span className="text-gray-800 font-medium">schools</span>
       </div>
       {showSubtitle && (
         <span className={`${s.subtitle} text-gray-500 tracking-wide`}>

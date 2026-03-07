@@ -46,8 +46,8 @@ export function StaffHeader({
       {/* Top green branded bar */}
       <div className="h-10 bg-rooted-green flex items-center justify-between px-6">
         <div className="flex items-center gap-3">
-          <span className="text-white/90 text-xs font-semibold tracking-wide uppercase">
-            Rooted Enrollment Management System
+          <span className="text-white/90 text-xs tracking-wide uppercase">
+            <span className="font-bold">rooted</span><span className="font-semibold">schools</span> Enrollment Management System
           </span>
           <span className="text-white/40 text-xs">|</span>
           <span className="text-white/60 text-xs">

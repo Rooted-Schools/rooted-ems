@@ -40,9 +40,9 @@ export function StaffLoginForm() {
       <div className="bg-white rounded-lg shadow-md p-8">
         <div className="flex justify-center mb-6">
           <div className="inline-flex flex-col items-center">
-            <div className="inline-flex items-baseline gap-2 text-xl font-medium tracking-wide">
-              <span className="text-rooted-green">rooted school</span>
-              <span className="text-gray-800">foundation</span>
+            <div className="inline-flex items-baseline text-xl tracking-wide">
+              <span className="text-rooted-green font-bold">rooted</span>
+              <span className="text-gray-800 font-medium">schools</span>
             </div>
           </div>
         </div>
@@ -85,7 +85,7 @@ export function StaffLoginForm() {
 
         <div className="mt-6 text-center">
           <a
-            href="/login"
+            href="/"
             className="text-sm text-rooted-green hover:underline"
           >
             Family login (email/phone)

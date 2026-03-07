@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Rooted EMS",
-  description: "Enrollment Management System for Rooted School Foundation",
+  title: "Rooted Schools EMS",
+  description: "Enrollment Management System for Rooted Schools",
 };
 
 export default function RootLayout({
