@@ -73,3 +73,13 @@ export {
   transferEnrollment,
   type CreateEnrollmentInput,
 } from "./enrollment";
+
+// Settings mutations
+export {
+  createEnrollmentWindow,
+  updateEnrollmentWindowStatus,
+  assignStaffRole,
+  removeStaffRole,
+  type CreateEnrollmentWindowInput,
+  type AssignStaffRoleInput,
+} from "./settings";
