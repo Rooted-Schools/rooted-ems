@@ -3,12 +3,19 @@ export const dynamic = "force-dynamic";
 
 import { getStaffOffers } from "@/lib/queries";
 import { OffersClient } from "./offers-client";
-import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
+import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 
-export default async function StaffOffersPage() {
+export default async function StaffOffersPage({
+  searchParams,
+}: {
+  searchParams: { campus?: string };
+}) {
   const session = await requireStaffSession();
-  const campusIds = getAccessibleCampusIds(session);
-  const { offers, stats } = await getStaffOffers(campusIds);
+  const accessibleIds = getAccessibleCampusIds(session);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
+
+  const { offers, stats } = await getStaffOffers(scopedCampusIds);
 
   return (
     <OffersClient

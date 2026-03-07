@@ -3,12 +3,19 @@ export const dynamic = "force-dynamic";
 
 import { getStaffWaitlist } from "@/lib/queries";
 import { WaitlistClient } from "./waitlist-client";
-import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
+import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 
-export default async function StaffWaitlistPage() {
+export default async function StaffWaitlistPage({
+  searchParams,
+}: {
+  searchParams: { campus?: string };
+}) {
   const session = await requireStaffSession();
-  const campusIds = getAccessibleCampusIds(session);
-  const { entries, campusCounts } = await getStaffWaitlist(campusIds);
+  const accessibleIds = getAccessibleCampusIds(session);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
+
+  const { entries, campusCounts } = await getStaffWaitlist(scopedCampusIds);
 
   return (
     <WaitlistClient

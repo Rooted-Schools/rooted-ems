@@ -5,7 +5,7 @@ import { createServerClient } from "@rooted-ems/database/server";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
+import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 
 interface PipelineStudent {
   id: string;
@@ -28,9 +28,15 @@ const PIPELINE_COLUMNS = [
   { key: "registered", label: "Registered", color: "bg-rooted-green/10 border-rooted-green", textColor: "text-rooted-green-dark" },
 ];
 
-export default async function PipelinePage() {
+export default async function PipelinePage({
+  searchParams,
+}: {
+  searchParams: { campus?: string };
+}) {
   const session = await requireStaffSession();
-  const campusIds = getAccessibleCampusIds(session);
+  const accessibleIds = getAccessibleCampusIds(session);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
   const supabase = await createServerClient();
 
   let appQuery = supabase
@@ -45,8 +51,8 @@ export default async function PipelinePage() {
     )
     .order("updated_at", { ascending: false });
 
-  if (campusIds.length > 0) {
-    appQuery = appQuery.in("campus_id", campusIds);
+  if (scopedCampusIds.length > 0) {
+    appQuery = appQuery.in("campus_id", scopedCampusIds);
   }
 
   const { data: apps } = await appQuery;

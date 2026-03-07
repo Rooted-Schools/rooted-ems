@@ -1,29 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@rooted-ems/database";
 import { Select } from "@/components/ui/select";
 
 interface StaffHeaderProps {
   userEmail?: string | null;
   campuses?: Array<{ id: string; name: string }>;
-  activeCampusId?: string;
 }
 
 export function StaffHeader({
   userEmail,
   campuses = [],
-  activeCampusId,
 }: StaffHeaderProps) {
-  const [selectedCampus, setSelectedCampus] = useState(
-    activeCampusId ?? campuses[0]?.id ?? ""
-  );
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Read current campus from URL, fall back to "all"
+  const selectedCampus = searchParams.get("campus") ?? "";
 
   const supabase = createBrowserClient();
 
   async function handleLogout() {
     await supabase.auth.signOut();
     window.location.href = "/staff-login";
+  }
+
+  function handleCampusChange(campusId: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (campusId) {
+      params.set("campus", campusId);
+    } else {
+      params.delete("campus");
+    }
+    const qs = params.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname);
   }
 
   const selectedCampusName =
@@ -69,7 +81,7 @@ export function StaffHeader({
               <Select
                 id="campus-select"
                 value={selectedCampus}
-                onChange={(e) => setSelectedCampus(e.target.value)}
+                onChange={(e) => handleCampusChange(e.target.value)}
                 className="w-52 h-8 text-sm"
               >
                 <option value="">All Campuses</option>

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { StaffSidebar } from "@/components/layout/staff-sidebar";
 import { StaffHeader } from "@/components/layout/staff-header";
 import { getSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
@@ -29,10 +30,12 @@ export default async function StaffLayout({
     <div className="flex min-h-screen bg-rooted-gray">
       <StaffSidebar />
       <div className="flex-1 flex flex-col">
-        <StaffHeader
-          userEmail={session?.email}
-          campuses={headerCampuses}
-        />
+        <Suspense fallback={<div className="h-[5.5rem]" />}>
+          <StaffHeader
+            userEmail={session?.email}
+            campuses={headerCampuses}
+          />
+        </Suspense>
         <main className="flex-1 p-6">{children}</main>
       </div>
     </div>

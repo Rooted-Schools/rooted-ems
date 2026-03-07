@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getStaffLotteryRuns } from "@/lib/queries";
-import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
+import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 
 const statusVariants: Record<string, { label: string; variant: "default" | "secondary" | "success" | "warning" }> = {
   draft: { label: "Draft", variant: "secondary" },
@@ -16,10 +16,17 @@ const statusVariants: Record<string, { label: string; variant: "default" | "seco
   archived: { label: "Archived", variant: "default" },
 };
 
-export default async function StaffLotteryPage() {
+export default async function StaffLotteryPage({
+  searchParams,
+}: {
+  searchParams: { campus?: string };
+}) {
   const session = await requireStaffSession();
-  const campusIds = getAccessibleCampusIds(session);
-  const runs = await getStaffLotteryRuns(campusIds);
+  const accessibleIds = getAccessibleCampusIds(session);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
+
+  const runs = await getStaffLotteryRuns(scopedCampusIds);
 
   return (
     <div className="space-y-6">

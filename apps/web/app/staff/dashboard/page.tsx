@@ -18,7 +18,7 @@ import {
   getUpcomingDeadlines,
   getRecentActivity,
 } from "@/lib/queries";
-import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
+import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 
 export const dynamic = "force-dynamic";
 
@@ -113,17 +113,23 @@ const QUEUE_ITEMS = [
   },
 ];
 
-export default async function StaffDashboardPage() {
+export default async function StaffDashboardPage({
+  searchParams,
+}: {
+  searchParams: { campus?: string };
+}) {
   const session = await requireStaffSession();
-  const campusIds = getAccessibleCampusIds(session);
+  const accessibleIds = getAccessibleCampusIds(session);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
 
   const [stats, appStats, deadlines, recentActivity, queueCounts] =
     await Promise.all([
-      getStaffDashboardStats(campusIds.length === 1 ? campusIds[0] : undefined),
-      getApplicationStats(campusIds.length === 1 ? campusIds[0] : undefined),
-      getUpcomingDeadlines(campusIds.length === 1 ? campusIds[0] : undefined),
-      getRecentActivity({ campusId: campusIds.length === 1 ? campusIds[0] : undefined }),
-      getWorkQueueCounts(campusIds),
+      getStaffDashboardStats(activeCampus),
+      getApplicationStats(activeCampus),
+      getUpcomingDeadlines(activeCampus),
+      getRecentActivity({ campusId: activeCampus }),
+      getWorkQueueCounts(scopedCampusIds),
     ]);
 
   const pipeline = buildPipeline(appStats);

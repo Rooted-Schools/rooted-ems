@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { createServerClient } from "@rooted-ems/database/server";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
+import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 
 interface SeatRow {
   id: string;
@@ -18,9 +18,15 @@ interface SeatRow {
   fill_pct: number;
 }
 
-export default async function SeatManagementPage() {
+export default async function SeatManagementPage({
+  searchParams,
+}: {
+  searchParams: { campus?: string };
+}) {
   const session = await requireStaffSession();
-  const campusIds = getAccessibleCampusIds(session);
+  const accessibleIds = getAccessibleCampusIds(session);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
   const supabase = await createServerClient();
 
   let planQuery = supabase
@@ -36,8 +42,8 @@ export default async function SeatManagementPage() {
     .order("campus_id")
     .order("grade_level_id");
 
-  if (campusIds.length > 0) {
-    planQuery = planQuery.in("campus_id", campusIds);
+  if (scopedCampusIds.length > 0) {
+    planQuery = planQuery.in("campus_id", scopedCampusIds);
   }
 
   const { data: plans } = await planQuery;

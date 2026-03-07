@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { createServerClient } from "@rooted-ems/database/server";
 import { ReportsClient } from "./reports-client";
-import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
+import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 
 export interface ReportData {
   pipeline: { status: string; count: number }[];
@@ -33,11 +33,18 @@ export interface ReportData {
   }[];
 }
 
-export default async function StaffReportsPage() {
+export default async function StaffReportsPage({
+  searchParams,
+}: {
+  searchParams: { campus?: string };
+}) {
   const session = await requireStaffSession();
-  const campusIds = getAccessibleCampusIds(session);
+  const accessibleIds = getAccessibleCampusIds(session);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
+
   const supabase = await createServerClient();
-  const hasCampusFilter = campusIds.length > 0;
+  const hasCampusFilter = scopedCampusIds.length > 0;
 
   // Build campus-scoped queries
   let appQuery = supabase
@@ -47,7 +54,7 @@ export default async function StaffReportsPage() {
       student:student_id (race_ethnicity)
     `)
     .neq("status", "draft");
-  if (hasCampusFilter) appQuery = appQuery.in("campus_id", campusIds);
+  if (hasCampusFilter) appQuery = appQuery.in("campus_id", scopedCampusIds);
 
   let capacityQuery = supabase
     .from("capacity_plan")
@@ -58,7 +65,7 @@ export default async function StaffReportsPage() {
     `)
     .order("campus_id")
     .order("grade_level_id");
-  if (hasCampusFilter) capacityQuery = capacityQuery.in("campus_id", campusIds);
+  if (hasCampusFilter) capacityQuery = capacityQuery.in("campus_id", scopedCampusIds);
 
   let enrollQuery = supabase
     .from("enrollment")
@@ -70,7 +77,7 @@ export default async function StaffReportsPage() {
     `)
     .order("enrolled_at", { ascending: false, nullsFirst: false })
     .limit(500);
-  if (hasCampusFilter) enrollQuery = enrollQuery.in("campus_id", campusIds);
+  if (hasCampusFilter) enrollQuery = enrollQuery.in("campus_id", scopedCampusIds);
 
   // Fetch data for all reports in parallel
   const [

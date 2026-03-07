@@ -5,7 +5,7 @@ import { createServerClient } from "@rooted-ems/database/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
+import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 
 interface WorkItem {
   id: string;
@@ -60,9 +60,15 @@ const QUEUE_CATEGORIES = [
   },
 ];
 
-export default async function StaffInboxPage() {
+export default async function StaffInboxPage({
+  searchParams,
+}: {
+  searchParams: { campus?: string };
+}) {
   const session = await requireStaffSession();
-  const campusIds = getAccessibleCampusIds(session);
+  const accessibleIds = getAccessibleCampusIds(session);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
   const supabase = await createServerClient();
 
   let appQuery = supabase
@@ -84,8 +90,8 @@ export default async function StaffInboxPage() {
     ])
     .order("updated_at", { ascending: true });
 
-  if (campusIds.length > 0) {
-    appQuery = appQuery.in("campus_id", campusIds);
+  if (scopedCampusIds.length > 0) {
+    appQuery = appQuery.in("campus_id", scopedCampusIds);
   }
 
   const { data: applications } = await appQuery;
