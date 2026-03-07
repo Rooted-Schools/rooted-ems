@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getStaffLotteryRuns, getCampuses } from "@/lib/queries";
-import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 import { NewLotteryRunDialog } from "./new-lottery-dialog";
 
 const statusVariants: Record<string, { label: string; variant: "default" | "secondary" | "success" | "warning" }> = {
@@ -22,7 +22,7 @@ export default async function StaffLotteryPage({
 }: {
   searchParams: { campus?: string };
 }) {
-  const session = await requireStaffSession();
+  const session = await requireMinRole("enrollment_manager");
   const accessibleIds = getAccessibleCampusIds(session);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;

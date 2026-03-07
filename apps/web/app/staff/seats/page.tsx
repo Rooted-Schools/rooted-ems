@@ -2,7 +2,7 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 import { createServerClient } from "@rooted-ems/database/server";
-import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 import { SeatsClient } from "./seats-client";
 
 export default async function SeatManagementPage({
@@ -10,7 +10,7 @@ export default async function SeatManagementPage({
 }: {
   searchParams: { campus?: string };
 }) {
-  const session = await requireStaffSession();
+  const session = await requireMinRole("system_admin");
   const accessibleIds = getAccessibleCampusIds(session);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
