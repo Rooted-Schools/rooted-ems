@@ -31,6 +31,7 @@ export interface ReportData {
     created_at: string;
     details: string;
   }[];
+  inquirySources: { source: string; count: number; converted: number }[];
 }
 
 export default async function StaffReportsPage({
@@ -79,12 +80,19 @@ export default async function StaffReportsPage({
     .limit(500);
   if (hasCampusFilter) enrollQuery = enrollQuery.in("campus_id", scopedCampusIds);
 
+  // Build inquiry query for source report
+  let inquiryQuery = supabase
+    .from("inquiry")
+    .select("source, status");
+  if (hasCampusFilter) inquiryQuery = inquiryQuery.in("campus_id", scopedCampusIds);
+
   // Fetch data for all reports in parallel
   const [
     { data: apps },
     { data: capacityPlans },
     { data: enrollmentRows },
     { data: auditRows },
+    { data: inquiryRows },
   ] = await Promise.all([
     appQuery,
     capacityQuery,
@@ -94,6 +102,7 @@ export default async function StaffReportsPage({
       .select("action, table_name, created_at, changes")
       .order("created_at", { ascending: false })
       .limit(200),
+    inquiryQuery,
   ]);
 
   // Pipeline counts
@@ -176,12 +185,25 @@ export default async function StaffReportsPage({
     })
   );
 
+  // Inquiry source conversion funnel
+  const sourceCounts: Record<string, { total: number; converted: number }> = {};
+  for (const inq of (inquiryRows ?? []) as Record<string, unknown>[]) {
+    const src = (inq.source as string) ?? "unknown";
+    if (!sourceCounts[src]) sourceCounts[src] = { total: 0, converted: 0 };
+    sourceCounts[src].total++;
+    if (inq.status === "applied") sourceCounts[src].converted++;
+  }
+  const inquirySources = Object.entries(sourceCounts)
+    .map(([source, { total, converted }]) => ({ source, count: total, converted }))
+    .sort((a, b) => b.count - a.count);
+
   const reportData: ReportData = {
     pipeline,
     demographics,
     capacity,
     enrollments,
     auditEvents,
+    inquirySources,
   };
 
   return <ReportsClient data={reportData} />;

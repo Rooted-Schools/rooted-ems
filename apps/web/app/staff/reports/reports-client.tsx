@@ -83,6 +83,13 @@ export function ReportsClient({ data }: { data: ReportData }) {
       icon: "🔍",
       recordCount: data.auditEvents.length,
     },
+    {
+      id: "inquiry-sources",
+      title: "Inquiry Sources",
+      description: "Where families learn about the school and conversion rates.",
+      icon: "📣",
+      recordCount: data.inquirySources.reduce((s, r) => s + r.count, 0),
+    },
   ];
 
   function handleExport(reportId: string) {
@@ -137,6 +144,17 @@ export function ReportsClient({ data }: { data: ReportData }) {
             r.table_name,
             r.created_at,
             r.details,
+          ])
+        );
+        break;
+      case "inquiry-sources":
+        csv = toCsv(
+          ["Source", "Total Inquiries", "Converted to Application", "Conversion Rate"],
+          data.inquirySources.map((r) => [
+            r.source,
+            String(r.count),
+            String(r.converted),
+            r.count > 0 ? `${((r.converted / r.count) * 100).toFixed(1)}%` : "0%",
           ])
         );
         break;
@@ -397,6 +415,51 @@ export function ReportsClient({ data }: { data: ReportData }) {
                       </TableCell>
                     </TableRow>
                   ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {previewId === "inquiry-sources" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Inquiry Sources Preview</CardTitle>
+          </CardHeader>
+          <CardContent className="px-0">
+            {data.inquirySources.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-gray-500">No inquiry data yet.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Source</TableHead>
+                    <TableHead className="text-right">Inquiries</TableHead>
+                    <TableHead className="text-right">Converted</TableHead>
+                    <TableHead className="text-right">Conversion Rate</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.inquirySources.map((row) => {
+                    const rate = row.count > 0 ? ((row.converted / row.count) * 100).toFixed(1) : "0.0";
+                    return (
+                      <TableRow key={row.source}>
+                        <TableCell className="font-medium capitalize">
+                          {row.source.replace(/_/g, " ")}
+                        </TableCell>
+                        <TableCell className="text-right">{row.count}</TableCell>
+                        <TableCell className="text-right">{row.converted}</TableCell>
+                        <TableCell className="text-right">
+                          <span className={Number(rate) >= 20 ? "text-rooted-green font-semibold" : "text-gray-500"}>
+                            {rate}%
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
