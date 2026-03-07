@@ -182,8 +182,8 @@ export function FamilyLoginForm() {
             </p>
             {method === "email" && (
               <p className="text-xs text-gray-400 text-center">
-                Enter the 6-digit code from the email, or click the link in
-                the email to sign in directly.
+                Enter the code from the email, or click the link in the
+                email to sign in directly.
               </p>
             )}
 
@@ -197,13 +197,11 @@ export function FamilyLoginForm() {
               <input
                 id="otp-code"
                 type="text"
-                inputMode="numeric"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
-                placeholder="123456"
+                placeholder="Enter code"
                 required
-                maxLength={6}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md text-center text-2xl tracking-widest focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md text-center text-lg tracking-wide focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
               />
             </div>
 
@@ -215,7 +213,7 @@ export function FamilyLoginForm() {
 
             <button
               type="submit"
-              disabled={loading || otp.length < 6}
+              disabled={loading || otp.length < 1}
               className="w-full py-2 px-4 bg-rooted-green text-white rounded-md font-medium hover:bg-rooted-green-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? "Verifying..." : "Verify Code"}
