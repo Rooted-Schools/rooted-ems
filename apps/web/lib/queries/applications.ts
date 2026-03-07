@@ -27,6 +27,8 @@ export interface ApplicationDetail extends ApplicationRow {
   review_notes: string | null;
   has_sibling_enrolled: boolean;
   locked_at: string | null;
+  offer_id: string | null;
+  offer_expires_at: string | null;
   documents: DocumentRow[];
   timeline: TimelineEntry[];
   notes: NoteRow[];
@@ -292,6 +294,15 @@ export async function getApplicationDetail(
     .select("tag:tag_id (name)")
     .eq("application_id", applicationId);
 
+  // Fetch pending offer (if any)
+  const { data: pendingOffer } = await supabase
+    .from("offer")
+    .select("id, expires_at")
+    .eq("application_id", applicationId)
+    .eq("status", "pending")
+    .limit(1)
+    .maybeSingle();
+
   const student = app.student as Record<string, string> | null;
   const guardian = app.guardian as Record<string, string> | null;
   const campus = app.campus as Record<string, string> | null;
@@ -325,6 +336,8 @@ export async function getApplicationDetail(
     review_notes: app.review_notes,
     has_sibling_enrolled: app.has_sibling_enrolled,
     locked_at: app.locked_at,
+    offer_id: pendingOffer?.id ?? null,
+    offer_expires_at: pendingOffer?.expires_at ?? null,
     documents: (docs ?? []).map((d: Record<string, unknown>) => ({
       id: d.id as string,
       document_type: d.document_type as string,

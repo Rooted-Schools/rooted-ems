@@ -6,6 +6,8 @@ import {
   updateApplication,
   submitApplication,
   withdrawApplication,
+  acceptOffer,
+  declineOffer,
   type CreateApplicationInput,
   type UpdateApplicationInput,
 } from "@/lib/mutations";
@@ -57,6 +59,41 @@ export async function familyWithdrawApplication(
   reason?: string
 ) {
   const result = await withdrawApplication(applicationId, reason);
+
+  if (!result.error) {
+    revalidatePath("/family/applications");
+    revalidatePath(`/family/applications/${applicationId}`);
+    revalidatePath("/family/dashboard");
+  }
+
+  return result;
+}
+
+// ─── Accept Offer ─────────────────────────────────────
+
+export async function familyAcceptOffer(
+  offerId: string,
+  guardianId: string,
+  applicationId: string
+) {
+  const result = await acceptOffer(offerId, guardianId);
+
+  if (!result.error) {
+    revalidatePath("/family/applications");
+    revalidatePath(`/family/applications/${applicationId}`);
+    revalidatePath("/family/dashboard");
+  }
+
+  return result;
+}
+
+// ─── Decline Offer ────────────────────────────────────
+
+export async function familyDeclineOffer(
+  offerId: string,
+  applicationId: string
+) {
+  const result = await declineOffer(offerId);
 
   if (!result.error) {
     revalidatePath("/family/applications");

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationDetail } from "@/lib/queries";
-import { familyWithdrawApplication } from "../actions";
+import { familyWithdrawApplication, familyAcceptOffer, familyDeclineOffer } from "../actions";
 
 /* ─── Status guide — what happens at each stage ─── */
 function getStatusExplanation(status: string): { title: string; explanation: string; icon: string } {
@@ -80,6 +80,33 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
   const needsAction = isDraft || detail.status === "needs_info" || isOffered;
   const canWithdraw = WITHDRAWABLE.includes(detail.status);
 
+  function handleAcceptOffer() {
+    if (!detail.offer_id) return;
+    startTransition(async () => {
+      const result = await familyAcceptOffer(detail.offer_id!, detail.guardian_id, detail.id);
+      if (result.error) {
+        setFeedback({ type: "error", message: result.error });
+      } else {
+        setFeedback({ type: "success", message: "Offer accepted! Welcome to the Rooted School family." });
+        router.refresh();
+      }
+    });
+  }
+
+  function handleDeclineOffer() {
+    if (!detail.offer_id) return;
+    if (!confirm("Are you sure you want to decline this offer? This cannot be undone.")) return;
+    startTransition(async () => {
+      const result = await familyDeclineOffer(detail.offer_id!, detail.id);
+      if (result.error) {
+        setFeedback({ type: "error", message: result.error });
+      } else {
+        setFeedback({ type: "success", message: "Offer declined." });
+        router.refresh();
+      }
+    });
+  }
+
   function handleWithdraw() {
     if (!confirm("Are you sure you want to withdraw this application? This cannot be undone.")) return;
     startTransition(async () => {
@@ -130,10 +157,14 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
               <Button>Continue Application</Button>
             </Link>
           )}
-          {isOffered && (
+          {isOffered && detail.offer_id && (
             <>
-              <Button disabled={isPending}>Accept Offer</Button>
-              <Button variant="outline" disabled={isPending}>Decline</Button>
+              <Button disabled={isPending} onClick={handleAcceptOffer}>
+                {isPending ? "Accepting..." : "Accept Offer"}
+              </Button>
+              <Button variant="outline" disabled={isPending} onClick={handleDeclineOffer}>
+                {isPending ? "..." : "Decline"}
+              </Button>
             </>
           )}
           {canWithdraw && (
@@ -157,6 +188,11 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
             <div>
               <p className="text-sm font-semibold text-gray-900">{statusExplanation.title}</p>
               <p className="text-sm text-gray-600 mt-0.5">{statusExplanation.explanation}</p>
+              {isOffered && detail.offer_expires_at && (
+                <p className="text-sm font-medium text-amber-700 mt-1">
+                  Respond by: {formatDate(detail.offer_expires_at)}
+                </p>
+              )}
             </div>
           </div>
         </CardContent>
