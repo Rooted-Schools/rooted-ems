@@ -51,10 +51,11 @@ interface FormData {
   firstName: string;
   middleName: string;
   lastName: string;
+  preferredName: string;
   suffix: string;
   dateOfBirth: string;
   gender: string;
-  raceEthnicity: string;
+  raceEthnicity: string[];
   primaryLanguage: string;
   homeLanguage: string;
   previousSchool: string;
@@ -67,6 +68,9 @@ interface FormData {
   guardianPhone: string;
   guardianPhoneSecondary: string;
   guardianEmployer: string;
+  guardianOccupation: string;
+  guardianPreferredContactMethod: string;
+  guardianPreferredLanguage: string;
   guardianSmsConsent: boolean;
   address: string;
   city: string;
@@ -85,12 +89,16 @@ interface FormData {
   // Step 4: Preferences & Services
   hasSiblingEnrolled: string;
   siblingName: string;
+  siblingCurrentSchool: string;
   transportationNeeds: string;
   beforeAfterCare: string;
   hasIEP: string;
   has504: string;
   isELL: string;
   isGiftedTalented: string;
+  hasSpeechLanguage: string;
+  hasOccupationalTherapy: string;
+  hasPhysicalTherapy: string;
   specialServicesNotes: string;
   // Step 6: Review
   dataSharingConsent: boolean;
@@ -106,10 +114,11 @@ const INITIAL: FormData = {
   firstName: "",
   middleName: "",
   lastName: "",
+  preferredName: "",
   suffix: "",
   dateOfBirth: "",
   gender: "",
-  raceEthnicity: "",
+  raceEthnicity: [],
   primaryLanguage: "",
   homeLanguage: "",
   previousSchool: "",
@@ -121,6 +130,9 @@ const INITIAL: FormData = {
   guardianPhone: "",
   guardianPhoneSecondary: "",
   guardianEmployer: "",
+  guardianOccupation: "",
+  guardianPreferredContactMethod: "",
+  guardianPreferredLanguage: "",
   guardianSmsConsent: false,
   address: "",
   city: "",
@@ -137,12 +149,16 @@ const INITIAL: FormData = {
   fosterCare: "",
   hasSiblingEnrolled: "",
   siblingName: "",
+  siblingCurrentSchool: "",
   transportationNeeds: "",
   beforeAfterCare: "",
   hasIEP: "",
   has504: "",
   isELL: "",
   isGiftedTalented: "",
+  hasSpeechLanguage: "",
+  hasOccupationalTherapy: "",
+  hasPhysicalTherapy: "",
   specialServicesNotes: "",
   dataSharingConsent: false,
   agreeTerms: false,
@@ -257,6 +273,10 @@ function buildCreateInput(form: FormData, campusWindows: EnrollmentWindowInfo[])
   if (form.beforeAfterCare) answers.before_after_care = form.beforeAfterCare;
   if (form.isELL) answers.ell = form.isELL;
   if (form.isGiftedTalented) answers.gifted_talented = form.isGiftedTalented;
+  if (form.hasSpeechLanguage) answers.speech_language = form.hasSpeechLanguage;
+  if (form.hasOccupationalTherapy) answers.occupational_therapy = form.hasOccupationalTherapy;
+  if (form.hasPhysicalTherapy) answers.physical_therapy = form.hasPhysicalTherapy;
+  if (form.siblingCurrentSchool) answers.sibling_current_school = form.siblingCurrentSchool;
   if (form.dataSharingConsent) answers.data_sharing_consent = true;
   if (form.signatureName) answers.e_signature_name = form.signatureName;
   answers.e_signature_date = new Date().toISOString().split("T")[0];
@@ -268,10 +288,11 @@ function buildCreateInput(form: FormData, campusWindows: EnrollmentWindowInfo[])
     student_first_name: form.firstName,
     student_middle_name: form.middleName || undefined,
     student_last_name: form.lastName,
+    student_preferred_name: form.preferredName || undefined,
     student_suffix: form.suffix || undefined,
     student_date_of_birth: form.dateOfBirth || undefined,
     student_gender: form.gender || undefined,
-    student_race_ethnicity: form.raceEthnicity || undefined,
+    student_race_ethnicity: form.raceEthnicity.length > 0 ? form.raceEthnicity : undefined,
     student_primary_language: form.primaryLanguage || undefined,
     student_home_language: form.homeLanguage || undefined,
     student_previous_school: form.previousSchool || undefined,
@@ -286,6 +307,9 @@ function buildCreateInput(form: FormData, campusWindows: EnrollmentWindowInfo[])
     guardian_phone: form.guardianPhone,
     guardian_phone_secondary: form.guardianPhoneSecondary || undefined,
     guardian_employer: form.guardianEmployer || undefined,
+    guardian_occupation: form.guardianOccupation || undefined,
+    guardian_preferred_contact_method: form.guardianPreferredContactMethod || undefined,
+    guardian_preferred_language: form.guardianPreferredLanguage || undefined,
     guardian_sms_consent: form.guardianSmsConsent,
     address_line1: form.address || undefined,
     city: form.city || undefined,
@@ -534,6 +558,13 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
                 </Select>
               </Field>
             </div>
+            <Field label="Preferred Name / Nickname">
+              <Input
+                value={form.preferredName}
+                onChange={(e) => update({ preferredName: e.target.value })}
+                placeholder="What does your child like to be called? (optional)"
+              />
+            </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Date of Birth" required>
                 <Input
@@ -555,21 +586,35 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
                 </Select>
               </Field>
             </div>
-            <Field label="Race / Ethnicity">
-              <Select
-                value={form.raceEthnicity}
-                onChange={(e) => update({ raceEthnicity: e.target.value })}
-              >
-                <option value="">Select...</option>
-                <option value="american_indian">American Indian or Alaska Native</option>
-                <option value="asian">Asian</option>
-                <option value="black">Black or African American</option>
-                <option value="hispanic">Hispanic or Latino</option>
-                <option value="pacific_islander">Native Hawaiian or Pacific Islander</option>
-                <option value="white">White</option>
-                <option value="two_or_more">Two or More Races</option>
-                <option value="prefer_not">Prefer not to say</option>
-              </Select>
+            <Field label="Race / Ethnicity (select all that apply)">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+                {[
+                  { value: "american_indian", label: "American Indian or Alaska Native" },
+                  { value: "asian", label: "Asian" },
+                  { value: "black", label: "Black or African American" },
+                  { value: "hispanic", label: "Hispanic or Latino" },
+                  { value: "pacific_islander", label: "Native Hawaiian or Pacific Islander" },
+                  { value: "white", label: "White" },
+                  { value: "two_or_more", label: "Two or More Races" },
+                  { value: "prefer_not", label: "Prefer not to say" },
+                ].map((opt) => (
+                  <label key={opt.value} className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={form.raceEthnicity.includes(opt.value)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          update({ raceEthnicity: [...form.raceEthnicity, opt.value] });
+                        } else {
+                          update({ raceEthnicity: form.raceEthnicity.filter((v) => v !== opt.value) });
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-gray-300 text-rooted-green focus:ring-rooted-green"
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Primary Language">
@@ -697,6 +742,40 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
                   onChange={(e) => update({ guardianEmployer: e.target.value })}
                   placeholder="Employer name"
                 />
+              </Field>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Field label="Occupation (optional)">
+                <Input
+                  value={form.guardianOccupation}
+                  onChange={(e) => update({ guardianOccupation: e.target.value })}
+                  placeholder="Job title"
+                />
+              </Field>
+              <Field label="Preferred Contact Method">
+                <Select
+                  value={form.guardianPreferredContactMethod}
+                  onChange={(e) => update({ guardianPreferredContactMethod: e.target.value })}
+                >
+                  <option value="">Select...</option>
+                  <option value="email">Email</option>
+                  <option value="phone">Phone Call</option>
+                  <option value="text">Text Message</option>
+                </Select>
+              </Field>
+              <Field label="Preferred Language">
+                <Select
+                  value={form.guardianPreferredLanguage}
+                  onChange={(e) => update({ guardianPreferredLanguage: e.target.value })}
+                >
+                  <option value="">English</option>
+                  <option value="English">English</option>
+                  <option value="Spanish">Spanish</option>
+                  <option value="Mandarin">Mandarin</option>
+                  <option value="Arabic">Arabic</option>
+                  <option value="Vietnamese">Vietnamese</option>
+                  <option value="Other">Other</option>
+                </Select>
               </Field>
             </div>
             <div className="flex items-center gap-2">
@@ -890,13 +969,22 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
               </Select>
             </Field>
             {form.hasSiblingEnrolled === "yes" && (
-              <Field label="Sibling Name">
-                <Input
-                  value={form.siblingName}
-                  onChange={(e) => update({ siblingName: e.target.value })}
-                  placeholder="Full name of enrolled sibling"
-                />
-              </Field>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Sibling Name">
+                  <Input
+                    value={form.siblingName}
+                    onChange={(e) => update({ siblingName: e.target.value })}
+                    placeholder="Full name of enrolled sibling"
+                  />
+                </Field>
+                <Field label="Sibling Current School">
+                  <Input
+                    value={form.siblingCurrentSchool}
+                    onChange={(e) => update({ siblingCurrentSchool: e.target.value })}
+                    placeholder="School sibling currently attends"
+                  />
+                </Field>
+              </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Transportation Needs?">
@@ -972,7 +1060,39 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
                 </Select>
               </Field>
             </div>
-            {(form.hasIEP === "yes" || form.has504 === "yes" || form.isELL === "yes" || form.isGiftedTalented === "yes") && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Field label="Speech / Language Services?">
+                <Select
+                  value={form.hasSpeechLanguage}
+                  onChange={(e) => update({ hasSpeechLanguage: e.target.value })}
+                >
+                  <option value="">Select...</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </Select>
+              </Field>
+              <Field label="Occupational Therapy?">
+                <Select
+                  value={form.hasOccupationalTherapy}
+                  onChange={(e) => update({ hasOccupationalTherapy: e.target.value })}
+                >
+                  <option value="">Select...</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </Select>
+              </Field>
+              <Field label="Physical Therapy?">
+                <Select
+                  value={form.hasPhysicalTherapy}
+                  onChange={(e) => update({ hasPhysicalTherapy: e.target.value })}
+                >
+                  <option value="">Select...</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </Select>
+              </Field>
+            </div>
+            {(form.hasIEP === "yes" || form.has504 === "yes" || form.isELL === "yes" || form.isGiftedTalented === "yes" || form.hasSpeechLanguage === "yes" || form.hasOccupationalTherapy === "yes" || form.hasPhysicalTherapy === "yes") && (
               <Field label="Special Services Notes">
                 <Input
                   value={form.specialServicesNotes}
@@ -1003,6 +1123,9 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
               { name: "Previous School Records", desc: "Report cards or transcripts from prior school", required: false },
               { name: "IEP / 504 Plan", desc: "If applicable, upload current plan documentation", required: false },
               { name: "Custody Documentation", desc: "If applicable, upload custody or guardianship documents", required: false },
+              { name: "McKinney-Vento Documentation", desc: "If applicable, documentation of homelessness status", required: false },
+              { name: "Income Verification", desc: "If claiming Free/Reduced Lunch eligibility", required: false },
+              { name: "Parent / Guardian Photo ID", desc: "Government-issued photo ID of primary guardian", required: false },
             ].map((doc) => (
               <div
                 key={doc.name}
@@ -1047,8 +1170,10 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
 
               <ReviewSection title="Student">
                 <ReviewRow label="Name" value={[form.firstName, form.middleName, form.lastName, form.suffix].filter(Boolean).join(" ") || "—"} />
+                {form.preferredName && <ReviewRow label="Preferred Name" value={form.preferredName} />}
                 <ReviewRow label="Date of Birth" value={form.dateOfBirth || "—"} />
                 <ReviewRow label="Gender" value={form.gender || "—"} />
+                <ReviewRow label="Race/Ethnicity" value={form.raceEthnicity.length > 0 ? form.raceEthnicity.join(", ") : "—"} />
                 <ReviewRow label="Language" value={form.primaryLanguage || "—"} />
                 <ReviewRow label="Previous School" value={form.previousSchool || "—"} />
               </ReviewSection>
@@ -1058,11 +1183,13 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
                 <ReviewRow label="Relationship" value={form.guardianRelationship || "—"} />
                 <ReviewRow label="Email" value={form.guardianEmail || "—"} />
                 <ReviewRow label="Phone" value={form.guardianPhone || "—"} />
+                {form.guardianOccupation && <ReviewRow label="Occupation" value={form.guardianOccupation} />}
+                {form.guardianPreferredContactMethod && <ReviewRow label="Contact Pref" value={form.guardianPreferredContactMethod} />}
                 <ReviewRow label="Address" value={[form.address, form.city, form.state, form.zip].filter(Boolean).join(", ") || "—"} />
               </ReviewSection>
 
               <ReviewSection title="Preferences">
-                <ReviewRow label="Sibling Enrolled" value={form.hasSiblingEnrolled === "yes" ? `Yes — ${form.siblingName || "—"}` : "No"} />
+                <ReviewRow label="Sibling Enrolled" value={form.hasSiblingEnrolled === "yes" ? `Yes — ${form.siblingName || "—"}${form.siblingCurrentSchool ? ` (${form.siblingCurrentSchool})` : ""}` : "No"} />
                 <ReviewRow label="Transportation" value={form.transportationNeeds === "yes" ? "Needs transportation" : "Own transportation"} />
               </ReviewSection>
 
@@ -1070,6 +1197,9 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
                 <ReviewRow label="IEP" value={form.hasIEP === "yes" ? "Yes" : "No"} />
                 <ReviewRow label="504 Plan" value={form.has504 === "yes" ? "Yes" : "No"} />
                 <ReviewRow label="ELL" value={form.isELL === "yes" ? "Yes" : "No"} />
+                {form.hasSpeechLanguage === "yes" && <ReviewRow label="Speech/Language" value="Yes" />}
+                {form.hasOccupationalTherapy === "yes" && <ReviewRow label="Occupational Therapy" value="Yes" />}
+                {form.hasPhysicalTherapy === "yes" && <ReviewRow label="Physical Therapy" value="Yes" />}
                 {form.specialServicesNotes && <ReviewRow label="Notes" value={form.specialServicesNotes} />}
               </ReviewSection>
             </div>

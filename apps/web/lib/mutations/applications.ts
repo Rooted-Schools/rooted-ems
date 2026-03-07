@@ -15,10 +15,11 @@ export interface CreateApplicationInput {
   student_first_name: string;
   student_middle_name?: string;
   student_last_name: string;
+  student_preferred_name?: string;
   student_suffix?: string;
   student_date_of_birth?: string;
   student_gender?: string;
-  student_race_ethnicity?: string;
+  student_race_ethnicity?: string[];
   student_primary_language?: string;
   student_home_language?: string;
   student_previous_school?: string;
@@ -34,6 +35,9 @@ export interface CreateApplicationInput {
   guardian_phone: string;
   guardian_phone_secondary?: string;
   guardian_employer?: string;
+  guardian_occupation?: string;
+  guardian_preferred_contact_method?: string;
+  guardian_preferred_language?: string;
   guardian_sms_consent?: boolean;
   // Household
   address_line1?: string;
@@ -58,10 +62,11 @@ export interface UpdateApplicationInput {
   student_first_name?: string;
   student_middle_name?: string;
   student_last_name?: string;
+  student_preferred_name?: string;
   student_suffix?: string;
   student_date_of_birth?: string;
   student_gender?: string;
-  student_race_ethnicity?: string;
+  student_race_ethnicity?: string[];
   student_primary_language?: string;
   student_home_language?: string;
   student_previous_school?: string;
@@ -77,6 +82,9 @@ export interface UpdateApplicationInput {
   guardian_phone?: string;
   guardian_phone_secondary?: string;
   guardian_employer?: string;
+  guardian_occupation?: string;
+  guardian_preferred_contact_method?: string;
+  guardian_preferred_language?: string;
   guardian_sms_consent?: boolean;
   // Household fields
   address_line1?: string;
@@ -178,6 +186,9 @@ export async function createApplication(
       phone: input.guardian_phone,
       phone_secondary: input.guardian_phone_secondary ?? null,
       employer: input.guardian_employer ?? null,
+      occupation: input.guardian_occupation ?? null,
+      preferred_contact_method: input.guardian_preferred_contact_method ?? null,
+      preferred_language: input.guardian_preferred_language ?? null,
       sms_consent: input.guardian_sms_consent ?? false,
       is_primary: true,
     })
@@ -197,11 +208,12 @@ export async function createApplication(
       first_name: input.student_first_name,
       middle_name: input.student_middle_name ?? null,
       last_name: input.student_last_name,
+      preferred_name: input.student_preferred_name ?? null,
       suffix: input.student_suffix ?? null,
       date_of_birth: input.student_date_of_birth ?? null,
       gender: input.student_gender ?? null,
-      race_ethnicity: input.student_race_ethnicity
-        ? [input.student_race_ethnicity]
+      race_ethnicity: input.student_race_ethnicity && input.student_race_ethnicity.length > 0
+        ? input.student_race_ethnicity
         : null,
       primary_language: input.student_primary_language ?? null,
       home_language: input.student_home_language ?? null,
@@ -316,8 +328,10 @@ export async function updateApplication(
     studentUpdates.date_of_birth = input.student_date_of_birth;
   if (input.student_gender !== undefined)
     studentUpdates.gender = input.student_gender;
+  if (input.student_preferred_name !== undefined)
+    studentUpdates.preferred_name = input.student_preferred_name;
   if (input.student_race_ethnicity !== undefined)
-    studentUpdates.race_ethnicity = [input.student_race_ethnicity];
+    studentUpdates.race_ethnicity = input.student_race_ethnicity;
   if (input.student_primary_language !== undefined)
     studentUpdates.primary_language = input.student_primary_language;
   if (input.student_home_language !== undefined)
@@ -368,6 +382,12 @@ export async function updateApplication(
     guardianUpdates.phone_secondary = input.guardian_phone_secondary;
   if (input.guardian_employer !== undefined)
     guardianUpdates.employer = input.guardian_employer;
+  if (input.guardian_occupation !== undefined)
+    guardianUpdates.occupation = input.guardian_occupation;
+  if (input.guardian_preferred_contact_method !== undefined)
+    guardianUpdates.preferred_contact_method = input.guardian_preferred_contact_method;
+  if (input.guardian_preferred_language !== undefined)
+    guardianUpdates.preferred_language = input.guardian_preferred_language;
   if (input.guardian_sms_consent !== undefined)
     guardianUpdates.sms_consent = input.guardian_sms_consent;
 

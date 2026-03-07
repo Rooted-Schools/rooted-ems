@@ -54,7 +54,7 @@ interface FormData {
   suffix: string;
   dateOfBirth: string;
   gender: string;
-  raceEthnicity: string;
+  raceEthnicity: string[];
   primaryLanguage: string;
   homeLanguage: string;
   previousSchool: string;
@@ -106,7 +106,7 @@ function draftToFormData(d: DraftApplicationData): FormData {
     suffix: d.student.suffix ?? "",
     dateOfBirth: d.student.date_of_birth ?? "",
     gender: d.student.gender ?? "",
-    raceEthnicity: d.student.race_ethnicity?.[0] ?? "",
+    raceEthnicity: d.student.race_ethnicity ?? [],
     primaryLanguage: d.student.primary_language ?? "",
     homeLanguage: d.student.home_language ?? "",
     previousSchool: d.student.previous_school_name ?? "",
@@ -246,7 +246,7 @@ function buildUpdateInput(applicationId: string, form: FormData) {
     student_suffix: form.suffix || undefined,
     student_date_of_birth: form.dateOfBirth || undefined,
     student_gender: form.gender || undefined,
-    student_race_ethnicity: form.raceEthnicity || undefined,
+    student_race_ethnicity: form.raceEthnicity.length > 0 ? form.raceEthnicity : undefined,
     student_primary_language: form.primaryLanguage || undefined,
     student_home_language: form.homeLanguage || undefined,
     student_previous_school: form.previousSchool || undefined,
@@ -434,13 +434,35 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
                 </Select>
               </Field>
             </div>
-            <Field label="Race / Ethnicity">
-              <Select value={form.raceEthnicity} onChange={(e) => update({ raceEthnicity: e.target.value })}>
-                <option value="">Select...</option><option value="american_indian">American Indian or Alaska Native</option>
-                <option value="asian">Asian</option><option value="black">Black or African American</option>
-                <option value="hispanic">Hispanic or Latino</option><option value="pacific_islander">Native Hawaiian or Pacific Islander</option>
-                <option value="white">White</option><option value="two_or_more">Two or More Races</option><option value="prefer_not">Prefer not to say</option>
-              </Select>
+            <Field label="Race / Ethnicity (select all that apply)">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+                {[
+                  { value: "american_indian", label: "American Indian or Alaska Native" },
+                  { value: "asian", label: "Asian" },
+                  { value: "black", label: "Black or African American" },
+                  { value: "hispanic", label: "Hispanic or Latino" },
+                  { value: "pacific_islander", label: "Native Hawaiian or Pacific Islander" },
+                  { value: "white", label: "White" },
+                  { value: "two_or_more", label: "Two or More Races" },
+                  { value: "prefer_not", label: "Prefer not to say" },
+                ].map((opt) => (
+                  <label key={opt.value} className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={form.raceEthnicity.includes(opt.value)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          update({ raceEthnicity: [...form.raceEthnicity, opt.value] });
+                        } else {
+                          update({ raceEthnicity: form.raceEthnicity.filter((v) => v !== opt.value) });
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-gray-300 text-rooted-green focus:ring-rooted-green"
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Primary Language">
