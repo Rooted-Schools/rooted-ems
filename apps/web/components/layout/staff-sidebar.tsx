@@ -1,13 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+
+/* ------------------------------------------------------------------ */
+/*  Role hierarchy — higher number = more access                      */
+/* ------------------------------------------------------------------ */
+const ROLE_LEVEL: Record<string, number> = {
+  compliance_auditor: 1,
+  enrollment_staff: 2,
+  enrollment_manager: 3,
+  system_admin: 4,
+};
+
+type MinRole = "compliance_auditor" | "enrollment_staff" | "enrollment_manager" | "system_admin";
 
 interface NavItem {
   label: string;
   href: string;
   icon: string;
+  /** Minimum role required to see this item (default: compliance_auditor = everyone) */
+  minRole?: MinRole;
 }
 
 interface NavSection {
@@ -19,53 +33,67 @@ const NAV_SECTIONS: NavSection[] = [
   {
     items: [
       { label: "Dashboard", href: "/staff/dashboard", icon: "📊" },
-      { label: "Inbox", href: "/staff/inbox", icon: "📥" },
+      { label: "Inbox", href: "/staff/inbox", icon: "📥", minRole: "enrollment_staff" },
     ],
   },
   {
     title: "Admissions",
     items: [
-      { label: "Inquiries", href: "/staff/inquiries", icon: "💬" },
+      { label: "Inquiries", href: "/staff/inquiries", icon: "💬", minRole: "enrollment_staff" },
       { label: "Applications", href: "/staff/applications", icon: "📋" },
       { label: "Students", href: "/staff/students", icon: "👤" },
-      { label: "Pipeline", href: "/staff/pipeline", icon: "🔄" },
-      { label: "Lottery", href: "/staff/lottery", icon: "🎲" },
-      { label: "Offers", href: "/staff/offers", icon: "✉️" },
-      { label: "Waitlist", href: "/staff/waitlist", icon: "📝" },
+      { label: "Pipeline", href: "/staff/pipeline", icon: "🔄", minRole: "enrollment_staff" },
+      { label: "Lottery", href: "/staff/lottery", icon: "🎲", minRole: "enrollment_manager" },
+      { label: "Offers", href: "/staff/offers", icon: "✉️", minRole: "enrollment_manager" },
+      { label: "Waitlist", href: "/staff/waitlist", icon: "📝", minRole: "enrollment_manager" },
     ],
   },
   {
     title: "Operations",
     items: [
-      { label: "Enrollment", href: "/staff/enrollment", icon: "✅" },
-      { label: "Seat Management", href: "/staff/seats", icon: "🪑" },
-      { label: "Communications", href: "/staff/communications", icon: "💬" },
+      { label: "Enrollment", href: "/staff/enrollment", icon: "✅", minRole: "enrollment_staff" },
+      { label: "Seat Management", href: "/staff/seats", icon: "🪑", minRole: "enrollment_manager" },
+      { label: "Communications", href: "/staff/communications", icon: "💬", minRole: "enrollment_staff" },
     ],
   },
   {
     title: "Analytics",
     items: [
-      { label: "Equity Dashboard", href: "/staff/equity", icon: "⚖️" },
+      { label: "Equity Dashboard", href: "/staff/equity", icon: "⚖️", minRole: "enrollment_manager" },
       { label: "Reports", href: "/staff/reports", icon: "📈" },
       { label: "Audit Trail", href: "/staff/audit", icon: "🔒" },
     ],
   },
   {
     items: [
-      { label: "Settings", href: "/staff/settings", icon: "⚙️" },
+      { label: "Settings", href: "/staff/settings", icon: "⚙️", minRole: "enrollment_manager" },
     ],
   },
 ];
 
-export function StaffSidebar() {
+interface StaffSidebarProps {
+  /** The user's highest role across all campuses (drives nav filtering) */
+  highestRole?: string;
+}
+
+export function StaffSidebar({ highestRole = "compliance_auditor" }: StaffSidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Preserve campus selection across navigation
+  const campusParam = searchParams.get("campus");
+  function buildHref(base: string) {
+    return campusParam ? `${base}?campus=${campusParam}` : base;
+  }
+
+  const userLevel = ROLE_LEVEL[highestRole] ?? 1;
 
   return (
     <aside className="w-64 bg-white border-r border-gray-200 min-h-screen flex flex-col">
       {/* Brand */}
       <div className="p-4 border-b border-gray-200">
         <Link
-          href="/staff/dashboard"
+          href={buildHref("/staff/dashboard")}
           className="inline-flex items-center gap-2.5 no-underline hover:opacity-90 transition-opacity"
         >
           {/* Tree icon */}
@@ -101,45 +129,54 @@ export function StaffSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 py-2 overflow-y-auto">
-        {NAV_SECTIONS.map((section, sIdx) => (
-          <div key={sIdx} className={cn(sIdx > 0 && "mt-2")}>
-            {section.title && (
-              <div className="px-4 py-1.5">
-                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                  {section.title}
-                </span>
+        {NAV_SECTIONS.map((section, sIdx) => {
+          // Filter items by role
+          const visibleItems = section.items.filter((item) => {
+            const required = ROLE_LEVEL[item.minRole ?? "compliance_auditor"] ?? 1;
+            return userLevel >= required;
+          });
+          if (visibleItems.length === 0) return null;
+
+          return (
+            <div key={sIdx} className={cn(sIdx > 0 && "mt-2")}>
+              {section.title && (
+                <div className="px-4 py-1.5">
+                  <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                    {section.title}
+                  </span>
+                </div>
+              )}
+              <div className="px-2 space-y-0.5">
+                {visibleItems.map((item) => {
+                  const isActive =
+                    pathname === item.href ||
+                    (item.href !== "/staff/dashboard" &&
+                      pathname.startsWith(item.href));
+                  return (
+                    <Link
+                      key={item.href}
+                      href={buildHref(item.href)}
+                      className={cn(
+                        "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors",
+                        isActive
+                          ? "bg-rooted-green/10 text-rooted-green-dark border border-rooted-green/20"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent"
+                      )}
+                    >
+                      <span className="text-sm" aria-hidden="true">
+                        {item.icon}
+                      </span>
+                      {item.label}
+                    </Link>
+                  );
+                })}
               </div>
-            )}
-            <div className="px-2 space-y-0.5">
-              {section.items.map((item) => {
-                const isActive =
-                  pathname === item.href ||
-                  (item.href !== "/staff/dashboard" &&
-                    pathname.startsWith(item.href));
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors",
-                      isActive
-                        ? "bg-rooted-green/10 text-rooted-green-dark border border-rooted-green/20"
-                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent"
-                    )}
-                  >
-                    <span className="text-sm" aria-hidden="true">
-                      {item.icon}
-                    </span>
-                    {item.label}
-                  </Link>
-                );
-              })}
+              {section.title && sIdx < NAV_SECTIONS.length - 1 && (
+                <div className="mx-4 mt-2 border-b border-gray-100" />
+              )}
             </div>
-            {section.title && sIdx < NAV_SECTIONS.length - 1 && (
-              <div className="mx-4 mt-2 border-b border-gray-100" />
-            )}
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Version footer */}
