@@ -33,8 +33,8 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   // Public routes — skip auth checks
-  const publicRoutes = ["/", "/login", "/staff-login", "/auth/callback", "/auth/verify"];
-  if (publicRoutes.includes(pathname)) {
+  const publicRoutes = ["/", "/login", "/staff-login", "/auth/callback", "/auth/verify", "/inquiry"];
+  if (publicRoutes.includes(pathname) || pathname.startsWith("/api/")) {
     return supabaseResponse;
   }
 

@@ -55,10 +55,10 @@ export default function HomePage() {
               Apply Now
             </Link>
             <Link
-              href="/staff-login"
+              href="/inquiry"
               className="inline-flex items-center justify-center px-6 py-3 text-base font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors w-full sm:w-auto"
             >
-              Staff Portal
+              Express Interest
             </Link>
           </div>
         </div>
@@ -176,6 +176,9 @@ export default function HomePage() {
             className="h-6 opacity-60"
           />
           <div className="flex items-center gap-6 text-xs text-gray-400">
+            <Link href="/inquiry" className="hover:text-gray-600">
+              Express Interest
+            </Link>
             <Link href="/login" className="hover:text-gray-600">
               Family Portal
             </Link>

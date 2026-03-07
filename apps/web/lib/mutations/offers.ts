@@ -133,7 +133,7 @@ export async function acceptOffer(
     .single();
 
   const schoolYearId =
-    (app?.enrollment_window as Record<string, string> | null)?.school_year_id ?? "";
+    (app?.enrollment_window as unknown as Record<string, string> | null)?.school_year_id ?? "";
 
   if (app?.student_id) {
     const enrollResult = await createEnrollment({
