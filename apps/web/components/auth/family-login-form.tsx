@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { createBrowserClient } from "@rooted-ems/database";
 
@@ -38,9 +38,17 @@ export function FamilyLoginForm() {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
 
   // Keep a stable reference to the OTP client across renders
   const otpClientRef = useRef(createOtpClient());
+
+  // Cooldown timer after sending OTP
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
 
   async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
@@ -60,6 +68,14 @@ export function FamilyLoginForm() {
 
       if (authError) {
         if (
+          authError.message.toLowerCase().includes("rate limit") ||
+          authError.message.toLowerCase().includes("too many")
+        ) {
+          setError(
+            "Too many login attempts. Please wait a few minutes before trying again."
+          );
+          setCooldown(120);
+        } else if (
           method === "phone" &&
           (authError.message.toLowerCase().includes("provider") ||
             authError.message.toLowerCase().includes("not supported") ||
@@ -75,6 +91,7 @@ export function FamilyLoginForm() {
       }
 
       setOtpSent(true);
+      setCooldown(60);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -202,10 +219,14 @@ export function FamilyLoginForm() {
 
             <button
               type="submit"
-              disabled={loading || !value}
+              disabled={loading || !value || cooldown > 0}
               className="w-full py-2 px-4 bg-rooted-green text-white rounded-md font-medium hover:bg-rooted-green-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? "Sending..." : "Send Verification Code"}
+              {loading
+                ? "Sending..."
+                : cooldown > 0
+                  ? `Wait ${cooldown}s`
+                  : "Send Verification Code"}
             </button>
           </form>
         ) : (
@@ -254,17 +275,48 @@ export function FamilyLoginForm() {
               {loading ? "Verifying..." : "Verify Code"}
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setOtpSent(false);
-                setOtp("");
-                setError(null);
-              }}
-              className="w-full text-sm text-gray-500 hover:text-gray-700"
-            >
-              Use a different {method === "email" ? "email" : "phone number"}
-            </button>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                disabled={cooldown > 0 || loading}
+                onClick={async () => {
+                  setLoading(true);
+                  setError(null);
+                  const otpClient = otpClientRef.current;
+                  const opts = method === "email" ? { email: value } : { phone: value };
+                  const { error: resendErr } = await otpClient.auth.signInWithOtp(opts);
+                  if (resendErr) {
+                    if (resendErr.message.toLowerCase().includes("rate limit") || resendErr.message.toLowerCase().includes("too many")) {
+                      setError("Too many attempts. Please wait a few minutes.");
+                      setCooldown(120);
+                    } else {
+                      setError(resendErr.message);
+                    }
+                  } else {
+                    setCooldown(60);
+                    setError(null);
+                  }
+                  setLoading(false);
+                }}
+                className="w-full text-sm text-rooted-green hover:text-rooted-green-dark disabled:text-gray-400 disabled:cursor-not-allowed"
+              >
+                {cooldown > 0
+                  ? `Resend code in ${cooldown}s`
+                  : "Resend verification code"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOtpSent(false);
+                  setOtp("");
+                  setError(null);
+                  setCooldown(0);
+                }}
+                className="w-full text-sm text-gray-500 hover:text-gray-700"
+              >
+                Use a different {method === "email" ? "email" : "phone number"}
+              </button>
+            </div>
           </form>
         )}
 
