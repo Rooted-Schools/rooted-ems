@@ -86,5 +86,17 @@ export {
   type PacketRequirementRow,
 } from "./staff";
 
+// Inquiry queries
+export {
+  getStaffInquiries,
+  getInquiryStats,
+  getInquiryDetail,
+  getRecentInquiries,
+  type InquiryRow,
+  type InquiryStats,
+  type InquiryDetail,
+  type ContactLogRow,
+} from "./inquiries";
+
 // Shared utilities
 export { formatRelativeTime } from "./utils";

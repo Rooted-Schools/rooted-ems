@@ -97,25 +97,61 @@ export default function HomePage() {
                 logo: "/logos/rooted-cleveland.png",
               },
             ].map((school) => (
-              <Link key={school.name} href="/login">
-                <div className="group border-2 border-gray-100 hover:border-rooted-green/40 rounded-xl p-6 flex flex-col items-center text-center transition-all hover:shadow-lg cursor-pointer">
-                  <div className="h-28 flex items-center justify-center mb-4">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={school.logo}
-                      alt={school.name}
-                      className="max-h-28 max-w-full object-contain group-hover:scale-105 transition-transform"
-                    />
-                  </div>
-                  <p className="text-sm text-gray-500">{school.location}</p>
-                  <p className="text-xs text-gray-400 mt-1">{school.grades}</p>
-                  <span className="mt-4 inline-flex items-center text-sm font-medium text-rooted-green group-hover:underline">
-                    Apply Now &rarr;
-                  </span>
+              <div key={school.name} className="group border-2 border-gray-100 hover:border-rooted-green/40 rounded-xl p-6 flex flex-col items-center text-center transition-all hover:shadow-lg">
+                <div className="h-28 flex items-center justify-center mb-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={school.logo}
+                    alt={school.name}
+                    className="max-h-28 max-w-full object-contain group-hover:scale-105 transition-transform"
+                  />
                 </div>
-              </Link>
+                <p className="text-sm text-gray-500">{school.location}</p>
+                <p className="text-xs text-gray-400 mt-1">{school.grades}</p>
+                <div className="mt-4 flex gap-2">
+                  <Link
+                    href="/login"
+                    className="inline-flex items-center text-sm font-medium text-white bg-rooted-green hover:bg-rooted-green/90 px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Apply Now
+                  </Link>
+                  <Link
+                    href="/inquiry"
+                    className="inline-flex items-center text-sm font-medium text-rooted-green border border-rooted-green/30 hover:bg-rooted-green/5 px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Learn More
+                  </Link>
+                </div>
+              </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ─── Express Interest CTA ─── */}
+      <section className="py-16 bg-rooted-green/5 border-y border-rooted-green/10">
+        <div className="max-w-3xl mx-auto px-6 text-center">
+          <p className="text-sm font-semibold text-rooted-green uppercase tracking-wider mb-2">
+            Not ready to apply?
+          </p>
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3">
+            Express Your Interest
+          </h2>
+          <p className="text-gray-600 max-w-xl mx-auto mb-8">
+            Complete a short form and our team will share more information about
+            our schools, upcoming enrollment windows, and how{" "}
+            <span className="font-bold">rooted</span>schools prepares students
+            for economic mobility.
+          </p>
+          <Link
+            href="/inquiry"
+            className="inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold text-white bg-rooted-green hover:bg-rooted-green/90 rounded-lg transition-colors shadow-sm"
+          >
+            Express Interest &rarr;
+          </Link>
+          <p className="text-xs text-gray-400 mt-4">
+            No commitment required. We&apos;ll follow up to answer your questions.
+          </p>
         </div>
       </section>
 

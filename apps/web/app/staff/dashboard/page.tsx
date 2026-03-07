@@ -17,6 +17,7 @@ import {
   buildPipeline,
   getUpcomingDeadlines,
   getRecentActivity,
+  getInquiryStats,
 } from "@/lib/queries";
 import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 
@@ -87,6 +88,12 @@ const FLOW_STAGES = [
 
 const QUEUE_ITEMS = [
   {
+    key: "new_inquiries",
+    label: "New Inquiries",
+    dotColor: "bg-purple-500",
+    href: "/staff/inquiries",
+  },
+  {
     key: "submitted",
     label: "New Submissions",
     dotColor: "bg-blue-500",
@@ -123,18 +130,25 @@ export default async function StaffDashboardPage({
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
 
-  const [stats, appStats, deadlines, recentActivity, queueCounts] =
+  const [stats, appStats, deadlines, recentActivity, queueCounts, inquiryStats] =
     await Promise.all([
       getStaffDashboardStats(activeCampus),
       getApplicationStats(activeCampus),
       getUpcomingDeadlines(activeCampus),
       getRecentActivity({ campusId: activeCampus }),
       getWorkQueueCounts(scopedCampusIds),
+      getInquiryStats(scopedCampusIds),
     ]);
 
   const pipeline = buildPipeline(appStats);
   const pipelineTotal = pipeline.reduce((acc, s) => acc + s.count, 0);
-  const totalQueueItems = Object.values(queueCounts).reduce(
+
+  // Merge inquiry counts into queue counts
+  const mergedQueueCounts: Record<string, number> = {
+    ...queueCounts,
+    new_inquiries: inquiryStats.new,
+  };
+  const totalQueueItems = Object.values(mergedQueueCounts).reduce(
     (a, b) => a + b,
     0
   );
@@ -159,7 +173,20 @@ export default async function StaffDashboardPage({
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Link href="/staff/inquiries" className="no-underline">
+          <Card className="border-t-4 border-t-purple-500 hover:shadow-md transition-shadow h-full">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                New Inquiries
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-purple-600">{inquiryStats.new}</p>
+              <p className="text-xs text-gray-400 mt-1">awaiting follow-up</p>
+            </CardContent>
+          </Card>
+        </Link>
         <Card className="border-t-4 border-t-rooted-green">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -317,11 +344,11 @@ export default async function StaffDashboardPage({
           </CardHeader>
           <CardContent className="space-y-2">
             {QUEUE_ITEMS.map((item) => {
-              const count = queueCounts[item.key] ?? 0;
+              const count = mergedQueueCounts[item.key] ?? 0;
               return (
                 <Link
                   key={item.key}
-                  href="/staff/inbox"
+                  href={item.href ?? "/staff/inbox"}
                   className="flex items-center justify-between py-1.5 no-underline hover:bg-gray-50 -mx-2 px-2 rounded-md transition-colors"
                 >
                   <div className="flex items-center gap-2">
