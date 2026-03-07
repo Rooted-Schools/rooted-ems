@@ -556,6 +556,260 @@ export async function withdrawApplication(
   return { data: null, error: null };
 }
 
+// ─── Staff Create Application (on behalf of family) ────
+
+/**
+ * Staff creates an application on behalf of a family that cannot
+ * apply online. Creates household, guardian, student, and application.
+ * No family user account required.
+ */
+export async function staffCreateApplication(
+  input: CreateApplicationInput & { created_by_staff: string },
+  options?: { autoSubmit?: boolean }
+): Promise<MutationResult<{ id: string; student_id: string; guardian_id: string }>> {
+  const supabase = await createServerClient();
+
+  // 1. Create household (no family user link)
+  const { data: household, error: hhErr } = await supabase
+    .from("household")
+    .insert({
+      user_id: null,
+      address_line1: input.address_line1 ?? null,
+      city: input.city ?? null,
+      state: input.state ?? null,
+      zip: input.zip ?? null,
+    })
+    .select("id")
+    .single();
+
+  if (hhErr || !household) {
+    console.error("[staffCreateApplication] household", hhErr?.message);
+    return { data: null, error: "Failed to create household" };
+  }
+
+  // 2. Create guardian
+  const { data: guardian, error: gErr } = await supabase
+    .from("guardian")
+    .insert({
+      household_id: household.id,
+      first_name: input.guardian_first_name,
+      last_name: input.guardian_last_name,
+      relationship: input.guardian_relationship,
+      email: input.guardian_email,
+      phone: input.guardian_phone,
+      phone_secondary: input.guardian_phone_secondary ?? null,
+      employer: input.guardian_employer ?? null,
+      occupation: input.guardian_occupation ?? null,
+      preferred_contact_method: input.guardian_preferred_contact_method ?? null,
+      preferred_language: input.guardian_preferred_language ?? null,
+      sms_consent: input.guardian_sms_consent ?? false,
+      is_primary: true,
+    })
+    .select("id")
+    .single();
+
+  if (gErr || !guardian) {
+    console.error("[staffCreateApplication] guardian", gErr?.message);
+    return { data: null, error: "Failed to create guardian record" };
+  }
+
+  // 3. Create student
+  const { data: student, error: sErr } = await supabase
+    .from("student")
+    .insert({
+      household_id: household.id,
+      first_name: input.student_first_name,
+      middle_name: input.student_middle_name ?? null,
+      last_name: input.student_last_name,
+      preferred_name: input.student_preferred_name ?? null,
+      suffix: input.student_suffix ?? null,
+      date_of_birth: input.student_date_of_birth ?? null,
+      gender: input.student_gender ?? null,
+      race_ethnicity:
+        input.student_race_ethnicity && input.student_race_ethnicity.length > 0
+          ? input.student_race_ethnicity
+          : null,
+      primary_language: input.student_primary_language ?? null,
+      home_language: input.student_home_language ?? null,
+      previous_school_name: input.student_previous_school ?? null,
+      previous_school_phone: input.student_previous_school_phone ?? null,
+      has_iep: input.student_has_iep ?? false,
+      has_504: input.student_has_504 ?? false,
+      special_services_notes: input.student_special_services_notes ?? null,
+      emergency_contact_1_name: input.emergency_contact_1_name ?? null,
+      emergency_contact_1_phone: input.emergency_contact_1_phone ?? null,
+      emergency_contact_1_relationship: input.emergency_contact_1_relationship ?? null,
+    })
+    .select("id")
+    .single();
+
+  if (sErr || !student) {
+    console.error("[staffCreateApplication] student", sErr?.message);
+    return { data: null, error: "Failed to create student record" };
+  }
+
+  // 4. Link guardian to student
+  await supabase.from("guardian_student").insert({
+    guardian_id: guardian.id,
+    student_id: student.id,
+    relationship: input.guardian_relationship,
+    is_legal_guardian: true,
+  });
+
+  // 5. Create application
+  const now = new Date().toISOString();
+  const status = options?.autoSubmit ? "submitted" : "draft";
+  const { data: app, error: aErr } = await supabase
+    .from("application")
+    .insert({
+      enrollment_window_id: input.enrollment_window_id,
+      student_id: student.id,
+      campus_id: input.campus_id,
+      grade_level_id: input.grade_level_id,
+      guardian_id: guardian.id,
+      status,
+      submitted_at: options?.autoSubmit ? now : null,
+      locked_at: options?.autoSubmit ? now : null,
+      has_sibling_enrolled: input.has_sibling_enrolled ?? false,
+      source: input.source ?? "staff_entry",
+      assigned_staff: input.created_by_staff,
+    })
+    .select("id")
+    .single();
+
+  if (aErr || !app) {
+    console.error("[staffCreateApplication] application", aErr?.message);
+    return { data: null, error: "Failed to create application" };
+  }
+
+  // 6. Save application answers (EAV fields)
+  const answers = input.answers ?? {};
+  if (input.sibling_name) answers.sibling_name = input.sibling_name;
+
+  const answerRows = Object.entries(answers)
+    .filter(([, v]) => v !== "" && v !== undefined)
+    .map(([key, value]) => ({
+      application_id: app.id,
+      field_key: key,
+      value: JSON.stringify(value),
+    }));
+
+  if (answerRows.length > 0) {
+    await supabase.from("application_answer").insert(answerRows);
+  }
+
+  return {
+    data: { id: app.id, student_id: student.id, guardian_id: guardian.id },
+    error: null,
+  };
+}
+
+// ─── Staff Fast-Track Enroll (skip lottery/offer) ──────
+
+/**
+ * Staff creates an application AND enrolls the student in one step.
+ * Used when a family can't apply online and the school has open seats.
+ * Creates: household → guardian → student → application (registered) →
+ *   offer (auto-accepted) → enrollment → registration packet.
+ */
+export async function staffFastTrackEnroll(
+  input: CreateApplicationInput & { created_by_staff: string }
+): Promise<MutationResult<{ application_id: string; enrollment_id: string }>> {
+  const supabase = await createServerClient();
+
+  // 1. Create the application (auto-submitted)
+  const appResult = await staffCreateApplication(input, { autoSubmit: true });
+  if (appResult.error || !appResult.data) {
+    return { data: null, error: appResult.error ?? "Failed to create application" };
+  }
+
+  const { id: applicationId, student_id, guardian_id } = appResult.data;
+
+  // 2. Auto-verify the application
+  await supabase
+    .from("application")
+    .update({
+      status: "verified",
+      reviewed_by: input.created_by_staff,
+      reviewed_at: new Date().toISOString(),
+      review_notes: "Fast-track enrollment by staff.",
+    })
+    .eq("id", applicationId);
+
+  // 3. Get school_year_id from enrollment window
+  const { data: ew } = await supabase
+    .from("enrollment_window")
+    .select("school_year_id")
+    .eq("id", input.enrollment_window_id)
+    .single();
+
+  const schoolYearId = ew?.school_year_id ?? "";
+
+  // 4. Create offer (auto-accepted)
+  const offerNow = new Date().toISOString();
+  const { data: offer } = await supabase
+    .from("offer")
+    .insert({
+      application_id: applicationId,
+      campus_id: input.campus_id,
+      grade_level_id: input.grade_level_id,
+      status: "accepted",
+      offered_at: offerNow,
+      expires_at: offerNow,
+      offered_by: input.created_by_staff,
+      responded_at: offerNow,
+    })
+    .select("id")
+    .single();
+
+  // 5. Create acceptance record
+  if (offer) {
+    await supabase.from("acceptance").insert({
+      offer_id: offer.id,
+      application_id: applicationId,
+      accepted_by: guardian_id,
+      accepted_at: offerNow,
+    });
+  }
+
+  // 6. Update application to "accepted" then to "registered"
+  await supabase
+    .from("application")
+    .update({ status: "offered", updated_at: offerNow })
+    .eq("id", applicationId);
+
+  // 7. Create enrollment
+  const { createEnrollment } = await import("./enrollment");
+  const enrollResult = await createEnrollment({
+    student_id,
+    campus_id: input.campus_id,
+    grade_level_id: input.grade_level_id,
+    school_year_id: schoolYearId,
+    acceptance_id: offer?.id ?? undefined,
+    application_id: applicationId,
+  });
+
+  if (enrollResult.error || !enrollResult.data) {
+    return { data: null, error: enrollResult.error ?? "Failed to create enrollment" };
+  }
+
+  // 8. Initialize registration packet
+  const { initializeRegistrationPacket } = await import("./registration");
+  await initializeRegistrationPacket({
+    enrollment_id: enrollResult.data.id,
+    campus_id: input.campus_id,
+    school_year_id: schoolYearId,
+  });
+
+  return {
+    data: {
+      application_id: applicationId,
+      enrollment_id: enrollResult.data.id,
+    },
+    error: null,
+  };
+}
+
 // ─── Update Application Status (Staff) ─────────────────
 
 /**

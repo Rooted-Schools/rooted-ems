@@ -88,6 +88,71 @@ export default async function FamilyDashboardPage() {
         </div>
       )}
 
+      {/* ─── Our Schools — Clickable logos ─── */}
+      <div>
+        <h2 className="text-base font-semibold text-gray-900 mb-3">
+          Our Schools
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            {
+              name: "Rooted School Vancouver",
+              location: "Vancouver, WA",
+              logo: "/logos/rooted-vancouver.png",
+              shortCode: "RSV",
+            },
+            {
+              name: "C.R. Neal Academy",
+              location: "Columbia, SC",
+              logo: "/logos/cr-neal-academy.png",
+              shortCode: "CRN",
+            },
+            {
+              name: "Rooted Schools Cleveland",
+              location: "Cleveland, OH",
+              logo: "/logos/rooted-cleveland.png",
+              shortCode: "RSC",
+            },
+          ].map((school) => {
+            const campusWindow = enrollmentWindows.find(
+              (w) => w.campus_name === school.name
+            );
+            const isOpen = !!campusWindow;
+            return (
+              <Link
+                key={school.shortCode}
+                href={`/family/applications/new${campusWindow ? `?campus=${school.shortCode}` : ""}`}
+              >
+                <Card className="hover:shadow-md transition-shadow cursor-pointer group border-2 hover:border-rooted-green/40">
+                  <CardContent className="py-6 flex flex-col items-center text-center">
+                    <div className="h-24 flex items-center justify-center mb-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={school.logo}
+                        alt={school.name}
+                        className="max-h-24 max-w-full object-contain group-hover:scale-105 transition-transform"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {school.location}
+                    </p>
+                    {isOpen ? (
+                      <Badge variant="success" className="mt-2">
+                        Accepting Applications
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="mt-2">
+                        Coming Soon
+                      </Badge>
+                    )}
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
       {/* ─── Application cards ─── */}
       <div>
         <div className="flex items-center justify-between mb-3">

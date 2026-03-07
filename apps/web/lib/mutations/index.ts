@@ -10,6 +10,8 @@ export {
   submitApplication,
   withdrawApplication,
   updateApplicationStatus,
+  staffCreateApplication,
+  staffFastTrackEnroll,
   type MutationResult,
   type CreateApplicationInput,
   type UpdateApplicationInput,

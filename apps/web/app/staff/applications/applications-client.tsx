@@ -97,9 +97,15 @@ export function StaffApplicationsClient({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <span className="font-medium">{totalCount}</span> total
-          applications
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500">
+            <span className="font-medium">{totalCount}</span> total
+          </span>
+          <Link href="/staff/applications/new">
+            <Button className="bg-rooted-green hover:bg-rooted-green/90 text-white">
+              + Create Application
+            </Button>
+          </Link>
         </div>
       </div>
 
