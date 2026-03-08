@@ -105,17 +105,17 @@ const QUEUE_ITEMS = [
   },
   {
     key: "verified",
-    label: "Pending Verification",
+    label: "Verified \u2014 Ready",
     dotColor: "bg-orange-500",
   },
   {
     key: "offered",
-    label: "Offers Expiring",
+    label: "Pending Response",
     dotColor: "bg-red-500",
   },
   {
     key: "accepted",
-    label: "Waitlist Follow-Ups",
+    label: "Pending Enrollment",
     dotColor: "bg-purple-500",
   },
 ];
@@ -195,7 +195,7 @@ export default async function StaffDashboardPage({
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">{stats.totalApplications}</p>
-            <p className="text-xs text-gray-400 mt-1">2026-27 cycle</p>
+            <p className="text-xs text-gray-400 mt-1">current cycle</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-amber-500">

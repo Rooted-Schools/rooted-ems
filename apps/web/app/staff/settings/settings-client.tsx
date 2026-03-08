@@ -52,6 +52,7 @@ interface SettingsClientProps {
   packetRequirements: PacketRequirementRow[];
   schoolYears: SchoolYear[];
   staffUserId: string;
+  activeCampusId?: string;
 }
 
 export function SettingsClient({
@@ -61,6 +62,7 @@ export function SettingsClient({
   packetRequirements,
   schoolYears,
   staffUserId,
+  activeCampusId,
 }: SettingsClientProps) {
   return (
     <div className="space-y-6">
@@ -96,6 +98,7 @@ export function SettingsClient({
             requirements={packetRequirements}
             campuses={campuses}
             schoolYears={schoolYears}
+            activeCampusId={activeCampusId}
           />
         </TabsContent>
 
@@ -180,6 +183,7 @@ function EnrollmentWindowsTab({
   function resetForm() {
     setName("");
     setCampusId("");
+    setSchoolYearId(schoolYears.find((sy) => sy.is_current)?.id ?? schoolYears[0]?.id ?? "");
     setStatus("draft");
     setOpenDate("");
     setCloseDate("");
@@ -232,7 +236,7 @@ function EnrollmentWindowsTab({
             </CardDescription>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger>
+            <DialogTrigger asChild>
               <Button>Create Window</Button>
             </DialogTrigger>
             <DialogContent>
@@ -462,15 +466,17 @@ function RegistrationRequirementsTab({
   requirements,
   campuses,
   schoolYears,
+  activeCampusId,
 }: {
   requirements: PacketRequirementRow[];
   campuses: CampusRow[];
   schoolYears: SchoolYear[];
+  activeCampusId?: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
-  const [selectedCampus, setSelectedCampus] = useState(campuses[0]?.id ?? "");
+  const [selectedCampus, setSelectedCampus] = useState(activeCampusId ?? campuses[0]?.id ?? "");
   const [selectedYear, setSelectedYear] = useState(
     schoolYears.find((sy) => sy.is_current)?.id ?? schoolYears[0]?.id ?? ""
   );
@@ -679,12 +685,18 @@ function StaffUsersTab({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<StaffUserRow | null>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  // Form state
+  // Assign form state
   const [email, setEmail] = useState("");
   const [campusId, setCampusId] = useState("");
   const [role, setRole] = useState<"enrollment_staff" | "enrollment_manager" | "system_admin" | "compliance_auditor">("enrollment_staff");
+
+  // Edit form state
+  const [editRole, setEditRole] = useState<string>("enrollment_staff");
+  const [editCampusId, setEditCampusId] = useState("");
 
   function resetForm() {
     setEmail("");
@@ -725,6 +737,39 @@ function StaffUsersTab({
     });
   }
 
+  function openEdit(user: StaffUserRow) {
+    setEditingUser(user);
+    setEditRole(user.role);
+    setEditCampusId(user.campus_id);
+    setEditDialogOpen(true);
+  }
+
+  function handleEditSave() {
+    if (!editingUser) return;
+    setFeedback(null);
+    startTransition(async () => {
+      // Remove old role, assign new one
+      const removeResult = await staffRemoveRole(editingUser.id);
+      if (removeResult.error) {
+        setFeedback({ type: "error", message: removeResult.error });
+        return;
+      }
+      const assignResult = await staffAssignRole({
+        user_email: editingUser.email,
+        campus_id: editCampusId,
+        role: editRole as "enrollment_staff" | "enrollment_manager" | "system_admin" | "compliance_auditor",
+        assigned_by: staffUserId,
+      });
+      if (assignResult.error) {
+        setFeedback({ type: "error", message: assignResult.error });
+      } else {
+        setFeedback({ type: "success", message: `Updated ${editingUser.full_name}'s role.` });
+        setEditDialogOpen(false);
+        router.refresh();
+      }
+    });
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -736,7 +781,7 @@ function StaffUsersTab({
             </CardDescription>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger>
+            <DialogTrigger asChild>
               <Button>Assign Role</Button>
             </DialogTrigger>
             <DialogContent>
@@ -833,9 +878,20 @@ function StaffUsersTab({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-[10px]">
+                    {user.campus_name}
+                  </Badge>
                   <span className="text-xs font-medium text-gray-500">
                     {roleLabels[user.role] ?? user.role}
                   </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => openEdit(user)}
+                  >
+                    Edit
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -851,6 +907,57 @@ function StaffUsersTab({
           </div>
         )}
       </CardContent>
+
+      {/* Edit Role Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Staff Role</DialogTitle>
+            <DialogDescription>
+              Update the role or campus assignment for {editingUser?.full_name}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-sm font-medium">{editingUser?.full_name}</p>
+              <p className="text-xs text-gray-500">{editingUser?.email}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Campus</label>
+              <select
+                value={editCampusId}
+                onChange={(e) => setEditCampusId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+              >
+                {campuses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+              <select
+                value={editRole}
+                onChange={(e) => setEditRole(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+              >
+                <option value="enrollment_staff">Enrollment Staff</option>
+                <option value="enrollment_manager">Enrollment Manager</option>
+                <option value="system_admin">System Admin</option>
+                <option value="compliance_auditor">Compliance Auditor</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditSave} disabled={isPending}>
+              {isPending ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

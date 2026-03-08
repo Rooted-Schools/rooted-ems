@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ export function EnrollmentClient({
   enrollments: EnrollmentRow[];
   stats: EnrollmentStats;
 }) {
+  const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sisInput, setSisInput] = useState<Record<string, string>>({});
@@ -58,6 +60,7 @@ export function EnrollmentClient({
     setError(null);
     const result = await staffSyncSIS(enrollmentId, sisId);
     if (result.error) setError(result.error);
+    else router.refresh();
     setLoading(null);
   }
 
@@ -67,6 +70,7 @@ export function EnrollmentClient({
     setError(null);
     const result = await staffWithdrawEnrollment(enrollmentId, "Withdrawn by staff.");
     if (result.error) setError(result.error);
+    else router.refresh();
     setLoading(null);
   }
 

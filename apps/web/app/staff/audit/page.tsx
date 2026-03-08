@@ -66,13 +66,8 @@ export default async function AuditTrailPage({
 
   const { data: events, count } = await query;
 
-  // Get distinct tables for filter
-  const { data: distinctTables } = await supabase
-    .from("audit_event")
-    .select("table_name")
-    .limit(100);
-
-  const tables = [...new Set((distinctTables ?? []).map((r: Record<string, unknown>) => r.table_name as string))].sort();
+  // Use known table names from the TABLE_LABELS config instead of a separate query
+  const tables = Object.keys(TABLE_LABELS);
   const totalPages = Math.ceil((count ?? 0) / pageSize);
 
   return (
@@ -88,6 +83,9 @@ export default async function AuditTrailPage({
       <Card>
         <CardContent className="py-3">
           <form className="flex items-center gap-3 flex-wrap">
+            {searchParams.campus && (
+              <input type="hidden" name="campus" value={searchParams.campus} />
+            )}
             <div className="flex items-center gap-2">
               <label className="text-xs font-medium text-gray-500">Table:</label>
               <select
@@ -125,7 +123,7 @@ export default async function AuditTrailPage({
             </button>
             {(searchParams.table || searchParams.action) && (
               <a
-                href="/staff/audit"
+                href={`/staff/audit${searchParams.campus ? `?campus=${searchParams.campus}` : ""}`}
                 className="text-xs text-gray-500 hover:text-gray-700 no-underline"
               >
                 Clear filters
@@ -244,7 +242,7 @@ export default async function AuditTrailPage({
           <div className="flex gap-2">
             {page > 1 && (
               <a
-                href={`/staff/audit?page=${page - 1}${searchParams.table ? `&table=${searchParams.table}` : ""}${searchParams.action ? `&action=${searchParams.action}` : ""}`}
+                href={`/staff/audit?page=${page - 1}${searchParams.campus ? `&campus=${searchParams.campus}` : ""}${searchParams.table ? `&table=${searchParams.table}` : ""}${searchParams.action ? `&action=${searchParams.action}` : ""}`}
                 className="text-sm px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 no-underline text-gray-700"
               >
                 Previous
@@ -252,7 +250,7 @@ export default async function AuditTrailPage({
             )}
             {page < totalPages && (
               <a
-                href={`/staff/audit?page=${page + 1}${searchParams.table ? `&table=${searchParams.table}` : ""}${searchParams.action ? `&action=${searchParams.action}` : ""}`}
+                href={`/staff/audit?page=${page + 1}${searchParams.campus ? `&campus=${searchParams.campus}` : ""}${searchParams.table ? `&table=${searchParams.table}` : ""}${searchParams.action ? `&action=${searchParams.action}` : ""}`}
                 className="text-sm px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 no-underline text-gray-700"
               >
                 Next

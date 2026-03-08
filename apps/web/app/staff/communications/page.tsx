@@ -26,7 +26,7 @@ export default async function StaffCommunicationsPage({
     recipients,
     allCampuses,
   ] = await Promise.all([
-    getStaffCommunications(),
+    getStaffCommunications(scopedCampusIds),
     getStaffMessageTemplates(),
     getNotificationRecipients(scopedCampusIds),
     getCampuses(),

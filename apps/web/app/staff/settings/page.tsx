@@ -11,7 +11,7 @@ export default async function StaffSettingsPage({
 }: {
   searchParams: { campus?: string };
 }) {
-  const session = await requireMinRole("system_admin");
+  const session = await requireMinRole("enrollment_manager");
   const accessibleIds = getAccessibleCampusIds(session);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const supabase = await createServerClient();
@@ -41,6 +41,7 @@ export default async function StaffSettingsPage({
         is_current: sy.is_current as boolean,
       }))}
       staffUserId={session.user_id}
+      activeCampusId={activeCampus ?? undefined}
     />
   );
 }

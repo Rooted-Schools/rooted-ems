@@ -103,7 +103,7 @@ export function OffersClient({
     setSuccess(null);
     const result = await staffRevokeOffer(offerId, staffUserId, "Revoked by staff.");
     if (result.error) setError(result.error);
-    else setSuccess("Offer revoked.");
+    else { setSuccess("Offer revoked."); router.refresh(); }
     setLoading(null);
   }
 
@@ -113,7 +113,7 @@ export function OffersClient({
     setSuccess(null);
     const result = await staffExpireOffer(offerId);
     if (result.error) setError(result.error);
-    else setSuccess("Offer expired.");
+    else { setSuccess("Offer expired."); router.refresh(); }
     setLoading(null);
   }
 
@@ -129,7 +129,7 @@ export function OffersClient({
       offer.application_id
     );
     if (result.error) setError(result.error);
-    else setSuccess(`${offer.student_name} has been enrolled.`);
+    else { setSuccess(`${offer.student_name} has been enrolled.`); router.refresh(); }
     setLoading(null);
   }
 

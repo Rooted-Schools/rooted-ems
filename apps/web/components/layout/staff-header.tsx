@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@rooted-ems/database";
 import { Select } from "@/components/ui/select";
@@ -20,7 +21,7 @@ export function StaffHeader({
   // Read current campus from URL, fall back to "all"
   const selectedCampus = searchParams.get("campus") ?? "";
 
-  const supabase = createBrowserClient();
+  const supabase = useMemo(() => createBrowserClient(), []);
 
   async function handleLogout() {
     await supabase.auth.signOut();

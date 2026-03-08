@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,7 @@ export function WaitlistClient({
   campusCounts: CampusCount[];
   staffUserId: string;
 }) {
+  const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +49,7 @@ export function WaitlistClient({
     const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
     const result = await staffPromoteFromWaitlist(positionId, staffUserId, expiresAt);
     if (result.error) setError(result.error);
+    else router.refresh();
     setLoading(null);
   }
 
@@ -55,6 +58,7 @@ export function WaitlistClient({
     setError(null);
     const result = await staffRemoveFromWaitlist(positionId, "Removed by staff.");
     if (result.error) setError(result.error);
+    else router.refresh();
     setLoading(null);
   }
 

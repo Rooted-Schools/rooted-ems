@@ -12,8 +12,9 @@ import { APPLICATION_STATUS_CONFIG } from "@/lib/application-helpers";
 export default async function StudentDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }> | { id: string };
 }) {
+  const { id } = await Promise.resolve(params);
   await requireStaffSession();
   const supabase = await createServerClient();
 
@@ -33,7 +34,7 @@ export default async function StudentDetailPage({
         id, address_line1, address_line2, city, state, zip, primary_language
       )
     `)
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (error || !student) {
@@ -50,7 +51,7 @@ export default async function StudentDetailPage({
         employer, is_primary, is_emergency_contact, sms_consent
       )
     `)
-    .eq("student_id", params.id);
+    .eq("student_id", id);
 
   // Fetch all applications
   const { data: applications } = await supabase
@@ -61,14 +62,14 @@ export default async function StudentDetailPage({
       grade_level:grade_level_id (grade),
       enrollment_window:enrollment_window_id (name)
     `)
-    .eq("student_id", params.id)
+    .eq("student_id", id)
     .order("created_at", { ascending: false });
 
   // Fetch documents
   const { data: documents } = await supabase
     .from("document")
     .select("id, document_type, file_name, status, created_at")
-    .eq("student_id", params.id)
+    .eq("student_id", id)
     .order("created_at", { ascending: false });
 
   // Fetch enrollments
@@ -80,7 +81,7 @@ export default async function StudentDetailPage({
       grade_level:grade_level_id (grade),
       school_year:school_year_id (name)
     `)
-    .eq("student_id", params.id)
+    .eq("student_id", id)
     .order("enrolled_at", { ascending: false });
 
   // Fetch notes for this student
@@ -91,7 +92,7 @@ export default async function StudentDetailPage({
       author:created_by (first_name, last_name)
     `)
     .eq("entity_type", "student")
-    .eq("entity_id", params.id)
+    .eq("entity_id", id)
     .order("created_at", { ascending: false })
     .limit(20);
 

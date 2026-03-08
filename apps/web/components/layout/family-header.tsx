@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
+import { usePathname } from "next/navigation";
 import { createBrowserClient } from "@rooted-ems/database";
 
 interface FamilyHeaderProps {
@@ -8,8 +10,17 @@ interface FamilyHeaderProps {
   userPhone?: string | null;
 }
 
+const NAV_LINKS = [
+  { href: "/family/dashboard", label: "Dashboard" },
+  { href: "/family/applications", label: "Applications" },
+  { href: "/family/documents", label: "Documents" },
+  { href: "/family/messages", label: "Messages" },
+  { href: "/family/registration", label: "Registration" },
+];
+
 export function FamilyHeader({ userEmail, userPhone }: FamilyHeaderProps) {
-  const supabase = createBrowserClient();
+  const pathname = usePathname();
+  const supabase = useMemo(() => createBrowserClient(), []);
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -29,36 +40,18 @@ export function FamilyHeader({ userEmail, userPhone }: FamilyHeaderProps) {
         </Link>
 
         <nav className="flex items-center gap-6">
-          <Link
-            href="/family/dashboard"
-            className="text-sm text-ink/70 hover:text-rooted-green transition-colors"
-          >
-            Dashboard
-          </Link>
-          <Link
-            href="/family/applications"
-            className="text-sm text-ink/70 hover:text-rooted-green transition-colors"
-          >
-            Applications
-          </Link>
-          <Link
-            href="/family/documents"
-            className="text-sm text-ink/70 hover:text-rooted-green transition-colors"
-          >
-            Documents
-          </Link>
-          <Link
-            href="/family/messages"
-            className="text-sm text-ink/70 hover:text-rooted-green transition-colors"
-          >
-            Messages
-          </Link>
-          <Link
-            href="/family/registration"
-            className="text-sm text-ink/70 hover:text-rooted-green transition-colors"
-          >
-            Registration
-          </Link>
+          {NAV_LINKS.map((link) => {
+            const isActive = pathname === link.href || pathname.startsWith(link.href + "/");
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`text-sm transition-colors ${isActive ? "text-rooted-green font-semibold" : "text-ink/70 hover:text-rooted-green"}`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
 
           <div className="flex items-center gap-3 ml-4 pl-4 border-l border-gray-200">
             <span className="text-sm text-stone">

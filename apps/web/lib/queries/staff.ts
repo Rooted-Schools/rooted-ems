@@ -97,6 +97,7 @@ export interface CommunicationRow {
   status: string;
   sent_at: string | null;
   recipient_count: number;
+  recipient_address: string | null;
 }
 
 export interface CommunicationStats {
@@ -118,10 +119,13 @@ export interface EnrollmentWindowRow {
 
 export interface StaffUserRow {
   id: string;
+  user_id: string;
   full_name: string;
   email: string;
   role: string;
   initials: string;
+  campus_name: string;
+  campus_id: string;
 }
 
 // ─── Lottery Queries ────────────────────────────────────
@@ -665,17 +669,23 @@ export async function getNotificationRecipients(
   return recipients;
 }
 
-export async function getStaffCommunications(): Promise<{
+export async function getStaffCommunications(campusIds?: string[]): Promise<{
   messages: CommunicationRow[];
   stats: CommunicationStats;
 }> {
   const supabase = await createServerClient();
 
-  const { data, error } = await supabase
+  let q = supabase
     .from("communication_log")
-    .select("id, subject, channel, status, sent_at")
+    .select("id, subject, channel, status, sent_at, recipient_address, recipient_count")
     .order("created_at", { ascending: false })
     .limit(100);
+
+  if (campusIds && campusIds.length > 0) {
+    q = q.in("campus_id", campusIds);
+  }
+
+  const { data, error } = await q;
 
   if (error) {
     console.error("[getStaffCommunications]", error.message);
@@ -699,7 +709,8 @@ export async function getStaffCommunications(): Promise<{
           year: "numeric",
         })
       : null,
-    recipient_count: 1, // communication_log is per-recipient; could aggregate later
+    recipient_count: (row.recipient_count as number) ?? 1,
+    recipient_address: (row.recipient_address as string) ?? null,
   }));
 
   const stats: CommunicationStats = {
@@ -1009,8 +1020,9 @@ export async function getStaffUsers(campusId?: string): Promise<StaffUserRow[]> 
   let query = supabase
     .from("user_campus_role")
     .select(`
-      id, role,
-      user:user_id (id, full_name, email)
+      id, role, campus_id,
+      user:user_id (id, full_name, email),
+      campus:campus_id (name)
     `);
 
   if (campusId) {
@@ -1026,6 +1038,7 @@ export async function getStaffUsers(campusId?: string): Promise<StaffUserRow[]> 
 
   return (data ?? []).map((row: Record<string, unknown>) => {
     const user = row.user as unknown as Record<string, string> | null;
+    const campus = row.campus as unknown as Record<string, string> | null;
     const fullName = user?.full_name ?? "Unknown";
     const initials = fullName
       .split(" ")
@@ -1036,10 +1049,13 @@ export async function getStaffUsers(campusId?: string): Promise<StaffUserRow[]> 
 
     return {
       id: row.id as string,
+      user_id: user?.id ?? "",
       full_name: fullName,
       email: user?.email ?? "",
       role: (row.role as string) ?? "enrollment_staff",
       initials,
+      campus_name: campus?.name ?? "",
+      campus_id: (row.campus_id as string) ?? "",
     };
   });
 }

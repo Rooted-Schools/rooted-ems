@@ -37,6 +37,7 @@ interface CommunicationRow {
   status: string;
   sent_at: string | null;
   recipient_count: number;
+  recipient_address: string | null;
 }
 
 interface CommunicationStats {
@@ -215,6 +216,7 @@ export function CommsClient({
               <TableHeader>
                 <TableRow>
                   <TableHead>Channel</TableHead>
+                  <TableHead>Recipient</TableHead>
                   <TableHead>Subject</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Sent</TableHead>
@@ -229,6 +231,9 @@ export function CommsClient({
                         <span className="text-lg" aria-hidden="true">
                           {channelIcons[msg.channel] ?? "📧"}
                         </span>
+                      </TableCell>
+                      <TableCell className="text-gray-600 text-xs">
+                        {msg.recipient_address ?? "\u2014"}
                       </TableCell>
                       <TableCell className="font-medium">{msg.subject ?? "\u2014"}</TableCell>
                       <TableCell>

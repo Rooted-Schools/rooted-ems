@@ -364,7 +364,6 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
                     {verifiedDocs} of {totalDocs} documents verified
                   </CardDescription>
                 </div>
-                <Button variant="outline" size="sm">Request Documents</Button>
               </div>
             </CardHeader>
             <CardContent className="px-0">

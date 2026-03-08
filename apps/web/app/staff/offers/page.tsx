@@ -31,7 +31,7 @@ export default async function StaffOffersPage({
         enrollment_window:enrollment_window_id (school_year_id)
       `)
       .in("status", ["verified", "lottery_assigned"])
-      .in("campus_id", scopedCampusIds.length > 0 ? scopedCampusIds : ["__none__"])
+      .in("campus_id", scopedCampusIds.length > 0 ? scopedCampusIds : accessibleIds.length > 0 ? accessibleIds : ["__none__"])
       .order("submitted_at", { ascending: true }),
   ]);
 

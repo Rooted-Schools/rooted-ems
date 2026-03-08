@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -106,7 +106,6 @@ interface InquiriesClientProps {
   enrollmentWindows: EnrollmentWindow[];
   contactLogsByInquiry: Record<string, ContactLog[]>;
   staffId: string;
-  staffName: string;
 }
 
 export function InquiriesClient({
@@ -143,7 +142,7 @@ export function InquiriesClient({
     const name = `${inq.student_first_name} ${inq.student_last_name} ${inq.guardian_name}`.toLowerCase();
     const matchesSearch = !search || name.includes(search.toLowerCase());
     const matchesStatus = statusFilter === "all" || inq.status === statusFilter;
-    const matchesCampus = campusFilter === "all" || inq.campus_name === campusFilter;
+    const matchesCampus = campusFilter === "all" || inq.campus_id === campusFilter;
     return matchesSearch && matchesStatus && matchesCampus;
   });
 
@@ -302,7 +301,7 @@ export function InquiriesClient({
             >
               <option value="all">All Campuses</option>
               {campuses.map((c) => (
-                <option key={c.id} value={c.name}>
+                <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
@@ -371,9 +370,8 @@ export function InquiriesClient({
                       const isExpanded = expandedId === inq.id;
 
                       return (
-                        <>
+                        <Fragment key={inq.id}>
                           <TableRow
-                            key={inq.id}
                             className={`cursor-pointer hover:bg-rooted-gray/30 ${isExpanded ? "bg-rooted-gray/20" : ""}`}
                             onClick={() => setExpandedId(isExpanded ? null : inq.id)}
                           >
@@ -564,7 +562,7 @@ export function InquiriesClient({
                               </TableCell>
                             </TableRow>
                           )}
-                        </>
+                        </Fragment>
                       );
                     })}
                   </TableBody>

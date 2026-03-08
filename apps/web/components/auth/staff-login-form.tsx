@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@rooted-ems/database";
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -10,9 +10,14 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 export function StaffLoginForm() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const searchParams = useSearchParams();
+
+  // Email/password state
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const supabase = createBrowserClient();
 
@@ -23,6 +28,30 @@ export function StaffLoginForm() {
       setError(ERROR_MESSAGES[errCode]);
     }
   }, [searchParams]);
+
+  async function handleEmailLogin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email || !password) return;
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) {
+        setError(authError.message);
+        setLoading(false);
+      } else {
+        router.push("/staff/dashboard");
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+      setLoading(false);
+    }
+  }
 
   async function handleGoogleLogin() {
     setLoading(true);
@@ -63,7 +92,7 @@ export function StaffLoginForm() {
         </div>
         <h2 className="text-2xl font-bold text-center mb-2">Staff Console</h2>
         <p className="text-center text-ink/60 mb-6">
-          Sign in with your school Google account
+          Sign in to access your campus dashboard
         </p>
 
         {error && (
@@ -71,6 +100,53 @@ export function StaffLoginForm() {
             {error}
           </p>
         )}
+
+        <form onSubmit={handleEmailLogin} className="space-y-3">
+          <div>
+            <label htmlFor="staff-email" className="block text-sm font-medium text-gray-700 mb-1">
+              Email
+            </label>
+            <input
+              id="staff-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@rootedschool.org"
+              className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+              required
+            />
+          </div>
+          <div>
+            <label htmlFor="staff-password" className="block text-sm font-medium text-gray-700 mb-1">
+              Password
+            </label>
+            <input
+              id="staff-password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading || !email || !password}
+            className="w-full py-3 px-4 bg-rooted-green text-white rounded-md font-medium hover:bg-rooted-green/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading ? "Signing in..." : "Sign In"}
+          </button>
+        </form>
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-stone/20" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white px-2 text-ink/40">or</span>
+          </div>
+        </div>
 
         <button
           onClick={handleGoogleLogin}

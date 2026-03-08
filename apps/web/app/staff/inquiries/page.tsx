@@ -79,7 +79,6 @@ export default async function StaffInquiriesPage({
       enrollmentWindows={enrollmentWindows}
       contactLogsByInquiry={logsByInquiry}
       staffId={session.user_id}
-      staffName={session.email ?? "Staff"}
     />
   );
 }

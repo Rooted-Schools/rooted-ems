@@ -97,11 +97,15 @@ export default async function StaffReportsPage({
     appQuery,
     capacityQuery,
     enrollQuery,
-    supabase
-      .from("audit_event")
-      .select("action, table_name, created_at, changes")
-      .order("created_at", { ascending: false })
-      .limit(200),
+    (() => {
+      let q = supabase
+        .from("audit_event")
+        .select("action, table_name, created_at, changes, actor:actor_id (email)")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (hasCampusFilter) q = q.in("campus_id", scopedCampusIds);
+      return q;
+    })(),
     inquiryQuery,
   ]);
 
@@ -170,10 +174,12 @@ export default async function StaffReportsPage({
 
   // Audit events
   const auditEvents = (auditRows ?? []).map(
-    (row: Record<string, unknown>) => ({
+    (row: Record<string, unknown>) => {
+      const actor = row.actor as Record<string, string> | null;
+      return {
       action: row.action as string,
       table_name: row.table_name as string,
-      actor_email: "",
+      actor_email: actor?.email ?? "",
       created_at: new Date(row.created_at as string).toLocaleString("en-US", {
         month: "short",
         day: "numeric",
@@ -182,8 +188,8 @@ export default async function StaffReportsPage({
         minute: "2-digit",
       }),
       details: row.changes ? JSON.stringify(row.changes).slice(0, 120) : "",
-    })
-  );
+    };
+    });
 
   // Inquiry source conversion funnel
   const sourceCounts: Record<string, { total: number; converted: number }> = {};

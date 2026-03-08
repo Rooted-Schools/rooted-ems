@@ -89,7 +89,7 @@ export function StaffApplicationsClient({
     const matchesStatus =
       statusFilter === "all" || app.status === statusFilter;
     const matchesCampus =
-      campusFilter === "all" || app.campus_name === campusFilter;
+      campusFilter === "all" || app.campus_id === campusFilter;
     return matchesSearch && matchesStatus && matchesCampus;
   });
 
@@ -179,7 +179,7 @@ export function StaffApplicationsClient({
             >
               <option value="all">All Campuses</option>
               {campuses.map((c) => (
-                <option key={c.id} value={c.name}>
+                <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}

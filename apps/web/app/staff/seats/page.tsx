@@ -10,7 +10,7 @@ export default async function SeatManagementPage({
 }: {
   searchParams: { campus?: string };
 }) {
-  const session = await requireMinRole("system_admin");
+  const session = await requireMinRole("enrollment_manager");
   const accessibleIds = getAccessibleCampusIds(session);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
