@@ -92,15 +92,16 @@ export function SeatsClient({ rows }: SeatsClientProps) {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
+        <Card className="border-t-4 border-t-rooted-green">
           <CardContent className="pt-4">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               Total Seats
             </p>
-            <p className="text-3xl font-bold mt-1">{totalSeats}</p>
+            <p className="text-3xl font-bold text-rooted-green mt-1">{totalSeats}</p>
+            <p className="text-xs text-gray-400 mt-1">across all grades</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-t-4 border-t-blue-500">
           <CardContent className="pt-4">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               Offered
@@ -108,9 +109,10 @@ export function SeatsClient({ rows }: SeatsClientProps) {
             <p className="text-3xl font-bold text-blue-600 mt-1">
               {totalOffered}
             </p>
+            <p className="text-xs text-gray-400 mt-1">pending acceptance</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-t-4 border-t-amber-500">
           <CardContent className="pt-4">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               Accepted
@@ -118,25 +120,34 @@ export function SeatsClient({ rows }: SeatsClientProps) {
             <p className="text-3xl font-bold text-amber-600 mt-1">
               {totalAccepted}
             </p>
+            <p className="text-xs text-gray-400 mt-1">completing registration</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-t-4 border-t-emerald-500">
           <CardContent className="pt-4">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               Registered
             </p>
-            <p className="text-3xl font-bold text-rooted-green mt-1">
+            <p className="text-3xl font-bold text-emerald-600 mt-1">
               {totalRegistered}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              {totalSeats > 0
+                ? `${Math.round((totalRegistered / totalSeats) * 100)}% fill rate`
+                : "fully enrolled"}
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={`border-t-4 ${totalAvailable <= 5 ? "border-t-red-500" : "border-t-gray-400"}`}>
           <CardContent className="pt-4">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               Available
             </p>
-            <p className="text-3xl font-bold text-emerald-600 mt-1">
+            <p className={`text-3xl font-bold mt-1 ${totalAvailable <= 0 ? "text-red-600" : totalAvailable <= 5 ? "text-amber-600" : "text-gray-600"}`}>
               {totalAvailable}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              {totalAvailable <= 0 ? "at capacity" : "seats remaining"}
             </p>
           </CardContent>
         </Card>

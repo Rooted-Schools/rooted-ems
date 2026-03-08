@@ -92,6 +92,12 @@ const offerStatusConfig: Record<
   revoked: { label: "Revoked", variant: "destructive" },
 };
 
+function getDaysUntilExpiry(expiresAt: string): number | null {
+  if (!expiresAt) return null;
+  const exp = new Date(expiresAt.includes("T") ? expiresAt : expiresAt + "T23:59:59");
+  return Math.max(0, Math.ceil((exp.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+}
+
 export function OffersClient({
   offers,
   stats,
@@ -346,17 +352,18 @@ export function OffersClient({
         <TabsContent value="offers">
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card>
+              <Card className="border-t-4 border-t-rooted-green">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Total Offers
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-2xl font-bold">{stats.total}</p>
+                  <p className="text-2xl font-bold text-rooted-green">{stats.total}</p>
+                  <p className="text-xs text-gray-400 mt-1">all time</p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="border-t-4 border-t-amber-500">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Pending Response
@@ -364,27 +371,36 @@ export function OffersClient({
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
+                  <p className="text-xs text-gray-400 mt-1">awaiting family reply</p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="border-t-4 border-t-emerald-500">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Accepted
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-2xl font-bold text-green-600">{stats.accepted}</p>
+                  <p className="text-2xl font-bold text-emerald-600">{stats.accepted}</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {stats.total > 0
+                      ? `${Math.round((stats.accepted / stats.total) * 100)}% acceptance rate`
+                      : "no offers yet"}
+                  </p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="border-t-4 border-t-gray-400">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Declined / Expired
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-2xl font-bold text-gray-400">
+                  <p className={`text-2xl font-bold ${stats.declined_or_expired === 0 ? "text-gray-300" : "text-red-600"}`}>
                     {stats.declined_or_expired}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {stats.declined_or_expired === 0 ? "none" : "lost offers"}
                   </p>
                 </CardContent>
               </Card>
@@ -426,8 +442,11 @@ export function OffersClient({
                         const isPending = offer.status === "pending";
                         const isAccepted = offer.status === "accepted";
                         const isLoading = loading === offer.id;
+                        const daysLeft = isPending ? getDaysUntilExpiry(offer.expires_at) : null;
+                        const isUrgent = daysLeft !== null && daysLeft <= 3;
+                        const isExpired = daysLeft !== null && daysLeft <= 0;
                         return (
-                          <TableRow key={offer.id}>
+                          <TableRow key={offer.id} className={isUrgent ? "bg-red-50/50" : ""}>
                             <TableCell className="font-medium">
                               {offer.student_name}
                             </TableCell>
@@ -441,12 +460,22 @@ export function OffersClient({
                                     Enrolled
                                   </Badge>
                                 )}
+                                {isPending && isUrgent && !isExpired && (
+                                  <Badge variant="destructive" className="text-[10px]">
+                                    {daysLeft === 1 ? "1 day left" : `${daysLeft} days left`}
+                                  </Badge>
+                                )}
+                                {isPending && isExpired && (
+                                  <Badge variant="destructive" className="text-[10px]">
+                                    Overdue
+                                  </Badge>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell className="text-gray-500">
                               {offer.offered_at}
                             </TableCell>
-                            <TableCell className="text-gray-500">
+                            <TableCell className={isUrgent ? "text-red-600 font-medium" : "text-gray-500"}>
                               {offer.expires_at}
                             </TableCell>
                             <TableCell>
@@ -497,25 +526,30 @@ export function OffersClient({
         {/* ─── Waitlist Tab ─── */}
         <TabsContent value="waitlist">
           <div className="space-y-4">
-            {waitlistCampusCounts.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {waitlistCampusCounts.map((cc) => (
-                  <Card key={cc.campus_name}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {cc.campus_name}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className={`text-2xl font-bold ${cc.count === 0 ? "text-gray-300" : ""}`}>
-                        {cc.count}
-                      </p>
-                      <p className="text-xs text-gray-400">students waiting</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+            {waitlistCampusCounts.length > 0 && (() => {
+              const borderColors = ["border-t-rooted-green", "border-t-blue-500", "border-t-amber-500"];
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {waitlistCampusCounts.map((cc, idx) => (
+                    <Card key={cc.campus_name} className={`border-t-4 ${borderColors[idx % borderColors.length]}`}>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          {cc.campus_name}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className={`text-2xl font-bold ${cc.count === 0 ? "text-gray-300" : ""}`}>
+                          {cc.count}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {cc.count === 0 ? "no students waiting" : `student${cc.count !== 1 ? "s" : ""} waiting`}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              );
+            })()}
 
             {waitlistEntries.length === 0 ? (
               <Card>

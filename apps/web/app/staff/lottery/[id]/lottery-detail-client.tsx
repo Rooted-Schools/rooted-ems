@@ -260,37 +260,42 @@ export function StaffLotteryDetailClient({
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
+        <Card className="border-t-4 border-t-rooted-green">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               Applicants
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{run.applicants}</p>
+            <p className="text-2xl font-bold text-rooted-green">{run.applicants}</p>
+            <p className="text-xs text-gray-400 mt-1">entered in lottery</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-t-4 border-t-blue-500">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               Seats
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{run.seats}</p>
+            <p className="text-2xl font-bold text-blue-600">{run.seats}</p>
+            <p className="text-xs text-gray-400 mt-1">available capacity</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-t-4 border-t-emerald-500">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               Offered
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-600">{offeredCount}</p>
+            <p className="text-2xl font-bold text-emerald-600">{offeredCount}</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {offeredCount === 0 ? "run lottery first" : "seats offered"}
+            </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-t-4 border-t-amber-500">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               Waitlisted
@@ -298,17 +303,25 @@ export function StaffLotteryDetailClient({
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-amber-600">{waitlistedCount}</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {waitlistedCount === 0 ? "none" : "waiting for seats"}
+            </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={`border-t-4 ${overSubscribed ? "border-t-red-500" : "border-t-gray-300"}`}>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               Over Capacity
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className={`text-2xl font-bold ${overSubscribed ? "text-red-600" : "text-gray-400"}`}>
+            <p className={`text-2xl font-bold ${overSubscribed ? "text-red-600" : "text-gray-300"}`}>
               {overSubscribed ? `+${run.applicants - run.seats}` : "0"}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              {overSubscribed
+                ? `${Math.round((run.applicants / run.seats) * 100)}% demand ratio`
+                : "within capacity"}
             </p>
           </CardContent>
         </Card>

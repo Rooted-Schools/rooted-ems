@@ -113,19 +113,20 @@ export function StaffApplicationsClient({
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="border-t-4 border-t-blue-500">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               Submitted
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-2xl font-bold text-blue-600">
               {stats.submitted}
             </p>
+            <p className="text-xs text-gray-400 mt-1">awaiting review</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-t-4 border-t-amber-500">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               Needs Info
@@ -135,21 +136,25 @@ export function StaffApplicationsClient({
             <p className="text-2xl font-bold text-amber-600">
               {stats.needs_info}
             </p>
+            <p className="text-xs text-gray-400 mt-1">
+              {stats.needs_info === 0 ? "none pending" : "action required"}
+            </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-t-4 border-t-emerald-500">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               Verified
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-600">
+            <p className="text-2xl font-bold text-emerald-600">
               {stats.verified}
             </p>
+            <p className="text-xs text-gray-400 mt-1">ready for lottery</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-t-4 border-t-rooted-green">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               Registered
@@ -159,6 +164,7 @@ export function StaffApplicationsClient({
             <p className="text-2xl font-bold text-rooted-green">
               {stats.registered}
             </p>
+            <p className="text-xs text-gray-400 mt-1">fully enrolled</p>
           </CardContent>
         </Card>
       </div>

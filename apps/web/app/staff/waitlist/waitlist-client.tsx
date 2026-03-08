@@ -99,25 +99,38 @@ export function WaitlistClient({
         <div className="rounded-md bg-green-50 border border-green-200 p-3 text-sm text-green-700">{success}</div>
       )}
 
-      {campusCounts.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {campusCounts.map((cc) => (
-            <Card key={cc.campus_name}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  {cc.campus_name}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className={`text-2xl font-bold ${cc.count === 0 ? "text-gray-300" : ""}`}>
-                  {cc.count}
-                </p>
-                <p className="text-xs text-gray-400">students waiting</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      {campusCounts.length > 0 && (() => {
+        const total = campusCounts.reduce((sum, c) => sum + c.count, 0);
+        const borderColors = ["border-t-rooted-green", "border-t-blue-500", "border-t-amber-500"];
+        return (
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-gray-500">
+                <span className="font-semibold text-gray-900">{total}</span> student{total !== 1 ? "s" : ""} waitlisted across all campuses
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {campusCounts.map((cc, idx) => (
+                <Card key={cc.campus_name} className={`border-t-4 ${borderColors[idx % borderColors.length]}`}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {cc.campus_name}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className={`text-2xl font-bold ${cc.count === 0 ? "text-gray-300" : ""}`}>
+                      {cc.count}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {cc.count === 0 ? "no students waiting" : `student${cc.count !== 1 ? "s" : ""} waiting`}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {entries.length === 0 ? (
         <Card>
