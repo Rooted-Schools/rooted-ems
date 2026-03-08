@@ -112,6 +112,7 @@ export function SettingsClient({
             schoolYears={schoolYears}
             gradeLevels={gradeLevels}
             campuses={campuses}
+            activeCampusId={activeCampusId}
           />
         </TabsContent>
 
@@ -1059,12 +1060,14 @@ function SchoolYearsGradesTab({
   schoolYears,
   gradeLevels,
   campuses,
+  activeCampusId,
 }: {
   schoolYears: SchoolYear[];
   gradeLevels: GradeLevel[];
   campuses: CampusRow[];
+  activeCampusId?: string;
 }) {
-  const [selectedCampus, setSelectedCampus] = useState(campuses[0]?.id ?? "");
+  const [selectedCampus, setSelectedCampus] = useState(activeCampusId ?? campuses[0]?.id ?? "");
 
   const campusGrades = gradeLevels
     .filter((g) => g.campus_id === selectedCampus)
