@@ -141,9 +141,9 @@ function draftToFormData(d: DraftApplicationData): FormData {
     isELL: d.answers.ell ?? "",
     isGiftedTalented: d.answers.gifted_talented ?? "",
     specialServicesNotes: d.student.special_services_notes ?? "",
-    dataSharingConsent: false,
-    agreeTerms: false,
-    signatureName: "",
+    dataSharingConsent: d.answers.data_sharing_consent === "true",
+    agreeTerms: d.answers.agree_terms === "true",
+    signatureName: d.answers.e_signature_name ?? "",
   };
 }
 

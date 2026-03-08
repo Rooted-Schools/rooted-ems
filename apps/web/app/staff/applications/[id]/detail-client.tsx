@@ -8,6 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -42,7 +50,8 @@ function formatDate(dateStr: string | null) {
   });
 }
 
-function formatDateTime(dateStr: string) {
+function formatDateTime(dateStr: string | null | undefined) {
+  if (!dateStr) return "—";
   return new Date(dateStr).toLocaleString("en-US", {
     month: "short",
     day: "numeric",
@@ -114,6 +123,7 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
   const [isPending, startTransition] = useTransition();
   const [noteText, setNoteText] = useState("");
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
 
   const statusCfg = getStatusConfig(detail.status);
   const actions = getAvailableActions(detail.status);
@@ -139,7 +149,11 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
   }
 
   function handleWithdraw() {
-    if (!confirm("Are you sure you want to withdraw this application?")) return;
+    setShowWithdrawDialog(true);
+  }
+
+  function confirmWithdraw() {
+    setShowWithdrawDialog(false);
     startTransition(async () => {
       const result = await staffWithdrawApplication(detail.id);
       if (result.error) {
@@ -644,6 +658,23 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Withdraw confirmation dialog */}
+      <Dialog open={showWithdrawDialog} onOpenChange={setShowWithdrawDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Withdraw Application</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to withdraw {detail.student_name}&apos;s application?
+              This action will remove the student from the enrollment pipeline.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowWithdrawDialog(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmWithdraw}>Withdraw Application</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

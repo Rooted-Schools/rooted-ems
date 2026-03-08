@@ -88,7 +88,12 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
   const statusExplanation = getStatusExplanation(detail.status);
   const isDraft = detail.status === "draft";
   const isOffered = detail.status === "offered";
-  const needsAction = isDraft || detail.status === "needs_info" || isOffered;
+  const offerExpired = (() => {
+    if (!isOffered || !detail.offer_expires_at) return false;
+    const exp = new Date(detail.offer_expires_at + (detail.offer_expires_at.includes("T") ? "" : "T23:59:59"));
+    return exp.getTime() < Date.now();
+  })();
+  const needsAction = isDraft || detail.status === "needs_info" || (isOffered && !offerExpired);
   const canWithdraw = WITHDRAWABLE.includes(detail.status);
 
   async function handleViewDocument(storagePath: string) {
@@ -187,7 +192,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
               <Button>Continue Application</Button>
             </Link>
           )}
-          {isOffered && detail.offer_id && (
+          {isOffered && detail.offer_id && !offerExpired && (
             <>
               <Button disabled={isPending} onClick={handleAcceptOffer}>
                 {isPending ? "Accepting..." : "Accept Offer"}

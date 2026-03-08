@@ -25,6 +25,18 @@ export async function sendOffer(
 ): Promise<MutationResult<{ id: string }>> {
   const supabase = await createServerClient();
 
+  // Verify application is in an offerable state
+  const { data: app } = await supabase
+    .from("application")
+    .select("status")
+    .eq("id", input.application_id)
+    .single();
+
+  const offerableStatuses = ["verified", "lottery_assigned", "waitlisted"];
+  if (!app || !offerableStatuses.includes(app.status)) {
+    return { data: null, error: `Cannot send offer: application is in "${app?.status ?? "unknown"}" status.` };
+  }
+
   // Create the offer record
   const { data: offer, error: offerError } = await supabase
     .from("offer")

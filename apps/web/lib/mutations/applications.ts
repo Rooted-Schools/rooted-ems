@@ -419,7 +419,11 @@ export async function updateApplication(
       .single();
 
     if (g) {
-      await supabase.from("household").update(hhUpdates).eq("id", g.household_id);
+      const { error: hhErr } = await supabase.from("household").update(hhUpdates).eq("id", g.household_id);
+      if (hhErr) {
+        console.error("[updateApplication] household", hhErr.message);
+        return { data: null, error: "Failed to update address" };
+      }
     }
   }
 
@@ -743,7 +747,10 @@ export async function staffFastTrackEnroll(
     .eq("id", input.enrollment_window_id)
     .single();
 
-  const schoolYearId = ew?.school_year_id ?? "";
+  const schoolYearId = ew?.school_year_id;
+  if (!schoolYearId) {
+    return { data: null, error: "Enrollment window not found or has no school year." };
+  }
 
   // 4. Create offer (auto-accepted)
   const offerNow = new Date().toISOString();
