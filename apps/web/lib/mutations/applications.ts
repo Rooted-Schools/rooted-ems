@@ -772,10 +772,10 @@ export async function staffFastTrackEnroll(
     });
   }
 
-  // 6. Update application to "accepted" then to "registered"
+  // 6. Update application to "accepted" (createEnrollment below will set to "registered")
   await supabase
     .from("application")
-    .update({ status: "offered", updated_at: offerNow })
+    .update({ status: "accepted", updated_at: offerNow })
     .eq("id", applicationId);
 
   // 7. Create enrollment

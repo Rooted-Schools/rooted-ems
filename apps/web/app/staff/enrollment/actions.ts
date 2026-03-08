@@ -37,6 +37,8 @@ export async function staffWithdrawEnrollment(
 
   if (!result.error) {
     revalidatePath("/staff/enrollment");
+    revalidatePath("/staff/applications");
+    revalidatePath("/staff/seats");
     revalidatePath("/staff/dashboard");
   }
 

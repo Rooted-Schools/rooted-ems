@@ -73,7 +73,7 @@ export async function acceptOffer(
   // Get the offer with full application details for enrollment creation
   const { data: offer, error: fetchError } = await supabase
     .from("offer")
-    .select("id, application_id, campus_id, grade_level_id, status")
+    .select("id, application_id, campus_id, grade_level_id, status, expires_at")
     .eq("id", offerId)
     .single();
 
@@ -83,6 +83,11 @@ export async function acceptOffer(
 
   if (offer.status !== "pending") {
     return { data: null, error: `Offer is ${offer.status}, cannot accept.` };
+  }
+
+  // Check if offer has expired
+  if (offer.expires_at && new Date(offer.expires_at) < new Date()) {
+    return { data: null, error: "This offer has expired and can no longer be accepted." };
   }
 
   // Update offer status
@@ -112,6 +117,7 @@ export async function acceptOffer(
 
   if (acceptError) {
     console.error("[acceptOffer] acceptance record", acceptError.message);
+    return { data: null, error: "Failed to create acceptance record." };
   }
 
   // Update application status
@@ -254,6 +260,21 @@ export async function revokeOffer(
 export async function expireOffer(offerId: string): Promise<MutationResult> {
   const supabase = await createServerClient();
 
+  // First check the offer is actually pending before expiring
+  const { data: offer, error: fetchError } = await supabase
+    .from("offer")
+    .select("id, application_id, status")
+    .eq("id", offerId)
+    .single();
+
+  if (fetchError || !offer) {
+    return { data: null, error: "Offer not found." };
+  }
+
+  if (offer.status !== "pending") {
+    return { data: null, error: `Offer is ${offer.status}, cannot expire.` };
+  }
+
   const { error } = await supabase
     .from("offer")
     .update({
@@ -267,19 +288,11 @@ export async function expireOffer(offerId: string): Promise<MutationResult> {
     return { data: null, error: "Failed to expire offer." };
   }
 
-  // Get app ID to update status
-  const { data: offer } = await supabase
-    .from("offer")
-    .select("application_id")
-    .eq("id", offerId)
-    .single();
-
-  if (offer) {
-    await supabase
-      .from("application")
-      .update({ status: "expired", updated_at: new Date().toISOString() })
-      .eq("id", offer.application_id);
-  }
+  // Update application status to expired
+  await supabase
+    .from("application")
+    .update({ status: "expired", updated_at: new Date().toISOString() })
+    .eq("id", offer.application_id);
 
   return { data: null, error: null };
 }

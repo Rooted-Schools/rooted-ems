@@ -234,7 +234,9 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
               </CardDescription>
             </div>
             {(isDraft || detail.status === "needs_info") && (
-              <Button variant="outline" size="sm" disabled>Upload Document</Button>
+              <Link href="/family/documents">
+                <Button variant="outline" size="sm">Upload Document</Button>
+              </Link>
             )}
           </div>
         </CardHeader>
@@ -242,11 +244,9 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
           {detail.documents.length === 0 ? (
             <div className="text-center py-6">
               <p className="text-sm text-gray-500">No documents uploaded yet.</p>
-              {isDraft && (
-                <p className="text-xs text-gray-400 mt-1">
-                  Documents can be uploaded after file upload is enabled.
-                </p>
-              )}
+              <Link href="/family/documents" className="text-xs text-rooted-green hover:underline mt-1 inline-block">
+                Go to Documents page to upload →
+              </Link>
             </div>
           ) : (
             <div className="space-y-2">
@@ -270,7 +270,9 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Badge variant={dcfg.variant}>{dcfg.label}</Badge>
-                      <Button variant="outline" size="sm">View</Button>
+                      <Link href="/family/documents">
+                        <Button variant="outline" size="sm">View</Button>
+                      </Link>
                     </div>
                   </div>
                 );

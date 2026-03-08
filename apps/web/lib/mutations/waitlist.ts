@@ -130,6 +130,14 @@ export async function removeFromWaitlist(
 ): Promise<MutationResult> {
   const supabase = await createServerClient();
 
+  // Fetch position to get the application_id before removing
+  const { data: position } = await supabase
+    .from("waitlist_position")
+    .select("application_id")
+    .eq("id", waitlistPositionId)
+    .is("removed_at", null)
+    .single();
+
   const { error } = await supabase
     .from("waitlist_position")
     .update({
@@ -141,6 +149,14 @@ export async function removeFromWaitlist(
 
   if (error) {
     return { data: null, error: "Failed to remove from waitlist." };
+  }
+
+  // Update application status to withdrawn since student was removed from waitlist
+  if (position?.application_id) {
+    await supabase
+      .from("application")
+      .update({ status: "withdrawn", updated_at: new Date().toISOString() })
+      .eq("id", position.application_id);
   }
 
   return { data: null, error: null };

@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationRow, ApplicationStats, CampusRow } from "@/lib/queries";
@@ -33,7 +33,9 @@ const STATUS_TABS = [
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return "—";
-  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
+  // Handle both date-only strings ("2025-01-15") and full timestamps ("2025-01-15T18:23:00Z")
+  const d = dateStr.includes("T") ? new Date(dateStr) : new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -99,7 +101,7 @@ export function StaffApplicationsClient({
         <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500">
-            <span className="font-medium">{totalCount}</span> total
+            <span className="font-medium">{filtered.length}</span>{filtered.length !== totalCount ? ` of ${totalCount}` : ""} total
           </span>
           <Link href="/staff/applications/new">
             <Button className="bg-rooted-green hover:bg-rooted-green/90 text-white">
@@ -199,7 +201,7 @@ export function StaffApplicationsClient({
             return (
               <TabsTrigger key={tab.value} value={tab.value}>
                 {tab.label}
-                {tab.value !== "all" && count ? (
+                {tab.value !== "all" && count != null ? (
                   <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 text-[10px] font-semibold">
                     {count}
                   </span>
@@ -208,44 +210,43 @@ export function StaffApplicationsClient({
             );
           })}
         </TabsList>
-
-        <TabsContent value={statusFilter}>
-          <Card>
-            <CardContent className="pt-6 px-0">
-              {filtered.length === 0 ? (
-                <EmptyState
-                  icon="📋"
-                  title="No applications found"
-                  description={
-                    search || campusFilter !== "all"
-                      ? "Try adjusting your search or filters."
-                      : "Applications will appear here once families submit them."
-                  }
-                />
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Student</TableHead>
-                      <TableHead>Guardian</TableHead>
-                      <TableHead>Grade</TableHead>
-                      <TableHead>Campus</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Submitted</TableHead>
-                      <TableHead>Updated</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filtered.map((app) => (
-                      <ApplicationTableRow key={app.id} app={app} />
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
+
+      {/* Filtered results table */}
+      <Card>
+        <CardContent className="pt-6 px-0">
+          {filtered.length === 0 ? (
+            <EmptyState
+              icon="📋"
+              title="No applications found"
+              description={
+                search || campusFilter !== "all"
+                  ? "Try adjusting your search or filters."
+                  : "Applications will appear here once families submit them."
+              }
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Guardian</TableHead>
+                  <TableHead>Grade</TableHead>
+                  <TableHead>Campus</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Submitted</TableHead>
+                  <TableHead>Updated</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((app) => (
+                  <ApplicationTableRow key={app.id} app={app} />
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -63,6 +63,17 @@ export async function withdrawEnrollment(
 ): Promise<MutationResult> {
   const supabase = await createServerClient();
 
+  // Fetch the enrollment to get the linked application_id
+  const { data: enrollment, error: fetchError } = await supabase
+    .from("enrollment")
+    .select("application_id")
+    .eq("id", enrollmentId)
+    .single();
+
+  if (fetchError || !enrollment) {
+    return { data: null, error: "Enrollment not found." };
+  }
+
   const { error } = await supabase
     .from("enrollment")
     .update({
@@ -74,6 +85,14 @@ export async function withdrawEnrollment(
 
   if (error) {
     return { data: null, error: "Failed to withdraw enrollment." };
+  }
+
+  // Also update the linked application status to withdrawn
+  if (enrollment.application_id) {
+    await supabase
+      .from("application")
+      .update({ status: "withdrawn", updated_at: new Date().toISOString() })
+      .eq("id", enrollment.application_id);
   }
 
   return { data: null, error: null };

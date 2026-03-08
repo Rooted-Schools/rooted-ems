@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,6 +98,7 @@ const STATUS_DISPLAY: Record<
 };
 
 export function RegistrationClient({ enrollments }: RegistrationClientProps) {
+  const router = useRouter();
   const [activeEnrollment, setActiveEnrollment] = useState(0);
   const [loadingItem, setLoadingItem] = useState<string | null>(null);
   const [submittingPacket, setSubmittingPacket] = useState(false);
@@ -150,6 +152,7 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
       setError(result.error);
     } else {
       setSuccess(`"${itemName}" has been completed.`);
+      router.refresh();
     }
     setLoadingItem(null);
   }
@@ -167,6 +170,7 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
       setError(result.error);
     } else {
       setSuccess("Registration packet submitted successfully!");
+      router.refresh();
     }
     setSubmittingPacket(false);
   }

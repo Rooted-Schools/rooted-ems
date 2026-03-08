@@ -156,38 +156,7 @@ export function FamilyLoginForm() {
 
         {!otpSent ? (
           <form onSubmit={handleSendOtp} className="space-y-4">
-            <div className="flex gap-2 mb-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setMethod("email");
-                  setValue("");
-                  setError(null);
-                }}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                  method === "email"
-                    ? "bg-rooted-green text-white"
-                    : "bg-rooted-gray text-ink/70 hover:bg-rooted-gray-dark/30"
-                }`}
-              >
-                Email
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMethod("phone");
-                  setValue("");
-                  setError(null);
-                }}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                  method === "phone"
-                    ? "bg-rooted-green text-white"
-                    : "bg-rooted-gray text-ink/70 hover:bg-rooted-gray-dark/30"
-                }`}
-              >
-                Phone
-              </button>
-            </div>
+            {/* Email-only login — phone login coming soon */}
 
             <div>
               <label
@@ -253,11 +222,14 @@ export function FamilyLoginForm() {
               <input
                 id="otp-code"
                 type="text"
+                inputMode="numeric"
+                maxLength={6}
+                autoComplete="one-time-code"
                 value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                placeholder="Enter code"
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="000000"
                 required
-                className="w-full px-4 py-2 border border-stone/30 rounded-md text-center text-lg tracking-wide focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
+                className="w-full px-4 py-2 border border-stone/30 rounded-md text-center text-lg tracking-[0.3em] font-mono focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
               />
             </div>
 

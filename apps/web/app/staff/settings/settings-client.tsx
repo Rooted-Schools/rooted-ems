@@ -748,12 +748,15 @@ function StaffUsersTab({
     if (!editingUser) return;
     setFeedback(null);
     startTransition(async () => {
-      // Remove old role, assign new one
-      const removeResult = await staffRemoveRole(editingUser.id);
-      if (removeResult.error) {
-        setFeedback({ type: "error", message: removeResult.error });
+      // Check if anything actually changed
+      const roleChanged = editRole !== editingUser.role;
+      const campusChanged = editCampusId !== editingUser.campus_id;
+      if (!roleChanged && !campusChanged) {
+        setEditDialogOpen(false);
         return;
       }
+
+      // Assign new role first (upsert), then remove old if campus changed
       const assignResult = await staffAssignRole({
         user_email: editingUser.email,
         campus_id: editCampusId,
@@ -762,11 +765,31 @@ function StaffUsersTab({
       });
       if (assignResult.error) {
         setFeedback({ type: "error", message: assignResult.error });
-      } else {
-        setFeedback({ type: "success", message: `Updated ${editingUser.full_name}'s role.` });
-        setEditDialogOpen(false);
-        router.refresh();
+        return;
       }
+
+      // If campus changed, remove old campus role after new one is created
+      if (campusChanged) {
+        const removeResult = await staffRemoveRole(editingUser.id);
+        if (removeResult.error) {
+          // New role already assigned — warn but don't block
+          setFeedback({ type: "error", message: `New role assigned but failed to remove old role: ${removeResult.error}` });
+          router.refresh();
+          return;
+        }
+      } else if (roleChanged) {
+        // Same campus, different role — remove old role entry
+        const removeResult = await staffRemoveRole(editingUser.id);
+        if (removeResult.error) {
+          setFeedback({ type: "error", message: `New role assigned but failed to remove old role: ${removeResult.error}` });
+          router.refresh();
+          return;
+        }
+      }
+
+      setFeedback({ type: "success", message: `Updated ${editingUser.full_name}'s role.` });
+      setEditDialogOpen(false);
+      router.refresh();
     });
   }
 

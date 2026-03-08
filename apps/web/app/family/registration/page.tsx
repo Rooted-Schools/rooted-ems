@@ -2,19 +2,21 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 import { createServerClient } from "@rooted-ems/database/server";
-import { requireSession } from "@/lib/auth/get-session";
 import { redirect } from "next/navigation";
 import { RegistrationClient } from "./registration-client";
 
 export default async function FamilyRegistrationPage() {
-  const session = await requireSession();
   const supabase = await createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
   // Find user's household
   const { data: household } = await supabase
     .from("household")
     .select("id")
-    .eq("user_id", session.user_id)
+    .eq("user_id", user.id)
     .single();
 
   if (!household) {
@@ -25,7 +27,7 @@ export default async function FamilyRegistrationPage() {
   const { data: enrollments } = await supabase
     .from("enrollment")
     .select(`
-      id, status, enrolled_at,
+      id, status, enrolled_at, campus_id, school_year_id,
       student:student_id (id, first_name, last_name),
       campus:campus_id (name),
       grade_level:grade_level_id (grade),
@@ -71,42 +73,35 @@ export default async function FamilyRegistrationPage() {
           .single(),
       ]);
 
-      // Fetch requirements for this campus/year
-      const campus = enr.campus as Record<string, unknown> | null;
-      const schoolYear = enr.school_year as Record<string, unknown> | null;
+      // Fetch requirements for this campus/year using IDs from the enrollment
+      const enrCampusId = enr.campus_id as string;
+      const enrSchoolYearId = enr.school_year_id as string;
 
       let requirements: { item_type: string; name: string; description: string; is_required: boolean; sort_order: number }[] = [];
-      if (campus) {
-        // Get campus_id from enrollment
-        const { data: campusData } = await supabase
-          .from("enrollment")
-          .select("campus_id, school_year_id")
-          .eq("id", enr.id as string)
-          .single();
-
-        if (campusData) {
-          const { data: reqs } = await supabase
-            .from("packet_requirement")
-            .select("item_type, name, description, is_required, sort_order")
-            .eq("campus_id", campusData.campus_id)
-            .eq("school_year_id", campusData.school_year_id)
-            .eq("is_active", true)
-            .order("sort_order");
-          requirements = (reqs ?? []) as { item_type: string; name: string; description: string; is_required: boolean; sort_order: number }[];
-        }
+      if (enrCampusId && enrSchoolYearId) {
+        const { data: reqs } = await supabase
+          .from("packet_requirement")
+          .select("item_type, name, description, is_required, sort_order")
+          .eq("campus_id", enrCampusId)
+          .eq("school_year_id", enrSchoolYearId)
+          .eq("is_active", true)
+          .order("sort_order");
+        requirements = (reqs ?? []) as { item_type: string; name: string; description: string; is_required: boolean; sort_order: number }[];
       }
 
       const student = enr.student as Record<string, string> | null;
       const grade = enr.grade_level as Record<string, string> | null;
+      const campus = enr.campus as Record<string, string> | null;
+      const schoolYear = enr.school_year as Record<string, string> | null;
 
       return {
         enrollment_id: enr.id as string,
         student_name: student
           ? `${student.first_name} ${student.last_name}`
           : "Unknown",
-        campus_name: (campus as Record<string, string> | null)?.name ?? "",
+        campus_name: campus?.name ?? "",
         grade: grade?.grade ?? "",
-        school_year: (schoolYear as Record<string, string> | null)?.name ?? "",
+        school_year: schoolYear?.name ?? "",
         enrollment_status: enr.status as string,
         packet: packet ?? null,
         items: items ?? [],

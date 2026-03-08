@@ -42,23 +42,35 @@ export function WaitlistClient({
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   async function handlePromote(positionId: string) {
     setLoading(positionId);
     setError(null);
+    setSuccess(null);
     const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
     const result = await staffPromoteFromWaitlist(positionId, staffUserId, expiresAt);
-    if (result.error) setError(result.error);
-    else router.refresh();
+    if (result.error) {
+      setError(result.error);
+    } else {
+      setSuccess("Student promoted from waitlist — offer sent.");
+      router.refresh();
+    }
     setLoading(null);
   }
 
   async function handleRemove(positionId: string) {
+    if (!confirm("Are you sure you want to remove this student from the waitlist?")) return;
     setLoading(positionId);
     setError(null);
+    setSuccess(null);
     const result = await staffRemoveFromWaitlist(positionId, "Removed by staff.");
-    if (result.error) setError(result.error);
-    else router.refresh();
+    if (result.error) {
+      setError(result.error);
+    } else {
+      setSuccess("Student removed from waitlist.");
+      router.refresh();
+    }
     setLoading(null);
   }
 
@@ -74,7 +86,10 @@ export function WaitlistClient({
       </div>
 
       {error && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</div>
+        <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>
+      )}
+      {success && (
+        <div className="rounded-md bg-green-50 border border-green-200 p-3 text-sm text-green-700">{success}</div>
       )}
 
       {campusCounts.length > 0 && (

@@ -53,7 +53,7 @@ export default async function SeatManagementPage({
     const offered = (row.seats_offered as number) ?? 0;
     const accepted = (row.seats_accepted as number) ?? 0;
     const registered = (row.seats_registered as number) ?? 0;
-    const available = total - offered;
+    const available = total - offered - accepted - registered;
 
     return {
       id: row.id as string,

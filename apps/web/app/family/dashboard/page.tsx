@@ -211,7 +211,7 @@ export default async function FamilyDashboardPage() {
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-gray-400">
                         Updated{" "}
-                        {new Date(app.updated_at + "T00:00:00").toLocaleDateString(
+                        {new Date(app.updated_at).toLocaleDateString(
                           "en-US",
                           { month: "short", day: "numeric", year: "numeric" }
                         )}
