@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +43,13 @@ export function WaitlistClient({
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Auto-clear success/error messages after 5 seconds
+  useEffect(() => {
+    if (!success && !error) return;
+    const timer = setTimeout(() => { setSuccess(null); setError(null); }, 5000);
+    return () => clearTimeout(timer);
+  }, [success, error]);
 
   async function handlePromote(positionId: string) {
     setLoading(positionId);

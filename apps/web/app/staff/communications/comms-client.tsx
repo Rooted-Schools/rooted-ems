@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -116,6 +116,13 @@ export function CommsClient({
   const [showNewMessage, setShowNewMessage] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showNewTemplate, setShowNewTemplate] = useState(false);
+
+  // Auto-clear feedback messages after 5 seconds
+  useEffect(() => {
+    if (!feedback) return;
+    const timer = setTimeout(() => setFeedback(null), 5000);
+    return () => clearTimeout(timer);
+  }, [feedback]);
 
   return (
     <div className="space-y-6">
@@ -358,6 +365,20 @@ function NewMessageDialog({
   const [statusTarget, setStatusTarget] = useState("submitted");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [templateId, setTemplateId] = useState("");
+
+  // Reset form when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setChannel("in_app");
+      setSubject("");
+      setBody("");
+      setLink("");
+      setAudienceType("all");
+      setStatusTarget("submitted");
+      setSelectedIds(new Set());
+      setTemplateId("");
+    }
+  }, [open]);
 
   function handleTemplateSelect(tplId: string) {
     setTemplateId(tplId);
@@ -697,6 +718,16 @@ function NewTemplateDialog({
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [channel, setChannel] = useState<"in_app" | "email" | "sms">("in_app");
+
+  // Reset form when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setName("");
+      setSubject("");
+      setBody("");
+      setChannel("in_app");
+    }
+  }, [open]);
 
   function handleSave() {
     if (!name.trim() || !body.trim()) return;

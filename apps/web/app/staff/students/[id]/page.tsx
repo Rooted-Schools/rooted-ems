@@ -2,7 +2,7 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 import { createServerClient } from "@rooted-ems/database/server";
-import { requireStaffSession } from "@/lib/auth/get-session";
+import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -15,8 +15,9 @@ export default async function StudentDetailPage({
   params: Promise<{ id: string }> | { id: string };
 }) {
   const { id } = await Promise.resolve(params);
-  await requireStaffSession();
+  const session = await requireStaffSession();
   const supabase = await createServerClient();
+  const accessibleCampusIds = getAccessibleCampusIds(session);
 
   // Fetch student with household info
   const { data: student, error } = await supabase
@@ -39,6 +40,25 @@ export default async function StudentDetailPage({
 
   if (error || !student) {
     redirect("/staff/students");
+  }
+
+  // Verify campus access: check if student has any application/enrollment at an accessible campus
+  if (accessibleCampusIds.length > 0) {
+    const { count: appCount } = await supabase
+      .from("application")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", id)
+      .in("campus_id", accessibleCampusIds);
+
+    const { count: enrollCount } = await supabase
+      .from("enrollment")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", id)
+      .in("campus_id", accessibleCampusIds);
+
+    if ((appCount ?? 0) === 0 && (enrollCount ?? 0) === 0) {
+      redirect("/staff/students");
+    }
   }
 
   // Fetch guardians

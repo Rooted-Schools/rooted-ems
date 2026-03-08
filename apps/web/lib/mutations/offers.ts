@@ -245,10 +245,22 @@ export async function revokeOffer(
     return { data: null, error: "Failed to revoke offer." };
   }
 
-  // Revert application to verified so it can re-enter lottery/offer flow
+  // Revert application to the status it had before "offered"
+  // Look up the most recent status history entry where to_status = 'offered'
+  const { data: history } = await supabase
+    .from("application_status_history")
+    .select("from_status")
+    .eq("application_id", offer.application_id)
+    .eq("to_status", "offered")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  const revertStatus = history?.from_status ?? "verified";
+
   await supabase
     .from("application")
-    .update({ status: "verified", updated_at: new Date().toISOString() })
+    .update({ status: revertStatus, updated_at: new Date().toISOString() })
     .eq("id", offer.application_id);
 
   return { data: null, error: null };

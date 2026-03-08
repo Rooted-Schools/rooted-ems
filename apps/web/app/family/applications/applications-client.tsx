@@ -41,7 +41,8 @@ function getStatusMessage(status: string): string {
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return null;
-  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
+  const d = dateStr.includes("T") ? new Date(dateStr) : new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",

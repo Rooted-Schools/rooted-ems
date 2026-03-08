@@ -36,12 +36,20 @@ export default async function AuditTrailPage({
 }: {
   searchParams: { campus?: string; table?: string; action?: string; page?: string };
 }) {
-  await requireStaffSession();
+  const session = await requireStaffSession();
   const supabase = await createServerClient();
+  const accessibleCampusIds = getAccessibleCampusIds(session);
 
   const page = parseInt(searchParams.page ?? "1", 10);
   const pageSize = 50;
   const offset = (page - 1) * pageSize;
+
+  // Validate campus param against user's accessible campuses
+  const requestedCampus = searchParams.campus;
+  const validCampus =
+    requestedCampus && accessibleCampusIds.includes(requestedCampus)
+      ? requestedCampus
+      : undefined;
 
   let query = supabase
     .from("audit_event")
@@ -54,8 +62,11 @@ export default async function AuditTrailPage({
     .order("created_at", { ascending: false })
     .range(offset, offset + pageSize - 1);
 
-  if (searchParams.campus) {
-    query = query.eq("campus_id", searchParams.campus);
+  if (validCampus) {
+    query = query.eq("campus_id", validCampus);
+  } else if (accessibleCampusIds.length > 0 && accessibleCampusIds.length < 3) {
+    // Non-CMO staff: scope to their accessible campuses only
+    query = query.in("campus_id", accessibleCampusIds);
   }
   if (searchParams.table) {
     query = query.eq("table_name", searchParams.table);
@@ -83,8 +94,8 @@ export default async function AuditTrailPage({
       <Card>
         <CardContent className="py-3">
           <form className="flex items-center gap-3 flex-wrap">
-            {searchParams.campus && (
-              <input type="hidden" name="campus" value={searchParams.campus} />
+            {validCampus && (
+              <input type="hidden" name="campus" value={validCampus} />
             )}
             <div className="flex items-center gap-2">
               <label className="text-xs font-medium text-gray-500">Table:</label>
@@ -123,7 +134,7 @@ export default async function AuditTrailPage({
             </button>
             {(searchParams.table || searchParams.action) && (
               <a
-                href={`/staff/audit${searchParams.campus ? `?campus=${searchParams.campus}` : ""}`}
+                href={`/staff/audit${validCampus ? `?campus=${validCampus}` : ""}`}
                 className="text-xs text-gray-500 hover:text-gray-700 no-underline"
               >
                 Clear filters
@@ -242,7 +253,7 @@ export default async function AuditTrailPage({
           <div className="flex gap-2">
             {page > 1 && (
               <a
-                href={`/staff/audit?page=${page - 1}${searchParams.campus ? `&campus=${searchParams.campus}` : ""}${searchParams.table ? `&table=${searchParams.table}` : ""}${searchParams.action ? `&action=${searchParams.action}` : ""}`}
+                href={`/staff/audit?page=${page - 1}${validCampus ? `&campus=${validCampus}` : ""}${searchParams.table ? `&table=${searchParams.table}` : ""}${searchParams.action ? `&action=${searchParams.action}` : ""}`}
                 className="text-sm px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 no-underline text-gray-700"
               >
                 Previous
@@ -250,7 +261,7 @@ export default async function AuditTrailPage({
             )}
             {page < totalPages && (
               <a
-                href={`/staff/audit?page=${page + 1}${searchParams.campus ? `&campus=${searchParams.campus}` : ""}${searchParams.table ? `&table=${searchParams.table}` : ""}${searchParams.action ? `&action=${searchParams.action}` : ""}`}
+                href={`/staff/audit?page=${page + 1}${validCampus ? `&campus=${validCampus}` : ""}${searchParams.table ? `&table=${searchParams.table}` : ""}${searchParams.action ? `&action=${searchParams.action}` : ""}`}
                 className="text-sm px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 no-underline text-gray-700"
               >
                 Next

@@ -170,5 +170,17 @@ export async function transferEnrollment(
     return { data: null, error: "Failed to create transfer enrollment." };
   }
 
+  // Update the linked application's campus_id to reflect the transfer
+  if (current.application_id) {
+    await supabase
+      .from("application")
+      .update({
+        campus_id: newCampusId,
+        grade_level_id: newGradeLevelId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", current.application_id);
+  }
+
   return { data: null, error: null };
 }
