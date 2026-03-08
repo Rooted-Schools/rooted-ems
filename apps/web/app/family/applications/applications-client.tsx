@@ -95,9 +95,13 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
               <Card
                 key={app.id}
                 className={
-                  needsAction
-                    ? "border-amber-200 bg-amber-50/30"
-                    : undefined
+                  app.status === "offered"
+                    ? "border-rooted-green bg-green-50/30 shadow-md"
+                    : app.status === "registered"
+                      ? "border-green-200 bg-green-50/20"
+                      : needsAction
+                        ? "border-amber-200 bg-amber-50/30"
+                        : undefined
                 }
               >
                 <CardHeader className="pb-3">

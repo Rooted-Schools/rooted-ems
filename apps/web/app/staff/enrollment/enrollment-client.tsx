@@ -97,7 +97,7 @@ export function EnrollmentClient({
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="border-t-4 border-t-rooted-green">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               Total Enrolled
@@ -105,29 +105,36 @@ export function EnrollmentClient({
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-rooted-green">{stats.total}</p>
+            <p className="text-xs text-gray-400 mt-1">all time</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-t-4 border-t-emerald-500">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               Active
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{stats.active}</p>
+            <p className="text-2xl font-bold text-emerald-600">{stats.active}</p>
+            <p className="text-xs text-gray-400 mt-1">currently enrolled</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-t-4 border-t-blue-500">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               SIS Synced
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{stats.sis_synced}</p>
+            <p className="text-2xl font-bold text-blue-600">{stats.sis_synced}</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {stats.active > 0
+                ? `${Math.round((stats.sis_synced / stats.active) * 100)}% of active`
+                : "synced to SIS"}
+            </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-t-4 border-t-gray-400">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
               Withdrawn
@@ -136,6 +143,9 @@ export function EnrollmentClient({
           <CardContent>
             <p className={`text-2xl font-bold ${stats.withdrawn === 0 ? "text-gray-300" : "text-red-600"}`}>
               {stats.withdrawn}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              {stats.withdrawn === 0 ? "none" : "students withdrawn"}
             </p>
           </CardContent>
         </Card>

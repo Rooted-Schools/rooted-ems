@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,9 +24,13 @@ interface MessagesClientProps {
 export function MessagesClient({ messages }: MessagesClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [filter, setFilter] = useState<"all" | "unread">("all");
 
   const unreadCount = messages.filter((m) => !m.is_read).length;
+  const readCount = messages.filter((m) => m.is_read).length;
   const unreadIds = messages.filter((m) => !m.is_read).map((m) => m.id);
+
+  const displayed = filter === "unread" ? messages.filter((m) => !m.is_read) : messages;
 
   function handleMarkAllRead() {
     if (unreadIds.length === 0) return;
@@ -52,105 +56,173 @@ export function MessagesClient({ messages }: MessagesClientProps) {
             Notifications and updates about your enrollment applications.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {unreadCount > 0 && (
-            <>
-              <Badge variant="warning">{unreadCount} unread</Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleMarkAllRead}
-                disabled={isPending}
-              >
-                {isPending ? "Marking..." : "Mark all read"}
-              </Button>
-            </>
-          )}
-        </div>
+        {unreadCount > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleMarkAllRead}
+            disabled={isPending}
+          >
+            {isPending ? "Marking..." : "Mark all read"}
+          </Button>
+        )}
       </div>
 
+      {/* Summary banner */}
+      {messages.length > 0 && (
+        <div className="grid grid-cols-2 gap-4">
+          <Card
+            className={`cursor-pointer transition-all ${
+              filter === "unread" && unreadCount > 0
+                ? "ring-2 ring-amber-400/50 border-amber-300"
+                : ""
+            }`}
+            onClick={() => setFilter(unreadCount > 0 ? (filter === "unread" ? "all" : "unread") : "all")}
+          >
+            <CardContent className="py-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                  <span className="text-lg" aria-hidden="true">📩</span>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-amber-600">{unreadCount}</p>
+                  <p className="text-xs text-gray-500">Unread</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="py-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                  <span className="text-lg" aria-hidden="true">📧</span>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-600">{readCount}</p>
+                  <p className="text-xs text-gray-500">Read</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {messages.length === 0 ? (
-        <Card>
-          <CardContent className="py-8">
+        <Card className="border-dashed">
+          <CardContent className="py-12">
             <EmptyState
               icon="📬"
               title="No messages yet"
-              description="You will receive notifications here when there are updates to your enrollment applications."
+              description="You will receive notifications here when there are updates to your enrollment applications — like status changes, document requests, or seat offers."
             />
+          </CardContent>
+        </Card>
+      ) : displayed.length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <p className="text-sm text-gray-500">All caught up! No unread messages.</p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => setFilter("all")}>
+              Show all messages
+            </Button>
           </CardContent>
         </Card>
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">All Messages</CardTitle>
-            <CardDescription>
-              {messages.length} message{messages.length !== 1 ? "s" : ""}
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">
+                  {filter === "unread" ? "Unread Messages" : "All Messages"}
+                </CardTitle>
+                <CardDescription>
+                  {displayed.length} message{displayed.length !== 1 ? "s" : ""}
+                  {filter === "unread" && (
+                    <button
+                      onClick={() => setFilter("all")}
+                      className="ml-2 text-rooted-green hover:underline"
+                    >
+                      Show all
+                    </button>
+                  )}
+                </CardDescription>
+              </div>
+              {filter === "all" && unreadCount > 0 && (
+                <Badge variant="warning">{unreadCount} unread</Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-1">
-              {messages.map((msg) => (
+            <div className="space-y-2">
+              {displayed.map((msg) => (
                 <div
                   key={msg.id}
-                  className={`flex items-start gap-3 p-3 rounded-md border transition-colors ${
+                  className={`flex items-start gap-3 p-3.5 rounded-lg border transition-all ${
                     !msg.is_read
-                      ? "border-amber-200 bg-amber-50/30"
-                      : "border-gray-200"
+                      ? "border-amber-200 bg-amber-50/40 shadow-sm"
+                      : "border-gray-100 hover:border-gray-200"
                   }`}
                 >
-                  <span className="text-lg mt-0.5 shrink-0" aria-hidden="true">
-                    {!msg.is_read ? "📩" : "📧"}
-                  </span>
+                  {/* Status indicator */}
+                  <div className="relative shrink-0 mt-0.5">
+                    <div
+                      className={`w-9 h-9 rounded-full flex items-center justify-center ${
+                        !msg.is_read ? "bg-amber-100" : "bg-gray-50"
+                      }`}
+                    >
+                      <span className="text-base" aria-hidden="true">
+                        {!msg.is_read ? "📩" : "📧"}
+                      </span>
+                    </div>
+                    {!msg.is_read && (
+                      <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-amber-500 border-2 border-white" />
+                    )}
+                  </div>
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p
-                            className={`text-sm truncate ${
-                              !msg.is_read
-                                ? "font-semibold text-gray-900"
-                                : "font-medium text-gray-700"
-                            }`}
-                          >
-                            {msg.title}
-                          </p>
-                          {!msg.is_read && (
-                            <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-                          )}
-                        </div>
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className={`text-sm ${
+                            !msg.is_read
+                              ? "font-semibold text-gray-900"
+                              : "font-medium text-gray-700"
+                          }`}
+                        >
+                          {msg.title}
+                        </p>
                         {msg.body && (
                           <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">
                             {msg.body}
                           </p>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs text-gray-400 whitespace-nowrap">
-                          {msg.time_ago}
-                        </span>
-                        {!msg.is_read && (
-                          <button
-                            onClick={() => handleMarkRead(msg.id)}
-                            disabled={isPending}
-                            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-                            title="Mark as read"
-                          >
-                            ✓
-                          </button>
-                        )}
-                      </div>
+                      <span className="text-xs text-gray-400 whitespace-nowrap mt-0.5 shrink-0">
+                        {msg.time_ago}
+                      </span>
                     </div>
-                    {msg.link && (
-                      <a
-                        href={msg.link}
-                        className="text-xs text-rooted-green hover:underline mt-1 inline-block"
-                        onClick={() => {
-                          if (!msg.is_read) handleMarkRead(msg.id);
-                        }}
-                      >
-                        View Details →
-                      </a>
-                    )}
+
+                    <div className="flex items-center gap-3 mt-2">
+                      {msg.link && (
+                        <a
+                          href={msg.link}
+                          className="text-xs font-medium text-rooted-green hover:underline"
+                          onClick={() => {
+                            if (!msg.is_read) handleMarkRead(msg.id);
+                          }}
+                        >
+                          View Details &rarr;
+                        </a>
+                      )}
+                      {!msg.is_read && (
+                        <button
+                          onClick={() => handleMarkRead(msg.id)}
+                          disabled={isPending}
+                          className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          Mark as read
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

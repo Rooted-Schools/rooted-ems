@@ -24,7 +24,7 @@ function getStatusExplanation(status: string): { title: string; explanation: str
     case "lottery_assigned":
       return { title: "In Lottery", explanation: "Your application has been entered into the enrollment lottery. Results will be shared once the lottery is run.", icon: "🎲" };
     case "offered":
-      return { title: "Seat Offered", explanation: "Congratulations! A seat has been offered to your student. Please respond before the deadline to accept or decline.", icon: "🎉" };
+      return { title: "Seat Offered!", explanation: "Congratulations! A seat has been offered to your student. Please respond before the deadline below to secure your spot.", icon: "🎉" };
     case "accepted":
       return { title: "Offer Accepted", explanation: "You have accepted the enrollment offer. Complete the registration process to finalize your student's enrollment.", icon: "✅" };
     case "waitlisted":
@@ -180,23 +180,76 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
         </div>
       </div>
 
-      {/* Status explanation card */}
-      <Card className={needsAction ? "border-amber-200 bg-amber-50/30" : "border-rooted-green/20 bg-rooted-green/5"}>
-        <CardContent className="py-4">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl" aria-hidden="true">{statusExplanation.icon}</span>
-            <div>
-              <p className="text-sm font-semibold text-gray-900">{statusExplanation.title}</p>
-              <p className="text-sm text-gray-600 mt-0.5">{statusExplanation.explanation}</p>
-              {isOffered && detail.offer_expires_at && (
-                <p className="text-sm font-medium text-amber-700 mt-1">
-                  Respond by: {formatDate(detail.offer_expires_at)}
-                </p>
-              )}
+      {/* Offer urgency card (special treatment) */}
+      {isOffered && detail.offer_expires_at ? (() => {
+        const expiresDate = new Date(detail.offer_expires_at + (detail.offer_expires_at.includes("T") ? "" : "T23:59:59"));
+        const daysLeft = Math.max(0, Math.ceil((expiresDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+        const isUrgent = daysLeft <= 3;
+        const isExpired = daysLeft <= 0;
+        return (
+          <Card className={isUrgent ? "border-red-300 bg-red-50" : "border-amber-200 bg-amber-50/30"}>
+            <CardContent className="py-5">
+              <div className="flex items-start gap-4">
+                <span className="text-3xl" aria-hidden="true">🎉</span>
+                <div className="flex-1">
+                  <p className="text-base font-bold text-gray-900">
+                    {isExpired ? "Offer Expired" : "You Have a Seat Offer!"}
+                  </p>
+                  <p className="text-sm text-gray-600 mt-0.5">
+                    {isExpired
+                      ? "This offer has expired. Please contact the enrollment office if you have questions."
+                      : "A seat has been offered to your student. Accept below to secure your spot."}
+                  </p>
+                  {!isExpired && (
+                    <div className={`inline-flex items-center gap-2 mt-2 px-3 py-1.5 rounded-full text-sm font-semibold ${
+                      isUrgent
+                        ? "bg-red-100 text-red-800"
+                        : "bg-amber-100 text-amber-800"
+                    }`}>
+                      <span aria-hidden="true">{isUrgent ? "⏰" : "📅"}</span>
+                      {daysLeft === 1
+                        ? "Expires tomorrow!"
+                        : daysLeft === 0
+                          ? "Expires today!"
+                          : `${daysLeft} days to respond`}
+                      <span className="text-xs font-normal opacity-70">
+                        (by {formatDate(detail.offer_expires_at)})
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {!isExpired && detail.offer_id && (
+                  <div className="flex flex-col gap-2 shrink-0">
+                    <Button
+                      disabled={isPending}
+                      onClick={handleAcceptOffer}
+                      className="bg-rooted-green hover:bg-rooted-green/90 text-white"
+                    >
+                      {isPending ? "Accepting..." : "Accept Offer"}
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={isPending} onClick={handleDeclineOffer}>
+                      {isPending ? "..." : "Decline"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })() : (
+        /* Standard status explanation card */
+        <Card className={needsAction ? "border-amber-200 bg-amber-50/30" : "border-rooted-green/20 bg-rooted-green/5"}>
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl" aria-hidden="true">{statusExplanation.icon}</span>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">{statusExplanation.title}</p>
+                <p className="text-sm text-gray-600 mt-0.5">{statusExplanation.explanation}</p>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Application details */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

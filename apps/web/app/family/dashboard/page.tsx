@@ -30,7 +30,18 @@ export default async function FamilyDashboardPage() {
 
   const hasApps = apps.length > 0;
   const draftCount = apps.filter((a) => a.status === "draft").length;
+  const offeredCount = apps.filter((a) => a.status === "offered").length;
+  const acceptedCount = apps.filter((a) => a.status === "accepted").length;
+  const registeredCount = apps.filter((a) => a.status === "registered").length;
   const enrollmentWindow = enrollmentWindows[0] ?? null;
+
+  // Determine farthest stage for dynamic stepper
+  const statusOrder = ["draft", "submitted", "needs_info", "verified", "lottery_assigned", "offered", "accepted", "registered"];
+  const farthestStatus = apps.reduce((max, a) => {
+    const idx = statusOrder.indexOf(a.status);
+    return idx > max ? idx : max;
+  }, -1);
+  const currentStep = farthestStatus <= 1 ? 1 : farthestStatus <= 4 ? 2 : farthestStatus === 5 ? 3 : farthestStatus === 6 ? 4 : farthestStatus >= 7 ? 5 : 0;
 
   // Derive a friendly name from the user's email or metadata
   const displayName =
@@ -53,6 +64,61 @@ export default async function FamilyDashboardPage() {
           <Button>Start New Application</Button>
         </Link>
       </div>
+
+      {/* ─── Celebration: registered students ─── */}
+      {registeredCount > 0 && (
+        <div className="bg-rooted-green/10 border border-rooted-green/30 rounded-lg p-4 flex items-start gap-3">
+          <span className="text-xl mt-0.5">🎓</span>
+          <div>
+            <p className="text-sm font-bold text-gray-900">
+              Welcome to the rootedschools family!
+            </p>
+            <p className="text-sm text-gray-600 mt-0.5">
+              {registeredCount} student{registeredCount > 1 ? "s are" : " is"} enrolled and registered. Check your school for orientation details.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Urgent: offer pending ─── */}
+      {offeredCount > 0 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 flex items-start gap-3">
+          <span className="text-xl mt-0.5">🎉</span>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-gray-900">
+              You have {offeredCount} seat offer{offeredCount > 1 ? "s" : ""} waiting!
+            </p>
+            <p className="text-sm text-gray-600 mt-0.5">
+              Respond before the deadline to secure your spot.
+            </p>
+          </div>
+          <Link href="/family/applications">
+            <Button size="sm" className="bg-rooted-green hover:bg-rooted-green/90 text-white shrink-0">
+              View Offer{offeredCount > 1 ? "s" : ""}
+            </Button>
+          </Link>
+        </div>
+      )}
+
+      {/* ─── Registration reminder ─── */}
+      {acceptedCount > 0 && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+          <span className="text-xl mt-0.5">📝</span>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-gray-900">
+              Complete Registration
+            </p>
+            <p className="text-sm text-gray-600 mt-0.5">
+              You have {acceptedCount} accepted enrollment{acceptedCount > 1 ? "s" : ""}. Complete the registration packet to finalize enrollment.
+            </p>
+          </div>
+          <Link href="/family/registration">
+            <Button size="sm" variant="outline" className="shrink-0">
+              Go to Registration
+            </Button>
+          </Link>
+        </div>
+      )}
 
       {/* ─── Alert banner: open enrollment ─── */}
       {enrollmentWindow && (
@@ -276,21 +342,32 @@ export default async function FamilyDashboardPage() {
                   title: "Registration",
                   desc: "Complete final registration to secure your child's enrollment.",
                 },
-              ].map((s) => (
-                <div key={s.step} className="flex gap-3">
-                  <div
-                    className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold shrink-0 mt-0.5 border border-gray-300 text-gray-400"
-                  >
-                    {s.step}
+              ].map((s) => {
+                const isComplete = hasApps && s.step < currentStep;
+                const isCurrent = hasApps && s.step === currentStep;
+                return (
+                  <div key={s.step} className={`flex gap-3 ${isCurrent ? "bg-rooted-green/5 -mx-2 px-2 py-1.5 rounded-lg" : ""}`}>
+                    <div
+                      className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold shrink-0 mt-0.5 ${
+                        isComplete
+                          ? "bg-rooted-green text-white border-2 border-rooted-green"
+                          : isCurrent
+                            ? "bg-white text-rooted-green border-2 border-rooted-green"
+                            : "border border-gray-300 text-gray-400"
+                      }`}
+                    >
+                      {isComplete ? "✓" : s.step}
+                    </div>
+                    <div>
+                      <p className={`text-sm font-medium ${isCurrent ? "text-rooted-green" : isComplete ? "text-gray-600" : "text-gray-900"}`}>
+                        {s.title}
+                        {isCurrent && <span className="text-[10px] ml-2 text-rooted-green font-bold uppercase">Current</span>}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">{s.desc}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {s.title}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">{s.desc}</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>

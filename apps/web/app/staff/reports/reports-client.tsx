@@ -44,6 +44,30 @@ function downloadCsv(filename: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
+/* ─── Inline bar component ─── */
+function Bar({ value, max, color = "bg-rooted-green", className = "" }: { value: number; max: number; color?: string; className?: string }) {
+  const pct = max > 0 ? (value / max) * 100 : 0;
+  return (
+    <div className={`w-full bg-gray-100 rounded-full h-2 ${className}`}>
+      <div className={`h-2 rounded-full transition-all ${color}`} style={{ width: `${Math.min(100, pct)}%` }} />
+    </div>
+  );
+}
+
+/* ─── Status color map for pipeline bars ─── */
+const STATUS_COLORS: Record<string, string> = {
+  submitted: "bg-blue-400",
+  needs_info: "bg-amber-400",
+  verified: "bg-green-400",
+  lottery_assigned: "bg-purple-400",
+  offered: "bg-indigo-400",
+  accepted: "bg-emerald-500",
+  registered: "bg-rooted-green",
+  waitlisted: "bg-orange-400",
+  withdrawn: "bg-gray-300",
+  declined: "bg-red-300",
+};
+
 export function ReportsClient({ data }: { data: ReportData }) {
   const [previewId, setPreviewId] = useState<string | null>(null);
 
@@ -92,6 +116,14 @@ export function ReportsClient({ data }: { data: ReportData }) {
     },
   ];
 
+  // Compute summary stats for the header
+  const totalApps = data.pipeline.reduce((s, r) => s + r.count, 0);
+  const registeredCount = data.pipeline.find(r => r.status === "registered")?.count ?? 0;
+  const totalSeats = data.capacity.reduce((s, r) => s + r.total_seats, 0);
+  const totalRegistered = data.capacity.reduce((s, r) => s + r.seats_registered, 0);
+  const conversionRate = totalApps > 0 ? ((registeredCount / totalApps) * 100).toFixed(1) : "0.0";
+  const utilizationRate = totalSeats > 0 ? ((totalRegistered / totalSeats) * 100).toFixed(1) : "0.0";
+
   function handleExport(reportId: string) {
     let csv = "";
     const date = new Date().toISOString().slice(0, 10);
@@ -138,10 +170,11 @@ export function ReportsClient({ data }: { data: ReportData }) {
         break;
       case "audit":
         csv = toCsv(
-          ["Action", "Table", "Date", "Details"],
+          ["Action", "Table", "Actor", "Date", "Details"],
           data.auditEvents.map((r) => [
             r.action,
             r.table_name,
+            r.actor_name,
             r.created_at,
             r.details,
           ])
@@ -165,15 +198,158 @@ export function ReportsClient({ data }: { data: ReportData }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Generate reports for compliance, analytics, and audit purposes.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Analytics, compliance exports, and audit trail.
+          </p>
+        </div>
       </div>
 
+      {/* KPI Summary Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="border-t-4 border-t-rooted-green">
+          <CardContent className="py-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Total Applications</p>
+            <p className="text-2xl font-bold mt-1">{totalApps}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-t-4 border-t-emerald-500">
+          <CardContent className="py-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Registered</p>
+            <p className="text-2xl font-bold text-emerald-600 mt-1">{registeredCount}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-t-4 border-t-blue-500">
+          <CardContent className="py-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Conversion Rate</p>
+            <p className="text-2xl font-bold text-blue-600 mt-1">{conversionRate}%</p>
+          </CardContent>
+        </Card>
+        <Card className="border-t-4 border-t-purple-500">
+          <CardContent className="py-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Seat Utilization</p>
+            <p className="text-2xl font-bold text-purple-600 mt-1">{utilizationRate}%</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Pipeline Visual — always visible */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Pipeline Summary</CardTitle>
+              <CardDescription>Application distribution across enrollment stages</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => handleExport("pipeline")} disabled={totalApps === 0}>
+              Export CSV
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {data.pipeline.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">No application data yet.</p>
+          ) : (
+            <div className="space-y-2.5">
+              {data.pipeline
+                .sort((a, b) => b.count - a.count)
+                .map((row) => {
+                  const pct = totalApps > 0 ? ((row.count / totalApps) * 100).toFixed(1) : "0.0";
+                  return (
+                    <div key={row.status} className="flex items-center gap-3">
+                      <span className="text-xs font-medium text-gray-600 w-28 text-right capitalize">
+                        {row.status.replace(/_/g, " ")}
+                      </span>
+                      <div className="flex-1">
+                        <Bar value={row.count} max={totalApps} color={STATUS_COLORS[row.status] ?? "bg-gray-300"} />
+                      </div>
+                      <span className="text-xs font-bold text-gray-700 w-10 text-right">{row.count}</span>
+                      <span className="text-[10px] text-gray-400 w-12 text-right">{pct}%</span>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Capacity Visual — always visible */}
+      {data.capacity.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Capacity Utilization</CardTitle>
+                <CardDescription>Seat fill rates by campus and grade</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => handleExport("capacity")}>
+                Export CSV
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {data.capacity.map((row, idx) => {
+                const available = row.total_seats - row.seats_registered;
+                const fillPct = row.total_seats > 0 ? ((row.seats_registered / row.total_seats) * 100) : 0;
+                return (
+                  <div key={idx} className="flex items-center gap-3">
+                    <div className="w-40 min-w-0">
+                      <p className="text-xs font-medium text-gray-700 truncate">{row.campus}</p>
+                      <p className="text-[10px] text-gray-400">{row.grade}</p>
+                    </div>
+                    <div className="flex-1">
+                      <div className="w-full bg-gray-100 rounded-full h-3 relative overflow-hidden">
+                        {/* Registered (solid green) */}
+                        <div
+                          className="absolute left-0 top-0 h-3 bg-rooted-green rounded-l-full"
+                          style={{ width: `${row.total_seats > 0 ? (row.seats_registered / row.total_seats) * 100 : 0}%` }}
+                        />
+                        {/* Accepted (lighter green, stacked) */}
+                        <div
+                          className="absolute left-0 top-0 h-3 bg-emerald-300 rounded-l-full"
+                          style={{ width: `${row.total_seats > 0 ? ((row.seats_registered + row.seats_accepted) / row.total_seats) * 100 : 0}%` }}
+                        />
+                        {/* Registered on top */}
+                        <div
+                          className="absolute left-0 top-0 h-3 bg-rooted-green rounded-l-full"
+                          style={{ width: `${row.total_seats > 0 ? (row.seats_registered / row.total_seats) * 100 : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="text-right w-20 shrink-0">
+                      <span className="text-xs font-bold">{row.seats_registered}/{row.total_seats}</span>
+                      <span className={`text-[10px] ml-1 ${fillPct >= 90 ? "text-red-500" : fillPct >= 70 ? "text-amber-500" : "text-gray-400"}`}>
+                        ({fillPct.toFixed(0)}%)
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex gap-4 mt-3 pt-3 border-t border-gray-100">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-rooted-green" />
+                <span className="text-[10px] text-gray-500">Registered</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-emerald-300" />
+                <span className="text-[10px] text-gray-500">Accepted</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-gray-100" />
+                <span className="text-[10px] text-gray-500">Available</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Other report cards in a grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {reports.map((report) => (
+        {reports.filter(r => r.id !== "pipeline" && r.id !== "capacity").map((report) => (
           <Card
             key={report.id}
             className={`hover:border-gray-300 transition-colors ${
@@ -224,110 +400,39 @@ export function ReportsClient({ data }: { data: ReportData }) {
         ))}
       </div>
 
-      {/* Preview Panel */}
-      {previewId === "pipeline" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Pipeline Summary Preview</CardTitle>
-          </CardHeader>
-          <CardContent className="px-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Count</TableHead>
-                  <TableHead className="text-right">% of Total</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.pipeline.map((row) => {
-                  const total = data.pipeline.reduce((s, r) => s + r.count, 0);
-                  const pct = total > 0 ? ((row.count / total) * 100).toFixed(1) : "0.0";
-                  return (
-                    <TableRow key={row.status}>
-                      <TableCell className="font-medium capitalize">{row.status.replace(/_/g, " ")}</TableCell>
-                      <TableCell className="text-right">{row.count}</TableCell>
-                      <TableCell className="text-right text-gray-500">{pct}%</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
+      {/* Preview Panels for sub-reports */}
       {previewId === "demographics" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Demographics Preview</CardTitle>
+            <CardTitle className="text-base">Demographics Breakdown</CardTitle>
+            <CardDescription>
+              Applicant demographics by race/ethnicity ({data.demographics.reduce((s, r) => s + r.count, 0)} total)
+            </CardDescription>
           </CardHeader>
-          <CardContent className="px-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Demographic Group</TableHead>
-                  <TableHead className="text-right">Count</TableHead>
-                  <TableHead className="text-right">% of Total</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+          <CardContent>
+            {data.demographics.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">No demographic data.</p>
+            ) : (
+              <div className="space-y-2.5">
                 {data.demographics.map((row) => {
                   const total = data.demographics.reduce((s, r) => s + r.count, 0);
                   const pct = total > 0 ? ((row.count / total) * 100).toFixed(1) : "0.0";
+                  const maxCount = Math.max(...data.demographics.map(r => r.count));
                   return (
-                    <TableRow key={row.group}>
-                      <TableCell className="font-medium">{row.group}</TableCell>
-                      <TableCell className="text-right">{row.count}</TableCell>
-                      <TableCell className="text-right text-gray-500">{pct}%</TableCell>
-                    </TableRow>
+                    <div key={row.group} className="flex items-center gap-3">
+                      <span className="text-xs font-medium text-gray-600 w-36 text-right truncate">
+                        {row.group}
+                      </span>
+                      <div className="flex-1">
+                        <Bar value={row.count} max={maxCount} color="bg-purple-400" />
+                      </div>
+                      <span className="text-xs font-bold text-gray-700 w-10 text-right">{row.count}</span>
+                      <span className="text-[10px] text-gray-400 w-12 text-right">{pct}%</span>
+                    </div>
                   );
                 })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
-      {previewId === "capacity" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Capacity Utilization Preview</CardTitle>
-          </CardHeader>
-          <CardContent className="px-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Campus</TableHead>
-                  <TableHead>Grade</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Offered</TableHead>
-                  <TableHead className="text-right">Accepted</TableHead>
-                  <TableHead className="text-right">Registered</TableHead>
-                  <TableHead className="text-right">Available</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.capacity.map((row, idx) => {
-                  const available = row.total_seats - row.seats_registered;
-                  return (
-                    <TableRow key={idx}>
-                      <TableCell className="font-medium">{row.campus}</TableCell>
-                      <TableCell>{row.grade}</TableCell>
-                      <TableCell className="text-right">{row.total_seats}</TableCell>
-                      <TableCell className="text-right">{row.seats_offered}</TableCell>
-                      <TableCell className="text-right">{row.seats_accepted}</TableCell>
-                      <TableCell className="text-right">{row.seats_registered}</TableCell>
-                      <TableCell className="text-right">
-                        <span className={available <= 0 ? "text-red-600 font-semibold" : ""}>
-                          {available}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -396,6 +501,7 @@ export function ReportsClient({ data }: { data: ReportData }) {
                   <TableRow>
                     <TableHead>Action</TableHead>
                     <TableHead>Table</TableHead>
+                    <TableHead>Actor</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Details</TableHead>
                   </TableRow>
@@ -409,6 +515,7 @@ export function ReportsClient({ data }: { data: ReportData }) {
                         </Badge>
                       </TableCell>
                       <TableCell className="font-mono text-xs">{row.table_name}</TableCell>
+                      <TableCell className="text-xs text-gray-700">{row.actor_name || "\u2014"}</TableCell>
                       <TableCell className="text-gray-500 text-xs">{row.created_at}</TableCell>
                       <TableCell className="text-xs text-gray-500 max-w-48 truncate">
                         {row.details || "\u2014"}
@@ -425,43 +532,60 @@ export function ReportsClient({ data }: { data: ReportData }) {
       {previewId === "inquiry-sources" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Inquiry Sources Preview</CardTitle>
+            <CardTitle className="text-base">Inquiry Sources & Conversion</CardTitle>
+            <CardDescription>
+              Where families learn about your school and how many convert to applications
+            </CardDescription>
           </CardHeader>
-          <CardContent className="px-0">
+          <CardContent>
             {data.inquirySources.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-sm text-gray-500">No inquiry data yet.</p>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Source</TableHead>
-                    <TableHead className="text-right">Inquiries</TableHead>
-                    <TableHead className="text-right">Converted</TableHead>
-                    <TableHead className="text-right">Conversion Rate</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.inquirySources.map((row) => {
-                    const rate = row.count > 0 ? ((row.converted / row.count) * 100).toFixed(1) : "0.0";
-                    return (
-                      <TableRow key={row.source}>
-                        <TableCell className="font-medium capitalize">
+              <div className="space-y-3">
+                {data.inquirySources.map((row) => {
+                  const rate = row.count > 0 ? ((row.converted / row.count) * 100) : 0;
+                  const maxCount = Math.max(...data.inquirySources.map(r => r.count));
+                  return (
+                    <div key={row.source}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-gray-700 capitalize">
                           {row.source.replace(/_/g, " ")}
-                        </TableCell>
-                        <TableCell className="text-right">{row.count}</TableCell>
-                        <TableCell className="text-right">{row.converted}</TableCell>
-                        <TableCell className="text-right">
-                          <span className={Number(rate) >= 20 ? "text-rooted-green font-semibold" : "text-gray-500"}>
-                            {rate}%
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-gray-500">{row.count} inquiries</span>
+                          <span className={`text-xs font-bold ${rate >= 20 ? "text-rooted-green" : "text-gray-400"}`}>
+                            {rate.toFixed(0)}% converted
                           </span>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                        </div>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2.5 relative overflow-hidden">
+                        {/* Total inquiries bar */}
+                        <div
+                          className="absolute left-0 top-0 h-2.5 bg-blue-200 rounded-full"
+                          style={{ width: `${maxCount > 0 ? (row.count / maxCount) * 100 : 0}%` }}
+                        />
+                        {/* Converted overlay */}
+                        <div
+                          className="absolute left-0 top-0 h-2.5 bg-rooted-green rounded-full"
+                          style={{ width: `${maxCount > 0 ? (row.converted / maxCount) * 100 : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="flex gap-4 mt-2 pt-2 border-t border-gray-100">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm bg-blue-200" />
+                    <span className="text-[10px] text-gray-500">Total Inquiries</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm bg-rooted-green" />
+                    <span className="text-[10px] text-gray-500">Converted to Application</span>
+                  </div>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>

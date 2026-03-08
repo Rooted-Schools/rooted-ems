@@ -116,6 +116,35 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
         </Button>
       </div>
 
+      {/* Document status summary */}
+      {documents.length > 0 && (() => {
+        const pending = documents.filter(d => d.status === "pending").length;
+        const verified = documents.filter(d => d.status === "verified").length;
+        const rejected = documents.filter(d => d.status === "rejected").length;
+        return (
+          <div className="flex gap-4">
+            {pending > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                <span className="text-sm text-gray-600">{pending} pending review</span>
+              </div>
+            )}
+            {verified > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                <span className="text-sm text-gray-600">{verified} verified</span>
+              </div>
+            )}
+            {rejected > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                <span className="text-sm text-red-600 font-medium">{rejected} need re-upload</span>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {feedback && (
         <div
           className={`p-3 rounded-lg text-sm ${

@@ -234,6 +234,62 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
         </div>
       </div>
 
+      {/* Review Guidance Banner */}
+      {detail.status === "submitted" && (
+        <Card className="border-blue-200 bg-blue-50/40">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl" aria-hidden="true">📋</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-900">Application Ready for Review</p>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  Review the student information and uploaded documents below.
+                  {totalDocs > 0 && verifiedDocs < totalDocs && (
+                    <span className="text-amber-700 font-medium"> {totalDocs - verifiedDocs} document{totalDocs - verifiedDocs > 1 ? "s" : ""} pending verification.</span>
+                  )}
+                  {totalDocs > 0 && verifiedDocs === totalDocs && (
+                    <span className="text-green-700 font-medium"> All documents verified — ready to mark as Verified.</span>
+                  )}
+                  {totalDocs === 0 && (
+                    <span className="text-amber-700 font-medium"> No documents uploaded yet — consider requesting more info.</span>
+                  )}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {detail.status === "needs_info" && (
+        <Card className="border-amber-200 bg-amber-50/40">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl" aria-hidden="true">⚠️</span>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Waiting for Family Response</p>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  Additional information or documents have been requested from the family. Once they respond, review and mark as Verified.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {detail.status === "verified" && (
+        <Card className="border-green-200 bg-green-50/30">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl" aria-hidden="true">✅</span>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Application Verified</p>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  This application is verified and ready to be assigned to a lottery run or given a direct offer.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Quick stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
@@ -249,11 +305,16 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Last Updated
+              Days in Review
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm font-medium">{formatDate(detail.updated_at)}</p>
+            <p className="text-sm font-medium">
+              {detail.submitted_at
+                ? Math.max(0, Math.ceil((Date.now() - new Date(detail.submitted_at).getTime()) / (1000 * 60 * 60 * 24)))
+                : "—"}{" "}
+              <span className="text-xs text-gray-400 font-normal">days</span>
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -264,7 +325,8 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
           </CardHeader>
           <CardContent>
             <p className="text-sm font-medium">
-              {verifiedDocs}/{totalDocs} verified
+              <span className={verifiedDocs === totalDocs && totalDocs > 0 ? "text-green-600" : ""}>{verifiedDocs}/{totalDocs}</span>
+              <span className="text-xs text-gray-400 font-normal ml-1">verified</span>
             </p>
           </CardContent>
         </Card>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -82,6 +83,12 @@ const channelIcons: Record<string, string> = {
   in_app: "🔔",
 };
 
+const channelLabels: Record<string, string> = {
+  email: "Email",
+  sms: "SMS",
+  in_app: "In-App",
+};
+
 const statusConfig: Record<string, { label: string; variant: "default" | "success" | "warning" | "destructive" | "secondary" }> = {
   queued: { label: "Queued", variant: "secondary" },
   sent: { label: "Sent", variant: "default" },
@@ -100,6 +107,20 @@ const appStatusLabels: Record<string, string> = {
   registered: "Registered",
 };
 
+function formatSentAt(dateStr: string | null): string {
+  if (!dateStr) return "\u2014";
+  try {
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
 // ─── Main Component ─────────────────────────────────────
 
 export function CommsClient({
@@ -114,8 +135,9 @@ export function CommsClient({
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [showNewMessage, setShowNewMessage] = useState(false);
-  const [showTemplates, setShowTemplates] = useState(false);
   const [showNewTemplate, setShowNewTemplate] = useState(false);
+  const [expandedMsgId, setExpandedMsgId] = useState<string | null>(null);
+  const [channelFilter, setChannelFilter] = useState<string>("all");
 
   // Auto-clear feedback messages after 5 seconds
   useEffect(() => {
@@ -123,6 +145,10 @@ export function CommsClient({
     const timer = setTimeout(() => setFeedback(null), 5000);
     return () => clearTimeout(timer);
   }, [feedback]);
+
+  const filteredMessages = channelFilter === "all"
+    ? messages
+    : messages.filter((m) => m.channel === channelFilter);
 
   return (
     <div className="space-y-6">
@@ -133,12 +159,7 @@ export function CommsClient({
             Send and track messages to families via email, SMS, or in-app notifications.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowTemplates(true)}>
-            Message Templates
-          </Button>
-          <Button onClick={() => setShowNewMessage(true)}>New Message</Button>
-        </div>
+        <Button onClick={() => setShowNewMessage(true)}>New Message</Button>
       </div>
 
       {feedback && (
@@ -201,60 +222,244 @@ export function CommsClient({
         </Card>
       </div>
 
-      {/* Message Log */}
-      {messages.length === 0 ? (
-        <Card>
-          <CardContent className="py-8">
-            <EmptyState
-              icon="📧"
-              title="No messages sent yet"
-              description="Use the 'New Message' button to send your first notification to families."
-            />
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Recent Messages</CardTitle>
-            <CardDescription>All messages sent from the enrollment system.</CardDescription>
-          </CardHeader>
-          <CardContent className="px-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Channel</TableHead>
-                  <TableHead>Recipient</TableHead>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Sent</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {messages.map((msg) => {
-                  const cfg = statusConfig[msg.status] ?? statusConfig.queued;
-                  return (
-                    <TableRow key={msg.id}>
-                      <TableCell>
-                        <span className="text-lg" aria-hidden="true">
-                          {channelIcons[msg.channel] ?? "📧"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-gray-600 text-xs">
-                        {msg.recipient_address ?? "\u2014"}
-                      </TableCell>
-                      <TableCell className="font-medium">{msg.subject ?? "\u2014"}</TableCell>
-                      <TableCell>
-                        <Badge variant={cfg.variant}>{cfg.label}</Badge>
-                      </TableCell>
-                      <TableCell className="text-gray-500">{msg.sent_at ?? "\u2014"}</TableCell>
+      {/* Tabbed content: Messages | Templates */}
+      <Tabs defaultValue="messages">
+        <TabsList>
+          <TabsTrigger value="messages">
+            Messages
+            {messages.length > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-rooted-gray text-[10px] font-semibold">
+                {messages.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="templates">
+            Templates
+            {templates.length > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-rooted-gray text-[10px] font-semibold">
+                {templates.length}
+              </span>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ─── Messages Tab ─── */}
+        <TabsContent value="messages">
+          {messages.length === 0 ? (
+            <Card>
+              <CardContent className="py-8">
+                <EmptyState
+                  icon="📧"
+                  title="No messages sent yet"
+                  description="Use the 'New Message' button to send your first notification to families."
+                />
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base">Message History</CardTitle>
+                    <CardDescription>Click a row to view message details.</CardDescription>
+                  </div>
+                  <div className="flex gap-1">
+                    {["all", "in_app", "email", "sms"].map((ch) => (
+                      <button
+                        key={ch}
+                        onClick={() => setChannelFilter(ch)}
+                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                          channelFilter === ch
+                            ? "bg-rooted-green text-white"
+                            : "text-gray-500 hover:bg-gray-100"
+                        }`}
+                      >
+                        {ch === "all" ? "All" : channelIcons[ch]} {ch === "all" ? "" : channelLabels[ch]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="px-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">Ch.</TableHead>
+                      <TableHead>Recipient</TableHead>
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Sent</TableHead>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+                  </TableHeader>
+                  <TableBody>
+                    {filteredMessages.map((msg) => {
+                      const cfg = statusConfig[msg.status] ?? statusConfig.queued;
+                      const isExpanded = expandedMsgId === msg.id;
+                      return (
+                        <>
+                          <TableRow
+                            key={msg.id}
+                            className={`cursor-pointer hover:bg-gray-50 ${isExpanded ? "bg-gray-50" : ""}`}
+                            onClick={() => setExpandedMsgId(isExpanded ? null : msg.id)}
+                          >
+                            <TableCell>
+                              <span className="text-base" title={channelLabels[msg.channel] ?? msg.channel} aria-hidden="true">
+                                {channelIcons[msg.channel] ?? "📧"}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-gray-700 text-sm">
+                              {msg.recipient_address ?? "\u2014"}
+                              {msg.recipient_count > 1 && (
+                                <span className="ml-1 text-[10px] text-gray-400">
+                                  +{msg.recipient_count - 1} more
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="font-medium text-sm">{msg.subject ?? "\u2014"}</TableCell>
+                            <TableCell>
+                              <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                            </TableCell>
+                            <TableCell className="text-gray-500 text-sm">
+                              {formatSentAt(msg.sent_at)}
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && (
+                            <TableRow key={`${msg.id}-detail`}>
+                              <TableCell colSpan={5} className="bg-gray-50/70 px-6 py-3">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                                  <div>
+                                    <span className="text-gray-400 block">Channel</span>
+                                    <span className="font-medium">{channelLabels[msg.channel] ?? msg.channel}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-400 block">Recipients</span>
+                                    <span className="font-medium">{msg.recipient_count}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-400 block">Status</span>
+                                    <span className="font-medium">{cfg.label}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-400 block">Message ID</span>
+                                    <span className="font-mono text-[10px] text-gray-500">{msg.id.slice(0, 12)}...</span>
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* ─── Templates Tab ─── */}
+        <TabsContent value="templates">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Message Templates</CardTitle>
+                  <CardDescription>
+                    Create reusable templates for common notifications. Use these when composing new messages.
+                  </CardDescription>
+                </div>
+                <Button onClick={() => setShowNewTemplate(true)}>
+                  New Template
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {templates.length === 0 ? (
+                <EmptyState
+                  icon="📝"
+                  title="No templates created"
+                  description="Create reusable message templates to speed up your communication workflow."
+                >
+                  <Button size="sm" onClick={() => setShowNewTemplate(true)}>
+                    Create First Template
+                  </Button>
+                </EmptyState>
+              ) : (
+                <div className="space-y-3">
+                  {templates.map((tpl) => (
+                    <div
+                      key={tpl.id}
+                      className="flex items-start justify-between gap-4 p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-semibold text-gray-900">{tpl.name}</span>
+                          <Badge variant="outline" className="text-[10px]">
+                            {channelIcons[tpl.channel] ?? ""} {channelLabels[tpl.channel] ?? tpl.channel}
+                          </Badge>
+                          {!tpl.is_active && (
+                            <Badge variant="secondary" className="text-[10px]">Archived</Badge>
+                          )}
+                        </div>
+                        {tpl.subject && (
+                          <p className="text-xs text-gray-500">
+                            <span className="font-medium">Subject:</span> {tpl.subject}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-400 mt-1 line-clamp-2">{tpl.body}</p>
+                        {tpl.merge_fields && tpl.merge_fields.length > 0 && (
+                          <div className="flex gap-1 mt-2 flex-wrap">
+                            {tpl.merge_fields.map((field) => (
+                              <span
+                                key={field}
+                                className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-mono"
+                              >
+                                {`{{${field}}}`}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => {
+                            // Use this template to compose a new message
+                            setShowNewMessage(true);
+                          }}
+                        >
+                          Use
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            startTransition(async () => {
+                              const result = await staffDeleteTemplate(tpl.id);
+                              if (result.error) {
+                                setFeedback({ type: "error", message: result.error });
+                              } else {
+                                setFeedback({ type: "success", message: "Template archived." });
+                                router.refresh();
+                              }
+                            });
+                          }}
+                          disabled={isPending}
+                          className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          Archive
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* New Message Dialog */}
       <NewMessageDialog
@@ -275,31 +480,6 @@ export function CommsClient({
                 message: `Sent ${result.data?.sentCount ?? 0} notification${(result.data?.sentCount ?? 0) !== 1 ? "s" : ""} successfully.`,
               });
               setShowNewMessage(false);
-              router.refresh();
-            }
-          });
-        }}
-      />
-
-      {/* Templates Dialog */}
-      <TemplatesDialog
-        open={showTemplates}
-        onOpenChange={setShowTemplates}
-        templates={templates}
-        campuses={campuses}
-        staffUserId={staffUserId}
-        isPending={isPending}
-        onShowNew={() => {
-          setShowTemplates(false);
-          setShowNewTemplate(true);
-        }}
-        onDelete={(id) => {
-          startTransition(async () => {
-            const result = await staffDeleteTemplate(id);
-            if (result.error) {
-              setFeedback({ type: "error", message: result.error });
-            } else {
-              setFeedback({ type: "success", message: "Template archived." });
               router.refresh();
             }
           });
@@ -437,7 +617,7 @@ function NewMessageDialog({
                 <option value="">No template — write custom message</option>
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name} ({t.channel})
+                    {t.name} ({channelLabels[t.channel] ?? t.channel})
                   </option>
                 ))}
               </select>
@@ -461,7 +641,7 @@ function NewMessageDialog({
                       : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                   }`}
                 >
-                  {channelIcons[ch]} {ch === "in_app" ? "In-App" : ch === "email" ? "Email" : "SMS"}
+                  {channelIcons[ch]} {channelLabels[ch]}
                 </button>
               ))}
             </div>
@@ -528,7 +708,7 @@ function NewMessageDialog({
                         className="rounded border-gray-300"
                       />
                       <span className="font-medium">{r.name}</span>
-                      <span className="text-gray-400">{r.email}</span>
+                      <span className="text-gray-400 text-xs">{r.email}</span>
                       <Badge variant="secondary" className="text-[10px] ml-auto">
                         {appStatusLabels[r.status] ?? r.status}
                       </Badge>
@@ -589,6 +769,24 @@ function NewMessageDialog({
               </p>
             </div>
           )}
+
+          {/* Preview */}
+          {(subject.trim() || body.trim()) && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-2">Preview</p>
+              <div className="bg-white rounded-md border border-gray-100 p-3">
+                {subject.trim() && (
+                  <p className="text-sm font-semibold text-gray-900">{subject}</p>
+                )}
+                {body.trim() && (
+                  <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{body}</p>
+                )}
+                {link.trim() && (
+                  <p className="text-xs text-rooted-green mt-2">{link}</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
@@ -601,88 +799,6 @@ function NewMessageDialog({
           >
             {isPending ? "Sending..." : `Send to ${recipientCount} recipient${recipientCount !== 1 ? "s" : ""}`}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ─── Templates Dialog ───────────────────────────────────
-
-function TemplatesDialog({
-  open,
-  onOpenChange,
-  templates,
-  campuses,
-  staffUserId,
-  isPending,
-  onShowNew,
-  onDelete,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  templates: MessageTemplate[];
-  campuses: { id: string; name: string }[];
-  staffUserId: string;
-  isPending: boolean;
-  onShowNew: () => void;
-  onDelete: (id: string) => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Message Templates</DialogTitle>
-          <DialogDescription>
-            Reusable message templates for common notifications.
-          </DialogDescription>
-        </DialogHeader>
-
-        {templates.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-400 mb-3">No templates created yet.</p>
-            <Button size="sm" onClick={onShowNew}>
-              Create First Template
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-3 py-2">
-            {templates.map((tpl) => (
-              <div
-                key={tpl.id}
-                className="flex items-start justify-between gap-3 p-3 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-900">{tpl.name}</span>
-                    <Badge variant="outline" className="text-[10px]">
-                      {channelIcons[tpl.channel] ?? ""} {tpl.channel === "in_app" ? "In-App" : tpl.channel}
-                    </Badge>
-                  </div>
-                  {tpl.subject && (
-                    <p className="text-xs text-gray-500 mt-0.5">Subject: {tpl.subject}</p>
-                  )}
-                  <p className="text-xs text-gray-400 mt-1 truncate">{tpl.body}</p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onDelete(tpl.id)}
-                  disabled={isPending}
-                  className="text-xs text-red-600 hover:text-red-700 shrink-0"
-                >
-                  Archive
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-          <Button onClick={onShowNew}>New Template</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -731,11 +847,18 @@ function NewTemplateDialog({
 
   function handleSave() {
     if (!name.trim() || !body.trim()) return;
+    // Detect merge fields from body ({{field_name}} pattern)
+    const mergeFieldMatches = body.match(/\{\{(\w+)\}\}/g);
+    const mergeFields = mergeFieldMatches
+      ? [...new Set(mergeFieldMatches.map((m) => m.replace(/[{}]/g, "")))]
+      : [];
+
     onSave({
       name: name.trim(),
       subject: subject.trim() || undefined,
       body: body.trim(),
       channel,
+      mergeFields: mergeFields.length > 0 ? mergeFields : undefined,
       createdBy: staffUserId,
     });
   }
@@ -746,7 +869,7 @@ function NewTemplateDialog({
         <DialogHeader>
           <DialogTitle>Create Template</DialogTitle>
           <DialogDescription>
-            Create a reusable message template for common notifications.
+            Create a reusable message template. Use {"{{field_name}}"} syntax for merge fields.
           </DialogDescription>
         </DialogHeader>
 
@@ -768,15 +891,22 @@ function NewTemplateDialog({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Channel
             </label>
-            <select
-              value={channel}
-              onChange={(e) => setChannel(e.target.value as "in_app" | "email" | "sms")}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
-            >
-              <option value="in_app">In-App Notification</option>
-              <option value="email">Email</option>
-              <option value="sms">SMS</option>
-            </select>
+            <div className="flex gap-2">
+              {(["in_app", "email", "sms"] as const).map((ch) => (
+                <button
+                  key={ch}
+                  type="button"
+                  onClick={() => setChannel(ch)}
+                  className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                    channel === ch
+                      ? "bg-rooted-green text-white border-rooted-green"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {channelIcons[ch]} {channelLabels[ch]}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div>
@@ -799,10 +929,13 @@ function NewTemplateDialog({
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              placeholder="Write the template message..."
-              rows={4}
+              placeholder="Write the template message... Use {{student_name}}, {{campus_name}} for merge fields."
+              rows={5}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 resize-none"
             />
+            <p className="text-xs text-gray-400 mt-1">
+              Available merge fields: {"{{student_name}}"}, {"{{guardian_name}}"}, {"{{campus_name}}"}, {"{{grade}}"}, {"{{deadline}}"}
+            </p>
           </div>
         </div>
 

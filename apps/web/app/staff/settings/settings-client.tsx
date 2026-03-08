@@ -910,51 +910,93 @@ function StaffUsersTab({
             title="No staff users"
             description="Staff users will appear here once they are assigned campus roles."
           />
-        ) : (
-          <div className="space-y-3">
-            {users.map((user) => (
-              <div
-                key={user.id}
-                className="flex items-center justify-between p-3 rounded-md border border-gray-200"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-rooted-green/10 flex items-center justify-center text-rooted-green text-sm font-medium">
-                    {user.initials}
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">{user.full_name}</p>
-                    <p className="text-xs text-gray-500">{user.email}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-[10px]">
-                    {user.campus_name}
-                  </Badge>
-                  <span className="text-xs font-medium text-gray-500">
-                    {roleLabels[user.role] ?? user.role}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={isPending}
-                    onClick={() => openEdit(user)}
+        ) : (() => {
+          // Group users by person (user_id) to show multi-campus assignments together
+          const grouped = users.reduce<Record<string, StaffUserRow[]>>((acc, u) => {
+            const key = u.user_id || u.id;
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(u);
+            return acc;
+          }, {});
+
+          return (
+            <div className="space-y-3">
+              {Object.values(grouped).map((roles) => {
+                const primary = roles[0];
+                const highestRole = roles.reduce((best, r) => {
+                  const roleOrder: Record<string, number> = { compliance_auditor: 1, enrollment_staff: 2, enrollment_manager: 3, system_admin: 4 };
+                  return (roleOrder[r.role] ?? 0) > (roleOrder[best.role] ?? 0) ? r : best;
+                }, roles[0]);
+                const isSelf = primary.user_id === staffUserId;
+
+                return (
+                  <div
+                    key={primary.user_id || primary.id}
+                    className={`p-4 rounded-lg border ${isSelf ? "border-rooted-green/30 bg-rooted-green/5" : "border-gray-200"}`}
                   >
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={isPending}
-                    onClick={() => handleRemove(user.id, user.full_name)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    Remove
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-rooted-green/10 flex items-center justify-center text-rooted-green font-semibold text-sm">
+                          {primary.initials}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm text-gray-900">{primary.full_name}</p>
+                            {isSelf && (
+                              <span className="text-[10px] bg-rooted-green/20 text-rooted-green px-1.5 py-0.5 rounded-full font-medium">You</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500">{primary.email}</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] shrink-0">
+                        {roleLabels[highestRole.role] ?? highestRole.role}
+                      </Badge>
+                    </div>
+
+                    {/* Campus assignments */}
+                    <div className="mt-3 ml-[52px] space-y-1.5">
+                      {roles.map((assignment) => (
+                        <div
+                          key={assignment.id}
+                          className="flex items-center justify-between py-1.5 px-3 rounded-md bg-gray-50 group"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs" aria-hidden="true">🏫</span>
+                            <span className="text-sm text-gray-700">{assignment.campus_name}</span>
+                            <span className="text-[10px] text-gray-400">
+                              {roleLabels[assignment.role] ?? assignment.role}
+                            </span>
+                          </div>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 text-[10px] px-2"
+                              disabled={isPending}
+                              onClick={() => openEdit(assignment)}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 text-[10px] px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              disabled={isPending}
+                              onClick={() => handleRemove(assignment.id, primary.full_name)}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </CardContent>
 
       {/* Edit Role Dialog */}

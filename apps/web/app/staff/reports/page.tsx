@@ -27,7 +27,7 @@ export interface ReportData {
   auditEvents: {
     action: string;
     table_name: string;
-    actor_email: string;
+    actor_name: string;
     created_at: string;
     details: string;
   }[];
@@ -100,7 +100,7 @@ export default async function StaffReportsPage({
     (() => {
       let q = supabase
         .from("audit_event")
-        .select("action, table_name, created_at, changes, actor:actor_id (email)")
+        .select("action, table_name, created_at, changes, actor:actor_id (full_name, email)")
         .order("created_at", { ascending: false })
         .limit(200);
       if (hasCampusFilter) q = q.in("campus_id", scopedCampusIds);
@@ -179,7 +179,7 @@ export default async function StaffReportsPage({
       return {
       action: row.action as string,
       table_name: row.table_name as string,
-      actor_email: actor?.email ?? "",
+      actor_name: actor?.full_name ?? actor?.email ?? "",
       created_at: new Date(row.created_at as string).toLocaleString("en-US", {
         month: "short",
         day: "numeric",
