@@ -18,22 +18,32 @@ export default async function StaffOffersPage({
 
   const supabase = await createServerClient();
 
+  // Build eligible applicants query with optional campus scope
+  let eligibleQuery = supabase
+    .from("application")
+    .select(`
+      id, status,
+      student:student_id (first_name, last_name),
+      campus:campus_id (id, name),
+      grade_level:grade_level_id (id, grade),
+      enrollment_window:enrollment_window_id (school_year_id)
+    `)
+    .in("status", ["verified", "lottery_assigned"])
+    .order("submitted_at", { ascending: true });
+
+  // Only apply campus filter if user has restricted access
+  if (scopedCampusIds.length > 0) {
+    eligibleQuery = eligibleQuery.in("campus_id", scopedCampusIds);
+  } else if (accessibleIds.length > 0) {
+    eligibleQuery = eligibleQuery.in("campus_id", accessibleIds);
+  }
+  // If both are empty, user is system admin — no filter needed (show all campuses)
+
   // Fetch offers, waitlist, and eligible applicants in parallel
   const [{ offers, stats }, waitlistData, { data: eligibleApps }] = await Promise.all([
     getStaffOffers(scopedCampusIds),
     getStaffWaitlist(scopedCampusIds),
-    supabase
-      .from("application")
-      .select(`
-        id, status,
-        student:student_id (first_name, last_name),
-        campus:campus_id (id, name),
-        grade_level:grade_level_id (id, grade),
-        enrollment_window:enrollment_window_id (school_year_id)
-      `)
-      .in("status", ["verified", "lottery_assigned"])
-      .in("campus_id", scopedCampusIds.length > 0 ? scopedCampusIds : accessibleIds.length > 0 ? accessibleIds : ["__none__"])
-      .order("submitted_at", { ascending: true }),
+    eligibleQuery,
   ]);
 
   // Transform eligible applicants for the create offer dialog

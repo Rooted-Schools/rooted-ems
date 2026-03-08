@@ -97,26 +97,31 @@ const QUEUE_ITEMS = [
     key: "submitted",
     label: "New Submissions",
     dotColor: "bg-blue-500",
+    href: "/staff/applications",
   },
   {
     key: "needs_info",
     label: "Missing Info",
     dotColor: "bg-amber-500",
+    href: "/staff/applications",
   },
   {
     key: "verified",
-    label: "Verified \u2014 Ready",
+    label: "Verified — Ready",
     dotColor: "bg-orange-500",
+    href: "/staff/applications",
   },
   {
     key: "offered",
     label: "Pending Response",
     dotColor: "bg-red-500",
+    href: "/staff/offers",
   },
   {
     key: "accepted",
     label: "Pending Enrollment",
     dotColor: "bg-purple-500",
+    href: "/staff/enrollment",
   },
 ];
 
@@ -130,7 +135,9 @@ export default async function StaffDashboardPage({
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
 
-  const [stats, appStats, deadlines, recentActivity, queueCounts, inquiryStats] =
+  const supabase = await createServerClient();
+
+  const [stats, appStats, deadlines, recentActivity, queueCounts, inquiryStats, { data: currentSY }] =
     await Promise.all([
       getStaffDashboardStats(activeCampus),
       getApplicationStats(activeCampus),
@@ -138,6 +145,7 @@ export default async function StaffDashboardPage({
       getRecentActivity({ campusId: activeCampus }),
       getWorkQueueCounts(scopedCampusIds),
       getInquiryStats(scopedCampusIds),
+      supabase.from("school_year").select("name").eq("is_current", true).single(),
     ]);
 
   const pipeline = buildPipeline(appStats);
@@ -195,7 +203,7 @@ export default async function StaffDashboardPage({
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">{stats.totalApplications}</p>
-            <p className="text-xs text-gray-400 mt-1">current cycle</p>
+            <p className="text-xs text-gray-400 mt-1">{currentSY?.name ?? "current cycle"}</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-amber-500">
@@ -348,7 +356,7 @@ export default async function StaffDashboardPage({
               return (
                 <Link
                   key={item.key}
-                  href={item.href ?? "/staff/inbox"}
+                  href={item.href ?? "/staff/applications"}
                   className="flex items-center justify-between py-1.5 no-underline hover:bg-gray-50 -mx-2 px-2 rounded-md transition-colors"
                 >
                   <div className="flex items-center gap-2">
@@ -368,10 +376,10 @@ export default async function StaffDashboardPage({
               );
             })}
             <Link
-              href="/staff/inbox"
+              href="/staff/applications"
               className="block text-center text-xs text-rooted-green hover:underline mt-2 no-underline"
             >
-              Open Inbox &rarr;
+              View All Applications &rarr;
             </Link>
           </CardContent>
         </Card>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@rooted-ems/database";
 
@@ -19,7 +19,7 @@ export function StaffLoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const supabase = createBrowserClient();
+  const supabase = useMemo(() => createBrowserClient(), []);
 
   // Show error from URL params (e.g. middleware redirect)
   useEffect(() => {
@@ -176,10 +176,10 @@ export function StaffLoginForm() {
 
         <div className="mt-6 text-center">
           <a
-            href="/"
+            href="/login"
             className="text-sm text-rooted-green hover:underline"
           >
-            Family login (email/phone)
+            Family login
           </a>
         </div>
       </div>
