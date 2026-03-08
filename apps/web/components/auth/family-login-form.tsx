@@ -84,7 +84,7 @@ export function FamilyLoginForm() {
       }
 
       setOtpSent(true);
-      setCooldown(60);
+      setCooldown(120);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -268,15 +268,15 @@ export function FamilyLoginForm() {
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 value={otp}
-                maxLength={6}
+                maxLength={8}
                 onChange={(e) => {
                   // Strip everything except digits, allow pasting codes with spaces/dashes
-                  const cleaned = e.target.value.replace(/[^0-9]/g, "").slice(0, 6);
+                  const cleaned = e.target.value.replace(/[^0-9]/g, "").slice(0, 8);
                   setOtp(cleaned);
                 }}
-                placeholder="000000"
+                placeholder="12345678"
                 required
-                className="w-full px-4 py-2 border border-stone/30 rounded-md text-center text-lg tracking-[0.3em] font-mono focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
+                className="w-full px-4 py-2 border border-stone/30 rounded-md text-center text-lg tracking-[0.25em] font-mono focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
               />
             </div>
 
@@ -288,7 +288,7 @@ export function FamilyLoginForm() {
 
             <button
               type="submit"
-              disabled={loading || otp.length < 6}
+              disabled={loading || otp.length < 6 || otp.length > 8}
               className="w-full py-2 px-4 bg-rooted-green text-white rounded-md font-medium hover:bg-deep-green disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? "Verifying..." : "Verify Code"}
@@ -312,7 +312,7 @@ export function FamilyLoginForm() {
                       setError(resendErr.message);
                     }
                   } else {
-                    setCooldown(60);
+                    setCooldown(120);
                     setError(null);
                   }
                   setLoading(false);
