@@ -399,7 +399,7 @@ export async function getStaffOffers(campusIds?: string[]): Promise<{ offers: Of
       campus_id: row.campus_id as string,
       grade_level_id: row.grade_level_id as string,
       student_id: (app?.student_id as string) ?? "",
-      school_year_id: (app?.school_year_id as string) ?? "",
+      school_year_id: ((app?.enrollment_window as Record<string, unknown> | null)?.school_year_id as string) ?? "",
       has_enrollment: enrolledAppIds.has(row.application_id as string),
     };
   });
@@ -970,26 +970,37 @@ export async function getStaffStudents(campusIds?: string[]): Promise<StudentRow
     return [];
   }
 
-  return (data ?? []).map((row: Record<string, unknown>) => {
-    const student = row.student as unknown as Record<string, string> | null;
-    const campus = row.campus as Record<string, string> | null;
-    const grade = row.grade_level as Record<string, string> | null;
-    const guardian = row.guardian as unknown as Record<string, string> | null;
+  // Deduplicate by student ID — a student may have multiple applications
+  const seen = new Set<string>();
+  const results: StudentRow[] = [];
 
-    return {
-      id: student?.id ?? "",
+  for (const row of data ?? []) {
+    const r = row as Record<string, unknown>;
+    const student = r.student as unknown as Record<string, string> | null;
+    const studentId = student?.id ?? "";
+    if (!studentId || seen.has(studentId)) continue;
+    seen.add(studentId);
+
+    const campus = r.campus as Record<string, string> | null;
+    const grade = r.grade_level as Record<string, string> | null;
+    const guardian = r.guardian as unknown as Record<string, string> | null;
+
+    results.push({
+      id: studentId,
       first_name: student?.first_name ?? "",
       last_name: student?.last_name ?? "",
       grade: grade?.grade ? `Grade ${grade.grade}` : "",
       campus_name: campus?.name ?? "",
-      status: row.status as string,
+      status: r.status as string,
       guardian_name: guardian
         ? `${guardian.first_name} ${guardian.last_name}`
         : "",
       guardian_email: guardian?.email ?? "",
-      application_id: row.id as string,
-    };
-  });
+      application_id: r.id as string,
+    });
+  }
+
+  return results;
 }
 
 export async function getStaffUsers(campusId?: string): Promise<StaffUserRow[]> {

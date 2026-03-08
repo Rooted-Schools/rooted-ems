@@ -64,13 +64,46 @@ async function getPublicCampuses() {
   });
 }
 
+async function getAvailableSchoolYears() {
+  const supabase = createServiceClient();
+
+  const { data, error } = await supabase
+    .from("school_year")
+    .select("id, name, start_date, is_current")
+    .gte("end_date", new Date().toISOString().slice(0, 10))
+    .order("start_date", { ascending: true });
+
+  if (error) {
+    console.error("[inquiry/getSchoolYears]", error.message);
+    return [];
+  }
+
+  // Deduplicate by name (multiple orgs may share school year names)
+  const seen = new Set<string>();
+  const results: { id: string; label: string; isCurrent: boolean }[] = [];
+  for (const row of data ?? []) {
+    const name = row.name as string;
+    if (seen.has(name)) continue;
+    seen.add(name);
+    results.push({
+      id: row.id as string,
+      label: name,
+      isCurrent: row.is_current as boolean,
+    });
+  }
+  return results;
+}
+
 export default async function InquiryPage() {
-  const campuses = await getPublicCampuses();
+  const [campuses, schoolYears] = await Promise.all([
+    getPublicCampuses(),
+    getAvailableSchoolYears(),
+  ]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-rooted-gray px-4 py-12">
       <div className="w-full max-w-lg">
-        <InquiryForm campuses={campuses} />
+        <InquiryForm campuses={campuses} schoolYears={schoolYears} />
       </div>
     </div>
   );

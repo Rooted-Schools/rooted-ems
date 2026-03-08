@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getActiveEnrollmentWindows } from "@/lib/queries";
+import { createServiceClient } from "@rooted-ems/database/service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "edge";
@@ -35,9 +35,53 @@ const campusAccent: Record<string, { border: string; bg: string; text: string; h
   },
 };
 
+async function getPublicEnrollmentWindows() {
+  const supabase = createServiceClient();
+  const now = new Date();
+  const nowIso = now.toISOString();
+
+  const { data, error } = await supabase
+    .from("enrollment_window")
+    .select(`id, name, open_date, close_date, status, campus:campus_id (id, name)`)
+    .gte("close_date", nowIso)
+    .eq("status", "open")
+    .order("open_date", { ascending: true });
+
+  if (error) {
+    console.error("[homepage/getEnrollmentWindows]", error.message);
+    return [];
+  }
+
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const campus = row.campus as Record<string, string> | null;
+    const openDate = new Date(row.open_date as string);
+    const closeDate = new Date(row.close_date as string);
+    const isOpen = now >= openDate && now <= closeDate;
+
+    let daysRemaining: number | null = null;
+    if (isOpen) {
+      daysRemaining = Math.ceil(
+        (closeDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      );
+    }
+
+    return {
+      campus_name: campus?.name ?? "",
+      campus_id: campus?.id ?? "",
+      is_open: isOpen,
+      close_date: closeDate.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }),
+      days_remaining: daysRemaining,
+    };
+  });
+}
+
 export default async function HomePage() {
-  // Fetch enrollment windows from DB
-  const windows = await getActiveEnrollmentWindows();
+  // Fetch enrollment windows from DB (service client bypasses RLS for public page)
+  const windows = await getPublicEnrollmentWindows();
 
   // Static school data with match keys to link to DB enrollment windows
   const schoolDefs = [

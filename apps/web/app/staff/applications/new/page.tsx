@@ -23,10 +23,11 @@ export default async function StaffNewApplicationPage() {
     .select("id, grade, campus_id")
     .order("grade");
 
-  // Fetch all enrollment windows (including non-active for manual entry)
+  // Fetch open enrollment windows for new application creation
   const { data: allWindows } = await supabase
     .from("enrollment_window")
     .select("id, name, campus_id, school_year_id, status")
+    .eq("status", "open")
     .order("name");
 
   const grades = (gradeLevels ?? []).map((g: Record<string, unknown>) => ({

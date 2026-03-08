@@ -20,7 +20,7 @@ export default async function FamilyDashboardPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/auth/family-login");
+  if (!user) redirect("/login");
 
   const [apps, notifications, enrollmentWindows] = await Promise.all([
     getFamilyDashboardApps(user.id),

@@ -142,6 +142,7 @@ export async function convertInquiryToApplication(
       household_id: household.id,
       first_name: guardianFirst,
       last_name: guardianLast,
+      relationship: "parent",
       email: inquiry.guardian_email ?? null,
       phone: inquiry.guardian_phone ?? null,
       is_primary: true,
@@ -174,6 +175,7 @@ export async function convertInquiryToApplication(
   await supabase.from("guardian_student").insert({
     guardian_id: guardian.id,
     student_id: student.id,
+    relationship: "parent",
     is_legal_guardian: true,
   });
 
@@ -188,7 +190,7 @@ export async function convertInquiryToApplication(
       guardian_id: guardian.id,
       status: "draft",
       source: inquiry.source ?? "inquiry_conversion",
-      assigned_staff: staffUserId,
+      assigned_staff_id: staffUserId,
     })
     .select("id")
     .single();

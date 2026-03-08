@@ -52,11 +52,28 @@ const CONTACT_CHANNELS = [
   { value: "other", label: "Other" },
 ];
 
+const CHANNEL_LABELS: Record<string, string> = {
+  phone: "Phone Call",
+  email: "Email",
+  meeting: "Meeting",
+  text: "Text Message",
+  other: "Other",
+};
+
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
+  });
+}
+
+function formatDateTime(dateStr: string) {
+  return new Date(dateStr).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
 }
 
@@ -73,12 +90,21 @@ interface EnrollmentWindow {
   status: string;
 }
 
+interface ContactLog {
+  id: string;
+  channel: string;
+  notes: string | null;
+  created_by_name: string | null;
+  created_at: string;
+}
+
 interface InquiriesClientProps {
   inquiries: InquiryRow[];
   stats: InquiryStats;
   campuses: CampusRow[];
   gradeLevels: GradeLevel[];
   enrollmentWindows: EnrollmentWindow[];
+  contactLogsByInquiry: Record<string, ContactLog[]>;
   staffId: string;
   staffName: string;
 }
@@ -89,12 +115,14 @@ export function InquiriesClient({
   campuses,
   gradeLevels,
   enrollmentWindows,
+  contactLogsByInquiry,
   staffId,
 }: InquiriesClientProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [campusFilter, setCampusFilter] = useState("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Contact log dialog
   const [contactLogOpen, setContactLogOpen] = useState(false);
@@ -133,6 +161,13 @@ export function InquiriesClient({
     });
   }
 
+  function openContactLog(inq: InquiryRow) {
+    setSelectedInquiry(inq);
+    setContactChannel("phone");
+    setContactNotes("");
+    setContactLogOpen(true);
+  }
+
   function handleContactLog() {
     if (!selectedInquiry) return;
     startTransition(async () => {
@@ -151,13 +186,11 @@ export function InquiriesClient({
   function openConvertDialog(inq: InquiryRow) {
     setConvertInquiry(inq);
     setConvertError("");
-    // Pre-select enrollment window and grade for this campus
     const campusWindows = enrollmentWindows.filter(
       (w) => w.campus_id === inq.campus_id && w.status === "open"
     );
     setConvertWindowId(campusWindows[0]?.id ?? "");
     const campusGrades = gradeLevels.filter((g) => g.campus_id === inq.campus_id);
-    // Try to match inquiry grade
     const matchGrade = campusGrades.find((g) => g.grade === inq.grade_applying);
     setConvertGradeId(matchGrade?.id ?? campusGrades[0]?.id ?? "");
     setConvertOpen(true);
@@ -188,7 +221,6 @@ export function InquiriesClient({
     });
   }
 
-  // Filter grade levels and windows for the convert dialog
   const convertCampusId = convertInquiry?.campus_id;
   const convertCampusGrades = gradeLevels.filter((g) => g.campus_id === convertCampusId);
   const convertCampusWindows = enrollmentWindows.filter(
@@ -323,6 +355,7 @@ export function InquiriesClient({
                       <TableHead>Campus</TableHead>
                       <TableHead>Source</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Contacts</TableHead>
                       <TableHead>Assigned</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Actions</TableHead>
@@ -334,87 +367,204 @@ export function InquiriesClient({
                         label: inq.status,
                         variant: "outline" as const,
                       };
+                      const logs = contactLogsByInquiry[inq.id] ?? [];
+                      const isExpanded = expandedId === inq.id;
+
                       return (
-                        <TableRow key={inq.id}>
-                          <TableCell className="font-medium">
-                            {inq.student_first_name} {inq.student_last_name}
-                          </TableCell>
-                          <TableCell className="text-stone">
-                            {inq.guardian_name}
-                          </TableCell>
-                          <TableCell>{inq.grade_applying}</TableCell>
-                          <TableCell>{inq.campus_name ?? "—"}</TableCell>
-                          <TableCell className="text-stone capitalize">
-                            {inq.source}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={cfg.variant}>{cfg.label}</Badge>
-                          </TableCell>
-                          <TableCell className="text-stone">
-                            {inq.assigned_staff_name ?? (
-                              <button
-                                onClick={() => handleAssignToMe(inq.id)}
-                                className="text-xs text-rooted-green hover:underline"
-                                disabled={isPending}
-                              >
-                                Assign to me
-                              </button>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-stone">
-                            {formatDate(inq.created_at)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              {inq.status === "new" && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleStatusUpdate(inq.id, "contacted")
-                                  }
+                        <>
+                          <TableRow
+                            key={inq.id}
+                            className={`cursor-pointer hover:bg-rooted-gray/30 ${isExpanded ? "bg-rooted-gray/20" : ""}`}
+                            onClick={() => setExpandedId(isExpanded ? null : inq.id)}
+                          >
+                            <TableCell className="font-medium">
+                              {inq.student_first_name} {inq.student_last_name}
+                            </TableCell>
+                            <TableCell className="text-stone">
+                              {inq.guardian_name}
+                            </TableCell>
+                            <TableCell>{inq.grade_applying}</TableCell>
+                            <TableCell>{inq.campus_name ?? "—"}</TableCell>
+                            <TableCell className="text-stone capitalize">
+                              {inq.source?.replace(/_/g, " ")}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              {logs.length > 0 ? (
+                                <span className="text-xs font-medium text-rooted-green">
+                                  {logs.length} {logs.length === 1 ? "contact" : "contacts"}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-stone">None</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-stone">
+                              {inq.assigned_staff_name ?? (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAssignToMe(inq.id);
+                                  }}
+                                  className="text-xs text-rooted-green hover:underline"
                                   disabled={isPending}
                                 >
-                                  Mark Contacted
-                                </Button>
+                                  Assign to me
+                                </button>
                               )}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedInquiry(inq);
-                                  setContactLogOpen(true);
-                                }}
-                              >
-                                Log Contact
-                              </Button>
-                              {(inq.status === "new" || inq.status === "contacted") && (
-                                <>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => openConvertDialog(inq)}
-                                    disabled={isPending}
-                                    className="text-rooted-green border-rooted-green/30 hover:bg-rooted-green/5"
-                                  >
-                                    Convert
-                                  </Button>
+                            </TableCell>
+                            <TableCell className="text-stone">
+                              {formatDate(inq.created_at)}
+                            </TableCell>
+                            <TableCell onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center gap-1">
+                                {inq.status === "new" && (
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() =>
-                                      handleStatusUpdate(inq.id, "lost")
+                                      handleStatusUpdate(inq.id, "contacted")
                                     }
                                     disabled={isPending}
-                                    className="text-stone hover:text-red-600"
                                   >
-                                    Lost
+                                    Mark Contacted
                                   </Button>
-                                </>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
+                                )}
+                                {(inq.status === "new" || inq.status === "contacted") && (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openConvertDialog(inq)}
+                                      disabled={isPending}
+                                      className="text-rooted-green border-rooted-green/30 hover:bg-rooted-green/5"
+                                    >
+                                      Convert
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        handleStatusUpdate(inq.id, "lost")
+                                      }
+                                      disabled={isPending}
+                                      className="text-stone hover:text-red-600"
+                                    >
+                                      Lost
+                                    </Button>
+                                  </>
+                                )}
+                                {inq.status === "lost" && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleStatusUpdate(inq.id, "new")
+                                    }
+                                    disabled={isPending}
+                                    className="text-rooted-green border-rooted-green/30 hover:bg-rooted-green/5"
+                                  >
+                                    Re-activate
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+
+                          {/* Expanded detail row */}
+                          {isExpanded && (
+                            <TableRow key={`${inq.id}-detail`}>
+                              <TableCell colSpan={10} className="bg-rooted-gray/10 p-0">
+                                <div className="px-6 py-4 space-y-4">
+                                  {/* Guardian contact info + Log Contact button */}
+                                  <div className="flex items-start justify-between">
+                                    <div className="space-y-1">
+                                      <h4 className="text-sm font-semibold text-ink">
+                                        Contact Information
+                                      </h4>
+                                      <div className="text-sm text-stone space-y-0.5">
+                                        <p>
+                                          <span className="font-medium text-ink">Guardian:</span>{" "}
+                                          {inq.guardian_name}
+                                        </p>
+                                        {inq.guardian_email && (
+                                          <p>
+                                            <span className="font-medium text-ink">Email:</span>{" "}
+                                            <a
+                                              href={`mailto:${inq.guardian_email}`}
+                                              className="text-rooted-green hover:underline"
+                                            >
+                                              {inq.guardian_email}
+                                            </a>
+                                          </p>
+                                        )}
+                                        {inq.guardian_phone && (
+                                          <p>
+                                            <span className="font-medium text-ink">Phone:</span>{" "}
+                                            <a
+                                              href={`tel:${inq.guardian_phone}`}
+                                              className="text-rooted-green hover:underline"
+                                            >
+                                              {inq.guardian_phone}
+                                            </a>
+                                          </p>
+                                        )}
+                                        {inq.notes && (
+                                          <p className="mt-1">
+                                            <span className="font-medium text-ink">Notes:</span>{" "}
+                                            {inq.notes}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <Button
+                                      onClick={() => openContactLog(inq)}
+                                      className="bg-rooted-green hover:bg-deep-green text-white shrink-0"
+                                    >
+                                      + Log Contact
+                                    </Button>
+                                  </div>
+
+                                  {/* Contact History */}
+                                  <div>
+                                    <h4 className="text-sm font-semibold text-ink mb-2">
+                                      Contact History
+                                    </h4>
+                                    {logs.length === 0 ? (
+                                      <p className="text-sm text-stone italic">
+                                        No contacts logged yet. Click &quot;+ Log Contact&quot; to record your first interaction.
+                                      </p>
+                                    ) : (
+                                      <div className="space-y-2">
+                                        {logs.map((log) => (
+                                          <div
+                                            key={log.id}
+                                            className="flex items-start gap-3 bg-white rounded-lg border border-gray-100 px-3 py-2"
+                                          >
+                                            <div className="shrink-0 mt-0.5">
+                                              <Badge variant="outline" className="text-[10px]">
+                                                {CHANNEL_LABELS[log.channel] ?? log.channel}
+                                              </Badge>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                              {log.notes && (
+                                                <p className="text-sm text-ink">{log.notes}</p>
+                                              )}
+                                              <p className="text-xs text-stone mt-0.5">
+                                                {log.created_by_name ?? "Staff"} &middot; {formatDateTime(log.created_at)}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </>
                       );
                     })}
                   </TableBody>
@@ -437,6 +587,17 @@ export function InquiriesClient({
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-4">
+            {selectedInquiry && (
+              <div className="bg-rooted-gray/50 rounded-lg p-3 text-sm space-y-0.5">
+                <p><span className="font-medium">Guardian:</span> {selectedInquiry.guardian_name}</p>
+                {selectedInquiry.guardian_email && (
+                  <p><span className="font-medium">Email:</span> {selectedInquiry.guardian_email}</p>
+                )}
+                {selectedInquiry.guardian_phone && (
+                  <p><span className="font-medium">Phone:</span> {selectedInquiry.guardian_phone}</p>
+                )}
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-ink mb-1">
                 Contact Channel
@@ -527,7 +688,7 @@ export function InquiriesClient({
                 <option value="">Select enrollment window...</option>
                 {convertCampusWindows.map((w) => (
                   <option key={w.id} value={w.id}>
-                    {w.name} ({w.status})
+                    {w.name}
                   </option>
                 ))}
               </Select>

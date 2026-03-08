@@ -485,7 +485,7 @@ export async function getDraftApplicationForEdit(
       .from("household")
       .select("address_line1, city, state, zip")
       .eq("id", householdId)
-      .single();
+      .maybeSingle();
     if (hh) household = hh as typeof household;
   }
 

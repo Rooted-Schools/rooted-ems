@@ -9,11 +9,18 @@ interface Campus {
   gradeCodes: string[];
 }
 
-interface InquiryFormProps {
-  campuses: Campus[];
+interface SchoolYear {
+  id: string;
+  label: string;
+  isCurrent: boolean;
 }
 
-export function InquiryForm({ campuses }: InquiryFormProps) {
+interface InquiryFormProps {
+  campuses: Campus[];
+  schoolYears: SchoolYear[];
+}
+
+export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
   const [submitted, setSubmitted] = useState(false);
   const [submittedCampusName, setSubmittedCampusName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,6 +33,7 @@ export function InquiryForm({ campuses }: InquiryFormProps) {
   const [guardianName, setGuardianName] = useState("");
   const [guardianEmail, setGuardianEmail] = useState("");
   const [guardianPhone, setGuardianPhone] = useState("");
+  const [targetStartYear, setTargetStartYear] = useState("");
   const [source, setSource] = useState("website");
 
   // Get the selected campus and its available grades
@@ -58,6 +66,7 @@ export function InquiryForm({ campuses }: InquiryFormProps) {
           student_first_name: studentFirst,
           student_last_name: studentLast,
           grade_applying: grade,
+          target_start_year: targetStartYear || null,
           guardian_name: guardianName,
           guardian_email: guardianEmail,
           guardian_phone: guardianPhone,
@@ -236,6 +245,44 @@ export function InquiryForm({ campuses }: InquiryFormProps) {
                 <option>Select a school first</option>
               </select>
             )}
+          </div>
+          <div className="mt-3">
+            <label
+              htmlFor="target-year"
+              className="block text-xs font-medium text-gray-600 mb-1"
+            >
+              Target Start Year
+            </label>
+            {schoolYears.length > 0 ? (
+              <select
+                id="target-year"
+                value={targetStartYear}
+                onChange={(e) => setTargetStartYear(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent bg-white"
+              >
+                <option value="">Not sure yet</option>
+                {schoolYears.map((sy) => (
+                  <option key={sy.id} value={sy.label}>
+                    {sy.label}{sy.isCurrent ? " (Current)" : ""}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select
+                id="target-year"
+                value={targetStartYear}
+                onChange={(e) => setTargetStartYear(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent bg-white"
+              >
+                <option value="">Not sure yet</option>
+                <option value="2026-27">2026-27</option>
+                <option value="2027-28">2027-28</option>
+                <option value="2028-29">2028-29</option>
+              </select>
+            )}
+            <p className="text-xs text-gray-400 mt-1">
+              When would your child ideally start? It&apos;s okay if you&apos;re not sure yet.
+            </p>
           </div>
         </fieldset>
 

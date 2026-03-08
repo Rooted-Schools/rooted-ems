@@ -75,7 +75,7 @@ export async function getFamilyNotifications(
 
   const { data, error } = await supabase
     .from("notification")
-    .select("id, title, message, created_at, read_at, type")
+    .select("id, title, body, created_at, read_at, is_read")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -88,11 +88,11 @@ export async function getFamilyNotifications(
   return (data ?? []).map((row: Record<string, unknown>) => ({
     id: row.id as string,
     title: (row.title as string) ?? "",
-    message: (row.message as string) ?? "",
+    message: (row.body as string) ?? "",
     time: formatRelativeTime(row.created_at as string),
     created_at: (row.created_at as string) ?? "",
-    read: !!(row.read_at as string | null),
-    type: (row.type as string) ?? "info",
+    read: (row.is_read as boolean) ?? false,
+    type: "info",
   }));
 }
 
@@ -117,6 +117,7 @@ export async function getActiveEnrollmentWindows(
     `
     )
     .gte("close_date", nowIso)
+    .eq("status", "open")
     .order("open_date", { ascending: true });
 
   if (campusId) {

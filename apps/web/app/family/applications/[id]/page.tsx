@@ -16,7 +16,7 @@ export default async function FamilyApplicationDetailPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/auth/family-login");
+  if (!user) redirect("/login");
 
   const { id } = await params;
   const detail = await getApplicationDetail(id);

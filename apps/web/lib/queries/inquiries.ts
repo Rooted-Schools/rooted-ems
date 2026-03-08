@@ -173,7 +173,7 @@ export async function getInquiryDetail(
     .select(
       `
       id, channel, notes, created_at,
-      created_by:created_by (full_name)
+      created_by:staff_id (full_name)
     `
     )
     .eq("inquiry_id", inquiryId)

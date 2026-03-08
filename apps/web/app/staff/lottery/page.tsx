@@ -45,6 +45,7 @@ export default async function StaffLotteryPage({
       .from("enrollment_window")
       .select("id, name, campus_id")
       .in("campus_id", accessibleIds.length > 0 ? accessibleIds : ["__none__"])
+      .eq("status", "open")
       .order("open_date", { ascending: false }),
   ]);
 

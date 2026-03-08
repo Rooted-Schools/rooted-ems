@@ -214,6 +214,7 @@ export async function getUpcomingDeadlines(
     `
     )
     .gte("close_date", now)
+    .eq("status", "open")
     .order("close_date", { ascending: true })
     .limit(5);
 

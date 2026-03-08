@@ -672,7 +672,7 @@ export async function staffCreateApplication(
       locked_at: options?.autoSubmit ? now : null,
       has_sibling_enrolled: input.has_sibling_enrolled ?? false,
       source: input.source ?? "staff_entry",
-      assigned_staff: input.created_by_staff,
+      assigned_staff_id: input.created_by_staff,
     })
     .select("id")
     .single();
