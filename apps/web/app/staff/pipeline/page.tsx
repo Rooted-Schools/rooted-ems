@@ -18,11 +18,12 @@ interface PipelineStudent {
 }
 
 const PIPELINE_COLUMNS = [
-  { key: "draft", label: "Draft", color: "bg-gray-100 border-gray-300", textColor: "text-gray-700" },
+  { key: "draft", label: "Draft", color: "bg-rooted-gray border-stone/30", textColor: "text-ink/70" },
   { key: "submitted", label: "Submitted", color: "bg-blue-50 border-blue-300", textColor: "text-blue-700" },
   { key: "needs_info", label: "Needs Info", color: "bg-amber-50 border-amber-300", textColor: "text-amber-700" },
   { key: "verified", label: "Verified", color: "bg-green-50 border-green-300", textColor: "text-green-700" },
   { key: "lottery_assigned", label: "Lottery", color: "bg-purple-50 border-purple-300", textColor: "text-purple-700" },
+  { key: "waitlisted", label: "Waitlisted", color: "bg-orange-50 border-orange-300", textColor: "text-orange-700" },
   { key: "offered", label: "Offered", color: "bg-indigo-50 border-indigo-300", textColor: "text-indigo-700" },
   { key: "accepted", label: "Accepted", color: "bg-emerald-50 border-emerald-300", textColor: "text-emerald-700" },
   { key: "registered", label: "Registered", color: "bg-rooted-green/10 border-rooted-green", textColor: "text-rooted-green-dark" },
@@ -93,10 +94,10 @@ export default async function PipelinePage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-ink">
             Admissions Pipeline
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-stone mt-1">
             {allApps.length} total applications across the enrollment funnel
           </p>
         </div>
@@ -126,7 +127,7 @@ export default async function PipelinePage({
                 </div>
                 {i < columnData.length - 1 && (
                   <svg
-                    className="w-5 h-5 text-gray-300 shrink-0 mx-0.5"
+                    className="w-5 h-5 text-stone/50 shrink-0 mx-0.5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -159,7 +160,7 @@ export default async function PipelinePage({
             </CardHeader>
             <CardContent className="space-y-2">
               {col.students.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-4">
+                <p className="text-xs text-stone text-center py-4">
                   No applications
                 </p>
               ) : (
@@ -169,7 +170,7 @@ export default async function PipelinePage({
                     href={`/staff/applications/${student.id}`}
                     className="block no-underline"
                   >
-                    <div className="p-2.5 rounded-lg border border-gray-200 bg-white hover:shadow-sm hover:border-gray-300 transition-all cursor-pointer">
+                    <div className="p-2.5 rounded-lg border border-stone/20 bg-white hover:shadow-sm hover:border-stone/30 transition-all cursor-pointer">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-full bg-rooted-green/10 flex items-center justify-center shrink-0">
                           <span className="text-[10px] font-bold text-rooted-green">
@@ -177,10 +178,10 @@ export default async function PipelinePage({
                           </span>
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-medium text-gray-900 truncate">
+                          <p className="text-xs font-medium text-ink truncate">
                             {student.student_name}
                           </p>
-                          <p className="text-[10px] text-gray-500 truncate">
+                          <p className="text-[10px] text-stone truncate">
                             Grade {student.grade} &middot; {student.campus_name}
                           </p>
                         </div>
@@ -190,9 +191,12 @@ export default async function PipelinePage({
                 ))
               )}
               {col.students.length > 10 && (
-                <p className="text-xs text-gray-400 text-center pt-1">
+                <Link
+                  href={`/staff/applications?status=${col.key}`}
+                  className="block text-xs text-rooted-green hover:text-deep-green text-center pt-1 no-underline"
+                >
                   +{col.students.length - 10} more
-                </p>
+                </Link>
               )}
             </CardContent>
           </Card>
@@ -219,9 +223,9 @@ export default async function PipelinePage({
                 <Link
                   key={app.id}
                   href={`/staff/applications/${app.id}`}
-                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 no-underline"
+                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-rooted-gray-light no-underline"
                 >
-                  <span className="text-xs font-medium text-gray-600">
+                  <span className="text-xs font-medium text-ink/60">
                     {app.student_name}
                   </span>
                   <Badge variant="secondary" className="text-[10px]">

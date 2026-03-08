@@ -218,7 +218,7 @@ export async function getApplicationStats(
  */
 export function buildPipeline(stats: ApplicationStats): PipelineStage[] {
   return [
-    { label: "Draft", status: "draft", count: stats.draft, color: "bg-gray-200" },
+    { label: "Draft", status: "draft", count: stats.draft, color: "bg-rooted-gray-dark/30" },
     { label: "Submitted", status: "submitted", count: stats.submitted, color: "bg-blue-400" },
     { label: "Needs Info", status: "needs_info", count: stats.needs_info, color: "bg-amber-400" },
     { label: "Verified", status: "verified", count: stats.verified, color: "bg-emerald-400" },

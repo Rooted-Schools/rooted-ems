@@ -107,6 +107,8 @@ export default async function EquityDashboardPage({
     { label: "Submitted", count: statusCounts["submitted"] ?? 0, color: "bg-blue-400" },
     { label: "Needs Info", count: statusCounts["needs_info"] ?? 0, color: "bg-amber-400" },
     { label: "Verified", count: statusCounts["verified"] ?? 0, color: "bg-green-400" },
+    { label: "Lottery", count: statusCounts["lottery_assigned"] ?? 0, color: "bg-purple-400" },
+    { label: "Waitlisted", count: statusCounts["waitlisted"] ?? 0, color: "bg-orange-400" },
     { label: "Offered", count: statusCounts["offered"] ?? 0, color: "bg-rooted-green" },
     { label: "Accepted", count: statusCounts["accepted"] ?? 0, color: "bg-emerald-600" },
     { label: "Registered", count: statusCounts["registered"] ?? 0, color: "bg-rooted-green-dark" },
@@ -145,8 +147,8 @@ export default async function EquityDashboardPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Equity Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-ink">Equity Dashboard</h1>
+        <p className="text-sm text-stone mt-1">
           Demographic analysis and equity metrics across the enrollment funnel
         </p>
       </div>
@@ -155,7 +157,7 @@ export default async function EquityDashboardPage({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="border-t-4 border-t-rooted-green">
           <CardContent className="pt-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <p className="text-xs font-medium text-stone uppercase tracking-wider">
               Total Applicants
             </p>
             <p className="text-3xl font-bold mt-1">{totalApplicants}</p>
@@ -163,7 +165,7 @@ export default async function EquityDashboardPage({
         </Card>
         <Card className="border-t-4 border-t-blue-500">
           <CardContent className="pt-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <p className="text-xs font-medium text-stone uppercase tracking-wider">
               Total Offers
             </p>
             <p className="text-3xl font-bold mt-1">{totalOffered}</p>
@@ -171,7 +173,7 @@ export default async function EquityDashboardPage({
         </Card>
         <Card className="border-t-4 border-t-amber-500">
           <CardContent className="pt-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <p className="text-xs font-medium text-stone uppercase tracking-wider">
               Waitlist Depth
             </p>
             <p className="text-3xl font-bold mt-1">{waitlistDepth}</p>
@@ -179,7 +181,7 @@ export default async function EquityDashboardPage({
         </Card>
         <Card className="border-t-4 border-t-emerald-600">
           <CardContent className="pt-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <p className="text-xs font-medium text-stone uppercase tracking-wider">
               Registered
             </p>
             <p className="text-3xl font-bold mt-1">{totalRegistered}</p>
@@ -199,10 +201,10 @@ export default async function EquityDashboardPage({
           <CardContent className="space-y-3">
             {funnelStages.map((stage) => (
               <div key={stage.label} className="flex items-center gap-3">
-                <span className="text-xs text-gray-500 w-20 text-right shrink-0">
+                <span className="text-xs text-stone w-20 text-right shrink-0">
                   {stage.label}
                 </span>
-                <div className="flex-1 h-7 bg-gray-100 rounded-md overflow-hidden relative">
+                <div className="flex-1 h-7 bg-rooted-gray rounded-md overflow-hidden relative">
                   <div
                     className={`h-full ${stage.color} rounded-md transition-all`}
                     style={{
@@ -211,7 +213,7 @@ export default async function EquityDashboardPage({
                     }}
                   />
                   {stage.count > 0 && (
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-600">
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-ink/60">
                       {stage.count}
                     </span>
                   )}
@@ -233,7 +235,7 @@ export default async function EquityDashboardPage({
           </CardHeader>
           <CardContent>
             {demographics.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">
+              <p className="text-sm text-stone text-center py-6">
                 No demographic data available
               </p>
             ) : (
@@ -247,21 +249,21 @@ export default async function EquityDashboardPage({
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="w-3 h-3 rounded-full bg-rooted-green shrink-0" />
-                        <span className="text-sm text-gray-700 truncate">
+                        <span className="text-sm text-ink/70 truncate">
                           {d.group}
                         </span>
                       </div>
                       <div className="flex items-center gap-4 shrink-0">
-                        <span className="text-xs text-gray-500 w-12 text-right">
+                        <span className="text-xs text-stone w-12 text-right">
                           {appliedPct}%
                         </span>
-                        <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="w-24 h-2 bg-rooted-gray rounded-full overflow-hidden">
                           <div
                             className="h-full bg-rooted-green rounded-full"
                             style={{ width: `${appliedPct}%` }}
                           />
                         </div>
-                        <span className="text-xs font-medium text-gray-900 w-6 text-right">
+                        <span className="text-xs font-medium text-ink w-6 text-right">
                           {d.applied}
                         </span>
                       </div>
@@ -289,23 +291,23 @@ export default async function EquityDashboardPage({
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-2 text-xs font-medium text-gray-500">
+                  <tr className="border-b border-stone/20">
+                    <th className="text-left py-2 text-xs font-medium text-stone">
                       Demographic
                     </th>
-                    <th className="text-right py-2 text-xs font-medium text-gray-500">
+                    <th className="text-right py-2 text-xs font-medium text-stone">
                       Applied
                     </th>
-                    <th className="text-right py-2 text-xs font-medium text-gray-500">
+                    <th className="text-right py-2 text-xs font-medium text-stone">
                       Verified
                     </th>
-                    <th className="text-right py-2 text-xs font-medium text-gray-500">
+                    <th className="text-right py-2 text-xs font-medium text-stone">
                       Offered
                     </th>
-                    <th className="text-right py-2 text-xs font-medium text-gray-500">
+                    <th className="text-right py-2 text-xs font-medium text-stone">
                       Registered
                     </th>
-                    <th className="text-right py-2 text-xs font-medium text-gray-500">
+                    <th className="text-right py-2 text-xs font-medium text-stone">
                       Yield
                     </th>
                   </tr>
@@ -314,21 +316,21 @@ export default async function EquityDashboardPage({
                   {demographics.map((d) => (
                     <tr
                       key={d.group}
-                      className="border-b border-gray-100 last:border-0"
+                      className="border-b border-rooted-gray last:border-0"
                     >
-                      <td className="py-2 font-medium text-gray-900">
+                      <td className="py-2 font-medium text-ink">
                         {d.group}
                       </td>
-                      <td className="py-2 text-right text-gray-600">
+                      <td className="py-2 text-right text-ink/60">
                         {d.applied}
                       </td>
-                      <td className="py-2 text-right text-gray-600">
+                      <td className="py-2 text-right text-ink/60">
                         {d.verified}
                       </td>
-                      <td className="py-2 text-right text-gray-600">
+                      <td className="py-2 text-right text-ink/60">
                         {d.offered}
                       </td>
-                      <td className="py-2 text-right text-gray-600">
+                      <td className="py-2 text-right text-ink/60">
                         {d.registered}
                       </td>
                       <td className="py-2 text-right">
@@ -417,15 +419,15 @@ export default async function EquityDashboardPage({
                     key={l.lang}
                     className="flex items-center justify-between"
                   >
-                    <span className="text-sm text-gray-700">{l.lang}</span>
+                    <span className="text-sm text-ink/70">{l.lang}</span>
                     <div className="flex items-center gap-2">
-                      <div className="w-20 h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="w-20 h-2 bg-rooted-gray rounded-full overflow-hidden">
                         <div
                           className="h-full bg-rooted-green rounded-full"
                           style={{ width: `${l.pct}%` }}
                         />
                       </div>
-                      <span className="text-xs font-medium text-gray-500 w-10 text-right">
+                      <span className="text-xs font-medium text-stone w-10 text-right">
                         {l.count} ({l.pct}%)
                       </span>
                     </div>

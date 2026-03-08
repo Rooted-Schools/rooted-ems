@@ -4,6 +4,14 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
+/** Validate redirect path to prevent open redirect attacks. */
+function sanitizeRedirectPath(next: string | null, fallback: string): string {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return fallback;
+  // Only allow paths under /family or /staff
+  if (!next.startsWith("/family") && !next.startsWith("/staff")) return fallback;
+  return next;
+}
+
 /**
  * Handles OAuth callbacks from Google, Apple, and other providers.
  * The `next` query param determines where to redirect after login.
@@ -13,7 +21,7 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/staff/dashboard";
+  const next = sanitizeRedirectPath(searchParams.get("next"), "/staff/dashboard");
 
   // Determine if this is a family login flow (for error redirect)
   const isFamily = next.startsWith("/family");

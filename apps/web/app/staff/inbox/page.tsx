@@ -134,10 +134,10 @@ export default async function StaffInboxPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-2xl font-bold text-ink">
           Staff Inbox & Work Queue
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-sm text-stone mt-1">
           {totalItems} item{totalItems !== 1 ? "s" : ""} requiring attention
         </p>
       </div>
@@ -148,7 +148,7 @@ export default async function StaffInboxPage({
           <a key={cat.key} href={`#${cat.key}`} className="block no-underline">
             <Card
               className={`hover:shadow-md transition-shadow cursor-pointer border-l-4 ${
-                cat.items.length > 0 ? cat.borderColor : "border-l-gray-200 opacity-60"
+                cat.items.length > 0 ? cat.borderColor : "border-l-stone/20 opacity-60"
               }`}
             >
               <CardContent className="p-3">
@@ -156,13 +156,13 @@ export default async function StaffInboxPage({
                   <span className="text-lg">{cat.icon}</span>
                   <span
                     className={`text-2xl font-bold ${
-                      cat.items.length > 0 ? "text-gray-900" : "text-gray-300"
+                      cat.items.length > 0 ? "text-ink" : "text-stone/50"
                     }`}
                   >
                     {cat.items.length}
                   </span>
                 </div>
-                <p className="text-xs font-medium text-gray-600 mt-1">
+                <p className="text-xs font-medium text-ink/60 mt-1">
                   {cat.label}
                 </p>
               </CardContent>
@@ -186,7 +186,7 @@ export default async function StaffInboxPage({
                     {cat.items.length}
                   </Badge>
                 </div>
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-stone">
                   {cat.description}
                 </span>
               </div>
@@ -194,17 +194,17 @@ export default async function StaffInboxPage({
             <CardContent>
               {cat.items.length === 0 ? (
                 <div className="text-center py-6">
-                  <p className="text-sm text-gray-400">
+                  <p className="text-sm text-stone">
                     No items in this queue
                   </p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-rooted-gray">
                   {cat.items.map((item) => (
                     <Link
                       key={item.id}
                       href={`/staff/applications/${item.id}`}
-                      className="flex items-center justify-between py-3 px-2 -mx-2 rounded-lg hover:bg-gray-50 transition-colors no-underline group"
+                      className="flex items-center justify-between py-3 px-2 -mx-2 rounded-lg hover:bg-rooted-gray-light transition-colors no-underline group"
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-rooted-green/10 flex items-center justify-center">
@@ -216,10 +216,10 @@ export default async function StaffInboxPage({
                           </span>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-gray-900 group-hover:text-rooted-green-dark">
+                          <p className="text-sm font-medium text-ink group-hover:text-rooted-green-dark">
                             {item.student_name}
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-stone">
                             {item.campus_name} &middot; Grade {item.grade}
                           </p>
                         </div>
@@ -230,11 +230,11 @@ export default async function StaffInboxPage({
                             {item.days_waiting}d waiting
                           </Badge>
                         )}
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-stone">
                           {item.updated_at}
                         </span>
                         <svg
-                          className="w-4 h-4 text-gray-300 group-hover:text-gray-500"
+                          className="w-4 h-4 text-stone/50 group-hover:text-stone"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"

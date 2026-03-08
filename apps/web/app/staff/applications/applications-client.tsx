@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,18 +48,18 @@ function ApplicationTableRow({ app }: { app: ApplicationRow }) {
 
   return (
     <Link href={`/staff/applications/${app.id}`} className="contents">
-      <TableRow className="cursor-pointer hover:bg-gray-50">
+      <TableRow className="cursor-pointer hover:bg-rooted-gray-light">
         <TableCell className="font-medium">{app.student_name}</TableCell>
-        <TableCell className="text-gray-500">{app.guardian_name}</TableCell>
+        <TableCell className="text-stone">{app.guardian_name}</TableCell>
         <TableCell>{getGradeLabel(app.grade)}</TableCell>
         <TableCell>{app.campus_name}</TableCell>
         <TableCell>
           <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
         </TableCell>
-        <TableCell className="text-gray-500">
+        <TableCell className="text-stone">
           {formatDate(app.submitted_at)}
         </TableCell>
-        <TableCell className="text-gray-500">
+        <TableCell className="text-stone">
           {formatDate(app.updated_at)}
         </TableCell>
       </TableRow>
@@ -71,6 +72,9 @@ interface StaffApplicationsClientProps {
   totalCount: number;
   stats: ApplicationStats;
   campuses: CampusRow[];
+  initialStatus?: string;
+  initialSearch?: string;
+  initialCampus?: string;
 }
 
 export function StaffApplicationsClient({
@@ -78,30 +82,46 @@ export function StaffApplicationsClient({
   totalCount,
   stats,
   campuses,
+  initialStatus = "all",
+  initialSearch = "",
+  initialCampus = "all",
 }: StaffApplicationsClientProps) {
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [campusFilter, setCampusFilter] = useState("all");
+  const router = useRouter();
+  const pathname = usePathname();
+  const currentParams = useSearchParams();
+  const [search, setSearch] = useState(initialSearch);
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
+  const [campusFilter, setCampusFilter] = useState(initialCampus);
 
-  const filtered = applications.filter((app) => {
-    const matchesSearch =
-      !search ||
-      app.student_name.toLowerCase().includes(search.toLowerCase()) ||
-      app.guardian_name.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus =
-      statusFilter === "all" || app.status === statusFilter;
-    const matchesCampus =
-      campusFilter === "all" || app.campus_id === campusFilter;
-    return matchesSearch && matchesStatus && matchesCampus;
-  });
+  const pushFilters = useCallback(
+    (overrides: { status?: string; search?: string; campus?: string }) => {
+      const params = new URLSearchParams(currentParams.toString());
+      const status = overrides.status ?? statusFilter;
+      const q = overrides.search ?? search;
+      const campus = overrides.campus ?? campusFilter;
+
+      if (status && status !== "all") params.set("status", status);
+      else params.delete("status");
+      if (q) params.set("search", q);
+      else params.delete("search");
+      if (campus && campus !== "all") params.set("campus", campus);
+      else params.delete("campus");
+
+      router.push(`${pathname}?${params.toString()}`);
+    },
+    [router, pathname, currentParams, statusFilter, search, campusFilter]
+  );
+
+  // Server already filtered — just display what we got
+  const filtered = applications;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
+        <h1 className="text-2xl font-bold text-ink">Applications</h1>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">
-            <span className="font-medium">{filtered.length}</span>{filtered.length !== totalCount ? ` of ${totalCount}` : ""} total
+          <span className="text-sm text-stone">
+            <span className="font-medium">{filtered.length}</span>{filtered.length !== totalCount ? ` of ${totalCount}` : ""} application{totalCount !== 1 ? "s" : ""}
           </span>
           <Link href="/staff/applications/new">
             <Button className="bg-rooted-green hover:bg-rooted-green/90 text-white">
@@ -115,7 +135,7 @@ export function StaffApplicationsClient({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="border-t-4 border-t-blue-500">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Submitted
             </CardTitle>
           </CardHeader>
@@ -123,12 +143,12 @@ export function StaffApplicationsClient({
             <p className="text-2xl font-bold text-blue-600">
               {stats.submitted}
             </p>
-            <p className="text-xs text-gray-400 mt-1">awaiting review</p>
+            <p className="text-xs text-stone mt-1">awaiting review</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-amber-500">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Needs Info
             </CardTitle>
           </CardHeader>
@@ -136,14 +156,14 @@ export function StaffApplicationsClient({
             <p className="text-2xl font-bold text-amber-600">
               {stats.needs_info}
             </p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-stone mt-1">
               {stats.needs_info === 0 ? "none pending" : "action required"}
             </p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-emerald-500">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Verified
             </CardTitle>
           </CardHeader>
@@ -151,12 +171,12 @@ export function StaffApplicationsClient({
             <p className="text-2xl font-bold text-emerald-600">
               {stats.verified}
             </p>
-            <p className="text-xs text-gray-400 mt-1">ready for lottery</p>
+            <p className="text-xs text-stone mt-1">ready for lottery</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-rooted-green">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Registered
             </CardTitle>
           </CardHeader>
@@ -164,7 +184,7 @@ export function StaffApplicationsClient({
             <p className="text-2xl font-bold text-rooted-green">
               {stats.registered}
             </p>
-            <p className="text-xs text-gray-400 mt-1">fully enrolled</p>
+            <p className="text-xs text-stone mt-1">fully enrolled</p>
           </CardContent>
         </Card>
       </div>
@@ -178,11 +198,21 @@ export function StaffApplicationsClient({
                 placeholder="Search by student or guardian name..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") pushFilters({ search });
+                }}
+                onBlur={() => {
+                  if (search !== initialSearch) pushFilters({ search });
+                }}
               />
             </div>
             <Select
               value={campusFilter}
-              onChange={(e) => setCampusFilter(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setCampusFilter(v);
+                pushFilters({ campus: v });
+              }}
               className="w-full sm:w-48"
             >
               <option value="all">All Campuses</option>
@@ -197,7 +227,10 @@ export function StaffApplicationsClient({
       </Card>
 
       {/* Status tabs + table */}
-      <Tabs defaultValue="all" onValueChange={setStatusFilter}>
+      <Tabs defaultValue={initialStatus} onValueChange={(v) => {
+        setStatusFilter(v);
+        pushFilters({ status: v });
+      }}>
         <TabsList>
           {STATUS_TABS.map((tab) => {
             const count =
@@ -208,7 +241,7 @@ export function StaffApplicationsClient({
               <TabsTrigger key={tab.value} value={tab.value}>
                 {tab.label}
                 {tab.value !== "all" && count != null ? (
-                  <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 text-[10px] font-semibold">
+                  <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-rooted-gray-dark/30 text-[10px] font-semibold">
                     {count}
                   </span>
                 ) : null}

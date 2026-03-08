@@ -178,7 +178,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label className="block text-sm font-medium text-ink/70 mb-1">
         {label}
         {required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
@@ -212,7 +212,7 @@ function StepIndicator({
                       ? "bg-rooted-green text-white"
                       : isCurrent
                         ? "border-2 border-rooted-green text-rooted-green"
-                        : "border border-gray-300 text-gray-400"
+                        : "border border-stone/30 text-stone"
                   }
                 `}
               >
@@ -236,7 +236,7 @@ function StepIndicator({
               </div>
               <span
                 className={`text-xs hidden sm:inline ${
-                  isCurrent ? "font-semibold text-gray-900" : "text-gray-400"
+                  isCurrent ? "font-semibold text-ink" : "text-stone"
                 }`}
               >
                 {step.label}
@@ -244,7 +244,7 @@ function StepIndicator({
               {i < steps.length - 1 && (
                 <div
                   className={`w-6 h-px ${
-                    isComplete ? "bg-rooted-green" : "bg-gray-200"
+                    isComplete ? "bg-rooted-green" : "bg-rooted-gray-dark/30"
                   }`}
                 />
               )}
@@ -369,6 +369,8 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
       const result = await familyCreateApplication(input);
       if (result.error) {
         setFeedback({ type: "error", message: result.error });
+      } else if (result.data?.id) {
+        router.push(`/family/applications/${result.data.id}/edit`);
       } else {
         setFeedback({ type: "success", message: "Draft saved!" });
         router.push("/family/applications");
@@ -414,14 +416,14 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
       <div>
         <Link
           href="/family/applications"
-          className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+          className="text-sm text-stone hover:text-ink/70 transition-colors"
         >
           &larr; Back to Applications
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900 mt-2">
+        <h1 className="text-2xl font-bold text-ink mt-2">
           New Application
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-sm text-stone mt-1">
           Complete the following steps to submit an enrollment application.
         </p>
       </div>
@@ -598,7 +600,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
                   { value: "two_or_more", label: "Two or More Races" },
                   { value: "prefer_not", label: "Prefer not to say" },
                 ].map((opt) => (
-                  <label key={opt.value} className="flex items-center gap-2 text-sm text-gray-700">
+                  <label key={opt.value} className="flex items-center gap-2 text-sm text-ink/70">
                     <input
                       type="checkbox"
                       checked={form.raceEthnicity.includes(opt.value)}
@@ -609,7 +611,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
                           update({ raceEthnicity: form.raceEthnicity.filter((v) => v !== opt.value) });
                         }
                       }}
-                      className="h-4 w-4 rounded border-gray-300 text-rooted-green focus:ring-rooted-green"
+                      className="h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
                     />
                     {opt.label}
                   </label>
@@ -784,14 +786,14 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
                 id="sms-consent"
                 checked={form.guardianSmsConsent}
                 onChange={(e) => update({ guardianSmsConsent: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300 text-rooted-green focus:ring-rooted-green"
+                className="h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
               />
-              <label htmlFor="sms-consent" className="text-sm text-gray-600">
+              <label htmlFor="sms-consent" className="text-sm text-ink/60">
                 I consent to receive SMS/text messages about my child&apos;s enrollment
               </label>
             </div>
 
-            <hr className="my-2 border-gray-200" />
+            <hr className="my-2 border-stone/20" />
 
             <Field label="Street Address" required>
               <Input
@@ -828,8 +830,8 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
               </Field>
             </div>
 
-            <hr className="my-2 border-gray-200" />
-            <p className="text-sm font-medium text-gray-700">
+            <hr className="my-2 border-stone/20" />
+            <p className="text-sm font-medium text-ink/70">
               Emergency Contact
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -863,8 +865,8 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
               </Field>
             </div>
 
-            <hr className="my-2 border-gray-200" />
-            <p className="text-sm font-medium text-gray-700">
+            <hr className="my-2 border-stone/20" />
+            <p className="text-sm font-medium text-ink/70">
               Household Information
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -955,7 +957,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm font-medium text-gray-700">
+            <p className="text-sm font-medium text-ink/70">
               Enrollment Preferences
             </p>
             <Field label="Does your child have a sibling currently enrolled?">
@@ -1011,8 +1013,8 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
               </Field>
             </div>
 
-            <hr className="my-2 border-gray-200" />
-            <p className="text-sm font-medium text-gray-700">
+            <hr className="my-2 border-stone/20" />
+            <p className="text-sm font-medium text-ink/70">
               Special Services
             </p>
 
@@ -1116,38 +1118,50 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[
-              { name: "Birth Certificate or Proof of Age", desc: "Birth certificate, passport, or baptismal record", required: true },
-              { name: "Proof of Residency", desc: "Utility bill, lease agreement, or mortgage statement", required: true },
-              { name: "Immunization Records", desc: "Current immunization record from your healthcare provider", required: true },
-              { name: "Previous School Records", desc: "Report cards or transcripts from prior school", required: false },
-              { name: "IEP / 504 Plan", desc: "If applicable, upload current plan documentation", required: false },
-              { name: "Custody Documentation", desc: "If applicable, upload custody or guardianship documents", required: false },
-              { name: "McKinney-Vento Documentation", desc: "If applicable, documentation of homelessness status", required: false },
-              { name: "Income Verification", desc: "If claiming Free/Reduced Lunch eligibility", required: false },
-              { name: "Parent / Guardian Photo ID", desc: "Government-issued photo ID of primary guardian", required: false },
-            ].map((doc) => (
-              <div
-                key={doc.name}
-                className="flex items-start justify-between gap-4 p-3 border border-gray-200 rounded-md"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900">
+            <div className="rounded-lg bg-rooted-gray-light/50 border border-stone/10 p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="text-2xl">📄</div>
+                <div>
+                  <p className="text-sm font-medium text-ink">
+                    Documents can be uploaded after you submit
+                  </p>
+                  <p className="text-xs text-stone mt-1">
+                    Submit your application first, then upload documents from the{" "}
+                    <Link href="/family/documents" className="text-rooted-green hover:underline font-medium">
+                      Documents
+                    </Link>{" "}
+                    page. Required documents must be uploaded before enrollment is finalized.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-ink mb-2">You will need to provide:</p>
+              {[
+                { name: "Birth Certificate or Proof of Age", required: true },
+                { name: "Proof of Residency", required: true },
+                { name: "Immunization Records", required: true },
+                { name: "Previous School Records", required: false },
+                { name: "IEP / 504 Plan (if applicable)", required: false },
+                { name: "Custody Documentation (if applicable)", required: false },
+                { name: "McKinney-Vento Documentation (if applicable)", required: false },
+                { name: "Income Verification (if applicable)", required: false },
+                { name: "Parent / Guardian Photo ID", required: false },
+              ].map((doc) => (
+                <div
+                  key={doc.name}
+                  className="flex items-center gap-2 py-1.5 px-3 text-sm"
+                >
+                  <span className="text-stone">
+                    {doc.required ? "☐" : "○"}
+                  </span>
+                  <span className={doc.required ? "text-ink" : "text-stone"}>
                     {doc.name}
                     {doc.required && <span className="text-red-500 ml-0.5">*</span>}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">{doc.desc}</p>
+                  </span>
                 </div>
-                <Button variant="outline" size="sm" className="shrink-0" disabled>
-                  Upload
-                </Button>
-              </div>
-            ))}
-            <p className="text-xs text-gray-500">
-              You can submit your application now and upload documents from
-              the <Link href="/family/documents" className="text-rooted-green hover:underline font-medium">Documents</Link> page
-              after saving. Required documents must be uploaded before enrollment is finalized.
-            </p>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -1204,7 +1218,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
               </ReviewSection>
             </div>
 
-            <hr className="border-gray-200" />
+            <hr className="border-stone/20" />
 
             <div className="space-y-3">
               <div className="flex items-start gap-2">
@@ -1213,9 +1227,9 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
                   id="data-sharing-consent"
                   checked={form.dataSharingConsent}
                   onChange={(e) => update({ dataSharingConsent: e.target.checked })}
-                  className="mt-1 h-4 w-4 rounded border-gray-300 text-rooted-green focus:ring-rooted-green"
+                  className="mt-1 h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
                 />
-                <label htmlFor="data-sharing-consent" className="text-sm text-gray-600">
+                <label htmlFor="data-sharing-consent" className="text-sm text-ink/60">
                   I consent to the sharing of my child&apos;s educational records with
                   <span className="font-bold">rooted</span>schools for the purpose of enrollment processing.
                 </label>
@@ -1226,9 +1240,9 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
                   id="agree-terms"
                   checked={form.agreeTerms}
                   onChange={(e) => update({ agreeTerms: e.target.checked })}
-                  className="mt-1 h-4 w-4 rounded border-gray-300 text-rooted-green focus:ring-rooted-green"
+                  className="mt-1 h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
                 />
-                <label htmlFor="agree-terms" className="text-sm text-gray-600">
+                <label htmlFor="agree-terms" className="text-sm text-ink/60">
                   I certify that the information provided in this application is
                   accurate and complete to the best of my knowledge. I understand
                   that providing false information may result in the
@@ -1237,8 +1251,8 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
               </div>
             </div>
 
-            <hr className="border-gray-200" />
-            <p className="text-sm font-medium text-gray-700">Electronic Signature</p>
+            <hr className="border-stone/20" />
+            <p className="text-sm font-medium text-ink/70">Electronic Signature</p>
             <Field label="Type your full legal name to sign" required>
               <Input
                 value={form.signatureName}
@@ -1246,7 +1260,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
                 placeholder="Full legal name"
               />
             </Field>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-stone">
               By typing your name above, you are electronically signing this application.
               Date: {new Date().toLocaleDateString("en-US")}
             </p>
@@ -1306,7 +1320,7 @@ function ReviewSection({
 }) {
   return (
     <div>
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+      <p className="text-xs font-semibold text-stone uppercase tracking-wider mb-2">
         {title}
       </p>
       <div className="space-y-1">{children}</div>
@@ -1317,8 +1331,8 @@ function ReviewSection({
 function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex gap-2 text-sm">
-      <span className="text-gray-500 w-32 shrink-0">{label}</span>
-      <span className="text-gray-900">{value}</span>
+      <span className="text-stone w-32 shrink-0">{label}</span>
+      <span className="text-ink">{value}</span>
     </div>
   );
 }

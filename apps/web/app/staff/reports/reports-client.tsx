@@ -48,7 +48,7 @@ function downloadCsv(filename: string, content: string) {
 function Bar({ value, max, color = "bg-rooted-green", className = "" }: { value: number; max: number; color?: string; className?: string }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
-    <div className={`w-full bg-gray-100 rounded-full h-2 ${className}`}>
+    <div className={`w-full bg-rooted-gray rounded-full h-2 ${className}`}>
       <div className={`h-2 rounded-full transition-all ${color}`} style={{ width: `${Math.min(100, pct)}%` }} />
     </div>
   );
@@ -64,7 +64,7 @@ const STATUS_COLORS: Record<string, string> = {
   accepted: "bg-emerald-500",
   registered: "bg-rooted-green",
   waitlisted: "bg-orange-400",
-  withdrawn: "bg-gray-300",
+  withdrawn: "bg-stone/50",
   declined: "bg-red-300",
 };
 
@@ -200,8 +200,8 @@ export function ReportsClient({ data }: { data: ReportData }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-ink">Reports</h1>
+          <p className="text-sm text-stone mt-1">
             Analytics, compliance exports, and audit trail.
           </p>
         </div>
@@ -211,25 +211,25 @@ export function ReportsClient({ data }: { data: ReportData }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="border-t-4 border-t-rooted-green">
           <CardContent className="py-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Total Applications</p>
+            <p className="text-xs text-stone uppercase tracking-wider font-medium">Total Applications</p>
             <p className="text-2xl font-bold mt-1">{totalApps}</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-emerald-500">
           <CardContent className="py-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Registered</p>
+            <p className="text-xs text-stone uppercase tracking-wider font-medium">Registered</p>
             <p className="text-2xl font-bold text-emerald-600 mt-1">{registeredCount}</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-blue-500">
           <CardContent className="py-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Conversion Rate</p>
+            <p className="text-xs text-stone uppercase tracking-wider font-medium">Conversion Rate</p>
             <p className="text-2xl font-bold text-blue-600 mt-1">{conversionRate}%</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-purple-500">
           <CardContent className="py-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Seat Utilization</p>
+            <p className="text-xs text-stone uppercase tracking-wider font-medium">Seat Utilization</p>
             <p className="text-2xl font-bold text-purple-600 mt-1">{utilizationRate}%</p>
           </CardContent>
         </Card>
@@ -250,7 +250,7 @@ export function ReportsClient({ data }: { data: ReportData }) {
         </CardHeader>
         <CardContent>
           {data.pipeline.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-4">No application data yet.</p>
+            <p className="text-sm text-stone text-center py-4">No application data yet.</p>
           ) : (
             <div className="space-y-2.5">
               {data.pipeline
@@ -259,14 +259,14 @@ export function ReportsClient({ data }: { data: ReportData }) {
                   const pct = totalApps > 0 ? ((row.count / totalApps) * 100).toFixed(1) : "0.0";
                   return (
                     <div key={row.status} className="flex items-center gap-3">
-                      <span className="text-xs font-medium text-gray-600 w-28 text-right capitalize">
+                      <span className="text-xs font-medium text-ink/60 w-28 text-right capitalize">
                         {row.status.replace(/_/g, " ")}
                       </span>
                       <div className="flex-1">
-                        <Bar value={row.count} max={totalApps} color={STATUS_COLORS[row.status] ?? "bg-gray-300"} />
+                        <Bar value={row.count} max={totalApps} color={STATUS_COLORS[row.status] ?? "bg-stone/50"} />
                       </div>
-                      <span className="text-xs font-bold text-gray-700 w-10 text-right">{row.count}</span>
-                      <span className="text-[10px] text-gray-400 w-12 text-right">{pct}%</span>
+                      <span className="text-xs font-bold text-ink/70 w-10 text-right">{row.count}</span>
+                      <span className="text-[10px] text-stone w-12 text-right">{pct}%</span>
                     </div>
                   );
                 })}
@@ -297,11 +297,11 @@ export function ReportsClient({ data }: { data: ReportData }) {
                 return (
                   <div key={idx} className="flex items-center gap-3">
                     <div className="w-40 min-w-0">
-                      <p className="text-xs font-medium text-gray-700 truncate">{row.campus}</p>
-                      <p className="text-[10px] text-gray-400">{row.grade}</p>
+                      <p className="text-xs font-medium text-ink/70 truncate">{row.campus}</p>
+                      <p className="text-[10px] text-stone">{row.grade}</p>
                     </div>
                     <div className="flex-1">
-                      <div className="w-full bg-gray-100 rounded-full h-3 relative overflow-hidden">
+                      <div className="w-full bg-rooted-gray rounded-full h-3 relative overflow-hidden">
                         {/* Registered (solid green) */}
                         <div
                           className="absolute left-0 top-0 h-3 bg-rooted-green rounded-l-full"
@@ -321,7 +321,7 @@ export function ReportsClient({ data }: { data: ReportData }) {
                     </div>
                     <div className="text-right w-20 shrink-0">
                       <span className="text-xs font-bold">{row.seats_registered}/{row.total_seats}</span>
-                      <span className={`text-[10px] ml-1 ${fillPct >= 90 ? "text-red-500" : fillPct >= 70 ? "text-amber-500" : "text-gray-400"}`}>
+                      <span className={`text-[10px] ml-1 ${fillPct >= 90 ? "text-red-500" : fillPct >= 70 ? "text-amber-500" : "text-stone"}`}>
                         ({fillPct.toFixed(0)}%)
                       </span>
                     </div>
@@ -329,18 +329,18 @@ export function ReportsClient({ data }: { data: ReportData }) {
                 );
               })}
             </div>
-            <div className="flex gap-4 mt-3 pt-3 border-t border-gray-100">
+            <div className="flex gap-4 mt-3 pt-3 border-t border-rooted-gray">
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-sm bg-rooted-green" />
-                <span className="text-[10px] text-gray-500">Registered</span>
+                <span className="text-[10px] text-stone">Registered</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-sm bg-emerald-300" />
-                <span className="text-[10px] text-gray-500">Accepted</span>
+                <span className="text-[10px] text-stone">Accepted</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-gray-100" />
-                <span className="text-[10px] text-gray-500">Available</span>
+                <div className="w-3 h-3 rounded-sm bg-rooted-gray" />
+                <span className="text-[10px] text-stone">Available</span>
               </div>
             </div>
           </CardContent>
@@ -352,7 +352,7 @@ export function ReportsClient({ data }: { data: ReportData }) {
         {reports.filter(r => r.id !== "pipeline" && r.id !== "capacity").map((report) => (
           <Card
             key={report.id}
-            className={`hover:border-gray-300 transition-colors ${
+            className={`hover:border-stone/30 transition-colors ${
               previewId === report.id ? "ring-2 ring-rooted-green/30 border-rooted-green/50" : ""
             }`}
           >
@@ -411,7 +411,7 @@ export function ReportsClient({ data }: { data: ReportData }) {
           </CardHeader>
           <CardContent>
             {data.demographics.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">No demographic data.</p>
+              <p className="text-sm text-stone text-center py-4">No demographic data.</p>
             ) : (
               <div className="space-y-2.5">
                 {data.demographics.map((row) => {
@@ -420,14 +420,14 @@ export function ReportsClient({ data }: { data: ReportData }) {
                   const maxCount = Math.max(...data.demographics.map(r => r.count));
                   return (
                     <div key={row.group} className="flex items-center gap-3">
-                      <span className="text-xs font-medium text-gray-600 w-36 text-right truncate">
+                      <span className="text-xs font-medium text-ink/60 w-36 text-right truncate">
                         {row.group}
                       </span>
                       <div className="flex-1">
                         <Bar value={row.count} max={maxCount} color="bg-purple-400" />
                       </div>
-                      <span className="text-xs font-bold text-gray-700 w-10 text-right">{row.count}</span>
-                      <span className="text-[10px] text-gray-400 w-12 text-right">{pct}%</span>
+                      <span className="text-xs font-bold text-ink/70 w-10 text-right">{row.count}</span>
+                      <span className="text-[10px] text-stone w-12 text-right">{pct}%</span>
                     </div>
                   );
                 })}
@@ -466,14 +466,14 @@ export function ReportsClient({ data }: { data: ReportData }) {
                         {row.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-gray-500">{row.enrolled_at ?? "\u2014"}</TableCell>
+                    <TableCell className="text-stone">{row.enrolled_at ?? "\u2014"}</TableCell>
                     <TableCell>
                       {row.sis_id ? (
-                        <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                        <code className="text-xs bg-rooted-gray px-1.5 py-0.5 rounded">
                           {row.sis_id}
                         </code>
                       ) : (
-                        <span className="text-gray-400">\u2014</span>
+                        <span className="text-stone">\u2014</span>
                       )}
                     </TableCell>
                   </TableRow>
@@ -493,7 +493,7 @@ export function ReportsClient({ data }: { data: ReportData }) {
           <CardContent className="px-0">
             {data.auditEvents.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-sm text-gray-500">No audit events recorded yet.</p>
+                <p className="text-sm text-stone">No audit events recorded yet.</p>
               </div>
             ) : (
               <Table>
@@ -515,9 +515,9 @@ export function ReportsClient({ data }: { data: ReportData }) {
                         </Badge>
                       </TableCell>
                       <TableCell className="font-mono text-xs">{row.table_name}</TableCell>
-                      <TableCell className="text-xs text-gray-700">{row.actor_name || "\u2014"}</TableCell>
-                      <TableCell className="text-gray-500 text-xs">{row.created_at}</TableCell>
-                      <TableCell className="text-xs text-gray-500 max-w-48 truncate">
+                      <TableCell className="text-xs text-ink/70">{row.actor_name || "\u2014"}</TableCell>
+                      <TableCell className="text-stone text-xs">{row.created_at}</TableCell>
+                      <TableCell className="text-xs text-stone max-w-48 truncate">
                         {row.details || "\u2014"}
                       </TableCell>
                     </TableRow>
@@ -540,7 +540,7 @@ export function ReportsClient({ data }: { data: ReportData }) {
           <CardContent>
             {data.inquirySources.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-sm text-gray-500">No inquiry data yet.</p>
+                <p className="text-sm text-stone">No inquiry data yet.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -550,17 +550,17 @@ export function ReportsClient({ data }: { data: ReportData }) {
                   return (
                     <div key={row.source}>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-700 capitalize">
+                        <span className="text-sm font-medium text-ink/70 capitalize">
                           {row.source.replace(/_/g, " ")}
                         </span>
                         <div className="flex items-center gap-3">
-                          <span className="text-xs text-gray-500">{row.count} inquiries</span>
-                          <span className={`text-xs font-bold ${rate >= 20 ? "text-rooted-green" : "text-gray-400"}`}>
+                          <span className="text-xs text-stone">{row.count} inquiries</span>
+                          <span className={`text-xs font-bold ${rate >= 20 ? "text-rooted-green" : "text-stone"}`}>
                             {rate.toFixed(0)}% converted
                           </span>
                         </div>
                       </div>
-                      <div className="w-full bg-gray-100 rounded-full h-2.5 relative overflow-hidden">
+                      <div className="w-full bg-rooted-gray rounded-full h-2.5 relative overflow-hidden">
                         {/* Total inquiries bar */}
                         <div
                           className="absolute left-0 top-0 h-2.5 bg-blue-200 rounded-full"
@@ -575,14 +575,14 @@ export function ReportsClient({ data }: { data: ReportData }) {
                     </div>
                   );
                 })}
-                <div className="flex gap-4 mt-2 pt-2 border-t border-gray-100">
+                <div className="flex gap-4 mt-2 pt-2 border-t border-rooted-gray">
                   <div className="flex items-center gap-1.5">
                     <div className="w-3 h-3 rounded-sm bg-blue-200" />
-                    <span className="text-[10px] text-gray-500">Total Inquiries</span>
+                    <span className="text-[10px] text-stone">Total Inquiries</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <div className="w-3 h-3 rounded-sm bg-rooted-green" />
-                    <span className="text-[10px] text-gray-500">Converted to Application</span>
+                    <span className="text-[10px] text-stone">Converted to Application</span>
                   </div>
                 </div>
               </div>

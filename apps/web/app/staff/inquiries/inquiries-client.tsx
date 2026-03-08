@@ -271,7 +271,7 @@ export function InquiriesClient({
             <p className="text-xs text-stone mt-1">converted</p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-gray-400">
+        <Card className="border-t-4 border-t-stone">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Lost
@@ -550,7 +550,7 @@ export function InquiriesClient({
                                         {logs.map((log) => (
                                           <div
                                             key={log.id}
-                                            className="flex items-start gap-3 bg-white rounded-lg border border-gray-100 px-3 py-2"
+                                            className="flex items-start gap-3 bg-white rounded-lg border border-rooted-gray px-3 py-2"
                                           >
                                             <div className="shrink-0 mt-0.5">
                                               <Badge variant="outline" className="text-[10px]">

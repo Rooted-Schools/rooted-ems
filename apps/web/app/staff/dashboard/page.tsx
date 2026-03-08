@@ -52,7 +52,7 @@ async function getWorkQueueCounts(campusIds?: string[]) {
 }
 
 const FLOW_STAGES = [
-  { key: "draft", label: "Draft", color: "bg-gray-200 text-gray-700" },
+  { key: "draft", label: "Draft", color: "bg-rooted-gray-dark/30 text-ink/70" },
   { key: "submitted", label: "Submitted", color: "bg-blue-100 text-blue-700" },
   {
     key: "needs_info",
@@ -165,7 +165,7 @@ export default async function StaffDashboardPage({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-ink">Dashboard</h1>
         <div className="flex gap-2">
           <Link href="/staff/applications">
             <Button variant="outline" size="sm">
@@ -185,30 +185,30 @@ export default async function StaffDashboardPage({
         <Link href="/staff/inquiries" className="no-underline">
           <Card className="border-t-4 border-t-purple-500 hover:shadow-md transition-shadow h-full">
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
                 New Inquiries
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-purple-600">{inquiryStats.new}</p>
-              <p className="text-xs text-gray-400 mt-1">awaiting follow-up</p>
+              <p className="text-xs text-stone mt-1">awaiting follow-up</p>
             </CardContent>
           </Card>
         </Link>
         <Card className="border-t-4 border-t-rooted-green">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Total Applicants
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">{stats.totalApplications}</p>
-            <p className="text-xs text-gray-400 mt-1">{currentSY?.name ?? "current cycle"}</p>
+            <p className="text-xs text-stone mt-1">{currentSY?.name ?? "current cycle"}</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-amber-500">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Pending Review
             </CardTitle>
           </CardHeader>
@@ -216,12 +216,12 @@ export default async function StaffDashboardPage({
             <p className="text-3xl font-bold text-amber-600">
               {stats.pendingReview}
             </p>
-            <p className="text-xs text-gray-400 mt-1">need attention</p>
+            <p className="text-xs text-stone mt-1">need attention</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-blue-500">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Available Seats
             </CardTitle>
           </CardHeader>
@@ -239,7 +239,7 @@ export default async function StaffDashboardPage({
         </Card>
         <Card className="border-t-4 border-t-emerald-600">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Enrolled
             </CardTitle>
           </CardHeader>
@@ -247,7 +247,7 @@ export default async function StaffDashboardPage({
             <p className="text-3xl font-bold text-rooted-green">
               {stats.enrolled}
             </p>
-            <p className="text-xs text-gray-400 mt-1">students registered</p>
+            <p className="text-xs text-stone mt-1">students registered</p>
           </CardContent>
         </Card>
       </div>
@@ -279,7 +279,7 @@ export default async function StaffDashboardPage({
                   </div>
                   {i < FLOW_STAGES.length - 1 && (
                     <svg
-                      className="w-4 h-4 text-gray-300 shrink-0 mx-0.5"
+                      className="w-4 h-4 text-stone/50 shrink-0 mx-0.5"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -308,7 +308,7 @@ export default async function StaffDashboardPage({
             <CardDescription>Distribution across statuses</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex h-6 rounded-full overflow-hidden bg-gray-100">
+            <div className="flex h-6 rounded-full overflow-hidden bg-rooted-gray">
               {pipeline.map((stage) => (
                 <div
                   key={stage.label}
@@ -330,7 +330,7 @@ export default async function StaffDashboardPage({
                   <div
                     className={`w-2 h-2 rounded-full ${stage.color}`}
                   />
-                  <span className="text-[10px] text-gray-600">
+                  <span className="text-[10px] text-ink/60">
                     {stage.label}{" "}
                     <span className="font-semibold">{stage.count}</span>
                   </span>
@@ -357,17 +357,17 @@ export default async function StaffDashboardPage({
                 <Link
                   key={item.key}
                   href={item.href ?? "/staff/applications"}
-                  className="flex items-center justify-between py-1.5 no-underline hover:bg-gray-50 -mx-2 px-2 rounded-md transition-colors"
+                  className="flex items-center justify-between py-1.5 no-underline hover:bg-rooted-gray-light -mx-2 px-2 rounded-md transition-colors"
                 >
                   <div className="flex items-center gap-2">
                     <div
                       className={`w-2.5 h-2.5 rounded-full ${item.dotColor}`}
                     />
-                    <span className="text-sm text-gray-700">{item.label}</span>
+                    <span className="text-sm text-ink/70">{item.label}</span>
                   </div>
                   <span
                     className={`text-sm font-bold ${
-                      count > 0 ? "text-gray-900" : "text-gray-300"
+                      count > 0 ? "text-ink" : "text-stone/50"
                     }`}
                   >
                     ({count})
@@ -391,7 +391,7 @@ export default async function StaffDashboardPage({
           </CardHeader>
           <CardContent className="space-y-3">
             {deadlines.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">
+              <p className="text-sm text-stone text-center py-4">
                 No upcoming deadlines
               </p>
             ) : (
@@ -401,10 +401,10 @@ export default async function StaffDashboardPage({
                   className="flex items-start justify-between gap-2"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+                    <p className="text-sm font-medium text-ink truncate">
                       {dl.title}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-stone">
                       {dl.campus} &middot; {dl.date}
                     </p>
                   </div>
@@ -434,14 +434,14 @@ export default async function StaffDashboardPage({
             {recentActivity.map((activity) => (
               <div
                 key={activity.id}
-                className="flex items-start gap-3 pb-3 border-b border-gray-100 last:border-0 last:pb-0"
+                className="flex items-start gap-3 pb-3 border-b border-rooted-gray last:border-0 last:pb-0"
               >
                 <span className="text-lg mt-0.5" aria-hidden="true">
                   {activity.icon}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-gray-700">{activity.text}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-sm text-ink/70">{activity.text}</p>
+                  <p className="text-xs text-stone mt-0.5">
                     {activity.time}
                   </p>
                 </div>

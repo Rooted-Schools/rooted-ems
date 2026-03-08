@@ -51,8 +51,8 @@ export function MessagesClient({ messages }: MessagesClientProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-ink">Messages</h1>
+          <p className="text-sm text-stone mt-1">
             Notifications and updates about your enrollment applications.
           </p>
         </div>
@@ -86,7 +86,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-amber-600">{unreadCount}</p>
-                  <p className="text-xs text-gray-500">Unread</p>
+                  <p className="text-xs text-stone">Unread</p>
                 </div>
               </div>
             </CardContent>
@@ -94,12 +94,12 @@ export function MessagesClient({ messages }: MessagesClientProps) {
           <Card>
             <CardContent className="py-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-full bg-rooted-gray flex items-center justify-center shrink-0">
                   <span className="text-lg" aria-hidden="true">📧</span>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-600">{readCount}</p>
-                  <p className="text-xs text-gray-500">Read</p>
+                  <p className="text-2xl font-bold text-ink/60">{readCount}</p>
+                  <p className="text-xs text-stone">Read</p>
                 </div>
               </div>
             </CardContent>
@@ -120,7 +120,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
       ) : displayed.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center">
-            <p className="text-sm text-gray-500">All caught up! No unread messages.</p>
+            <p className="text-sm text-stone">All caught up! No unread messages.</p>
             <Button variant="outline" size="sm" className="mt-3" onClick={() => setFilter("all")}>
               Show all messages
             </Button>
@@ -159,14 +159,14 @@ export function MessagesClient({ messages }: MessagesClientProps) {
                   className={`flex items-start gap-3 p-3.5 rounded-lg border transition-all ${
                     !msg.is_read
                       ? "border-amber-200 bg-amber-50/40 shadow-sm"
-                      : "border-gray-100 hover:border-gray-200"
+                      : "border-rooted-gray hover:border-stone/20"
                   }`}
                 >
                   {/* Status indicator */}
                   <div className="relative shrink-0 mt-0.5">
                     <div
                       className={`w-9 h-9 rounded-full flex items-center justify-center ${
-                        !msg.is_read ? "bg-amber-100" : "bg-gray-50"
+                        !msg.is_read ? "bg-amber-100" : "bg-rooted-gray-light"
                       }`}
                     >
                       <span className="text-base" aria-hidden="true">
@@ -184,19 +184,19 @@ export function MessagesClient({ messages }: MessagesClientProps) {
                         <p
                           className={`text-sm ${
                             !msg.is_read
-                              ? "font-semibold text-gray-900"
-                              : "font-medium text-gray-700"
+                              ? "font-semibold text-ink"
+                              : "font-medium text-ink/70"
                           }`}
                         >
                           {msg.title}
                         </p>
                         {msg.body && (
-                          <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">
+                          <p className="text-sm text-stone mt-0.5 line-clamp-2">
                             {msg.body}
                           </p>
                         )}
                       </div>
-                      <span className="text-xs text-gray-400 whitespace-nowrap mt-0.5 shrink-0">
+                      <span className="text-xs text-stone whitespace-nowrap mt-0.5 shrink-0">
                         {msg.time_ago}
                       </span>
                     </div>
@@ -217,7 +217,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
                         <button
                           onClick={() => handleMarkRead(msg.id)}
                           disabled={isPending}
-                          className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                          className="text-xs text-stone hover:text-ink/60 transition-colors"
                         >
                           Mark as read
                         </button>

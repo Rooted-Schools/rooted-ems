@@ -108,10 +108,10 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
             />
           </svg>
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <h2 className="text-2xl font-bold text-ink mb-2">
           Thank You!
         </h2>
-        <p className="text-gray-600 mb-6">
+        <p className="text-ink/60 mb-6">
           We&apos;ve received your interest form.
           {submittedCampusName
             ? ` The enrollment team at ${submittedCampusName} will reach out to you soon with next steps.`
@@ -126,7 +126,7 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
           </a>
           <a
             href="/"
-            className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
+            className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-ink/70 bg-white border border-stone/30 hover:bg-rooted-gray-light rounded-lg transition-colors"
           >
             Back to Home
           </a>
@@ -145,7 +145,7 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
       <h2 className="text-2xl font-bold text-center mb-2">
         Express Your Interest
       </h2>
-      <p className="text-center text-gray-600 mb-6">
+      <p className="text-center text-ink/60 mb-6">
         Interested in enrolling? Fill out this quick form and your
         school&apos;s enrollment team will follow up with you.
       </p>
@@ -155,7 +155,7 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
         <div>
           <label
             htmlFor="campus"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-ink/70 mb-1"
           >
             Which school are you interested in? *
           </label>
@@ -164,7 +164,7 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
             value={campusId}
             onChange={(e) => handleCampusChange(e.target.value)}
             required
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent bg-white"
+            className="w-full px-4 py-2 border border-stone/30 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent bg-white"
           >
             <option value="">Select a school</option>
             {campuses.map((c) => (
@@ -177,14 +177,14 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
 
         {/* Student Info */}
         <fieldset>
-          <legend className="text-sm font-semibold text-gray-900 mb-2">
+          <legend className="text-sm font-semibold text-ink mb-2">
             Student Information
           </legend>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label
                 htmlFor="student-first"
-                className="block text-xs font-medium text-gray-600 mb-1"
+                className="block text-xs font-medium text-ink/60 mb-1"
               >
                 First Name *
               </label>
@@ -194,13 +194,13 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
                 value={studentFirst}
                 onChange={(e) => setStudentFirst(e.target.value)}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
+                className="w-full px-4 py-2 border border-stone/30 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
               />
             </div>
             <div>
               <label
                 htmlFor="student-last"
-                className="block text-xs font-medium text-gray-600 mb-1"
+                className="block text-xs font-medium text-ink/60 mb-1"
               >
                 Last Name *
               </label>
@@ -210,14 +210,14 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
                 value={studentLast}
                 onChange={(e) => setStudentLast(e.target.value)}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
+                className="w-full px-4 py-2 border border-stone/30 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
               />
             </div>
           </div>
           <div className="mt-3">
             <label
               htmlFor="grade"
-              className="block text-xs font-medium text-gray-600 mb-1"
+              className="block text-xs font-medium text-ink/60 mb-1"
             >
               Grade Applying For *
             </label>
@@ -227,7 +227,7 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
                 value={grade}
                 onChange={(e) => setGrade(e.target.value)}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent bg-white"
+                className="w-full px-4 py-2 border border-stone/30 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent bg-white"
               >
                 <option value="">Select grade</option>
                 {availableGrades.map((code) => (
@@ -240,7 +240,7 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
               <select
                 id="grade"
                 disabled
-                className="w-full px-4 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-400 cursor-not-allowed"
+                className="w-full px-4 py-2 border border-stone/20 rounded-md bg-rooted-gray-light text-stone cursor-not-allowed"
               >
                 <option>Select a school first</option>
               </select>
@@ -249,7 +249,7 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
           <div className="mt-3">
             <label
               htmlFor="target-year"
-              className="block text-xs font-medium text-gray-600 mb-1"
+              className="block text-xs font-medium text-ink/60 mb-1"
             >
               Target Start Year
             </label>
@@ -258,7 +258,7 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
                 id="target-year"
                 value={targetStartYear}
                 onChange={(e) => setTargetStartYear(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent bg-white"
+                className="w-full px-4 py-2 border border-stone/30 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent bg-white"
               >
                 <option value="">Not sure yet</option>
                 {schoolYears.map((sy) => (
@@ -272,7 +272,7 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
                 id="target-year"
                 value={targetStartYear}
                 onChange={(e) => setTargetStartYear(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent bg-white"
+                className="w-full px-4 py-2 border border-stone/30 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent bg-white"
               >
                 <option value="">Not sure yet</option>
                 <option value="2026-27">2026-27</option>
@@ -280,7 +280,7 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
                 <option value="2028-29">2028-29</option>
               </select>
             )}
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-stone mt-1">
               When would your child ideally start? It&apos;s okay if you&apos;re not sure yet.
             </p>
           </div>
@@ -288,13 +288,13 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
 
         {/* Guardian Info */}
         <fieldset>
-          <legend className="text-sm font-semibold text-gray-900 mb-2">
+          <legend className="text-sm font-semibold text-ink mb-2">
             Parent / Guardian Information
           </legend>
           <div>
             <label
               htmlFor="guardian-name"
-              className="block text-xs font-medium text-gray-600 mb-1"
+              className="block text-xs font-medium text-ink/60 mb-1"
             >
               Full Name *
             </label>
@@ -304,14 +304,14 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
               value={guardianName}
               onChange={(e) => setGuardianName(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
+              className="w-full px-4 py-2 border border-stone/30 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
             <div>
               <label
                 htmlFor="guardian-email"
-                className="block text-xs font-medium text-gray-600 mb-1"
+                className="block text-xs font-medium text-ink/60 mb-1"
               >
                 Email Address
               </label>
@@ -321,13 +321,13 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
                 value={guardianEmail}
                 onChange={(e) => setGuardianEmail(e.target.value)}
                 placeholder="parent@example.com"
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
+                className="w-full px-4 py-2 border border-stone/30 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
               />
             </div>
             <div>
               <label
                 htmlFor="guardian-phone"
-                className="block text-xs font-medium text-gray-600 mb-1"
+                className="block text-xs font-medium text-ink/60 mb-1"
               >
                 Phone Number
               </label>
@@ -337,11 +337,11 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
                 value={guardianPhone}
                 onChange={(e) => setGuardianPhone(e.target.value)}
                 placeholder="(555) 123-4567"
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
+                className="w-full px-4 py-2 border border-stone/30 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
               />
             </div>
           </div>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-stone mt-1">
             Please provide at least one way to reach you.
           </p>
         </fieldset>
@@ -350,7 +350,7 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
         <div>
           <label
             htmlFor="source"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-ink/70 mb-1"
           >
             How did you hear about us?
           </label>
@@ -358,7 +358,7 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
             id="source"
             value={source}
             onChange={(e) => setSource(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent bg-white"
+            className="w-full px-4 py-2 border border-stone/30 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent bg-white"
           >
             <option value="website">Website</option>
             <option value="word_of_mouth">Word of Mouth</option>
@@ -384,8 +384,8 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
         </button>
       </form>
 
-      <div className="mt-6 pt-4 border-t border-gray-100 text-center space-y-2">
-        <p className="text-sm text-gray-500">
+      <div className="mt-6 pt-4 border-t border-rooted-gray text-center space-y-2">
+        <p className="text-sm text-stone">
           Ready to apply?{" "}
           <a
             href="/login"
@@ -396,7 +396,7 @@ export function InquiryForm({ campuses, schoolYears }: InquiryFormProps) {
         </p>
         <a
           href="/"
-          className="text-xs text-gray-400 hover:text-gray-600 hover:underline"
+          className="text-xs text-stone hover:text-ink/60 hover:underline"
         >
           Back to home
         </a>

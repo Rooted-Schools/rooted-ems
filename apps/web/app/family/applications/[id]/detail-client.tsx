@@ -6,8 +6,17 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationDetail } from "@/lib/queries";
+import { getSignedUrl } from "@/lib/storage/upload";
 import { familyWithdrawApplication, familyAcceptOffer, familyDeclineOffer } from "../actions";
 
 /* ─── Status guide — what happens at each stage ─── */
@@ -55,9 +64,9 @@ function formatDate(dateStr: string | null) {
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between py-2 border-b border-gray-50 last:border-0">
-      <span className="text-sm text-gray-500">{label}</span>
-      <span className="text-sm font-medium text-gray-900 text-right">{value}</span>
+    <div className="flex justify-between py-2 border-b border-rooted-gray last:border-0">
+      <span className="text-sm text-stone">{label}</span>
+      <span className="text-sm font-medium text-ink text-right">{value}</span>
     </div>
   );
 }
@@ -72,6 +81,8 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [showDeclineDialog, setShowDeclineDialog] = useState(false);
+  const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
 
   const statusCfg = getStatusConfig(detail.status);
   const statusExplanation = getStatusExplanation(detail.status);
@@ -79,6 +90,16 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
   const isOffered = detail.status === "offered";
   const needsAction = isDraft || detail.status === "needs_info" || isOffered;
   const canWithdraw = WITHDRAWABLE.includes(detail.status);
+
+  async function handleViewDocument(storagePath: string) {
+    if (!storagePath) return;
+    const { url, error } = await getSignedUrl(storagePath);
+    if (error) {
+      setFeedback({ type: "error", message: `Could not open document: ${error}` });
+      return;
+    }
+    if (url) window.open(url, "_blank");
+  }
 
   function handleAcceptOffer() {
     if (!detail.offer_id) return;
@@ -95,7 +116,12 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
 
   function handleDeclineOffer() {
     if (!detail.offer_id) return;
-    if (!confirm("Are you sure you want to decline this offer? This cannot be undone.")) return;
+    setShowDeclineDialog(true);
+  }
+
+  function confirmDeclineOffer() {
+    if (!detail.offer_id) return;
+    setShowDeclineDialog(false);
     startTransition(async () => {
       const result = await familyDeclineOffer(detail.offer_id!, detail.id);
       if (result.error) {
@@ -108,7 +134,11 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
   }
 
   function handleWithdraw() {
-    if (!confirm("Are you sure you want to withdraw this application? This cannot be undone.")) return;
+    setShowWithdrawDialog(true);
+  }
+
+  function confirmWithdraw() {
+    setShowWithdrawDialog(false);
     startTransition(async () => {
       const result = await familyWithdrawApplication(detail.id);
       if (result.error) {
@@ -144,10 +174,10 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">{detail.student_name}</h1>
+            <h1 className="text-2xl font-bold text-ink">{detail.student_name}</h1>
             <Badge variant={statusCfg.variant}>{statusCfg.label}</Badge>
           </div>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-stone mt-1">
             {getGradeLabel(detail.grade)} &middot; {detail.campus_name} &middot; {detail.enrollment_window_name}
           </p>
         </div>
@@ -192,10 +222,10 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
               <div className="flex items-start gap-4">
                 <span className="text-3xl" aria-hidden="true">🎉</span>
                 <div className="flex-1">
-                  <p className="text-base font-bold text-gray-900">
+                  <p className="text-base font-bold text-ink">
                     {isExpired ? "Offer Expired" : "You Have a Seat Offer!"}
                   </p>
-                  <p className="text-sm text-gray-600 mt-0.5">
+                  <p className="text-sm text-ink/60 mt-0.5">
                     {isExpired
                       ? "This offer has expired. Please contact the enrollment office if you have questions."
                       : "A seat has been offered to your student. Accept below to secure your spot."}
@@ -243,8 +273,8 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
             <div className="flex items-start gap-3">
               <span className="text-2xl" aria-hidden="true">{statusExplanation.icon}</span>
               <div>
-                <p className="text-sm font-semibold text-gray-900">{statusExplanation.title}</p>
-                <p className="text-sm text-gray-600 mt-0.5">{statusExplanation.explanation}</p>
+                <p className="text-sm font-semibold text-ink">{statusExplanation.title}</p>
+                <p className="text-sm text-ink/60 mt-0.5">{statusExplanation.explanation}</p>
               </div>
             </div>
           </CardContent>
@@ -296,7 +326,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
         <CardContent>
           {detail.documents.length === 0 ? (
             <div className="text-center py-6">
-              <p className="text-sm text-gray-500">No documents uploaded yet.</p>
+              <p className="text-sm text-stone">No documents uploaded yet.</p>
               <Link href="/family/documents" className="text-xs text-rooted-green hover:underline mt-1 inline-block">
                 Go to Documents page to upload →
               </Link>
@@ -308,24 +338,29 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                 return (
                   <div
                     key={doc.id}
-                    className="flex items-center justify-between p-3 rounded-md border border-gray-200"
+                    className="flex items-center justify-between p-3 rounded-md border border-stone/20"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="text-lg" aria-hidden="true">📄</span>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                        <p className="text-sm font-medium text-ink truncate">
                           {doc.file_name}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-stone">
                           Uploaded {formatDate(doc.created_at)}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Badge variant={dcfg.variant}>{dcfg.label}</Badge>
-                      <Link href="/family/documents">
-                        <Button variant="outline" size="sm">View</Button>
-                      </Link>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewDocument(doc.storage_path)}
+                        disabled={!doc.storage_path}
+                      >
+                        View
+                      </Button>
                     </div>
                   </div>
                 );
@@ -345,12 +380,12 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
         </CardHeader>
         <CardContent>
           {detail.timeline.length === 0 ? (
-            <p className="text-center text-gray-500 py-6 text-sm">
+            <p className="text-center text-stone py-6 text-sm">
               No activity recorded yet.
             </p>
           ) : (
             <div className="relative">
-              <div className="absolute left-3 top-2 bottom-2 w-px bg-gray-200" />
+              <div className="absolute left-3 top-2 bottom-2 w-px bg-rooted-gray-dark/30" />
               <div className="space-y-5">
                 {detail.timeline.map((entry, idx) => {
                   const toCfg = getStatusConfig(entry.to_status);
@@ -358,12 +393,12 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                     <div key={entry.id} className="relative flex gap-4 pl-0">
                       <div
                         className={`relative z-10 w-6 h-6 rounded-full border-2 border-white shadow-sm flex items-center justify-center shrink-0 ${
-                          idx === 0 ? "bg-rooted-green" : "bg-gray-200"
+                          idx === 0 ? "bg-rooted-green" : "bg-rooted-gray-dark/30"
                         }`}
                       >
                         <div
                           className={`w-2 h-2 rounded-full ${
-                            idx === 0 ? "bg-white" : "bg-gray-400"
+                            idx === 0 ? "bg-white" : "bg-stone"
                           }`}
                         />
                       </div>
@@ -374,7 +409,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                               <Badge variant="secondary" className="text-xs">
                                 {getStatusConfig(entry.from_status).label}
                               </Badge>
-                              <span className="text-gray-400 text-xs">→</span>
+                              <span className="text-stone text-xs">→</span>
                             </>
                           )}
                           <Badge variant={toCfg.variant} className="text-xs">
@@ -382,11 +417,11 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                           </Badge>
                         </div>
                         {entry.reason && (
-                          <p className="text-sm text-gray-500 mt-0.5">
+                          <p className="text-sm text-stone mt-0.5">
                             {entry.reason}
                           </p>
                         )}
-                        <p className="text-xs text-gray-400 mt-1">
+                        <p className="text-xs text-stone mt-1">
                           {formatDate(entry.created_at)}
                         </p>
                       </div>
@@ -400,11 +435,59 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
       </Card>
 
       {/* Dates footer */}
-      <div className="flex gap-6 text-xs text-gray-400 pb-4">
+      <div className="flex gap-6 text-xs text-stone pb-4">
         {detail.submitted_at && <span>Submitted: {formatDate(detail.submitted_at)}</span>}
         <span>Last Updated: {formatDate(detail.updated_at)}</span>
         <span>Application ID: {detail.id}</span>
       </div>
+
+      {/* Decline Offer Dialog */}
+      <Dialog open={showDeclineDialog} onOpenChange={setShowDeclineDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Decline Seat Offer</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to decline this seat offer for {detail.student_name}? This action cannot be undone and the seat will be offered to the next student on the waitlist.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeclineDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeclineOffer}
+              disabled={isPending}
+            >
+              {isPending ? "Declining..." : "Decline Offer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdraw Application Dialog */}
+      <Dialog open={showWithdrawDialog} onOpenChange={setShowWithdrawDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Withdraw Application</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to withdraw {detail.student_name}&apos;s application? This action cannot be undone. You would need to submit a new application to re-apply.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowWithdrawDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmWithdraw}
+              disabled={isPending}
+            >
+              {isPending ? "Withdrawing..." : "Withdraw Application"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

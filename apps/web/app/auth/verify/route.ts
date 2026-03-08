@@ -5,6 +5,13 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
+/** Validate redirect path to prevent open redirect attacks. */
+function sanitizeRedirectPath(next: string | null, fallback: string): string {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return fallback;
+  if (!next.startsWith("/family") && !next.startsWith("/staff")) return fallback;
+  return next;
+}
+
 /**
  * Handles OTP verification for family login.
  * Verifies the token_hash sent via email magic link or OTP.
@@ -16,7 +23,7 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/family/dashboard";
+  const next = sanitizeRedirectPath(searchParams.get("next"), "/family/dashboard");
 
   if (!tokenHash || !type) {
     return NextResponse.redirect(`${origin}/login?error=invalid_link`);

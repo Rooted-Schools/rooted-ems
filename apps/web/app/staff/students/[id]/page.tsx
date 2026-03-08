@@ -149,17 +149,17 @@ export default async function StudentDetailPage({
           <div className="flex items-center gap-2">
             <Link
               href="/staff/students"
-              className="text-sm text-gray-500 hover:text-gray-700 no-underline"
+              className="text-sm text-stone hover:text-ink/70 no-underline"
             >
               &larr; All Students
             </Link>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mt-2">
+          <h1 className="text-2xl font-bold text-ink mt-2">
             {student.first_name} {student.middle_name ?? ""}{" "}
             {student.last_name}
             {student.suffix ? ` ${student.suffix}` : ""}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-stone mt-1">
             {student.gender ?? "—"} &middot; Age {studentAge ?? "—"}
             {student.date_of_birth
               ? ` (DOB: ${new Date(student.date_of_birth as string).toLocaleDateString("en-US")})`
@@ -187,21 +187,21 @@ export default async function StudentDetailPage({
             <CardContent>
               <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                 <div>
-                  <dt className="text-gray-500">Race/Ethnicity</dt>
+                  <dt className="text-stone">Race/Ethnicity</dt>
                   <dd className="font-medium">
                     {(student.race_ethnicity as string[] | null)?.join(", ") ?? "—"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-gray-500">Primary Language</dt>
+                  <dt className="text-stone">Primary Language</dt>
                   <dd className="font-medium">{student.primary_language ?? "—"}</dd>
                 </div>
                 <div>
-                  <dt className="text-gray-500">Home Language</dt>
+                  <dt className="text-stone">Home Language</dt>
                   <dd className="font-medium">{student.home_language ?? "—"}</dd>
                 </div>
                 <div>
-                  <dt className="text-gray-500">Previous School</dt>
+                  <dt className="text-stone">Previous School</dt>
                   <dd className="font-medium">
                     {student.previous_school_name ?? "—"}
                     {student.previous_school_phone
@@ -222,16 +222,16 @@ export default async function StudentDetailPage({
               <CardContent>
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                   <div>
-                    <dt className="text-gray-500">IEP</dt>
+                    <dt className="text-stone">IEP</dt>
                     <dd className="font-medium">{student.has_iep ? "Yes" : "No"}</dd>
                   </div>
                   <div>
-                    <dt className="text-gray-500">504 Plan</dt>
+                    <dt className="text-stone">504 Plan</dt>
                     <dd className="font-medium">{student.has_504 ? "Yes" : "No"}</dd>
                   </div>
                   {student.special_services_notes && (
                     <div className="col-span-2">
-                      <dt className="text-gray-500">Notes</dt>
+                      <dt className="text-stone">Notes</dt>
                       <dd className="font-medium">{student.special_services_notes}</dd>
                     </div>
                   )}
@@ -247,11 +247,11 @@ export default async function StudentDetailPage({
             </CardHeader>
             <CardContent>
               {(!applications || applications.length === 0) ? (
-                <p className="text-sm text-gray-400 text-center py-4">
+                <p className="text-sm text-stone text-center py-4">
                   No applications on record
                 </p>
               ) : (
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-rooted-gray">
                   {(applications as Record<string, unknown>[]).map((app) => {
                     const campus = app.campus as Record<string, string> | null;
                     const grade = app.grade_level as Record<string, string> | null;
@@ -262,13 +262,13 @@ export default async function StudentDetailPage({
                       <Link
                         key={app.id as string}
                         href={`/staff/applications/${app.id}`}
-                        className="flex items-center justify-between py-3 hover:bg-gray-50 rounded-lg px-2 -mx-2 no-underline"
+                        className="flex items-center justify-between py-3 hover:bg-rooted-gray-light rounded-lg px-2 -mx-2 no-underline"
                       >
                         <div>
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-sm font-medium text-ink">
                             {campus?.name ?? ""} &middot; Grade {grade?.grade ?? ""}
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-stone">
                             {window?.name ?? ""} &middot;{" "}
                             {app.submitted_at
                               ? `Submitted ${new Date(app.submitted_at as string).toLocaleDateString("en-US")}`
@@ -296,11 +296,11 @@ export default async function StudentDetailPage({
             </CardHeader>
             <CardContent>
               {(!enrollments || enrollments.length === 0) ? (
-                <p className="text-sm text-gray-400 text-center py-4">
+                <p className="text-sm text-stone text-center py-4">
                   No enrollment records
                 </p>
               ) : (
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-rooted-gray">
                   {(enrollments as Record<string, unknown>[]).map((enr) => {
                     const campus = enr.campus as Record<string, string> | null;
                     const grade = enr.grade_level as Record<string, string> | null;
@@ -308,10 +308,10 @@ export default async function StudentDetailPage({
                     return (
                       <div key={enr.id as string} className="py-3 flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-sm font-medium text-ink">
                             {campus?.name ?? ""} &middot; Grade {grade?.grade ?? ""}
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-stone">
                             {year?.name ?? ""} &middot;{" "}
                             {enr.enrolled_at
                               ? `Enrolled ${new Date(enr.enrolled_at as string).toLocaleDateString("en-US")}`
@@ -323,7 +323,7 @@ export default async function StudentDetailPage({
                             {enr.status as string}
                           </Badge>
                           {(enr.sis_student_id as string | null) && (
-                            <span className="text-[10px] text-gray-400 font-mono">
+                            <span className="text-[10px] text-stone font-mono">
                               SIS: {enr.sis_student_id as string}
                             </span>
                           )}
@@ -343,18 +343,18 @@ export default async function StudentDetailPage({
             </CardHeader>
             <CardContent>
               {(!documents || documents.length === 0) ? (
-                <p className="text-sm text-gray-400 text-center py-4">
+                <p className="text-sm text-stone text-center py-4">
                   No documents uploaded
                 </p>
               ) : (
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-rooted-gray">
                   {(documents as Record<string, unknown>[]).map((doc) => (
                     <div key={doc.id as string} className="py-2 flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-ink">
                           {(doc.document_type as string)?.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())}
                         </p>
-                        <p className="text-xs text-gray-500">{doc.file_name as string}</p>
+                        <p className="text-xs text-stone">{doc.file_name as string}</p>
                       </div>
                       <Badge
                         variant={doc.status === "verified" ? "default" : doc.status === "rejected" ? "destructive" : "secondary"}
@@ -386,7 +386,7 @@ export default async function StudentDetailPage({
                   </p>
                 </div>
               ) : (
-                <p className="text-sm text-gray-400">No address on file</p>
+                <p className="text-sm text-stone">No address on file</p>
               )}
             </CardContent>
           </Card>
@@ -400,13 +400,13 @@ export default async function StudentDetailPage({
             </CardHeader>
             <CardContent>
               {guardians.length === 0 ? (
-                <p className="text-sm text-gray-400">No guardians linked</p>
+                <p className="text-sm text-stone">No guardians linked</p>
               ) : (
                 <div className="space-y-4">
                   {guardians.map((g) => (
-                    <div key={g.id} className="border-b border-gray-100 pb-3 last:border-0 last:pb-0">
+                    <div key={g.id} className="border-b border-rooted-gray pb-3 last:border-0 last:pb-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-ink">
                           {g.first_name} {g.last_name}
                         </p>
                         {g.is_primary && (
@@ -415,15 +415,15 @@ export default async function StudentDetailPage({
                           </Badge>
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 capitalize">
+                      <p className="text-xs text-stone capitalize">
                         {g.relationship?.replace(/_/g, " ")}
                         {g.is_legal_guardian ? " (Legal Guardian)" : ""}
                       </p>
                       {g.email && (
-                        <p className="text-xs text-gray-600 mt-1">{g.email}</p>
+                        <p className="text-xs text-ink/60 mt-1">{g.email}</p>
                       )}
                       {g.phone && (
-                        <p className="text-xs text-gray-600">{g.phone}</p>
+                        <p className="text-xs text-ink/60">{g.phone}</p>
                       )}
                     </div>
                   ))}
@@ -442,19 +442,19 @@ export default async function StudentDetailPage({
                 <dl className="space-y-2 text-sm">
                   {student.medical_allergies && (
                     <div>
-                      <dt className="text-gray-500 text-xs">Allergies</dt>
+                      <dt className="text-stone text-xs">Allergies</dt>
                       <dd className="font-medium">{student.medical_allergies}</dd>
                     </div>
                   )}
                   {student.medical_medications && (
                     <div>
-                      <dt className="text-gray-500 text-xs">Medications</dt>
+                      <dt className="text-stone text-xs">Medications</dt>
                       <dd className="font-medium">{student.medical_medications}</dd>
                     </div>
                   )}
                   {student.medical_conditions && (
                     <div>
-                      <dt className="text-gray-500 text-xs">Conditions</dt>
+                      <dt className="text-stone text-xs">Conditions</dt>
                       <dd className="font-medium">{student.medical_conditions}</dd>
                     </div>
                   )}
@@ -473,7 +473,7 @@ export default async function StudentDetailPage({
                 {student.emergency_contact_1_name && (
                   <div>
                     <p className="font-medium">{student.emergency_contact_1_name}</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-stone">
                       {student.emergency_contact_1_relationship} &middot; {student.emergency_contact_1_phone}
                     </p>
                   </div>
@@ -481,7 +481,7 @@ export default async function StudentDetailPage({
                 {student.emergency_contact_2_name && (
                   <div>
                     <p className="font-medium">{student.emergency_contact_2_name}</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-stone">
                       {student.emergency_contact_2_relationship} &middot; {student.emergency_contact_2_phone}
                     </p>
                   </div>
@@ -499,7 +499,7 @@ export default async function StudentDetailPage({
             </CardHeader>
             <CardContent>
               {(!notes || notes.length === 0) ? (
-                <p className="text-sm text-gray-400 text-center py-2">
+                <p className="text-sm text-stone text-center py-2">
                   No notes
                 </p>
               ) : (
@@ -507,9 +507,9 @@ export default async function StudentDetailPage({
                   {(notes as Record<string, unknown>[]).map((note) => {
                     const author = note.author as Record<string, string> | null;
                     return (
-                      <div key={note.id as string} className="border-b border-gray-100 pb-2 last:border-0">
-                        <p className="text-sm text-gray-800">{note.content as string}</p>
-                        <p className="text-[10px] text-gray-400 mt-1">
+                      <div key={note.id as string} className="border-b border-rooted-gray pb-2 last:border-0">
+                        <p className="text-sm text-ink">{note.content as string}</p>
+                        <p className="text-[10px] text-stone mt-1">
                           {author
                             ? `${author.first_name} ${author.last_name}`
                             : "System"}{" "}

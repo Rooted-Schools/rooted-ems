@@ -11,7 +11,7 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   update: { label: "Updated", color: "bg-blue-100 text-blue-800" },
   delete: { label: "Deleted", color: "bg-red-100 text-red-800" },
   status_change: { label: "Status Change", color: "bg-purple-100 text-purple-800" },
-  login: { label: "Login", color: "bg-gray-100 text-gray-800" },
+  login: { label: "Login", color: "bg-rooted-gray text-ink" },
   export: { label: "Export", color: "bg-amber-100 text-amber-800" },
 };
 
@@ -84,8 +84,8 @@ export default async function AuditTrailPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Audit Trail</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-ink">Audit Trail</h1>
+        <p className="text-sm text-stone mt-1">
           {count ?? 0} audit event{(count ?? 0) !== 1 ? "s" : ""} recorded
         </p>
       </div>
@@ -98,11 +98,11 @@ export default async function AuditTrailPage({
               <input type="hidden" name="campus" value={validCampus} />
             )}
             <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-gray-500">Table:</label>
+              <label className="text-xs font-medium text-stone">Table:</label>
               <select
                 name="table"
                 defaultValue={searchParams.table ?? ""}
-                className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white"
+                className="text-sm border border-stone/30 rounded-md px-2 py-1 bg-white"
               >
                 <option value="">All Tables</option>
                 {tables.map((t) => (
@@ -113,11 +113,11 @@ export default async function AuditTrailPage({
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-gray-500">Action:</label>
+              <label className="text-xs font-medium text-stone">Action:</label>
               <select
                 name="action"
                 defaultValue={searchParams.action ?? ""}
-                className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white"
+                className="text-sm border border-stone/30 rounded-md px-2 py-1 bg-white"
               >
                 <option value="">All Actions</option>
                 <option value="create">Create</option>
@@ -135,7 +135,7 @@ export default async function AuditTrailPage({
             {(searchParams.table || searchParams.action) && (
               <a
                 href={`/staff/audit${validCampus ? `?campus=${validCampus}` : ""}`}
-                className="text-xs text-gray-500 hover:text-gray-700 no-underline"
+                className="text-xs text-stone hover:text-ink/70 no-underline"
               >
                 Clear filters
               </a>
@@ -150,19 +150,19 @@ export default async function AuditTrailPage({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-gray-50">
-                  <th className="text-left py-2 px-4 font-medium text-gray-500 text-xs">Time</th>
-                  <th className="text-left py-2 px-4 font-medium text-gray-500 text-xs">Actor</th>
-                  <th className="text-left py-2 px-4 font-medium text-gray-500 text-xs">Action</th>
-                  <th className="text-left py-2 px-4 font-medium text-gray-500 text-xs">Table</th>
-                  <th className="text-left py-2 px-4 font-medium text-gray-500 text-xs">Campus</th>
-                  <th className="text-left py-2 px-4 font-medium text-gray-500 text-xs">Details</th>
+                <tr className="border-b bg-rooted-gray-light">
+                  <th className="text-left py-2 px-4 font-medium text-stone text-xs">Time</th>
+                  <th className="text-left py-2 px-4 font-medium text-stone text-xs">Actor</th>
+                  <th className="text-left py-2 px-4 font-medium text-stone text-xs">Action</th>
+                  <th className="text-left py-2 px-4 font-medium text-stone text-xs">Table</th>
+                  <th className="text-left py-2 px-4 font-medium text-stone text-xs">Campus</th>
+                  <th className="text-left py-2 px-4 font-medium text-stone text-xs">Details</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-rooted-gray">
                 {(!events || events.length === 0) ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-gray-400">
+                    <td colSpan={6} className="text-center py-8 text-stone">
                       No audit events found
                     </td>
                   </tr>
@@ -173,7 +173,7 @@ export default async function AuditTrailPage({
                     const action = event.action as string;
                     const actionCfg = ACTION_LABELS[action] ?? {
                       label: action,
-                      color: "bg-gray-100 text-gray-800",
+                      color: "bg-rooted-gray text-ink",
                     };
                     const oldData = event.old_data as Record<string, unknown> | null;
                     const newData = event.new_data as Record<string, unknown> | null;
@@ -198,8 +198,8 @@ export default async function AuditTrailPage({
                     }
 
                     return (
-                      <tr key={event.id as string} className="hover:bg-gray-50">
-                        <td className="py-2 px-4 text-xs text-gray-500 whitespace-nowrap">
+                      <tr key={event.id as string} className="hover:bg-rooted-gray-light">
+                        <td className="py-2 px-4 text-xs text-stone whitespace-nowrap">
                           {new Date(event.created_at as string).toLocaleDateString(
                             "en-US",
                             {
@@ -220,16 +220,16 @@ export default async function AuditTrailPage({
                             {actionCfg.label}
                           </Badge>
                         </td>
-                        <td className="py-2 px-4 text-xs text-gray-600">
+                        <td className="py-2 px-4 text-xs text-ink/60">
                           {TABLE_LABELS[event.table_name as string] ??
                             (event.table_name as string)}
                         </td>
-                        <td className="py-2 px-4 text-xs text-gray-500">
+                        <td className="py-2 px-4 text-xs text-stone">
                           {campus?.name ?? "—"}
                         </td>
-                        <td className="py-2 px-4 text-xs text-gray-500 max-w-xs truncate">
+                        <td className="py-2 px-4 text-xs text-stone max-w-xs truncate">
                           {changeSummary || (
-                            <span className="text-gray-300 font-mono text-[10px]">
+                            <span className="text-stone/50 font-mono text-[10px]">
                               {(event.record_id as string)?.slice(0, 8)}...
                             </span>
                           )}
@@ -247,14 +247,14 @@ export default async function AuditTrailPage({
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-stone">
             Page {page} of {totalPages}
           </p>
           <div className="flex gap-2">
             {page > 1 && (
               <a
                 href={`/staff/audit?page=${page - 1}${validCampus ? `&campus=${validCampus}` : ""}${searchParams.table ? `&table=${searchParams.table}` : ""}${searchParams.action ? `&action=${searchParams.action}` : ""}`}
-                className="text-sm px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 no-underline text-gray-700"
+                className="text-sm px-3 py-1 border border-stone/30 rounded-md hover:bg-rooted-gray-light no-underline text-ink/70"
               >
                 Previous
               </a>
@@ -262,7 +262,7 @@ export default async function AuditTrailPage({
             {page < totalPages && (
               <a
                 href={`/staff/audit?page=${page + 1}${validCampus ? `&campus=${validCampus}` : ""}${searchParams.table ? `&table=${searchParams.table}` : ""}${searchParams.action ? `&action=${searchParams.action}` : ""}`}
-                className="text-sm px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 no-underline text-gray-700"
+                className="text-sm px-3 py-1 border border-stone/30 rounded-md hover:bg-rooted-gray-light no-underline text-ink/70"
               >
                 Next
               </a>

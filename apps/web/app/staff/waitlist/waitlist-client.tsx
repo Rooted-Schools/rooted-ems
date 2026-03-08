@@ -85,8 +85,8 @@ export function WaitlistClient({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Waitlist</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-ink">Waitlist</h1>
+          <p className="text-sm text-stone mt-1">
             Students waiting for available seats, ordered by lottery rank.
           </p>
         </div>
@@ -105,23 +105,23 @@ export function WaitlistClient({
         return (
           <div className="space-y-2">
             <div className="flex items-center gap-3">
-              <p className="text-sm text-gray-500">
-                <span className="font-semibold text-gray-900">{total}</span> student{total !== 1 ? "s" : ""} waitlisted across all campuses
+              <p className="text-sm text-stone">
+                <span className="font-semibold text-ink">{total}</span> student{total !== 1 ? "s" : ""} waitlisted across all campuses
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {campusCounts.map((cc, idx) => (
                 <Card key={cc.campus_name} className={`border-t-4 ${borderColors[idx % borderColors.length]}`}>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
                       {cc.campus_name}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className={`text-2xl font-bold ${cc.count === 0 ? "text-gray-300" : ""}`}>
+                    <p className={`text-2xl font-bold ${cc.count === 0 ? "text-stone/50" : ""}`}>
                       {cc.count}
                     </p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-stone">
                       {cc.count === 0 ? "no students waiting" : `student${cc.count !== 1 ? "s" : ""} waiting`}
                     </p>
                   </CardContent>
@@ -175,7 +175,7 @@ export function WaitlistClient({
                       </TableCell>
                       <TableCell>{entry.grade}</TableCell>
                       <TableCell>{entry.campus_name}</TableCell>
-                      <TableCell className="text-gray-500">
+                      <TableCell className="text-stone">
                         {entry.added_at}
                       </TableCell>
                       <TableCell>

@@ -67,8 +67,8 @@ export default async function StaffLotteryPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Lottery</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-ink">Lottery</h1>
+          <p className="text-sm text-stone mt-1">
             Configure and run enrollment lotteries when demand exceeds capacity.
           </p>
         </div>
@@ -103,7 +103,7 @@ export default async function StaffLotteryPage({
 
             return (
               <Link key={run.id} href={`/staff/lottery/${run.id}`}>
-                <Card className="hover:border-gray-300 transition-colors cursor-pointer">
+                <Card className="hover:border-stone/30 transition-colors cursor-pointer">
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
@@ -118,11 +118,11 @@ export default async function StaffLotteryPage({
                   <CardContent>
                     <div className="flex items-center gap-6 text-sm">
                       <div>
-                        <span className="text-gray-500">Applicants:</span>{" "}
+                        <span className="text-stone">Applicants:</span>{" "}
                         <span className="font-medium">{run.total_applicants}</span>
                       </div>
                       <div>
-                        <span className="text-gray-500">Seats:</span>{" "}
+                        <span className="text-stone">Seats:</span>{" "}
                         <span className="font-medium">{run.total_seats}</span>
                       </div>
                       {overSubscribed && (
@@ -130,7 +130,7 @@ export default async function StaffLotteryPage({
                           {run.total_applicants - run.total_seats} over capacity
                         </Badge>
                       )}
-                      <div className="ml-auto text-gray-400 text-xs">
+                      <div className="ml-auto text-stone text-xs">
                         Created {run.created_at}
                       </div>
                     </div>

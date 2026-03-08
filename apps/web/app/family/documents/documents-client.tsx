@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useTransition } from "react";
+import { useState, useRef, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -103,8 +103,8 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Documents</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-ink">Documents</h1>
+          <p className="text-sm text-stone mt-1">
             Uploaded documents for your enrollment applications.
           </p>
         </div>
@@ -126,13 +126,13 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
             {pending > 0 && (
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                <span className="text-sm text-gray-600">{pending} pending review</span>
+                <span className="text-sm text-ink/60">{pending} pending review</span>
               </div>
             )}
             {verified > 0 && (
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                <span className="text-sm text-gray-600">{verified} verified</span>
+                <span className="text-sm text-ink/60">{verified} verified</span>
               </div>
             )}
             {rejected > 0 && (
@@ -187,17 +187,17 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
                 return (
                   <div
                     key={doc.id}
-                    className="flex items-center justify-between p-3 rounded-md border border-gray-200"
+                    className="flex items-center justify-between p-3 rounded-md border border-stone/20"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="text-xl shrink-0" aria-hidden="true">
                         📄
                       </span>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                        <p className="text-sm font-medium text-ink truncate">
                           {doc.file_name}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-stone">
                           {formatDocType(doc.document_type)}
                           {sizeStr && <> &middot; {sizeStr}</>}
                           {" "}&middot; Uploaded {formatDate(doc.created_at)}
@@ -270,6 +270,17 @@ function UploadDialog({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Reset form state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setSelectedApp(applications[0]?.id ?? "");
+      setDocType("birth_certificate");
+      setSelectedFile(null);
+      setValidationError(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }, [open, applications]);
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -349,13 +360,13 @@ function UploadDialog({
         <div className="space-y-4 py-4">
           {/* Application selector */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink/70 mb-1">
               Application
             </label>
             <select
               value={selectedApp}
               onChange={(e) => setSelectedApp(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+              className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
             >
               {applications.map((app) => (
                 <option key={app.id} value={app.id}>
@@ -367,13 +378,13 @@ function UploadDialog({
 
           {/* Document type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink/70 mb-1">
               Document Type
             </label>
             <select
               value={docType}
               onChange={(e) => setDocType(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+              className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
             >
               {documentTypes.map((dt) => (
                 <option key={dt.value} value={dt.value}>
@@ -385,7 +396,7 @@ function UploadDialog({
 
           {/* File input */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink/70 mb-1">
               File
             </label>
             <input
@@ -393,13 +404,13 @@ function UploadDialog({
               type="file"
               accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
               onChange={handleFileSelect}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 file:mr-3 file:px-3 file:py-1 file:rounded file:border-0 file:bg-rooted-green/10 file:text-rooted-green file:font-medium file:text-sm file:cursor-pointer"
+              className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 file:mr-3 file:px-3 file:py-1 file:rounded file:border-0 file:bg-rooted-green/10 file:text-rooted-green file:font-medium file:text-sm file:cursor-pointer"
             />
             {validationError && (
               <p className="text-xs text-red-600 mt-1">{validationError}</p>
             )}
             {selectedFile && !validationError && (
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-stone mt-1">
                 {selectedFile.name} ({formatFileSize(selectedFile.size)})
               </p>
             )}

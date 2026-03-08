@@ -7,6 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -59,9 +67,9 @@ function formatDateTime(dateStr: string | null) {
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between py-2 border-b border-gray-50 last:border-0">
-      <span className="text-sm text-gray-500">{label}</span>
-      <span className="text-sm font-medium text-gray-900 text-right">{value}</span>
+    <div className="flex justify-between py-2 border-b border-rooted-gray last:border-0">
+      <span className="text-sm text-stone">{label}</span>
+      <span className="text-sm font-medium text-ink text-right">{value}</span>
     </div>
   );
 }
@@ -79,6 +87,12 @@ export function StaffLotteryDetailClient({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // Dialog state
+  const [finalizeDialogOpen, setFinalizeDialogOpen] = useState(false);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [sendOffersDialogOpen, setSendOffersDialogOpen] = useState(false);
+  const [offerExpiresIn, setOfferExpiresIn] = useState("14");
 
   /* ─── Action Handlers ─── */
 
@@ -98,7 +112,12 @@ export function StaffLotteryDetailClient({
 
   function handleFinalize() {
     if (!run) return;
-    if (!confirm("Finalize this lottery as official? This creates an immutable record of results and cannot be undone.")) return;
+    setFinalizeDialogOpen(true);
+  }
+
+  function doFinalize() {
+    if (!run) return;
+    setFinalizeDialogOpen(false);
     setFeedback(null);
     startTransition(async () => {
       const result = await staffFinalizeLottery(run.id, staffUserId);
@@ -113,7 +132,12 @@ export function StaffLotteryDetailClient({
 
   function handleArchive() {
     if (!run) return;
-    if (!confirm("Archive this lottery run? It will be moved to archived status.")) return;
+    setArchiveDialogOpen(true);
+  }
+
+  function doArchive() {
+    if (!run) return;
+    setArchiveDialogOpen(false);
     setFeedback(null);
     startTransition(async () => {
       const result = await staffArchiveLottery(run.id);
@@ -128,10 +152,15 @@ export function StaffLotteryDetailClient({
 
   function handleSendOffers() {
     if (!run) return;
-    // Default offer expiration: 14 days from now
-    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-    if (!confirm("Send enrollment offers to all selected students? Offers will expire in 14 days.")) return;
+    setOfferExpiresIn("14");
+    setSendOffersDialogOpen(true);
+  }
+
+  function doSendOffers() {
+    if (!run) return;
+    setSendOffersDialogOpen(false);
     setFeedback(null);
+    const expiresAt = new Date(Date.now() + parseInt(offerExpiresIn, 10) * 24 * 60 * 60 * 1000).toISOString();
     startTransition(async () => {
       const result = await staffSendLotteryOffers(run.id, expiresAt, staffUserId);
       if (result.error) {
@@ -174,7 +203,7 @@ export function StaffLotteryDetailClient({
         </Link>
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-gray-500">Lottery run not found.</p>
+            <p className="text-stone">Lottery run not found.</p>
           </CardContent>
         </Card>
       </div>
@@ -246,10 +275,10 @@ export function StaffLotteryDetailClient({
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">{run.name}</h1>
+            <h1 className="text-2xl font-bold text-ink">{run.name}</h1>
             <Badge variant={s.variant}>{s.label}</Badge>
           </div>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-stone mt-1">
             {run.campus} &middot; {run.grade}
           </p>
         </div>
@@ -262,63 +291,63 @@ export function StaffLotteryDetailClient({
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card className="border-t-4 border-t-rooted-green">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Applicants
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-rooted-green">{run.applicants}</p>
-            <p className="text-xs text-gray-400 mt-1">entered in lottery</p>
+            <p className="text-xs text-stone mt-1">entered in lottery</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-blue-500">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Seats
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-blue-600">{run.seats}</p>
-            <p className="text-xs text-gray-400 mt-1">available capacity</p>
+            <p className="text-xs text-stone mt-1">available capacity</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-emerald-500">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Offered
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-emerald-600">{offeredCount}</p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-stone mt-1">
               {offeredCount === 0 ? "run lottery first" : "seats offered"}
             </p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-amber-500">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Waitlisted
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-amber-600">{waitlistedCount}</p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-stone mt-1">
               {waitlistedCount === 0 ? "none" : "waiting for seats"}
             </p>
           </CardContent>
         </Card>
-        <Card className={`border-t-4 ${overSubscribed ? "border-t-red-500" : "border-t-gray-300"}`}>
+        <Card className={`border-t-4 ${overSubscribed ? "border-t-red-500" : "border-t-stone/30"}`}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Over Capacity
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className={`text-2xl font-bold ${overSubscribed ? "text-red-600" : "text-gray-300"}`}>
+            <p className={`text-2xl font-bold ${overSubscribed ? "text-red-600" : "text-stone/50"}`}>
               {overSubscribed ? `+${run.applicants - run.seats}` : "0"}
             </p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-stone mt-1">
               {overSubscribed
                 ? `${Math.round((run.applicants / run.seats) * 100)}% demand ratio`
                 : "within capacity"}
@@ -352,16 +381,16 @@ export function StaffLotteryDetailClient({
             <DetailRow label="Sibling Preference" value={run.ruleSet.siblingPreference ? "Enabled" : "Disabled"} />
             {run.ruleSet.priorityTiers.length > 0 && (
               <div className="mt-3">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                <p className="text-xs font-medium text-stone uppercase tracking-wider mb-2">
                   Priority Tiers
                 </p>
                 <div className="space-y-1.5">
                   {run.ruleSet.priorityTiers.map((tier, idx) => (
                     <div key={idx} className="flex items-center gap-2">
-                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 text-xs font-semibold text-gray-600">
+                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-rooted-gray text-xs font-semibold text-ink/60">
                         {idx + 1}
                       </span>
-                      <span className="text-sm text-gray-700">{tier}</span>
+                      <span className="text-sm text-ink/70">{tier}</span>
                     </div>
                   ))}
                 </div>
@@ -385,7 +414,7 @@ export function StaffLotteryDetailClient({
         <CardContent className="px-0">
           {entrants.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-stone">
                 No entrants assigned to this lottery run yet.
               </p>
             </div>
@@ -412,14 +441,14 @@ export function StaffLotteryDetailClient({
                         </TableCell>
                       )}
                       <TableCell className="font-medium">{entrant.studentName}</TableCell>
-                      <TableCell className="text-gray-500">{entrant.guardianName}</TableCell>
+                      <TableCell className="text-stone">{entrant.guardianName}</TableCell>
                       <TableCell>
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-xs font-semibold text-gray-600">
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-rooted-gray text-xs font-semibold text-ink/60">
                           {entrant.priorityTier}
                         </span>
                       </TableCell>
                       {run.status !== "draft" && (
-                        <TableCell className="font-mono text-xs text-gray-500">
+                        <TableCell className="font-mono text-xs text-stone">
                           {entrant.randomNumber?.toFixed(4) ?? "\u2014"}
                         </TableCell>
                       )}
@@ -436,11 +465,101 @@ export function StaffLotteryDetailClient({
       </Card>
 
       {/* Footer metadata */}
-      <div className="flex gap-6 text-xs text-gray-400 pb-4">
+      <div className="flex gap-6 text-xs text-stone pb-4">
         <span>Lottery ID: {run.id}</span>
         <span>Created: {formatDate(run.createdAt)}</span>
         <span>Updated: {formatDate(run.updatedAt)}</span>
       </div>
+
+      {/* ─── Finalize Confirmation Dialog ─── */}
+      <Dialog open={finalizeDialogOpen} onOpenChange={setFinalizeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Finalize Lottery</DialogTitle>
+            <DialogDescription>
+              This creates an immutable record of results and cannot be undone. Once finalized, you can send enrollment offers.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm space-y-1">
+            <p className="font-medium text-ink">{run.name}</p>
+            <p className="text-stone">{run.campus} &middot; {run.grade}</p>
+            <p className="text-stone">{offeredCount} offered &middot; {waitlistedCount} waitlisted</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFinalizeDialogOpen(false)}>Cancel</Button>
+            <Button onClick={doFinalize} className="bg-rooted-green hover:bg-rooted-green/90 text-white">
+              Finalize as Official
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Archive Confirmation Dialog ─── */}
+      <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Archive Lottery Run</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to archive this lottery run? It will be moved to archived status.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg bg-rooted-gray-light p-3 text-sm space-y-1">
+            <p className="font-medium text-ink">{run.name}</p>
+            <p className="text-stone">{run.campus} &middot; {run.grade}</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setArchiveDialogOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={doArchive}>Archive</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Send Offers Dialog ─── */}
+      <Dialog open={sendOffersDialogOpen} onOpenChange={setSendOffersDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Enrollment Offers</DialogTitle>
+            <DialogDescription>
+              Send seat offers to all {offeredCount} selected student{offeredCount !== 1 ? "s" : ""}. Choose how long families have to respond.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm space-y-1">
+              <p className="font-medium text-ink">{run.name}</p>
+              <p className="text-stone">{run.campus} &middot; {run.grade}</p>
+              <p className="text-emerald-700 font-medium">{offeredCount} offer{offeredCount !== 1 ? "s" : ""} will be sent</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-ink/70 mb-1">Response Deadline</label>
+              <select
+                value={offerExpiresIn}
+                onChange={(e) => setOfferExpiresIn(e.target.value)}
+                className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+              >
+                <option value="7">7 days</option>
+                <option value="10">10 days</option>
+                <option value="14">14 days</option>
+                <option value="21">21 days</option>
+                <option value="30">30 days</option>
+              </select>
+              <p className="text-xs text-stone mt-1">
+                Offers will expire on{" "}
+                {new Date(Date.now() + parseInt(offerExpiresIn, 10) * 24 * 60 * 60 * 1000).toLocaleDateString("en-US", {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSendOffersDialogOpen(false)}>Cancel</Button>
+            <Button onClick={doSendOffers} className="bg-rooted-green hover:bg-rooted-green/90 text-white">
+              Send {offeredCount} Offer{offeredCount !== 1 ? "s" : ""}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

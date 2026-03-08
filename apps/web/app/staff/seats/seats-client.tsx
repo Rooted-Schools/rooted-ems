@@ -72,8 +72,8 @@ export function SeatsClient({ rows }: SeatsClientProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Seat Management</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-ink">Seat Management</h1>
+        <p className="text-sm text-stone mt-1">
           Capacity planning and real-time seat availability across all campuses
         </p>
       </div>
@@ -94,59 +94,59 @@ export function SeatsClient({ rows }: SeatsClientProps) {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card className="border-t-4 border-t-rooted-green">
           <CardContent className="pt-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <p className="text-xs font-medium text-stone uppercase tracking-wider">
               Total Seats
             </p>
             <p className="text-3xl font-bold text-rooted-green mt-1">{totalSeats}</p>
-            <p className="text-xs text-gray-400 mt-1">across all grades</p>
+            <p className="text-xs text-stone mt-1">across all grades</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-blue-500">
           <CardContent className="pt-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <p className="text-xs font-medium text-stone uppercase tracking-wider">
               Offered
             </p>
             <p className="text-3xl font-bold text-blue-600 mt-1">
               {totalOffered}
             </p>
-            <p className="text-xs text-gray-400 mt-1">pending acceptance</p>
+            <p className="text-xs text-stone mt-1">pending acceptance</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-amber-500">
           <CardContent className="pt-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <p className="text-xs font-medium text-stone uppercase tracking-wider">
               Accepted
             </p>
             <p className="text-3xl font-bold text-amber-600 mt-1">
               {totalAccepted}
             </p>
-            <p className="text-xs text-gray-400 mt-1">completing registration</p>
+            <p className="text-xs text-stone mt-1">completing registration</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-emerald-500">
           <CardContent className="pt-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <p className="text-xs font-medium text-stone uppercase tracking-wider">
               Registered
             </p>
             <p className="text-3xl font-bold text-emerald-600 mt-1">
               {totalRegistered}
             </p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-stone mt-1">
               {totalSeats > 0
                 ? `${Math.round((totalRegistered / totalSeats) * 100)}% fill rate`
                 : "fully enrolled"}
             </p>
           </CardContent>
         </Card>
-        <Card className={`border-t-4 ${totalAvailable <= 5 ? "border-t-red-500" : "border-t-gray-400"}`}>
+        <Card className={`border-t-4 ${totalAvailable <= 5 ? "border-t-red-500" : "border-t-stone"}`}>
           <CardContent className="pt-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <p className="text-xs font-medium text-stone uppercase tracking-wider">
               Available
             </p>
-            <p className={`text-3xl font-bold mt-1 ${totalAvailable <= 0 ? "text-red-600" : totalAvailable <= 5 ? "text-amber-600" : "text-gray-600"}`}>
+            <p className={`text-3xl font-bold mt-1 ${totalAvailable <= 0 ? "text-red-600" : totalAvailable <= 5 ? "text-amber-600" : "text-ink/60"}`}>
               {totalAvailable}
             </p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-stone mt-1">
               {totalAvailable <= 0 ? "at capacity" : "seats remaining"}
             </p>
           </CardContent>
@@ -174,7 +174,7 @@ export function SeatsClient({ rows }: SeatsClientProps) {
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-32 h-3 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="w-32 h-3 bg-rooted-gray rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full ${
                         campusFill >= 90
@@ -186,7 +186,7 @@ export function SeatsClient({ rows }: SeatsClientProps) {
                       style={{ width: `${campusFill}%` }}
                     />
                   </div>
-                  <span className="text-sm font-medium text-gray-600">
+                  <span className="text-sm font-medium text-ink/60">
                     {campusFill}%
                   </span>
                 </div>
@@ -196,29 +196,29 @@ export function SeatsClient({ rows }: SeatsClientProps) {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-2 text-xs font-medium text-gray-500">
+                    <tr className="border-b border-stone/20">
+                      <th className="text-left py-2 text-xs font-medium text-stone">
                         Grade
                       </th>
-                      <th className="text-right py-2 text-xs font-medium text-gray-500">
+                      <th className="text-right py-2 text-xs font-medium text-stone">
                         Total
                       </th>
-                      <th className="text-right py-2 text-xs font-medium text-gray-500">
+                      <th className="text-right py-2 text-xs font-medium text-stone">
                         Offered
                       </th>
-                      <th className="text-right py-2 text-xs font-medium text-gray-500">
+                      <th className="text-right py-2 text-xs font-medium text-stone">
                         Accepted
                       </th>
-                      <th className="text-right py-2 text-xs font-medium text-gray-500">
+                      <th className="text-right py-2 text-xs font-medium text-stone">
                         Registered
                       </th>
-                      <th className="text-right py-2 text-xs font-medium text-gray-500">
+                      <th className="text-right py-2 text-xs font-medium text-stone">
                         Available
                       </th>
-                      <th className="text-right py-2 text-xs font-medium text-gray-500">
+                      <th className="text-right py-2 text-xs font-medium text-stone">
                         Fill
                       </th>
-                      <th className="text-right py-2 text-xs font-medium text-gray-500 w-20">
+                      <th className="text-right py-2 text-xs font-medium text-stone w-20">
                         Edit
                       </th>
                     </tr>
@@ -227,9 +227,9 @@ export function SeatsClient({ rows }: SeatsClientProps) {
                     {campusRows.map((row) => (
                       <tr
                         key={row.id}
-                        className="border-b border-gray-100 last:border-0"
+                        className="border-b border-rooted-gray last:border-0"
                       >
-                        <td className="py-2.5 font-medium text-gray-900">
+                        <td className="py-2.5 font-medium text-ink">
                           Grade {row.grade}
                         </td>
                         <td className="py-2.5 text-right">
@@ -242,7 +242,7 @@ export function SeatsClient({ rows }: SeatsClientProps) {
                               }
                               min={0}
                               max={999}
-                              className="w-16 px-2 py-1 text-right border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                              className="w-16 px-2 py-1 text-right border border-stone/30 rounded text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                               autoFocus
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") handleSave(row.id);
@@ -250,7 +250,7 @@ export function SeatsClient({ rows }: SeatsClientProps) {
                               }}
                             />
                           ) : (
-                            <span className="text-gray-600">
+                            <span className="text-ink/60">
                               {row.total_seats}
                             </span>
                           )}
@@ -279,7 +279,7 @@ export function SeatsClient({ rows }: SeatsClientProps) {
                         </td>
                         <td className="py-2.5 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="w-16 h-2 bg-rooted-gray rounded-full overflow-hidden">
                               <div
                                 className={`h-full rounded-full ${
                                   row.fill_pct >= 90
@@ -291,7 +291,7 @@ export function SeatsClient({ rows }: SeatsClientProps) {
                                 style={{ width: `${row.fill_pct}%` }}
                               />
                             </div>
-                            <span className="text-xs text-gray-500 w-8 text-right">
+                            <span className="text-xs text-stone w-8 text-right">
                               {row.fill_pct}%
                             </span>
                           </div>
@@ -320,7 +320,7 @@ export function SeatsClient({ rows }: SeatsClientProps) {
                           ) : (
                             <button
                               onClick={() => handleEdit(row)}
-                              className="text-xs text-gray-400 hover:text-rooted-green transition-colors"
+                              className="text-xs text-stone hover:text-rooted-green transition-colors"
                               title="Edit total seats"
                             >
                               ✏️
@@ -340,7 +340,7 @@ export function SeatsClient({ rows }: SeatsClientProps) {
       {rows.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-gray-400">
+            <p className="text-stone">
               No capacity plans configured. Add capacity plans in Settings.
             </p>
           </CardContent>

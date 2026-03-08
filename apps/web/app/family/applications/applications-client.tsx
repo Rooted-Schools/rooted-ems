@@ -60,8 +60,8 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">My Applications</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-ink">My Applications</h1>
+          <p className="text-sm text-stone mt-1">
             Track the status of your children&apos;s enrollment applications.
           </p>
         </div>
@@ -110,7 +110,7 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
                       <CardTitle className="text-base">
                         {app.student_name}
                       </CardTitle>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-stone">
                         {getGradeLabel(app.grade)} &middot; {app.campus_name}
                       </p>
                     </div>
@@ -119,7 +119,7 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {statusMessage && (
-                    <p className="text-sm text-gray-600">{statusMessage}</p>
+                    <p className="text-sm text-ink/60">{statusMessage}</p>
                   )}
 
                   {needsAction && (
@@ -127,7 +127,7 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
                       <p className="text-xs font-medium text-amber-800 mb-1">
                         Action needed
                       </p>
-                      <p className="text-sm text-gray-700">
+                      <p className="text-sm text-ink/70">
                         {isDraft
                           ? "Complete and submit your application before the enrollment window closes."
                           : app.status === "needs_info"
@@ -137,8 +137,8 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                    <div className="flex gap-4 text-xs text-gray-400">
+                  <div className="flex items-center justify-between pt-2 border-t border-rooted-gray">
+                    <div className="flex gap-4 text-xs text-stone">
                       {app.submitted_at && (
                         <span>Submitted: {formatDate(app.submitted_at)}</span>
                       )}

@@ -94,7 +94,9 @@ const offerStatusConfig: Record<
 
 function getDaysUntilExpiry(expiresAt: string): number | null {
   if (!expiresAt) return null;
-  const exp = new Date(expiresAt.includes("T") ? expiresAt : expiresAt + "T23:59:59");
+  // Handle both ISO timestamps and pre-formatted dates like "Mar 7, 2026"
+  const exp = new Date(expiresAt);
+  if (isNaN(exp.getTime())) return null;
   return Math.max(0, Math.ceil((exp.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
 }
 
@@ -130,6 +132,15 @@ export function OffersClient({
   const [selectedAppId, setSelectedAppId] = useState("");
   const [expiresIn, setExpiresIn] = useState("14");
   const [creatingOffer, setCreatingOffer] = useState(false);
+
+  // Promote dialog state
+  const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
+  const [promotePositionId, setPromotePositionId] = useState<string | null>(null);
+  const [promoteExpiresIn, setPromoteExpiresIn] = useState("14");
+
+  // Remove confirmation dialog state
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [removePositionId, setRemovePositionId] = useState<string | null>(null);
 
   async function handleRevoke(offerId: string) {
     setLoading(offerId);
@@ -199,27 +210,43 @@ export function OffersClient({
     setCreatingOffer(false);
   }
 
-  // Waitlist actions
-  async function handlePromote(positionId: string) {
-    setLoading(positionId);
+  // Waitlist actions — open dialogs instead of hardcoding
+  function handlePromote(positionId: string) {
+    setPromotePositionId(positionId);
+    setPromoteExpiresIn("14");
+    setPromoteDialogOpen(true);
+  }
+
+  async function doPromote() {
+    if (!promotePositionId) return;
+    setPromoteDialogOpen(false);
+    setLoading(promotePositionId);
     setError(null);
     setSuccess(null);
-    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-    const result = await staffPromoteFromWaitlist(positionId, staffUserId, expiresAt);
+    const expiresAt = new Date(Date.now() + parseInt(promoteExpiresIn, 10) * 24 * 60 * 60 * 1000).toISOString();
+    const result = await staffPromoteFromWaitlist(promotePositionId, staffUserId, expiresAt);
     if (result.error) setError(result.error);
     else { setSuccess("Student promoted from waitlist — offer sent."); router.refresh(); }
     setLoading(null);
+    setPromotePositionId(null);
   }
 
-  async function handleRemove(positionId: string) {
-    if (!confirm("Are you sure you want to remove this student from the waitlist?")) return;
-    setLoading(positionId);
+  function handleRemove(positionId: string) {
+    setRemovePositionId(positionId);
+    setRemoveDialogOpen(true);
+  }
+
+  async function doRemove() {
+    if (!removePositionId) return;
+    setRemoveDialogOpen(false);
+    setLoading(removePositionId);
     setError(null);
     setSuccess(null);
-    const result = await staffRemoveFromWaitlist(positionId, "Removed by staff.");
+    const result = await staffRemoveFromWaitlist(removePositionId, "Removed by staff.");
     if (result.error) setError(result.error);
     else { setSuccess("Student removed from waitlist."); router.refresh(); }
     setLoading(null);
+    setRemovePositionId(null);
   }
 
   const totalWaitlisted = waitlistCampusCounts.reduce((sum, c) => sum + c.count, 0);
@@ -228,8 +255,8 @@ export function OffersClient({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Offers & Waitlist</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-ink">Offers & Waitlist</h1>
+          <p className="text-sm text-stone mt-1">
             Manage seat offers and waitlisted students.
           </p>
         </div>
@@ -248,13 +275,13 @@ export function OffersClient({
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-ink/70 mb-1">
                   Applicant
                 </label>
                 <select
                   value={selectedAppId}
                   onChange={(e) => setSelectedAppId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                  className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                 >
                   <option value="">Select an applicant...</option>
                   {eligibleApplicants.map((a) => (
@@ -265,13 +292,13 @@ export function OffersClient({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-ink/70 mb-1">
                   Response Deadline
                 </label>
                 <select
                   value={expiresIn}
                   onChange={(e) => setExpiresIn(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                  className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                 >
                   <option value="7">7 days</option>
                   <option value="10">10 days</option>
@@ -286,12 +313,12 @@ export function OffersClient({
                 const expDate = new Date();
                 expDate.setDate(expDate.getDate() + parseInt(expiresIn, 10));
                 return (
-                  <div className="rounded-lg bg-gray-50 p-3 text-sm">
-                    <p className="font-medium text-gray-900">{a.student_name}</p>
-                    <p className="text-gray-500">
+                  <div className="rounded-lg bg-rooted-gray-light p-3 text-sm">
+                    <p className="font-medium text-ink">{a.student_name}</p>
+                    <p className="text-stone">
                       {a.campus_name} · Grade {a.grade}
                     </p>
-                    <p className="text-gray-500 mt-1">
+                    <p className="text-stone mt-1">
                       Offer expires: {expDate.toLocaleDateString("en-US", {
                         month: "long",
                         day: "numeric",
@@ -354,52 +381,52 @@ export function OffersClient({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card className="border-t-4 border-t-rooted-green">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
                     Total Offers
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-bold text-rooted-green">{stats.total}</p>
-                  <p className="text-xs text-gray-400 mt-1">all time</p>
+                  <p className="text-xs text-stone mt-1">all time</p>
                 </CardContent>
               </Card>
               <Card className="border-t-4 border-t-amber-500">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
                     Pending Response
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
-                  <p className="text-xs text-gray-400 mt-1">awaiting family reply</p>
+                  <p className="text-xs text-stone mt-1">awaiting family reply</p>
                 </CardContent>
               </Card>
               <Card className="border-t-4 border-t-emerald-500">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
                     Accepted
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-bold text-emerald-600">{stats.accepted}</p>
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-stone mt-1">
                     {stats.total > 0
                       ? `${Math.round((stats.accepted / stats.total) * 100)}% acceptance rate`
                       : "no offers yet"}
                   </p>
                 </CardContent>
               </Card>
-              <Card className="border-t-4 border-t-gray-400">
+              <Card className="border-t-4 border-t-stone">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
                     Declined / Expired
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className={`text-2xl font-bold ${stats.declined_or_expired === 0 ? "text-gray-300" : "text-red-600"}`}>
+                  <p className={`text-2xl font-bold ${stats.declined_or_expired === 0 ? "text-stone/50" : "text-red-600"}`}>
                     {stats.declined_or_expired}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-stone mt-1">
                     {stats.declined_or_expired === 0 ? "none" : "lost offers"}
                   </p>
                 </CardContent>
@@ -472,10 +499,10 @@ export function OffersClient({
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell className="text-gray-500">
+                            <TableCell className="text-stone">
                               {offer.offered_at}
                             </TableCell>
-                            <TableCell className={isUrgent ? "text-red-600 font-medium" : "text-gray-500"}>
+                            <TableCell className={isUrgent ? "text-red-600 font-medium" : "text-stone"}>
                               {offer.expires_at}
                             </TableCell>
                             <TableCell>
@@ -533,15 +560,15 @@ export function OffersClient({
                   {waitlistCampusCounts.map((cc, idx) => (
                     <Card key={cc.campus_name} className={`border-t-4 ${borderColors[idx % borderColors.length]}`}>
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
                           {cc.campus_name}
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <p className={`text-2xl font-bold ${cc.count === 0 ? "text-gray-300" : ""}`}>
+                        <p className={`text-2xl font-bold ${cc.count === 0 ? "text-stone/50" : ""}`}>
                           {cc.count}
                         </p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-stone">
                           {cc.count === 0 ? "no students waiting" : `student${cc.count !== 1 ? "s" : ""} waiting`}
                         </p>
                       </CardContent>
@@ -594,7 +621,7 @@ export function OffersClient({
                             </TableCell>
                             <TableCell>{entry.grade}</TableCell>
                             <TableCell>{entry.campus_name}</TableCell>
-                            <TableCell className="text-gray-500">
+                            <TableCell className="text-stone">
                               {entry.added_at}
                             </TableCell>
                             <TableCell>
@@ -628,6 +655,95 @@ export function OffersClient({
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* ─── Promote from Waitlist Dialog ─── */}
+      <Dialog open={promoteDialogOpen} onOpenChange={setPromoteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Promote from Waitlist</DialogTitle>
+            <DialogDescription>
+              This will send a seat offer to the next student on the waitlist. Choose how long the family has to respond.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {promotePositionId && (() => {
+              const entry = waitlistEntries.find((e) => e.id === promotePositionId);
+              if (!entry) return null;
+              const expDate = new Date();
+              expDate.setDate(expDate.getDate() + parseInt(promoteExpiresIn, 10));
+              return (
+                <>
+                  <div className="rounded-lg bg-rooted-gray-light p-3 text-sm">
+                    <p className="font-medium text-ink">{entry.student_name}</p>
+                    <p className="text-stone">
+                      {entry.campus_name} · Grade {entry.grade} · Waitlist #{entry.position}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-ink/70 mb-1">
+                      Response Deadline
+                    </label>
+                    <select
+                      value={promoteExpiresIn}
+                      onChange={(e) => setPromoteExpiresIn(e.target.value)}
+                      className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                    >
+                      <option value="7">7 days</option>
+                      <option value="10">10 days</option>
+                      <option value="14">14 days</option>
+                      <option value="21">21 days</option>
+                      <option value="30">30 days</option>
+                    </select>
+                    <p className="text-xs text-stone mt-1">
+                      Offer will expire on {expDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                    </p>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPromoteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={doPromote} className="bg-rooted-green hover:bg-rooted-green/90 text-white">
+              Send Offer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Remove from Waitlist Confirmation ─── */}
+      <Dialog open={removeDialogOpen} onOpenChange={setRemoveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove from Waitlist</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove this student from the waitlist? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {removePositionId && (() => {
+            const entry = waitlistEntries.find((e) => e.id === removePositionId);
+            if (!entry) return null;
+            return (
+              <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm">
+                <p className="font-medium text-ink">{entry.student_name}</p>
+                <p className="text-stone">
+                  {entry.campus_name} · Grade {entry.grade} · Waitlist #{entry.position}
+                </p>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={doRemove}>
+              Remove Student
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

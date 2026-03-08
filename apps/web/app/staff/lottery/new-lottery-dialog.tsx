@@ -108,8 +108,8 @@ export function NewLotteryRunDialog({
   }
 
   const selectClasses =
-    "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-rooted-green focus:outline-none focus:ring-1 focus:ring-rooted-green";
-  const labelClasses = "block text-sm font-medium text-gray-700 mb-1";
+    "w-full rounded-lg border border-stone/30 bg-white px-3 py-2 text-sm text-ink focus:border-rooted-green focus:outline-none focus:ring-1 focus:ring-rooted-green";
+  const labelClasses = "block text-sm font-medium text-ink/70 mb-1";
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -196,7 +196,7 @@ export function NewLotteryRunDialog({
               onChange={(e) => { setTotalSeats(e.target.value); setError(null); }}
               disabled={isPending}
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-stone mt-1">
               Number of seats available for this grade level
             </p>
           </div>

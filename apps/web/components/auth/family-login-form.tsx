@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { createBrowserClient } from "@rooted-ems/database";
 
@@ -25,6 +26,7 @@ function createOtpClient() {
 }
 
 export function FamilyLoginForm() {
+  const searchParams = useSearchParams();
   const [method] = useState<LoginMethod>("email");
   const [value, setValue] = useState("");
   const [otpSent, setOtpSent] = useState(false);
@@ -34,6 +36,16 @@ export function FamilyLoginForm() {
   const [cooldown, setCooldown] = useState(0);
 
   const otpClientRef = useRef(createOtpClient());
+  const campusParam = searchParams.get("campus");
+
+  // Surface auth callback errors (e.g. magic link failures)
+  useEffect(() => {
+    const urlError = searchParams.get("error");
+    const urlErrorDesc = searchParams.get("error_description");
+    if (urlError) {
+      setError(urlErrorDesc || "Login failed. Please try again.");
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -101,13 +113,24 @@ export function FamilyLoginForm() {
 
       if (data.session) {
         const ssrClient = createBrowserClient();
-        await ssrClient.auth.setSession({
+        const { error: sessionError } = await ssrClient.auth.setSession({
           access_token: data.session.access_token,
           refresh_token: data.session.refresh_token,
         });
+        if (sessionError) {
+          setError("Failed to establish session. Please try again.");
+          return;
+        }
+      } else {
+        setError("No session returned. Please try again.");
+        return;
       }
 
-      window.location.href = "/family/dashboard";
+      // Sanitize campus param to prevent injection
+      const safeCampus = campusParam?.replace(/[^a-zA-Z0-9]/g, "") || "";
+      window.location.href = safeCampus
+        ? `/family/applications/new?campus=${safeCampus}`
+        : "/family/dashboard";
     } catch {
       setError("Verification failed. Please try again.");
     } finally {
@@ -124,7 +147,7 @@ export function FamilyLoginForm() {
       const { error: authError } = await oauthClient.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=/family/dashboard`,
+          redirectTo: `${window.location.origin}/auth/callback?next=${campusParam ? `/family/applications/new?campus=${campusParam}` : "/family/dashboard"}`,
           queryParams: { prompt: "select_account" },
         },
       });
@@ -161,7 +184,7 @@ export function FamilyLoginForm() {
             type="button"
             onClick={handleGoogleLogin}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-stone/30 rounded-md bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-stone/30 rounded-md bg-white hover:bg-rooted-gray-light disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -243,10 +266,14 @@ export function FamilyLoginForm() {
                 id="otp-code"
                 type="text"
                 inputMode="numeric"
-                maxLength={6}
                 autoComplete="one-time-code"
                 value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                maxLength={6}
+                onChange={(e) => {
+                  // Strip everything except digits, allow pasting codes with spaces/dashes
+                  const cleaned = e.target.value.replace(/[^0-9]/g, "").slice(0, 6);
+                  setOtp(cleaned);
+                }}
                 placeholder="000000"
                 required
                 className="w-full px-4 py-2 border border-stone/30 rounded-md text-center text-lg tracking-[0.3em] font-mono focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
@@ -261,7 +288,7 @@ export function FamilyLoginForm() {
 
             <button
               type="submit"
-              disabled={loading || otp.length < 1}
+              disabled={loading || otp.length < 6}
               className="w-full py-2 px-4 bg-rooted-green text-white rounded-md font-medium hover:bg-deep-green disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? "Verifying..." : "Verify Code"}

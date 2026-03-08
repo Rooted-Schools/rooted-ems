@@ -127,15 +127,16 @@ export function StaffNewApplicationForm({
   const campusWindows = enrollmentWindows.filter((w) => w.campus_id === form.campusId);
 
   function updateField<K extends keyof FormData>(key: K, value: FormData[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
-    // Reset dependent fields
     if (key === "campusId") {
+      // Reset dependent fields when campus changes
       setForm((prev) => ({
         ...prev,
         campusId: value as string,
         gradeLevelId: "",
         enrollmentWindowId: "",
       }));
+    } else {
+      setForm((prev) => ({ ...prev, [key]: value }));
     }
   }
 
@@ -203,8 +204,15 @@ export function StaffNewApplicationForm({
     }
   }
 
+  const [showFastTrackConfirm, setShowFastTrackConfirm] = useState(false);
+
   async function handleFastTrackEnroll() {
     if (!isValid) return;
+    if (!showFastTrackConfirm) {
+      setShowFastTrackConfirm(true);
+      return;
+    }
+    setShowFastTrackConfirm(false);
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -232,10 +240,10 @@ export function StaffNewApplicationForm({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-ink">
             Create Application
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-stone mt-1">
             Apply on behalf of a family without internet access.
           </p>
         </div>
@@ -266,7 +274,7 @@ export function StaffNewApplicationForm({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink/70 mb-1">
                 Campus *
               </label>
               <Select
@@ -282,7 +290,7 @@ export function StaffNewApplicationForm({
               </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink/70 mb-1">
                 Enrollment Window *
               </label>
               <Select
@@ -299,7 +307,7 @@ export function StaffNewApplicationForm({
               </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink/70 mb-1">
                 Grade Level *
               </label>
               <Select
@@ -319,7 +327,7 @@ export function StaffNewApplicationForm({
           {selectedCampus && (
             <div className="flex items-center gap-2">
               <Badge variant="outline">{selectedCampus.name}</Badge>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-stone">
                 {selectedCampus.region_name}
               </span>
             </div>
@@ -338,7 +346,7 @@ export function StaffNewApplicationForm({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink/70 mb-1">
                 First Name *
               </label>
               <Input
@@ -348,7 +356,7 @@ export function StaffNewApplicationForm({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink/70 mb-1">
                 Last Name *
               </label>
               <Input
@@ -360,7 +368,7 @@ export function StaffNewApplicationForm({
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink/70 mb-1">
                 Date of Birth
               </label>
               <Input
@@ -370,7 +378,7 @@ export function StaffNewApplicationForm({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink/70 mb-1">
                 Gender
               </label>
               <Select
@@ -385,7 +393,7 @@ export function StaffNewApplicationForm({
               </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink/70 mb-1">
                 Primary Language
               </label>
               <Select
@@ -401,7 +409,7 @@ export function StaffNewApplicationForm({
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink/70 mb-1">
               Previous School
             </label>
             <Input
@@ -416,7 +424,7 @@ export function StaffNewApplicationForm({
                 type="checkbox"
                 checked={form.hasIEP}
                 onChange={(e) => updateField("hasIEP", e.target.checked)}
-                className="rounded border-gray-300"
+                className="rounded border-stone/30"
               />
               Has IEP
             </label>
@@ -425,7 +433,7 @@ export function StaffNewApplicationForm({
                 type="checkbox"
                 checked={form.has504}
                 onChange={(e) => updateField("has504", e.target.checked)}
-                className="rounded border-gray-300"
+                className="rounded border-stone/30"
               />
               Has 504 Plan
             </label>
@@ -436,14 +444,14 @@ export function StaffNewApplicationForm({
                 onChange={(e) =>
                   updateField("hasSiblingEnrolled", e.target.checked)
                 }
-                className="rounded border-gray-300"
+                className="rounded border-stone/30"
               />
               Sibling enrolled
             </label>
           </div>
           {form.hasSiblingEnrolled && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink/70 mb-1">
                 Sibling Name
               </label>
               <Input
@@ -455,7 +463,7 @@ export function StaffNewApplicationForm({
           )}
           {(form.hasIEP || form.has504) && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink/70 mb-1">
                 Special Services Notes
               </label>
               <textarea
@@ -465,7 +473,7 @@ export function StaffNewApplicationForm({
                 }
                 placeholder="Any relevant notes about special services..."
                 rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
               />
             </div>
           )}
@@ -485,7 +493,7 @@ export function StaffNewApplicationForm({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink/70 mb-1">
                 Guardian First Name *
               </label>
               <Input
@@ -497,7 +505,7 @@ export function StaffNewApplicationForm({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink/70 mb-1">
                 Guardian Last Name *
               </label>
               <Input
@@ -511,7 +519,7 @@ export function StaffNewApplicationForm({
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink/70 mb-1">
                 Relationship
               </label>
               <Select
@@ -528,7 +536,7 @@ export function StaffNewApplicationForm({
               </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink/70 mb-1">
                 Phone *
               </label>
               <Input
@@ -539,7 +547,7 @@ export function StaffNewApplicationForm({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink/70 mb-1">
                 Email
               </label>
               <Input
@@ -558,15 +566,15 @@ export function StaffNewApplicationForm({
                 onChange={(e) =>
                   updateField("guardianSmsConsent", e.target.checked)
                 }
-                className="rounded border-gray-300"
+                className="rounded border-stone/30"
               />
               Guardian consents to SMS messages
             </label>
           </div>
 
           {/* Address */}
-          <div className="border-t border-gray-100 pt-4 mt-4">
-            <p className="text-sm font-medium text-gray-700 mb-3">
+          <div className="border-t border-rooted-gray pt-4 mt-4">
+            <p className="text-sm font-medium text-ink/70 mb-3">
               Home Address
             </p>
             <div className="space-y-3">
@@ -598,8 +606,8 @@ export function StaffNewApplicationForm({
           </div>
 
           {/* Emergency Contact */}
-          <div className="border-t border-gray-100 pt-4 mt-4">
-            <p className="text-sm font-medium text-gray-700 mb-3">
+          <div className="border-t border-rooted-gray pt-4 mt-4">
+            <p className="text-sm font-medium text-ink/70 mb-3">
               Emergency Contact
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -642,19 +650,47 @@ export function StaffNewApplicationForm({
             >
               {loading ? "Creating..." : "Submit Application"}
             </Button>
-            <Button
-              onClick={handleFastTrackEnroll}
-              disabled={!isValid || loading}
-              className="flex-1 bg-rooted-green hover:bg-rooted-green/90 text-white"
-            >
-              {loading ? "Enrolling..." : "Apply & Enroll Now"}
-            </Button>
+            {showFastTrackConfirm ? (
+              <Button
+                onClick={handleFastTrackEnroll}
+                disabled={!isValid || loading}
+                className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                {loading ? "Enrolling..." : "Confirm — Bypass Lottery & Enroll"}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleFastTrackEnroll}
+                disabled={!isValid || loading}
+                className="flex-1 bg-rooted-green hover:bg-rooted-green/90 text-white"
+              >
+                Apply & Enroll Now
+              </Button>
+            )}
           </div>
+          {showFastTrackConfirm && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
+              <p className="text-sm text-amber-800 font-medium">
+                This will permanently bypass the lottery process and enroll {form.firstName || "this student"} immediately.
+              </p>
+              <p className="text-xs text-amber-700 mt-1">
+                Click &quot;Confirm&quot; to proceed or{" "}
+                <button
+                  type="button"
+                  onClick={() => setShowFastTrackConfirm(false)}
+                  className="underline hover:no-underline"
+                >
+                  cancel
+                </button>
+                .
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-            <p className="text-xs text-gray-500 text-center">
+            <p className="text-xs text-stone text-center">
               Creates application and enters normal review pipeline.
             </p>
-            <p className="text-xs text-gray-500 text-center">
+            <p className="text-xs text-stone text-center">
               Skips lottery/offer and enrolls immediately. Use when seats are
               available.
             </p>

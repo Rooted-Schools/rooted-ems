@@ -160,7 +160,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label className="block text-sm font-medium text-ink/70 mb-1">
         {label}
         {required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
@@ -194,7 +194,7 @@ function StepIndicator({
                       ? "bg-rooted-green text-white"
                       : isCurrent
                         ? "border-2 border-rooted-green text-rooted-green"
-                        : "border border-gray-300 text-gray-400"
+                        : "border border-stone/30 text-stone"
                   }
                 `}
               >
@@ -206,11 +206,11 @@ function StepIndicator({
                   i + 1
                 )}
               </div>
-              <span className={`text-xs hidden sm:inline ${isCurrent ? "font-semibold text-gray-900" : "text-gray-400"}`}>
+              <span className={`text-xs hidden sm:inline ${isCurrent ? "font-semibold text-ink" : "text-stone"}`}>
                 {step.label}
               </span>
               {i < steps.length - 1 && (
-                <div className={`w-6 h-px ${isComplete ? "bg-rooted-green" : "bg-gray-200"}`} />
+                <div className={`w-6 h-px ${isComplete ? "bg-rooted-green" : "bg-rooted-gray-dark/30"}`} />
               )}
             </li>
           );
@@ -355,10 +355,10 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
           &larr; Back to Application
         </Link>
         <div className="flex items-center gap-3 mt-2">
-          <h1 className="text-2xl font-bold text-gray-900">Edit Application — {studentName}</h1>
+          <h1 className="text-2xl font-bold text-ink">Edit Application — {studentName}</h1>
           <Badge variant="secondary">Draft</Badge>
         </div>
-        <p className="text-sm text-gray-500 mt-1">Continue filling out the application. Save your progress at any time.</p>
+        <p className="text-sm text-stone mt-1">Continue filling out the application. Save your progress at any time.</p>
       </div>
 
       {feedback && (
@@ -446,7 +446,7 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
                   { value: "two_or_more", label: "Two or More Races" },
                   { value: "prefer_not", label: "Prefer not to say" },
                 ].map((opt) => (
-                  <label key={opt.value} className="flex items-center gap-2 text-sm text-gray-700">
+                  <label key={opt.value} className="flex items-center gap-2 text-sm text-ink/70">
                     <input
                       type="checkbox"
                       checked={form.raceEthnicity.includes(opt.value)}
@@ -457,7 +457,7 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
                           update({ raceEthnicity: form.raceEthnicity.filter((v) => v !== opt.value) });
                         }
                       }}
-                      className="h-4 w-4 rounded border-gray-300 text-rooted-green focus:ring-rooted-green"
+                      className="h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
                     />
                     {opt.label}
                   </label>
@@ -514,18 +514,18 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
               <Field label="Employer (optional)"><Input value={form.guardianEmployer} onChange={(e) => update({ guardianEmployer: e.target.value })} placeholder="Employer name" /></Field>
             </div>
             <div className="flex items-center gap-2">
-              <input type="checkbox" id="sms-consent-edit" checked={form.guardianSmsConsent} onChange={(e) => update({ guardianSmsConsent: e.target.checked })} className="h-4 w-4 rounded border-gray-300 text-rooted-green focus:ring-rooted-green" />
-              <label htmlFor="sms-consent-edit" className="text-sm text-gray-600">I consent to receive SMS/text messages about my child&apos;s enrollment</label>
+              <input type="checkbox" id="sms-consent-edit" checked={form.guardianSmsConsent} onChange={(e) => update({ guardianSmsConsent: e.target.checked })} className="h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green" />
+              <label htmlFor="sms-consent-edit" className="text-sm text-ink/60">I consent to receive SMS/text messages about my child&apos;s enrollment</label>
             </div>
-            <hr className="my-2 border-gray-200" />
+            <hr className="my-2 border-stone/20" />
             <Field label="Street Address" required><Input value={form.address} onChange={(e) => update({ address: e.target.value })} placeholder="1234 Main St" /></Field>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="col-span-2"><Field label="City" required><Input value={form.city} onChange={(e) => update({ city: e.target.value })} placeholder="City" /></Field></div>
               <Field label="State" required><Input value={form.state} onChange={(e) => update({ state: e.target.value })} placeholder="WA" maxLength={2} /></Field>
               <Field label="ZIP" required><Input value={form.zip} onChange={(e) => update({ zip: e.target.value })} placeholder="98660" maxLength={10} /></Field>
             </div>
-            <hr className="my-2 border-gray-200" />
-            <p className="text-sm font-medium text-gray-700">Emergency Contact</p>
+            <hr className="my-2 border-stone/20" />
+            <p className="text-sm font-medium text-ink/70">Emergency Contact</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Field label="Contact Name"><Input value={form.emergencyContactName} onChange={(e) => update({ emergencyContactName: e.target.value })} placeholder="Full name" /></Field>
               <Field label="Phone"><Input type="tel" value={form.emergencyContactPhone} onChange={(e) => update({ emergencyContactPhone: e.target.value })} placeholder="(555) 555-0100" /></Field>
@@ -536,8 +536,8 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
                 </Select>
               </Field>
             </div>
-            <hr className="my-2 border-gray-200" />
-            <p className="text-sm font-medium text-gray-700">Household Information</p>
+            <hr className="my-2 border-stone/20" />
+            <p className="text-sm font-medium text-ink/70">Household Information</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Household Income Bracket">
                 <Select value={form.incomeBracket} onChange={(e) => update({ incomeBracket: e.target.value })}>
@@ -588,7 +588,7 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
             <CardDescription>Tell us about enrollment preferences and any special services your child may need.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm font-medium text-gray-700">Enrollment Preferences</p>
+            <p className="text-sm font-medium text-ink/70">Enrollment Preferences</p>
             <Field label="Does your child have a sibling currently enrolled?">
               <Select value={form.hasSiblingEnrolled} onChange={(e) => update({ hasSiblingEnrolled: e.target.value })}>
                 <option value="">Select...</option><option value="yes">Yes</option><option value="no">No</option>
@@ -610,8 +610,8 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
                 </Select>
               </Field>
             </div>
-            <hr className="my-2 border-gray-200" />
-            <p className="text-sm font-medium text-gray-700">Special Services</p>
+            <hr className="my-2 border-stone/20" />
+            <p className="text-sm font-medium text-ink/70">Special Services</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="IEP (Individualized Education Program)?">
                 <Select value={form.hasIEP} onChange={(e) => update({ hasIEP: e.target.value })}>
@@ -659,15 +659,15 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
               { name: "IEP / 504 Plan", desc: "If applicable, upload current plan documentation", required: false },
               { name: "Custody Documentation", desc: "If applicable, upload custody or guardianship documents", required: false },
             ].map((doc) => (
-              <div key={doc.name} className="flex items-start justify-between gap-4 p-3 border border-gray-200 rounded-md">
+              <div key={doc.name} className="flex items-start justify-between gap-4 p-3 border border-stone/20 rounded-md">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900">{doc.name}{doc.required && <span className="text-red-500 ml-0.5">*</span>}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{doc.desc}</p>
+                  <p className="text-sm font-medium text-ink">{doc.name}{doc.required && <span className="text-red-500 ml-0.5">*</span>}</p>
+                  <p className="text-xs text-stone mt-0.5">{doc.desc}</p>
                 </div>
                 <Button variant="outline" size="sm" className="shrink-0" disabled>Upload</Button>
               </div>
             ))}
-            <p className="text-xs text-gray-500">You can submit your application now and upload documents from the <Link href="/family/documents" className="text-rooted-green hover:underline font-medium">Documents</Link> page after saving. Required documents must be uploaded before enrollment is finalized.</p>
+            <p className="text-xs text-stone">You can submit your application now and upload documents from the <Link href="/family/documents" className="text-rooted-green hover:underline font-medium">Documents</Link> page after saving. Required documents must be uploaded before enrollment is finalized.</p>
           </CardContent>
         </Card>
       )}
@@ -710,23 +710,23 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
                 {form.specialServicesNotes && <ReviewRow label="Notes" value={form.specialServicesNotes} />}
               </ReviewSection>
             </div>
-            <hr className="border-gray-200" />
+            <hr className="border-stone/20" />
             <div className="space-y-3">
               <div className="flex items-start gap-2">
-                <input type="checkbox" id="data-sharing-consent-edit" checked={form.dataSharingConsent} onChange={(e) => update({ dataSharingConsent: e.target.checked })} className="mt-1 h-4 w-4 rounded border-gray-300 text-rooted-green focus:ring-rooted-green" />
-                <label htmlFor="data-sharing-consent-edit" className="text-sm text-gray-600">I consent to the sharing of my child&apos;s educational records with <span className="font-bold">rooted</span>schools for the purpose of enrollment processing.</label>
+                <input type="checkbox" id="data-sharing-consent-edit" checked={form.dataSharingConsent} onChange={(e) => update({ dataSharingConsent: e.target.checked })} className="mt-1 h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green" />
+                <label htmlFor="data-sharing-consent-edit" className="text-sm text-ink/60">I consent to the sharing of my child&apos;s educational records with <span className="font-bold">rooted</span>schools for the purpose of enrollment processing.</label>
               </div>
               <div className="flex items-start gap-2">
-                <input type="checkbox" id="agree-terms-edit" checked={form.agreeTerms} onChange={(e) => update({ agreeTerms: e.target.checked })} className="mt-1 h-4 w-4 rounded border-gray-300 text-rooted-green focus:ring-rooted-green" />
-                <label htmlFor="agree-terms-edit" className="text-sm text-gray-600">I certify that the information provided in this application is accurate and complete to the best of my knowledge. I understand that providing false information may result in the disqualification of this application.</label>
+                <input type="checkbox" id="agree-terms-edit" checked={form.agreeTerms} onChange={(e) => update({ agreeTerms: e.target.checked })} className="mt-1 h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green" />
+                <label htmlFor="agree-terms-edit" className="text-sm text-ink/60">I certify that the information provided in this application is accurate and complete to the best of my knowledge. I understand that providing false information may result in the disqualification of this application.</label>
               </div>
             </div>
-            <hr className="border-gray-200" />
-            <p className="text-sm font-medium text-gray-700">Electronic Signature</p>
+            <hr className="border-stone/20" />
+            <p className="text-sm font-medium text-ink/70">Electronic Signature</p>
             <Field label="Type your full legal name to sign" required>
               <Input value={form.signatureName} onChange={(e) => update({ signatureName: e.target.value })} placeholder="Full legal name" />
             </Field>
-            <p className="text-xs text-gray-400">By typing your name above, you are electronically signing this application. Date: {new Date().toLocaleDateString("en-US")}</p>
+            <p className="text-xs text-stone">By typing your name above, you are electronically signing this application. Date: {new Date().toLocaleDateString("en-US")}</p>
           </CardContent>
         </Card>
       )}
@@ -752,7 +752,7 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
           )}
         </div>
       </div>
-      <div className="text-xs text-gray-400 pb-4">Application ID: {draft.id}</div>
+      <div className="text-xs text-stone pb-4">Application ID: {draft.id}</div>
     </div>
   );
 }
@@ -762,7 +762,7 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
 function ReviewSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{title}</p>
+      <p className="text-xs font-semibold text-stone uppercase tracking-wider mb-2">{title}</p>
       <div className="space-y-1">{children}</div>
     </div>
   );
@@ -771,8 +771,8 @@ function ReviewSection({ title, children }: { title: string; children: React.Rea
 function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex gap-2 text-sm">
-      <span className="text-gray-500 w-32 shrink-0">{label}</span>
-      <span className="text-gray-900">{value}</span>
+      <span className="text-stone w-32 shrink-0">{label}</span>
+      <span className="text-ink">{value}</span>
     </div>
   );
 }

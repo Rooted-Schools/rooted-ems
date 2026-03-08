@@ -78,8 +78,8 @@ export function StudentsClient({ students, initialSearch = "" }: StudentsClientP
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Students</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-ink">Students</h1>
+        <p className="text-sm text-stone mt-1">
           {filtered.length} of {students.length} student record
           {students.length !== 1 ? "s" : ""}
         </p>
@@ -93,13 +93,13 @@ export function StudentsClient({ students, initialSearch = "" }: StudentsClientP
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search students or guardians..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 focus:border-rooted-green"
+            className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 focus:border-rooted-green"
           />
         </div>
         <select
           value={gradeFilter}
           onChange={(e) => setGradeFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+          className="px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
         >
           <option value="all">All Grades</option>
           {grades.map((g) => (
@@ -111,7 +111,7 @@ export function StudentsClient({ students, initialSearch = "" }: StudentsClientP
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+          className="px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
         >
           <option value="all">All Statuses</option>
           {statuses.map((s) => (
@@ -127,7 +127,7 @@ export function StudentsClient({ students, initialSearch = "" }: StudentsClientP
               setStatusFilter("all");
               setGradeFilter("all");
             }}
-            className="text-xs text-gray-500 hover:text-gray-700 underline"
+            className="text-xs text-stone hover:text-ink/70 underline"
           >
             Clear filters
           </button>
@@ -141,7 +141,7 @@ export function StudentsClient({ students, initialSearch = "" }: StudentsClientP
         <CardContent>
           {filtered.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-400">
+              <p className="text-stone">
                 {students.length === 0
                   ? "No student records found"
                   : "No students match your filters"}
@@ -151,23 +151,23 @@ export function StudentsClient({ students, initialSearch = "" }: StudentsClientP
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-2.5 text-xs font-medium text-gray-500">
+                  <tr className="border-b border-stone/20">
+                    <th className="text-left py-2.5 text-xs font-medium text-stone">
                       Student
                     </th>
-                    <th className="text-left py-2.5 text-xs font-medium text-gray-500">
+                    <th className="text-left py-2.5 text-xs font-medium text-stone">
                       Campus
                     </th>
-                    <th className="text-left py-2.5 text-xs font-medium text-gray-500">
+                    <th className="text-left py-2.5 text-xs font-medium text-stone">
                       Grade
                     </th>
-                    <th className="text-left py-2.5 text-xs font-medium text-gray-500">
+                    <th className="text-left py-2.5 text-xs font-medium text-stone">
                       Guardian
                     </th>
-                    <th className="text-left py-2.5 text-xs font-medium text-gray-500">
+                    <th className="text-left py-2.5 text-xs font-medium text-stone">
                       Demographics
                     </th>
-                    <th className="text-left py-2.5 text-xs font-medium text-gray-500">
+                    <th className="text-left py-2.5 text-xs font-medium text-stone">
                       Status
                     </th>
                   </tr>
@@ -181,7 +181,7 @@ export function StudentsClient({ students, initialSearch = "" }: StudentsClientP
                     return (
                       <tr
                         key={s.application_id}
-                        className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors"
+                        className="border-b border-rooted-gray last:border-0 hover:bg-rooted-gray-light transition-colors"
                       >
                         <td className="py-3">
                           <Link
@@ -195,17 +195,17 @@ export function StudentsClient({ students, initialSearch = "" }: StudentsClientP
                                   {s.last_name[0]}
                                 </span>
                               </div>
-                              <span className="text-sm font-medium text-gray-900 hover:text-rooted-green-dark">
+                              <span className="text-sm font-medium text-ink hover:text-rooted-green-dark">
                                 {s.first_name} {s.last_name}
                               </span>
                             </div>
                           </Link>
                         </td>
-                        <td className="py-3 text-gray-600">{s.campus_name}</td>
-                        <td className="py-3 text-gray-600">
+                        <td className="py-3 text-ink/60">{s.campus_name}</td>
+                        <td className="py-3 text-ink/60">
                           Grade {s.grade}
                         </td>
-                        <td className="py-3 text-gray-600">
+                        <td className="py-3 text-ink/60">
                           {s.guardian_name}
                         </td>
                         <td className="py-3">

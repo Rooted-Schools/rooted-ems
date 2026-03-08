@@ -1,11 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   familyCompleteRegistrationItem,
   familySubmitRegistrationPacket,
@@ -93,7 +102,7 @@ const STATUS_DISPLAY: Record<
   string,
   { label: string; color: string }
 > = {
-  pending: { label: "Not Started", color: "bg-gray-100 text-gray-600" },
+  pending: { label: "Not Started", color: "bg-rooted-gray text-ink/60" },
   submitted: { label: "Submitted", color: "bg-blue-100 text-blue-800" },
   verified: { label: "Verified", color: "bg-green-100 text-green-800" },
 };
@@ -145,6 +154,289 @@ const ITEM_TO_CATEGORY: Record<string, string> = {
   before_after_care: "services",
 };
 
+/* ─── Completion modes per item type ─── */
+
+type FieldDef = {
+  key: string;
+  label: string;
+  type: "text" | "tel" | "email" | "select" | "textarea" | "checkbox" | "date" | "phone";
+  placeholder?: string;
+  options?: string[];
+  required?: boolean;
+};
+
+type CompletionConfig =
+  | { mode: "form"; title: string; description: string; fields: FieldDef[] }
+  | { mode: "acknowledge"; title: string; description: string }
+  | { mode: "upload"; title: string; description: string };
+
+const ITEM_COMPLETION_CONFIG: Record<string, CompletionConfig> = {
+  // ─── Data Entry Forms ───
+  emergency_contact: {
+    mode: "form",
+    title: "Emergency Contact Information",
+    description: "Provide emergency contact details for your child.",
+    fields: [
+      { key: "contact_name", label: "Contact Name", type: "text", placeholder: "Full name", required: true },
+      { key: "relationship", label: "Relationship", type: "select", options: ["Parent", "Grandparent", "Aunt/Uncle", "Sibling", "Family Friend", "Other"], required: true },
+      { key: "phone", label: "Phone Number", type: "tel", placeholder: "(555) 555-5555", required: true },
+      { key: "alt_phone", label: "Alternate Phone", type: "tel", placeholder: "(555) 555-5555" },
+    ],
+  },
+  medical_info: {
+    mode: "form",
+    title: "Medical Information",
+    description: "Provide your child's medical information so the school can respond in an emergency.",
+    fields: [
+      { key: "physician_name", label: "Physician Name", type: "text", placeholder: "Dr. Smith", required: true },
+      { key: "physician_phone", label: "Physician Phone", type: "tel", placeholder: "(555) 555-5555", required: true },
+      { key: "insurance_provider", label: "Insurance Provider", type: "text", placeholder: "e.g. Blue Cross" },
+      { key: "policy_number", label: "Policy Number", type: "text", placeholder: "Policy or member ID" },
+      { key: "allergies", label: "Allergies", type: "textarea", placeholder: "List any known allergies (or write None)" },
+      { key: "conditions", label: "Medical Conditions", type: "textarea", placeholder: "List any conditions or special needs (or write None)" },
+    ],
+  },
+  medication_auth: {
+    mode: "form",
+    title: "Medication Authorization",
+    description: "Authorize the school to administer medication if needed.",
+    fields: [
+      { key: "medication_name", label: "Medication Name", type: "text", placeholder: "Name of medication", required: true },
+      { key: "dosage", label: "Dosage", type: "text", placeholder: "e.g. 10mg", required: true },
+      { key: "frequency", label: "Frequency", type: "text", placeholder: "e.g. Once daily at noon", required: true },
+      { key: "reason", label: "Reason", type: "text", placeholder: "Condition being treated" },
+      { key: "authorize", label: "I authorize the school to administer this medication", type: "checkbox", required: true },
+    ],
+  },
+  food_allergy_plan: {
+    mode: "form",
+    title: "Food Allergy Action Plan",
+    description: "Provide details about your child's food allergies so the school can keep them safe.",
+    fields: [
+      { key: "allergens", label: "Allergens", type: "textarea", placeholder: "List specific food allergens (e.g. peanuts, dairy)", required: true },
+      { key: "severity", label: "Severity", type: "select", options: ["Mild", "Moderate", "Severe / Anaphylaxis"], required: true },
+      { key: "symptoms", label: "Symptoms", type: "textarea", placeholder: "Describe typical reaction symptoms" },
+      { key: "treatment", label: "Treatment Plan", type: "textarea", placeholder: "e.g. EpiPen, Benadryl — include instructions", required: true },
+      { key: "epipen_onsite", label: "EpiPen will be kept on-site", type: "checkbox" },
+    ],
+  },
+  pickup_auth: {
+    mode: "form",
+    title: "Authorized Pickup Contacts",
+    description: "List all people authorized to pick up your child from school besides guardians on file.",
+    fields: [
+      { key: "contact1_name", label: "Authorized Person #1", type: "text", placeholder: "Full name", required: true },
+      { key: "contact1_relationship", label: "Relationship", type: "text", placeholder: "e.g. Grandmother" },
+      { key: "contact1_phone", label: "Phone", type: "tel", placeholder: "(555) 555-5555", required: true },
+      { key: "contact2_name", label: "Authorized Person #2", type: "text", placeholder: "Full name" },
+      { key: "contact2_relationship", label: "Relationship", type: "text", placeholder: "e.g. Neighbor" },
+      { key: "contact2_phone", label: "Phone", type: "tel", placeholder: "(555) 555-5555" },
+    ],
+  },
+  home_language_survey: {
+    mode: "form",
+    title: "Home Language Survey",
+    description: "Federal law requires schools to identify students who may need English language support.",
+    fields: [
+      { key: "home_language", label: "Language most often spoken at home", type: "text", placeholder: "e.g. English, Spanish", required: true },
+      { key: "student_first_language", label: "Language student learned first", type: "text", placeholder: "e.g. English", required: true },
+      { key: "student_school_language", label: "Language student uses most at school", type: "text", placeholder: "e.g. English", required: true },
+      { key: "other_languages", label: "Other languages spoken in the home", type: "text", placeholder: "e.g. None" },
+    ],
+  },
+  transport: {
+    mode: "form",
+    title: "Transportation Preferences",
+    description: "How will your child get to and from school?",
+    fields: [
+      { key: "arrival_mode", label: "Arrival Method", type: "select", options: ["Parent Drop-off", "School Bus", "Public Transit", "Walk/Bike", "Carpool", "Other"], required: true },
+      { key: "departure_mode", label: "Departure Method", type: "select", options: ["Parent Pick-up", "School Bus", "Public Transit", "Walk/Bike", "Carpool", "After-School Program", "Other"], required: true },
+      { key: "notes", label: "Additional Notes", type: "textarea", placeholder: "Any special transportation arrangements" },
+    ],
+  },
+  before_after_care: {
+    mode: "form",
+    title: "Before & After School Care",
+    description: "Indicate if your child needs before or after school care.",
+    fields: [
+      { key: "before_care", label: "Needs before-school care", type: "checkbox" },
+      { key: "after_care", label: "Needs after-school care", type: "checkbox" },
+      { key: "days_needed", label: "Days Needed", type: "select", options: ["Monday-Friday", "Select Days Only"], required: true },
+      { key: "notes", label: "Additional Notes", type: "textarea", placeholder: "Any specific schedule needs" },
+    ],
+  },
+  frl_app: {
+    mode: "form",
+    title: "Free/Reduced Lunch Application",
+    description: "Provide household information for the National School Lunch Program.",
+    fields: [
+      { key: "household_size", label: "Household Size", type: "text", placeholder: "Number of people in household", required: true },
+      { key: "annual_income", label: "Annual Household Income", type: "text", placeholder: "e.g. $35,000", required: true },
+      { key: "snap_tanf", label: "Household receives SNAP, TANF, or FDPIR benefits", type: "checkbox" },
+      { key: "foster_child", label: "Student is a foster child", type: "checkbox" },
+    ],
+  },
+  military_family: {
+    mode: "form",
+    title: "Military Family Information",
+    description: "If applicable, provide details about military family status.",
+    fields: [
+      { key: "branch", label: "Branch of Service", type: "select", options: ["Army", "Navy", "Air Force", "Marines", "Coast Guard", "Space Force", "National Guard"], required: true },
+      { key: "status", label: "Service Status", type: "select", options: ["Active Duty", "Reserve", "Veteran", "Retired"], required: true },
+      { key: "deployment_notes", label: "Deployment / Special Circumstances", type: "textarea", placeholder: "Any relevant information" },
+    ],
+  },
+
+  // ─── Policy Acknowledgments ───
+  income_verification: {
+    mode: "acknowledge",
+    title: "Income Verification Acknowledgment",
+    description: "I acknowledge that the income information provided is true and accurate. I understand the school may request supporting documentation.",
+  },
+  tech_policy: {
+    mode: "acknowledge",
+    title: "Technology Acceptable Use Policy",
+    description: "I have read and agree to the school's technology acceptable use policy. I understand the rules for using school-provided devices and internet access.",
+  },
+  handbook_ack: {
+    mode: "acknowledge",
+    title: "Student & Family Handbook",
+    description: "I have read and understand the Student & Family Handbook, including attendance policies, academic expectations, and behavioral guidelines.",
+  },
+  discipline_policy: {
+    mode: "acknowledge",
+    title: "Discipline Policy",
+    description: "I have read and understand the school's discipline policy, including the progressive discipline framework and due process procedures.",
+  },
+  media_release: {
+    mode: "acknowledge",
+    title: "Media / Photo Release",
+    description: "I grant permission for my child's name, image, and/or work to be used in school publications, website, and promotional materials.",
+  },
+  field_trip: {
+    mode: "acknowledge",
+    title: "Field Trip Permission",
+    description: "I grant blanket permission for my child to participate in school-sponsored field trips during the school year. I understand I will be notified before each trip.",
+  },
+  internet_safety: {
+    mode: "acknowledge",
+    title: "Internet Safety Agreement",
+    description: "I have reviewed the internet safety guidelines with my child and understand the expectations for safe and responsible online behavior at school.",
+  },
+  anti_bullying: {
+    mode: "acknowledge",
+    title: "Anti-Bullying Policy",
+    description: "I have read the school's anti-bullying policy and understand the reporting procedures. I will encourage my child to report any bullying incidents.",
+  },
+  uniform_policy: {
+    mode: "acknowledge",
+    title: "Uniform Policy",
+    description: "I have read and understand the school's uniform/dress code policy and agree to ensure my child arrives at school in compliance.",
+  },
+  ferpa_consent: {
+    mode: "acknowledge",
+    title: "FERPA Consent",
+    description: "I have read the Family Educational Rights and Privacy Act (FERPA) notice and understand my rights regarding my child's educational records.",
+  },
+
+  // ─── Document Uploads ───
+  immunization_records: {
+    mode: "upload",
+    title: "Immunization Records",
+    description: "Upload your child's current immunization records from their healthcare provider.",
+  },
+  proof_of_residency: {
+    mode: "upload",
+    title: "Proof of Residency",
+    description: "Upload a utility bill, lease agreement, or other proof of your current address.",
+  },
+  proof_of_age: {
+    mode: "upload",
+    title: "Proof of Age / Birth Certificate",
+    description: "Upload your child's birth certificate or other official proof of age.",
+  },
+  parent_id: {
+    mode: "upload",
+    title: "Parent/Guardian ID",
+    description: "Upload a government-issued photo ID for the enrolling parent or guardian.",
+  },
+  custody_docs: {
+    mode: "upload",
+    title: "Custody Documentation",
+    description: "Upload any relevant custody or guardianship documentation.",
+  },
+  student_photo: {
+    mode: "upload",
+    title: "Student Photo",
+    description: "Upload a recent photo of your child for school identification purposes.",
+  },
+  sports_physical: {
+    mode: "upload",
+    title: "Sports Physical",
+    description: "Upload a completed sports physical form if your child plans to participate in athletics.",
+  },
+  previous_school_records: {
+    mode: "upload",
+    title: "Previous School Records",
+    description: "Upload transcripts, report cards, or other records from your child's previous school.",
+  },
+  iep_records: {
+    mode: "upload",
+    title: "IEP Records",
+    description: "Upload your child's current Individualized Education Program (IEP) documents.",
+  },
+  "504_plan": {
+    mode: "upload",
+    title: "504 Plan",
+    description: "Upload your child's current 504 Plan documents.",
+  },
+  mckinney_vento: {
+    mode: "upload",
+    title: "McKinney-Vento Questionnaire",
+    description: "Upload the completed McKinney-Vento Housing Questionnaire if applicable.",
+  },
+  lthc_form: {
+    mode: "upload",
+    title: "Licensed Treatment Health Certificate",
+    description: "Upload the completed LTHC form signed by your child's healthcare provider.",
+  },
+  sc_health_exam: {
+    mode: "upload",
+    title: "SC Health Examination",
+    description: "Upload the South Carolina health examination form completed by your child's physician.",
+  },
+  sc_dental_screen: {
+    mode: "upload",
+    title: "SC Dental Screening",
+    description: "Upload the South Carolina dental screening form.",
+  },
+  oh_custody_affidavit: {
+    mode: "upload",
+    title: "Ohio Custody Affidavit",
+    description: "Upload the completed Ohio custody affidavit if applicable.",
+  },
+  wa_health_exam: {
+    mode: "upload",
+    title: "WA Health Examination",
+    description: "Upload the Washington state health examination form completed by your child's physician.",
+  },
+};
+
+function getCompletionConfig(itemType: string): CompletionConfig {
+  return ITEM_COMPLETION_CONFIG[itemType] ?? {
+    mode: "acknowledge",
+    title: "Complete Item",
+    description: "Confirm that you have completed this registration requirement.",
+  };
+}
+
+function getButtonLabel(itemType: string): string {
+  const config = getCompletionConfig(itemType);
+  if (config.mode === "form") return "Fill Out";
+  if (config.mode === "upload") return "Upload";
+  return "Review & Agree";
+}
+
 export function RegistrationClient({ enrollments }: RegistrationClientProps) {
   const router = useRouter();
   const [activeEnrollment, setActiveEnrollment] = useState(0);
@@ -152,11 +444,15 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
   const [submittingPacket, setSubmittingPacket] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [completionOpen, setCompletionOpen] = useState(false);
+  const [completionTarget, setCompletionTarget] = useState<{ itemId: string; itemType: string; itemName: string } | null>(null);
+  const [completionForm, setCompletionForm] = useState<Record<string, string | boolean>>({});
+  const [completionAck, setCompletionAck] = useState(false);
 
   if (enrollments.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">No registration packets available.</p>
+        <p className="text-stone">No registration packets available.</p>
       </div>
     );
   }
@@ -186,15 +482,34 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
     enrollment.packet?.status === "submitted" ||
     enrollment.packet?.status === "complete";
 
-  async function handleCompleteItem(itemId: string, itemName: string) {
+  function openCompletionDialog(itemId: string, itemType: string, itemName: string) {
+    setCompletionTarget({ itemId, itemType, itemName });
+    setCompletionForm({});
+    setCompletionAck(false);
+    setError(null);
+    setCompletionOpen(true);
+  }
+
+  async function doCompleteItem() {
+    if (!completionTarget) return;
+    const { itemId, itemType, itemName } = completionTarget;
+    const config = getCompletionConfig(itemType);
+
     setLoadingItem(itemId);
     setError(null);
     setSuccess(null);
+    setCompletionOpen(false);
 
-    const result = await familyCompleteRegistrationItem(itemId, {
+    const payload: Record<string, unknown> = {
       acknowledged: true,
       completed_at: new Date().toISOString(),
-    });
+    };
+
+    if (config.mode === "form") {
+      payload.form_data = { ...completionForm };
+    }
+
+    const result = await familyCompleteRegistrationItem(itemId, payload);
 
     if (result.error) {
       setError(result.error);
@@ -203,6 +518,7 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
       router.refresh();
     }
     setLoadingItem(null);
+    setCompletionTarget(null);
   }
 
   async function handleSubmitPacket() {
@@ -270,10 +586,10 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
             <div className="flex items-start gap-4">
               <span className="text-3xl" aria-hidden="true">🎓</span>
               <div>
-                <p className="text-base font-bold text-gray-900">
+                <p className="text-base font-bold text-ink">
                   Welcome to Registration!
                 </p>
-                <p className="text-sm text-gray-600 mt-0.5">
+                <p className="text-sm text-ink/60 mt-0.5">
                   {allItemsComplete
                     ? "All items are complete — submit your packet below to finalize enrollment."
                     : `Complete the ${totalRequired > 0 ? totalRequired + " required" : ""} items below to finalize ${enrollment.student_name}'s enrollment at ${enrollment.campus_name}. You can complete items in any order.`}
@@ -303,11 +619,11 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
                 className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
                   idx === activeEnrollment
                     ? "bg-rooted-green text-white shadow-sm"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    : "bg-rooted-gray text-ink/70 hover:bg-rooted-gray-dark/30"
                 }`}
               >
                 {enr.student_name}
-                <span className={`text-xs ${idx === activeEnrollment ? "text-white/70" : "text-gray-400"}`}>
+                <span className={`text-xs ${idx === activeEnrollment ? "text-white/70" : "text-stone"}`}>
                   {enrCompletedCount}/{enrTotalItems}
                 </span>
               </button>
@@ -321,10 +637,10 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
         <CardContent className="py-5">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="text-sm font-semibold text-gray-900">
+              <p className="text-sm font-semibold text-ink">
                 {enrollment.student_name}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-stone">
                 {enrollment.campus_name} &middot; Grade {enrollment.grade}{" "}
                 &middot; {enrollment.school_year}
               </p>
@@ -348,7 +664,7 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
             </Badge>
           </div>
           {/* Progress bar */}
-          <div className="w-full bg-gray-200 rounded-full h-3">
+          <div className="w-full bg-rooted-gray-dark/30 rounded-full h-3">
             <div
               className={`h-3 rounded-full transition-all ${
                 packetSubmitted ? "bg-blue-500" : allItemsComplete ? "bg-rooted-green" : "bg-rooted-green"
@@ -359,10 +675,10 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
             />
           </div>
           <div className="flex items-center justify-between mt-2">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-stone">
               {completedCount} of {totalItems} items completed
               {totalRequired > 0 && totalRequired < totalItems && (
-                <span className="text-gray-400"> &middot; {totalRequired} required</span>
+                <span className="text-stone"> &middot; {totalRequired} required</span>
               )}
             </p>
             {!packetSubmitted && completedCount < totalItems && (
@@ -373,17 +689,17 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
           </div>
           {/* Category mini-progress */}
           {Object.keys(groupedRequirements).length > 1 && (
-            <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-100">
+            <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-rooted-gray">
               {Object.entries(ITEM_CATEGORIES).map(([catKey, catCfg]) => {
                 if (!groupedRequirements[catKey]) return null;
                 const prog = getCategoryProgress(catKey);
                 return (
                   <div key={catKey} className="flex items-center gap-1.5">
                     <span className="text-xs">{catCfg.icon}</span>
-                    <span className="text-[10px] text-gray-500">
+                    <span className="text-[10px] text-stone">
                       {catCfg.label}
                     </span>
-                    <span className={`text-[10px] font-bold ${prog.done === prog.total ? "text-green-600" : "text-gray-400"}`}>
+                    <span className={`text-[10px] font-bold ${prog.done === prog.total ? "text-green-600" : "text-stone"}`}>
                       {prog.done}/{prog.total}
                     </span>
                   </div>
@@ -398,10 +714,10 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
       {enrollment.requirements.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center">
-            <p className="text-gray-500">
+            <p className="text-stone">
               No registration requirements configured for this campus yet.
             </p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-stone mt-1">
               Check back soon — your school is setting up the registration packet.
             </p>
           </CardContent>
@@ -421,7 +737,7 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
                     <span className="text-lg">{catCfg.icon}</span>
                     <CardTitle className="text-sm">{catCfg.label}</CardTitle>
                   </div>
-                  <span className={`text-xs font-semibold ${allDone ? "text-green-600" : "text-gray-400"}`}>
+                  <span className={`text-xs font-semibold ${allDone ? "text-green-600" : "text-stone"}`}>
                     {prog.done}/{prog.total} complete
                   </span>
                 </div>
@@ -441,7 +757,7 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
                           ? "border-green-200 bg-green-50/40"
                           : status === "submitted"
                             ? "border-blue-200 bg-blue-50/30"
-                            : "border-gray-200 hover:border-gray-300 hover:bg-gray-50/50"
+                            : "border-stone/20 hover:border-stone/30 hover:bg-rooted-gray-light"
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
@@ -450,7 +766,7 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
                         </span>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium text-gray-900">
+                            <p className="text-sm font-medium text-ink">
                               {req.name}
                             </p>
                             {req.is_required && (
@@ -460,12 +776,12 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
                             )}
                           </div>
                           {req.description && (
-                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                            <p className="text-xs text-stone mt-0.5 line-clamp-1">
                               {req.description}
                             </p>
                           )}
                           {item?.signed_at && (
-                            <p className="text-[10px] text-gray-400 mt-0.5">
+                            <p className="text-[10px] text-stone mt-0.5">
                               Completed{" "}
                               {new Date(item.signed_at).toLocaleDateString("en-US", {
                                 month: "short",
@@ -481,15 +797,15 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
                             size="sm"
                             disabled={isLoading}
                             onClick={() =>
-                              handleCompleteItem(item.id, req.name)
+                              openCompletionDialog(item.id, req.item_type, req.name)
                             }
                             className="bg-rooted-green hover:bg-rooted-green/90 text-white"
                           >
-                            {isLoading ? "Saving..." : "Complete"}
+                            {isLoading ? "Saving..." : getButtonLabel(req.item_type)}
                           </Button>
                         )}
                         {status === "pending" && !item && (
-                          <Badge className="text-[10px] bg-gray-100 text-gray-500">
+                          <Badge className="text-[10px] bg-rooted-gray text-stone">
                             Awaiting Setup
                           </Badge>
                         )}
@@ -547,10 +863,10 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
               <div className="flex items-start gap-3">
                 <span className="text-2xl" aria-hidden="true">🎉</span>
                 <div>
-                  <p className="text-base font-bold text-gray-900">
+                  <p className="text-base font-bold text-ink">
                     All Items Complete!
                   </p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-ink/60">
                     Submit your registration packet to finalize {enrollment.student_name}&apos;s enrollment.
                   </p>
                 </div>
@@ -597,11 +913,131 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
       {/* Help section */}
       {!packetSubmitted && (
         <div className="text-center py-2">
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-stone">
             Need help? Contact your school&apos;s enrollment office for assistance with any registration items.
           </p>
         </div>
       )}
+
+      {/* Completion Dialog */}
+      {completionTarget && (() => {
+        const config = getCompletionConfig(completionTarget.itemType);
+        const canSubmit =
+          config.mode === "form"
+            ? config.fields.every((f) =>
+                !f.required || (completionForm[f.key] !== undefined && completionForm[f.key] !== "")
+              )
+            : config.mode === "acknowledge"
+              ? completionAck
+              : completionAck; // upload mode: user confirms they uploaded
+
+        return (
+          <Dialog open={completionOpen} onOpenChange={setCompletionOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{config.title}</DialogTitle>
+                <DialogDescription>{config.description}</DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4">
+                {config.mode === "form" && config.fields.map((field) => (
+                  <div key={field.key}>
+                    <label className="block text-sm font-medium text-ink/70 mb-1">
+                      {field.label}
+                      {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                    </label>
+                    {field.type === "select" && field.options ? (
+                      <select
+                        value={(completionForm[field.key] as string) ?? ""}
+                        onChange={(e) =>
+                          setCompletionForm((prev) => ({ ...prev, [field.key]: e.target.value }))
+                        }
+                        className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                      >
+                        <option value="">Select...</option>
+                        {field.options.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    ) : field.type === "textarea" ? (
+                      <textarea
+                        value={(completionForm[field.key] as string) ?? ""}
+                        onChange={(e) =>
+                          setCompletionForm((prev) => ({ ...prev, [field.key]: e.target.value }))
+                        }
+                        placeholder={field.placeholder}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                      />
+                    ) : (
+                      <Input
+                        type={field.type === "date" ? "date" : field.type === "email" ? "email" : field.type === "phone" ? "tel" : "text"}
+                        value={(completionForm[field.key] as string) ?? ""}
+                        onChange={(e) =>
+                          setCompletionForm((prev) => ({ ...prev, [field.key]: e.target.value }))
+                        }
+                        placeholder={field.placeholder}
+                      />
+                    )}
+                  </div>
+                ))}
+
+                {config.mode === "acknowledge" && (
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={completionAck}
+                      onChange={(e) => setCompletionAck(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
+                    />
+                    <span className="text-sm text-ink/70">
+                      I have read and agree to the above. I understand this is a binding acknowledgement.
+                    </span>
+                  </label>
+                )}
+
+                {config.mode === "upload" && (
+                  <div className="space-y-3">
+                    <div className="bg-rooted-green/5 border border-rooted-green/20 rounded-lg p-3">
+                      <p className="text-sm text-ink/70">
+                        Please upload the required document on the{" "}
+                        <a href="/family/documents" className="text-rooted-green hover:underline font-medium">
+                          Documents page
+                        </a>
+                        , then return here to confirm.
+                      </p>
+                    </div>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={completionAck}
+                        onChange={(e) => setCompletionAck(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
+                      />
+                      <span className="text-sm text-ink/70">
+                        I have uploaded the required document.
+                      </span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCompletionOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={doCompleteItem}
+                  disabled={!canSubmit}
+                  className="bg-rooted-green hover:bg-rooted-green/90 text-white"
+                >
+                  {config.mode === "form" ? "Submit" : "Confirm"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }

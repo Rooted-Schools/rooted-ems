@@ -53,7 +53,10 @@ export default async function SeatManagementPage({
     const offered = (row.seats_offered as number) ?? 0;
     const accepted = (row.seats_accepted as number) ?? 0;
     const registered = (row.seats_registered as number) ?? 0;
-    const available = total - offered - accepted - registered;
+    // offered/accepted/registered are cumulative pipeline stages, not independent buckets
+    // available = total capacity minus highest committed stage to avoid double-counting
+    const committed = Math.max(offered, accepted, registered);
+    const available = total - committed;
 
     return {
       id: row.id as string,

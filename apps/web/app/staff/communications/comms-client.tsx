@@ -154,8 +154,8 @@ export function CommsClient({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Communications</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-ink">Communications</h1>
+          <p className="text-sm text-stone mt-1">
             Send and track messages to families via email, SMS, or in-app notifications.
           </p>
         </div>
@@ -178,7 +178,7 @@ export function CommsClient({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Total Sent
             </CardTitle>
           </CardHeader>
@@ -188,7 +188,7 @@ export function CommsClient({
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Delivered
             </CardTitle>
           </CardHeader>
@@ -198,24 +198,24 @@ export function CommsClient({
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Queued
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className={`text-2xl font-bold ${stats.queued > 0 ? "text-amber-600" : "text-gray-300"}`}>
+            <p className={`text-2xl font-bold ${stats.queued > 0 ? "text-amber-600" : "text-stone/50"}`}>
               {stats.queued}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Failed
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className={`text-2xl font-bold ${stats.failed > 0 ? "text-red-600" : "text-gray-300"}`}>
+            <p className={`text-2xl font-bold ${stats.failed > 0 ? "text-red-600" : "text-stone/50"}`}>
               {stats.failed}
             </p>
           </CardContent>
@@ -271,7 +271,7 @@ export function CommsClient({
                         className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                           channelFilter === ch
                             ? "bg-rooted-green text-white"
-                            : "text-gray-500 hover:bg-gray-100"
+                            : "text-stone hover:bg-rooted-gray"
                         }`}
                       >
                         {ch === "all" ? "All" : channelIcons[ch]} {ch === "all" ? "" : channelLabels[ch]}
@@ -299,7 +299,7 @@ export function CommsClient({
                         <>
                           <TableRow
                             key={msg.id}
-                            className={`cursor-pointer hover:bg-gray-50 ${isExpanded ? "bg-gray-50" : ""}`}
+                            className={`cursor-pointer hover:bg-rooted-gray-light ${isExpanded ? "bg-rooted-gray-light" : ""}`}
                             onClick={() => setExpandedMsgId(isExpanded ? null : msg.id)}
                           >
                             <TableCell>
@@ -307,10 +307,10 @@ export function CommsClient({
                                 {channelIcons[msg.channel] ?? "📧"}
                               </span>
                             </TableCell>
-                            <TableCell className="text-gray-700 text-sm">
+                            <TableCell className="text-ink/70 text-sm">
                               {msg.recipient_address ?? "\u2014"}
                               {msg.recipient_count > 1 && (
-                                <span className="ml-1 text-[10px] text-gray-400">
+                                <span className="ml-1 text-[10px] text-stone">
                                   +{msg.recipient_count - 1} more
                                 </span>
                               )}
@@ -319,29 +319,29 @@ export function CommsClient({
                             <TableCell>
                               <Badge variant={cfg.variant}>{cfg.label}</Badge>
                             </TableCell>
-                            <TableCell className="text-gray-500 text-sm">
+                            <TableCell className="text-stone text-sm">
                               {formatSentAt(msg.sent_at)}
                             </TableCell>
                           </TableRow>
                           {isExpanded && (
                             <TableRow key={`${msg.id}-detail`}>
-                              <TableCell colSpan={5} className="bg-gray-50/70 px-6 py-3">
+                              <TableCell colSpan={5} className="bg-rooted-gray-light/70 px-6 py-3">
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                                   <div>
-                                    <span className="text-gray-400 block">Channel</span>
+                                    <span className="text-stone block">Channel</span>
                                     <span className="font-medium">{channelLabels[msg.channel] ?? msg.channel}</span>
                                   </div>
                                   <div>
-                                    <span className="text-gray-400 block">Recipients</span>
+                                    <span className="text-stone block">Recipients</span>
                                     <span className="font-medium">{msg.recipient_count}</span>
                                   </div>
                                   <div>
-                                    <span className="text-gray-400 block">Status</span>
+                                    <span className="text-stone block">Status</span>
                                     <span className="font-medium">{cfg.label}</span>
                                   </div>
                                   <div>
-                                    <span className="text-gray-400 block">Message ID</span>
-                                    <span className="font-mono text-[10px] text-gray-500">{msg.id.slice(0, 12)}...</span>
+                                    <span className="text-stone block">Message ID</span>
+                                    <span className="font-mono text-[10px] text-stone">{msg.id.slice(0, 12)}...</span>
                                   </div>
                                 </div>
                               </TableCell>
@@ -389,11 +389,11 @@ export function CommsClient({
                   {templates.map((tpl) => (
                     <div
                       key={tpl.id}
-                      className="flex items-start justify-between gap-4 p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                      className="flex items-start justify-between gap-4 p-4 rounded-lg border border-stone/20 hover:border-stone/30 transition-colors"
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-semibold text-gray-900">{tpl.name}</span>
+                          <span className="text-sm font-semibold text-ink">{tpl.name}</span>
                           <Badge variant="outline" className="text-[10px]">
                             {channelIcons[tpl.channel] ?? ""} {channelLabels[tpl.channel] ?? tpl.channel}
                           </Badge>
@@ -402,11 +402,11 @@ export function CommsClient({
                           )}
                         </div>
                         {tpl.subject && (
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-stone">
                             <span className="font-medium">Subject:</span> {tpl.subject}
                           </p>
                         )}
-                        <p className="text-xs text-gray-400 mt-1 line-clamp-2">{tpl.body}</p>
+                        <p className="text-xs text-stone mt-1 line-clamp-2">{tpl.body}</p>
                         {tpl.merge_fields && tpl.merge_fields.length > 0 && (
                           <div className="flex gap-1 mt-2 flex-wrap">
                             {tpl.merge_fields.map((field) => (
@@ -606,13 +606,13 @@ function NewMessageDialog({
           {/* Template selector */}
           {templates.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink/70 mb-1">
                 Use Template (optional)
               </label>
               <select
                 value={templateId}
                 onChange={(e) => handleTemplateSelect(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
               >
                 <option value="">No template — write custom message</option>
                 {templates.map((t) => (
@@ -626,7 +626,7 @@ function NewMessageDialog({
 
           {/* Channel */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink/70 mb-1">
               Channel
             </label>
             <div className="flex gap-2">
@@ -638,7 +638,7 @@ function NewMessageDialog({
                   className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
                     channel === ch
                       ? "bg-rooted-green text-white border-rooted-green"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      : "bg-white text-ink/70 border-stone/30 hover:bg-rooted-gray-light"
                   }`}
                 >
                   {channelIcons[ch]} {channelLabels[ch]}
@@ -654,7 +654,7 @@ function NewMessageDialog({
 
           {/* Audience */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink/70 mb-1">
               Audience
             </label>
             <div className="flex gap-2 mb-2">
@@ -666,7 +666,7 @@ function NewMessageDialog({
                   className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
                     audienceType === type
                       ? "bg-rooted-green text-white border-rooted-green"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      : "bg-white text-ink/70 border-stone/30 hover:bg-rooted-gray-light"
                   }`}
                 >
                   {type === "all" ? "All Families" : type === "status" ? "By Status" : "Individual"}
@@ -678,7 +678,7 @@ function NewMessageDialog({
               <select
                 value={statusTarget}
                 onChange={(e) => setStatusTarget(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
               >
                 {Object.entries(appStatusLabels).map(([val, label]) => (
                   <option key={val} value={val}>{label}</option>
@@ -687,14 +687,14 @@ function NewMessageDialog({
             )}
 
             {audienceType === "individual" && (
-              <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
+              <div className="max-h-40 overflow-y-auto border border-stone/20 rounded-lg">
                 {recipients.length === 0 ? (
-                  <p className="text-sm text-gray-400 p-3">No recipients available.</p>
+                  <p className="text-sm text-stone p-3">No recipients available.</p>
                 ) : (
                   recipients.map((r) => (
                     <label
                       key={r.userId}
-                      className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer text-sm"
+                      className="flex items-center gap-2 px-3 py-1.5 hover:bg-rooted-gray-light cursor-pointer text-sm"
                     >
                       <input
                         type="checkbox"
@@ -705,10 +705,10 @@ function NewMessageDialog({
                           else next.delete(r.userId);
                           setSelectedIds(next);
                         }}
-                        className="rounded border-gray-300"
+                        className="rounded border-stone/30"
                       />
                       <span className="font-medium">{r.name}</span>
-                      <span className="text-gray-400 text-xs">{r.email}</span>
+                      <span className="text-stone text-xs">{r.email}</span>
                       <Badge variant="secondary" className="text-[10px] ml-auto">
                         {appStatusLabels[r.status] ?? r.status}
                       </Badge>
@@ -718,14 +718,14 @@ function NewMessageDialog({
               </div>
             )}
 
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-stone mt-1">
               {recipientCount} recipient{recipientCount !== 1 ? "s" : ""} selected
             </p>
           </div>
 
           {/* Subject */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink/70 mb-1">
               Subject
             </label>
             <input
@@ -733,13 +733,13 @@ function NewMessageDialog({
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Notification title..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+              className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
             />
           </div>
 
           {/* Body */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink/70 mb-1">
               Message
             </label>
             <textarea
@@ -747,14 +747,14 @@ function NewMessageDialog({
               onChange={(e) => setBody(e.target.value)}
               placeholder="Write your message..."
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 resize-none"
+              className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 resize-none"
             />
           </div>
 
           {/* Optional link (in-app only) */}
           {channel === "in_app" && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink/70 mb-1">
                 Link (optional)
               </label>
               <input
@@ -762,9 +762,9 @@ function NewMessageDialog({
                 value={link}
                 onChange={(e) => setLink(e.target.value)}
                 placeholder="/family/dashboard"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
               />
-              <p className="text-xs text-gray-400 mt-0.5">
+              <p className="text-xs text-stone mt-0.5">
                 Deep link shown in the notification (e.g. /family/applications)
               </p>
             </div>
@@ -772,14 +772,14 @@ function NewMessageDialog({
 
           {/* Preview */}
           {(subject.trim() || body.trim()) && (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-              <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-2">Preview</p>
-              <div className="bg-white rounded-md border border-gray-100 p-3">
+            <div className="rounded-lg border border-stone/20 bg-rooted-gray-light p-3">
+              <p className="text-[10px] text-stone uppercase tracking-wider mb-2">Preview</p>
+              <div className="bg-white rounded-md border border-rooted-gray p-3">
                 {subject.trim() && (
-                  <p className="text-sm font-semibold text-gray-900">{subject}</p>
+                  <p className="text-sm font-semibold text-ink">{subject}</p>
                 )}
                 {body.trim() && (
-                  <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{body}</p>
+                  <p className="text-sm text-ink/60 mt-1 whitespace-pre-wrap">{body}</p>
                 )}
                 {link.trim() && (
                   <p className="text-xs text-rooted-green mt-2">{link}</p>
@@ -875,7 +875,7 @@ function NewTemplateDialog({
 
         <div className="space-y-4 py-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink/70 mb-1">
               Template Name
             </label>
             <input
@@ -883,12 +883,12 @@ function NewTemplateDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Application Received"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+              className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink/70 mb-1">
               Channel
             </label>
             <div className="flex gap-2">
@@ -900,7 +900,7 @@ function NewTemplateDialog({
                   className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
                     channel === ch
                       ? "bg-rooted-green text-white border-rooted-green"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      : "bg-white text-ink/70 border-stone/30 hover:bg-rooted-gray-light"
                   }`}
                 >
                   {channelIcons[ch]} {channelLabels[ch]}
@@ -910,7 +910,7 @@ function NewTemplateDialog({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink/70 mb-1">
               Subject (optional)
             </label>
             <input
@@ -918,12 +918,12 @@ function NewTemplateDialog({
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Notification subject line..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+              className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink/70 mb-1">
               Message Body
             </label>
             <textarea
@@ -931,9 +931,9 @@ function NewTemplateDialog({
               onChange={(e) => setBody(e.target.value)}
               placeholder="Write the template message... Use {{student_name}}, {{campus_name}} for merge fields."
               rows={5}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 resize-none"
+              className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 resize-none"
             />
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-stone mt-1">
               Available merge fields: {"{{student_name}}"}, {"{{guardian_name}}"}, {"{{campus_name}}"}, {"{{grade}}"}, {"{{deadline}}"}
             </p>
           </div>

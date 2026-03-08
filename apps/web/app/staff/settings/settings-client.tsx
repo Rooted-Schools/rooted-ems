@@ -34,9 +34,9 @@ const roleLabels: Record<string, string> = {
 
 const windowStatusConfig: Record<string, { label: string; className: string }> = {
   open: { label: "Open", className: "bg-green-100 text-green-800" },
-  draft: { label: "Draft", className: "bg-gray-100 text-gray-700" },
-  closed: { label: "Closed", className: "bg-gray-100 text-gray-900" },
-  archived: { label: "Archived", className: "bg-gray-100 text-gray-500" },
+  draft: { label: "Draft", className: "bg-rooted-gray text-ink/70" },
+  closed: { label: "Closed", className: "bg-rooted-gray text-ink" },
+  archived: { label: "Archived", className: "bg-rooted-gray text-stone" },
 };
 
 interface SchoolYear {
@@ -79,8 +79,8 @@ export function SettingsClient({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-ink">Settings</h1>
+        <p className="text-sm text-stone mt-1">
           Manage campus configuration, enrollment windows, registration requirements, and staff access.
         </p>
       </div>
@@ -164,11 +164,11 @@ function CampusTab({ campuses }: { campuses: CampusRow[] }) {
             {campuses.map((campus) => (
               <div
                 key={campus.id}
-                className="flex items-center justify-between p-3 rounded-md border border-gray-200"
+                className="flex items-center justify-between p-3 rounded-md border border-stone/20"
               >
                 <div>
                   <p className="font-medium text-sm">{campus.name}</p>
-                  <p className="text-xs text-gray-500">{campus.region_name}</p>
+                  <p className="text-xs text-stone">{campus.region_name}</p>
                 </div>
                 <Badge variant="secondary">{campus.short_code || "—"}</Badge>
               </div>
@@ -275,22 +275,22 @@ function EnrollmentWindowsTab({
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <label className="block text-sm font-medium text-ink/70 mb-1">Name</label>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Fall 2026-27 Open Enrollment"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                    className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Campus</label>
+                    <label className="block text-sm font-medium text-ink/70 mb-1">Campus</label>
                     <select
                       value={campusId}
                       onChange={(e) => setCampusId(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                      className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                     >
                       <option value="">Select campus</option>
                       {campuses.map((c) => (
@@ -299,11 +299,11 @@ function EnrollmentWindowsTab({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">School Year</label>
+                    <label className="block text-sm font-medium text-ink/70 mb-1">School Year</label>
                     <select
                       value={schoolYearId}
                       onChange={(e) => setSchoolYearId(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                      className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                     >
                       {schoolYears.map((sy) => (
                         <option key={sy.id} value={sy.id}>{sy.name}</option>
@@ -313,43 +313,43 @@ function EnrollmentWindowsTab({
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Open Date</label>
+                    <label className="block text-sm font-medium text-ink/70 mb-1">Open Date</label>
                     <input
                       type="date"
                       value={openDate}
                       onChange={(e) => setOpenDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                      className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Close Date</label>
+                    <label className="block text-sm font-medium text-ink/70 mb-1">Close Date</label>
                     <input
                       type="date"
                       value={closeDate}
                       onChange={(e) => setCloseDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                      className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Initial Status</label>
+                  <label className="block text-sm font-medium text-ink/70 mb-1">Initial Status</label>
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value as "draft" | "open")}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                    className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                   >
                     <option value="draft">Draft</option>
                     <option value="open">Open</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
+                  <label className="block text-sm font-medium text-ink/70 mb-1">Description (optional)</label>
                   <input
                     type="text"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Brief description of this enrollment window"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                    className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                   />
                 </div>
               </div>
@@ -391,11 +391,11 @@ function EnrollmentWindowsTab({
               return (
                 <div
                   key={w.id}
-                  className="flex items-center justify-between p-3 rounded-md border border-gray-200"
+                  className="flex items-center justify-between p-3 rounded-md border border-stone/20"
                 >
                   <div>
                     <p className="font-medium text-sm">{w.name}</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-stone">
                       {w.open_date} — {w.close_date}
                     </p>
                   </div>
@@ -558,11 +558,11 @@ function RegistrationRequirementsTab({
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-4 mb-6">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Campus</label>
+            <label className="block text-xs font-medium text-stone mb-1">Campus</label>
             <select
               value={selectedCampus}
               onChange={(e) => { setSelectedCampus(e.target.value); setFeedback(null); }}
-              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+              className="px-3 py-1.5 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
             >
               {campuses.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -570,11 +570,11 @@ function RegistrationRequirementsTab({
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">School Year</label>
+            <label className="block text-xs font-medium text-stone mb-1">School Year</label>
             <select
               value={selectedYear}
               onChange={(e) => { setSelectedYear(e.target.value); setFeedback(null); }}
-              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+              className="px-3 py-1.5 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
             >
               {schoolYears.map((sy) => (
                 <option key={sy.id} value={sy.id}>{sy.name}</option>
@@ -589,25 +589,25 @@ function RegistrationRequirementsTab({
                 onChange={(e) => setShowInactive(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-rooted-green/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rooted-green" />
+              <div className="w-9 h-5 bg-rooted-gray-dark/30 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-rooted-green/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone/30 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rooted-green" />
             </label>
-            <span className="text-sm text-gray-600">Show inactive items</span>
+            <span className="text-sm text-ink/60">Show inactive items</span>
           </div>
         </div>
 
         {/* Stats bar */}
-        <div className="flex gap-4 mb-5 pb-4 border-b border-gray-200">
+        <div className="flex gap-4 mb-5 pb-4 border-b border-stone/20">
           <div className="text-center">
             <p className="text-2xl font-bold text-rooted-green">{activeCount}</p>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wide">Active</p>
+            <p className="text-[10px] text-stone uppercase tracking-wide">Active</p>
           </div>
           <div className="text-center">
             <p className="text-2xl font-bold text-red-600">{requiredCount}</p>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wide">Required</p>
+            <p className="text-[10px] text-stone uppercase tracking-wide">Required</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-gray-400">{totalCount - activeCount}</p>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wide">Inactive</p>
+            <p className="text-2xl font-bold text-stone">{totalCount - activeCount}</p>
+            <p className="text-[10px] text-stone uppercase tracking-wide">Inactive</p>
           </div>
         </div>
 
@@ -635,7 +635,7 @@ function RegistrationRequirementsTab({
 
               return (
                 <div key={category}>
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  <h3 className="text-xs font-semibold text-stone uppercase tracking-wider mb-2">
                     {category}
                   </h3>
                   <div className="space-y-1">
@@ -644,8 +644,8 @@ function RegistrationRequirementsTab({
                         key={req.id}
                         className={`flex items-center justify-between p-3 rounded-md border transition-colors ${
                           !req.is_active
-                            ? "border-gray-100 bg-gray-50/50 opacity-60"
-                            : "border-gray-200 hover:border-gray-300"
+                            ? "border-rooted-gray bg-rooted-gray-light/50 opacity-60"
+                            : "border-stone/20 hover:border-stone/30"
                         }`}
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -653,9 +653,9 @@ function RegistrationRequirementsTab({
                             {ITEM_ICONS[req.item_type] ?? "📄"}
                           </span>
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{req.name}</p>
+                            <p className="text-sm font-medium text-ink truncate">{req.name}</p>
                             {req.description && (
-                              <p className="text-xs text-gray-500 truncate">{req.description}</p>
+                              <p className="text-xs text-stone truncate">{req.description}</p>
                             )}
                           </div>
                         </div>
@@ -667,9 +667,9 @@ function RegistrationRequirementsTab({
                               checked={req.is_required}
                               disabled={isPending || !req.is_active}
                               onChange={(e) => handleToggle(req.id, "is_required", e.target.checked)}
-                              className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500 disabled:opacity-40"
+                              className="w-4 h-4 text-red-600 border-stone/30 rounded focus:ring-red-500 disabled:opacity-40"
                             />
-                            <span className={`text-[10px] font-medium ${req.is_required && req.is_active ? "text-red-600" : "text-gray-400"}`}>
+                            <span className={`text-[10px] font-medium ${req.is_required && req.is_active ? "text-red-600" : "text-stone"}`}>
                               Required
                             </span>
                           </label>
@@ -682,7 +682,7 @@ function RegistrationRequirementsTab({
                               onChange={(e) => handleToggle(req.id, "is_active", e.target.checked)}
                               className="sr-only peer"
                             />
-                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-rooted-green/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rooted-green peer-disabled:opacity-50" />
+                            <div className="w-9 h-5 bg-rooted-gray-dark/30 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-rooted-green/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone/30 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rooted-green peer-disabled:opacity-50" />
                           </label>
                         </div>
                       </div>
@@ -843,22 +843,22 @@ function StaffUsersTab({
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">User Email</label>
+                  <label className="block text-sm font-medium text-ink/70 mb-1">User Email</label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="staff@rootedschool.org"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                    className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Campus</label>
+                    <label className="block text-sm font-medium text-ink/70 mb-1">Campus</label>
                     <select
                       value={campusId}
                       onChange={(e) => setCampusId(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                      className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                     >
                       <option value="">Select campus</option>
                       {campuses.map((c) => (
@@ -867,11 +867,11 @@ function StaffUsersTab({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                    <label className="block text-sm font-medium text-ink/70 mb-1">Role</label>
                     <select
                       value={role}
                       onChange={(e) => setRole(e.target.value as typeof role)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                      className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                     >
                       <option value="enrollment_staff">Enrollment Staff</option>
                       <option value="enrollment_manager">Enrollment Manager</option>
@@ -933,7 +933,7 @@ function StaffUsersTab({
                 return (
                   <div
                     key={primary.user_id || primary.id}
-                    className={`p-4 rounded-lg border ${isSelf ? "border-rooted-green/30 bg-rooted-green/5" : "border-gray-200"}`}
+                    className={`p-4 rounded-lg border ${isSelf ? "border-rooted-green/30 bg-rooted-green/5" : "border-stone/20"}`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
@@ -942,12 +942,12 @@ function StaffUsersTab({
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="font-medium text-sm text-gray-900">{primary.full_name}</p>
+                            <p className="font-medium text-sm text-ink">{primary.full_name}</p>
                             {isSelf && (
                               <span className="text-[10px] bg-rooted-green/20 text-rooted-green px-1.5 py-0.5 rounded-full font-medium">You</span>
                             )}
                           </div>
-                          <p className="text-xs text-gray-500">{primary.email}</p>
+                          <p className="text-xs text-stone">{primary.email}</p>
                         </div>
                       </div>
                       <Badge variant="outline" className="text-[10px] shrink-0">
@@ -960,12 +960,12 @@ function StaffUsersTab({
                       {roles.map((assignment) => (
                         <div
                           key={assignment.id}
-                          className="flex items-center justify-between py-1.5 px-3 rounded-md bg-gray-50 group"
+                          className="flex items-center justify-between py-1.5 px-3 rounded-md bg-rooted-gray-light group"
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-xs" aria-hidden="true">🏫</span>
-                            <span className="text-sm text-gray-700">{assignment.campus_name}</span>
-                            <span className="text-[10px] text-gray-400">
+                            <span className="text-sm text-ink/70">{assignment.campus_name}</span>
+                            <span className="text-[10px] text-stone">
                               {roleLabels[assignment.role] ?? assignment.role}
                             </span>
                           </div>
@@ -1010,16 +1010,16 @@ function StaffUsersTab({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="bg-gray-50 rounded-lg p-3">
+            <div className="bg-rooted-gray-light rounded-lg p-3">
               <p className="text-sm font-medium">{editingUser?.full_name}</p>
-              <p className="text-xs text-gray-500">{editingUser?.email}</p>
+              <p className="text-xs text-stone">{editingUser?.email}</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Campus</label>
+              <label className="block text-sm font-medium text-ink/70 mb-1">Campus</label>
               <select
                 value={editCampusId}
                 onChange={(e) => setEditCampusId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
               >
                 {campuses.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
@@ -1027,11 +1027,11 @@ function StaffUsersTab({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+              <label className="block text-sm font-medium text-ink/70 mb-1">Role</label>
               <select
                 value={editRole}
                 onChange={(e) => setEditRole(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
               >
                 <option value="enrollment_staff">Enrollment Staff</option>
                 <option value="enrollment_manager">Enrollment Manager</option>
@@ -1100,13 +1100,13 @@ function SchoolYearsGradesTab({
                 <div
                   key={sy.id}
                   className={`flex items-center justify-between p-3 rounded-md border ${
-                    sy.is_current ? "border-rooted-green/40 bg-rooted-green/5" : "border-gray-200"
+                    sy.is_current ? "border-rooted-green/40 bg-rooted-green/5" : "border-stone/20"
                   }`}
                 >
                   <div>
                     <p className="font-medium text-sm">{sy.name}</p>
                     {sy.start_date && sy.end_date && (
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-stone">
                         {new Date(sy.start_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                         {" — "}
                         {new Date(sy.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
@@ -1142,7 +1142,7 @@ function SchoolYearsGradesTab({
               <select
                 value={selectedCampus}
                 onChange={(e) => setSelectedCampus(e.target.value)}
-                className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                className="px-3 py-1.5 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
               >
                 {campuses.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
@@ -1163,16 +1163,16 @@ function SchoolYearsGradesTab({
               {campusGrades.map((g) => (
                 <div
                   key={g.id}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 bg-white"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-stone/20 bg-white"
                 >
-                  <span className="text-sm font-medium text-gray-900">
+                  <span className="text-sm font-medium text-ink">
                     Grade {g.grade}
                   </span>
                 </div>
               ))}
             </div>
           )}
-          <p className="text-xs text-gray-400 mt-4">
+          <p className="text-xs text-stone mt-4">
             {campusGrades.length} grade level{campusGrades.length !== 1 ? "s" : ""} configured for{" "}
             {campuses.find((c) => c.id === selectedCampus)?.name ?? "this campus"}
           </p>
@@ -1284,7 +1284,7 @@ function PreferencesTab({ settings }: { settings: Record<string, string> }) {
             <CardDescription>{section.description}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-rooted-gray">
               {section.items.map((item) => {
                 const currentValue = settings[item.key] ?? item.default;
                 const isOn = currentValue === "true";
@@ -1292,8 +1292,8 @@ function PreferencesTab({ settings }: { settings: Record<string, string> }) {
                 return (
                   <div key={item.key} className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
                     <div className="pr-4">
-                      <p className="text-sm font-medium text-gray-900">{item.label}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
+                      <p className="text-sm font-medium text-ink">{item.label}</p>
+                      <p className="text-xs text-stone mt-0.5">{item.description}</p>
                     </div>
                     <div className="flex-shrink-0">
                       {item.type === "toggle" && (
@@ -1304,7 +1304,7 @@ function PreferencesTab({ settings }: { settings: Record<string, string> }) {
                             readOnly
                             className="sr-only peer"
                           />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-rooted-green/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rooted-green" />
+                          <div className="w-11 h-6 bg-rooted-gray-dark/30 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-rooted-green/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rooted-green" />
                         </label>
                       )}
                       {item.type === "number" && (
@@ -1312,14 +1312,14 @@ function PreferencesTab({ settings }: { settings: Record<string, string> }) {
                           type="number"
                           value={currentValue}
                           readOnly
-                          className="w-20 px-3 py-1.5 border border-gray-300 rounded-md text-sm text-right focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                          className="w-20 px-3 py-1.5 border border-stone/30 rounded-md text-sm text-right focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                         />
                       )}
                       {item.type === "select" && "options" in item && (
                         <select
                           value={currentValue}
                           disabled
-                          className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                          className="px-3 py-1.5 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                         >
                           {item.options?.map((opt) => (
                             <option key={opt.value} value={opt.value}>
@@ -1333,7 +1333,7 @@ function PreferencesTab({ settings }: { settings: Record<string, string> }) {
                 );
               })}
             </div>
-            <p className="text-xs text-gray-400 mt-4 pt-3 border-t border-gray-100">
+            <p className="text-xs text-stone mt-4 pt-3 border-t border-rooted-gray">
               Preference changes require a database update. Contact your system administrator to modify these settings.
             </p>
           </CardContent>

@@ -103,7 +103,7 @@ export function StaffLoginForm() {
 
         <form onSubmit={handleEmailLogin} className="space-y-3">
           <div>
-            <label htmlFor="staff-email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="staff-email" className="block text-sm font-medium text-ink/70 mb-1">
               Email
             </label>
             <input
@@ -117,7 +117,7 @@ export function StaffLoginForm() {
             />
           </div>
           <div>
-            <label htmlFor="staff-password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="staff-password" className="block text-sm font-medium text-ink/70 mb-1">
               Password
             </label>
             <input

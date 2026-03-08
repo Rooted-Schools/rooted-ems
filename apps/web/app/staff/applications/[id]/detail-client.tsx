@@ -55,9 +55,9 @@ function formatDateTime(dateStr: string) {
 /* ─── Detail row helper ─── */
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between py-2 border-b border-gray-50 last:border-0">
-      <span className="text-sm text-gray-500">{label}</span>
-      <span className="text-sm font-medium text-gray-900 text-right">{value}</span>
+    <div className="flex justify-between py-2 border-b border-rooted-gray last:border-0">
+      <span className="text-sm text-stone">{label}</span>
+      <span className="text-sm font-medium text-ink text-right">{value}</span>
     </div>
   );
 }
@@ -202,10 +202,10 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">{detail.student_name}</h1>
+            <h1 className="text-2xl font-bold text-ink">{detail.student_name}</h1>
             <Badge variant={statusCfg.variant}>{statusCfg.label}</Badge>
           </div>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-stone mt-1">
             {getGradeLabel(detail.grade)} &middot; {detail.campus_name} &middot; {detail.enrollment_window_name} &middot; ID: {detail.id}
           </p>
         </div>
@@ -241,8 +241,8 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
             <div className="flex items-start gap-3">
               <span className="text-2xl" aria-hidden="true">📋</span>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-gray-900">Application Ready for Review</p>
-                <p className="text-xs text-gray-600 mt-0.5">
+                <p className="text-sm font-semibold text-ink">Application Ready for Review</p>
+                <p className="text-xs text-ink/60 mt-0.5">
                   Review the student information and uploaded documents below.
                   {totalDocs > 0 && verifiedDocs < totalDocs && (
                     <span className="text-amber-700 font-medium"> {totalDocs - verifiedDocs} document{totalDocs - verifiedDocs > 1 ? "s" : ""} pending verification.</span>
@@ -265,8 +265,8 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
             <div className="flex items-start gap-3">
               <span className="text-2xl" aria-hidden="true">⚠️</span>
               <div>
-                <p className="text-sm font-semibold text-gray-900">Waiting for Family Response</p>
-                <p className="text-xs text-gray-600 mt-0.5">
+                <p className="text-sm font-semibold text-ink">Waiting for Family Response</p>
+                <p className="text-xs text-ink/60 mt-0.5">
                   Additional information or documents have been requested from the family. Once they respond, review and mark as Verified.
                 </p>
               </div>
@@ -280,8 +280,8 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
             <div className="flex items-start gap-3">
               <span className="text-2xl" aria-hidden="true">✅</span>
               <div>
-                <p className="text-sm font-semibold text-gray-900">Application Verified</p>
-                <p className="text-xs text-gray-600 mt-0.5">
+                <p className="text-sm font-semibold text-ink">Application Verified</p>
+                <p className="text-xs text-ink/60 mt-0.5">
                   This application is verified and ready to be assigned to a lottery run or given a direct offer.
                 </p>
               </div>
@@ -294,7 +294,7 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Submitted
             </CardTitle>
           </CardHeader>
@@ -304,7 +304,7 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Days in Review
             </CardTitle>
           </CardHeader>
@@ -313,26 +313,26 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
               {detail.submitted_at
                 ? Math.max(0, Math.ceil((Date.now() - new Date(detail.submitted_at).getTime()) / (1000 * 60 * 60 * 24)))
                 : "—"}{" "}
-              <span className="text-xs text-gray-400 font-normal">days</span>
+              <span className="text-xs text-stone font-normal">days</span>
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Documents
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm font-medium">
               <span className={verifiedDocs === totalDocs && totalDocs > 0 ? "text-green-600" : ""}>{verifiedDocs}/{totalDocs}</span>
-              <span className="text-xs text-gray-400 font-normal ml-1">verified</span>
+              <span className="text-xs text-stone font-normal ml-1">verified</span>
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Notes
             </CardTitle>
           </CardHeader>
@@ -430,7 +430,7 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
             </CardHeader>
             <CardContent className="px-0">
               {detail.documents.length === 0 ? (
-                <p className="text-center text-gray-500 py-8 text-sm">
+                <p className="text-center text-stone py-8 text-sm">
                   No documents uploaded yet.
                 </p>
               ) : (
@@ -455,13 +455,13 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
                               {doc.file_name}
                             </div>
                           </TableCell>
-                          <TableCell className="text-gray-500 capitalize">
+                          <TableCell className="text-stone capitalize">
                             {doc.document_type.replace(/_/g, " ")}
                           </TableCell>
                           <TableCell>
                             <Badge variant={dcfg.variant}>{dcfg.label}</Badge>
                           </TableCell>
-                          <TableCell className="text-gray-500">
+                          <TableCell className="text-stone">
                             {formatDate(doc.created_at)}
                           </TableCell>
                           <TableCell>
@@ -530,7 +530,7 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && noteText.trim()) handleAddNote();
                   }}
-                  className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
+                  className="flex-1 rounded-md border border-stone/30 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
                 />
                 <Button
                   disabled={!noteText.trim() || isPending}
@@ -542,7 +542,7 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
 
               {/* Notes list */}
               {detail.notes.length === 0 ? (
-                <p className="text-center text-gray-500 py-6 text-sm">
+                <p className="text-center text-stone py-6 text-sm">
                   No notes yet. Add one above.
                 </p>
               ) : (
@@ -550,19 +550,19 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
                   {detail.notes.map((note) => (
                     <div
                       key={note.id}
-                      className="border border-gray-100 rounded-md p-3"
+                      className="border border-rooted-gray rounded-md p-3"
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-900">
+                        <span className="text-sm font-medium text-ink">
                           {note.created_by_name}
                         </span>
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-stone">
                           {formatDateTime(note.created_at)}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-700">{note.content}</p>
+                      <p className="text-sm text-ink/70">{note.content}</p>
                       {note.is_internal && (
-                        <span className="inline-block mt-1.5 text-[10px] text-gray-400 uppercase tracking-wide">
+                        <span className="inline-block mt-1.5 text-[10px] text-stone uppercase tracking-wide">
                           Internal
                         </span>
                       )}
@@ -585,13 +585,13 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
             </CardHeader>
             <CardContent>
               {detail.timeline.length === 0 ? (
-                <p className="text-center text-gray-500 py-6 text-sm">
+                <p className="text-center text-stone py-6 text-sm">
                   No history recorded yet.
                 </p>
               ) : (
                 <div className="relative">
                   {/* Timeline line */}
-                  <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200" />
+                  <div className="absolute left-4 top-0 bottom-0 w-px bg-rooted-gray-dark/30" />
 
                   <div className="space-y-6">
                     {detail.timeline.map((entry, idx) => {
@@ -601,7 +601,7 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
                           {/* Timeline dot */}
                           <div
                             className={`relative z-10 w-7 h-7 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-xs shrink-0 ${
-                              idx === 0 ? "bg-rooted-green text-white" : "bg-gray-200 text-gray-600"
+                              idx === 0 ? "bg-rooted-green text-white" : "bg-rooted-gray-dark/30 text-ink/60"
                             }`}
                           >
                             {idx === 0 ? "●" : (detail.timeline.length - idx)}
@@ -613,7 +613,7 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
                                   <Badge variant="secondary" className="text-xs">
                                     {getStatusConfig(entry.from_status).label}
                                   </Badge>
-                                  <span className="text-gray-400 text-xs">→</span>
+                                  <span className="text-stone text-xs">→</span>
                                 </>
                               )}
                               <Badge variant={toCfg.variant} className="text-xs">
@@ -621,16 +621,16 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
                               </Badge>
                             </div>
                             {entry.changed_by_name && (
-                              <p className="text-sm text-gray-700 mt-1">
+                              <p className="text-sm text-ink/70 mt-1">
                                 by <span className="font-medium">{entry.changed_by_name}</span>
                               </p>
                             )}
                             {entry.reason && (
-                              <p className="text-sm text-gray-500 mt-0.5 italic">
+                              <p className="text-sm text-stone mt-0.5 italic">
                                 &ldquo;{entry.reason}&rdquo;
                               </p>
                             )}
-                            <p className="text-xs text-gray-400 mt-1">
+                            <p className="text-xs text-stone mt-1">
                               {formatDateTime(entry.created_at)}
                             </p>
                           </div>

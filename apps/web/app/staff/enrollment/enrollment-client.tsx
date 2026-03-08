@@ -85,8 +85,8 @@ export function EnrollmentClient({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Enrollment</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-ink">Enrollment</h1>
+          <p className="text-sm text-stone mt-1">
             Students who have completed the full enrollment process and are registered.
           </p>
         </div>
@@ -99,52 +99,52 @@ export function EnrollmentClient({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="border-t-4 border-t-rooted-green">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Total Enrolled
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-rooted-green">{stats.total}</p>
-            <p className="text-xs text-gray-400 mt-1">all time</p>
+            <p className="text-xs text-stone mt-1">all time</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-emerald-500">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Active
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-emerald-600">{stats.active}</p>
-            <p className="text-xs text-gray-400 mt-1">currently enrolled</p>
+            <p className="text-xs text-stone mt-1">currently enrolled</p>
           </CardContent>
         </Card>
         <Card className="border-t-4 border-t-blue-500">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               SIS Synced
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-blue-600">{stats.sis_synced}</p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-stone mt-1">
               {stats.active > 0
                 ? `${Math.round((stats.sis_synced / stats.active) * 100)}% of active`
                 : "synced to SIS"}
             </p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-gray-400">
+        <Card className="border-t-4 border-t-stone">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Withdrawn
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className={`text-2xl font-bold ${stats.withdrawn === 0 ? "text-gray-300" : "text-red-600"}`}>
+            <p className={`text-2xl font-bold ${stats.withdrawn === 0 ? "text-stone/50" : "text-red-600"}`}>
               {stats.withdrawn}
             </p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-stone mt-1">
               {stats.withdrawn === 0 ? "none" : "students withdrawn"}
             </p>
           </CardContent>
@@ -195,7 +195,7 @@ export function EnrollmentClient({
                       </TableCell>
                       <TableCell>
                         {enrollment.sis_id ? (
-                          <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                          <code className="text-xs bg-rooted-gray px-1.5 py-0.5 rounded">
                             {enrollment.sis_id}
                           </code>
                         ) : isActive ? (
@@ -222,10 +222,10 @@ export function EnrollmentClient({
                             </Button>
                           </div>
                         ) : (
-                          <span className="text-xs text-gray-400">—</span>
+                          <span className="text-xs text-stone">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-gray-500">
+                      <TableCell className="text-stone">
                         {enrollment.enrolled_at ?? "—"}
                       </TableCell>
                       <TableCell>

@@ -9,14 +9,21 @@ export const dynamic = "force-dynamic";
 export default async function StaffApplicationsPage({
   searchParams,
 }: {
-  searchParams: { campus?: string };
+  searchParams: { campus?: string; status?: string; search?: string };
 }) {
   const session = await requireStaffSession();
   const accessibleIds = getAccessibleCampusIds(session);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const statusParam = searchParams?.status && searchParams.status !== "all" ? searchParams.status : undefined;
+  const searchParam = searchParams?.search || undefined;
 
   const [{ data: applications, count }, stats, allCampuses] = await Promise.all([
-    getStaffApplications({ campusId: activeCampus }),
+    getStaffApplications({
+      campusId: activeCampus,
+      status: statusParam,
+      search: searchParam,
+      limit: 500,
+    }),
     getApplicationStats(activeCampus),
     getCampuses(),
   ]);
@@ -32,6 +39,9 @@ export default async function StaffApplicationsPage({
       totalCount={count}
       stats={stats}
       campuses={campuses}
+      initialStatus={searchParams?.status ?? "all"}
+      initialSearch={searchParams?.search ?? ""}
+      initialCampus={searchParams?.campus ?? "all"}
     />
   );
 }

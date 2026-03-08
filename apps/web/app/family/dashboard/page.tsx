@@ -53,10 +53,10 @@ export default async function FamilyDashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-ink">
             Welcome back, {displayName}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-stone mt-1">
             {user.email}
           </p>
         </div>
@@ -70,10 +70,10 @@ export default async function FamilyDashboardPage() {
         <div className="bg-rooted-green/10 border border-rooted-green/30 rounded-lg p-4 flex items-start gap-3">
           <span className="text-xl mt-0.5">🎓</span>
           <div>
-            <p className="text-sm font-bold text-gray-900">
+            <p className="text-sm font-bold text-ink">
               Welcome to the rootedschools family!
             </p>
-            <p className="text-sm text-gray-600 mt-0.5">
+            <p className="text-sm text-ink/60 mt-0.5">
               {registeredCount} student{registeredCount > 1 ? "s are" : " is"} enrolled and registered. Check your school for orientation details.
             </p>
           </div>
@@ -85,10 +85,10 @@ export default async function FamilyDashboardPage() {
         <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 flex items-start gap-3">
           <span className="text-xl mt-0.5">🎉</span>
           <div className="flex-1">
-            <p className="text-sm font-bold text-gray-900">
+            <p className="text-sm font-bold text-ink">
               You have {offeredCount} seat offer{offeredCount > 1 ? "s" : ""} waiting!
             </p>
-            <p className="text-sm text-gray-600 mt-0.5">
+            <p className="text-sm text-ink/60 mt-0.5">
               Respond before the deadline to secure your spot.
             </p>
           </div>
@@ -105,10 +105,10 @@ export default async function FamilyDashboardPage() {
         <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
           <span className="text-xl mt-0.5">📝</span>
           <div className="flex-1">
-            <p className="text-sm font-bold text-gray-900">
+            <p className="text-sm font-bold text-ink">
               Complete Registration
             </p>
-            <p className="text-sm text-gray-600 mt-0.5">
+            <p className="text-sm text-ink/60 mt-0.5">
               You have {acceptedCount} accepted enrollment{acceptedCount > 1 ? "s" : ""}. Complete the registration packet to finalize enrollment.
             </p>
           </div>
@@ -125,10 +125,10 @@ export default async function FamilyDashboardPage() {
         <div className="bg-rooted-green/10 border border-rooted-green/30 rounded-lg p-4 flex items-start gap-3">
           <span className="text-xl mt-0.5">📅</span>
           <div>
-            <p className="text-sm font-medium text-gray-900">
+            <p className="text-sm font-medium text-ink">
               {enrollmentWindow.name} is open
             </p>
-            <p className="text-sm text-gray-600 mt-0.5">
+            <p className="text-sm text-ink/60 mt-0.5">
               Applications for {enrollmentWindow.campus_name} are being accepted
               until{" "}
               <span className="font-semibold">
@@ -156,7 +156,7 @@ export default async function FamilyDashboardPage() {
 
       {/* ─── Our Schools — Clickable logos ─── */}
       <div>
-        <h2 className="text-base font-semibold text-gray-900 mb-3">
+        <h2 className="text-base font-semibold text-ink mb-3">
           Our Schools
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -184,36 +184,42 @@ export default async function FamilyDashboardPage() {
               (w) => w.campus_name === school.name
             );
             const isOpen = !!campusWindow;
-            return (
+            const cardContent = (
+              <Card className={`transition-shadow border-2 ${isOpen ? "hover:shadow-md cursor-pointer group hover:border-rooted-green/40" : "opacity-75"}`}>
+                <CardContent className="py-6 flex flex-col items-center text-center">
+                  <div className="h-24 flex items-center justify-center mb-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={school.logo}
+                      alt={school.name}
+                      className={`max-h-24 max-w-full object-contain ${isOpen ? "group-hover:scale-105 transition-transform" : ""}`}
+                    />
+                  </div>
+                  <p className="text-xs text-stone mt-1">
+                    {school.location}
+                  </p>
+                  {isOpen ? (
+                    <Badge variant="success" className="mt-2">
+                      Accepting Applications
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="mt-2">
+                      Coming Soon
+                    </Badge>
+                  )}
+                </CardContent>
+              </Card>
+            );
+
+            return isOpen ? (
               <Link
                 key={school.shortCode}
-                href={`/family/applications/new${campusWindow ? `?campus=${school.shortCode}` : ""}`}
+                href={`/family/applications/new?campus=${school.shortCode}`}
               >
-                <Card className="hover:shadow-md transition-shadow cursor-pointer group border-2 hover:border-rooted-green/40">
-                  <CardContent className="py-6 flex flex-col items-center text-center">
-                    <div className="h-24 flex items-center justify-center mb-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={school.logo}
-                        alt={school.name}
-                        className="max-h-24 max-w-full object-contain group-hover:scale-105 transition-transform"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {school.location}
-                    </p>
-                    {isOpen ? (
-                      <Badge variant="success" className="mt-2">
-                        Accepting Applications
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="mt-2">
-                        Coming Soon
-                      </Badge>
-                    )}
-                  </CardContent>
-                </Card>
+                {cardContent}
               </Link>
+            ) : (
+              <div key={school.shortCode}>{cardContent}</div>
             );
           })}
         </div>
@@ -222,7 +228,7 @@ export default async function FamilyDashboardPage() {
       {/* ─── Application cards ─── */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-gray-900">
+          <h2 className="text-base font-semibold text-ink">
             Your Applications
           </h2>
           <Link
@@ -236,7 +242,7 @@ export default async function FamilyDashboardPage() {
         {!hasApps ? (
           <Card>
             <CardContent className="py-8 text-center">
-              <p className="text-gray-400 mb-4">
+              <p className="text-stone mb-4">
                 You have no applications yet.
               </p>
               <Link href="/family/applications/new">
@@ -272,10 +278,10 @@ export default async function FamilyDashboardPage() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {app.next_step && (
-                      <p className="text-sm text-gray-600">{app.next_step}</p>
+                      <p className="text-sm text-ink/60">{app.next_step}</p>
                     )}
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-stone">
                         Updated{" "}
                         {new Date(app.updated_at).toLocaleDateString(
                           "en-US",
@@ -353,17 +359,17 @@ export default async function FamilyDashboardPage() {
                           ? "bg-rooted-green text-white border-2 border-rooted-green"
                           : isCurrent
                             ? "bg-white text-rooted-green border-2 border-rooted-green"
-                            : "border border-gray-300 text-gray-400"
+                            : "border border-stone/30 text-stone"
                       }`}
                     >
                       {isComplete ? "✓" : s.step}
                     </div>
                     <div>
-                      <p className={`text-sm font-medium ${isCurrent ? "text-rooted-green" : isComplete ? "text-gray-600" : "text-gray-900"}`}>
+                      <p className={`text-sm font-medium ${isCurrent ? "text-rooted-green" : isComplete ? "text-ink/60" : "text-ink"}`}>
                         {s.title}
                         {isCurrent && <span className="text-[10px] ml-2 text-rooted-green font-bold uppercase">Current</span>}
                       </p>
-                      <p className="text-xs text-gray-500 mt-0.5">{s.desc}</p>
+                      <p className="text-xs text-stone mt-0.5">{s.desc}</p>
                     </div>
                   </div>
                 );
@@ -380,7 +386,7 @@ export default async function FamilyDashboardPage() {
           </CardHeader>
           <CardContent>
             {notifications.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">
+              <p className="text-sm text-stone text-center py-4">
                 No notifications yet.
               </p>
             ) : (
@@ -388,16 +394,16 @@ export default async function FamilyDashboardPage() {
                 {notifications.map((n) => (
                   <div
                     key={n.id}
-                    className="flex items-start gap-3 pb-3 border-b border-gray-100 last:border-0 last:pb-0"
+                    className="flex items-start gap-3 pb-3 border-b border-rooted-gray last:border-0 last:pb-0"
                   >
                     <div
                       className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
-                        n.read ? "bg-gray-300" : "bg-rooted-green"
+                        n.read ? "bg-stone/50" : "bg-rooted-green"
                       }`}
                     />
                     <div className="min-w-0">
-                      <p className="text-sm text-gray-700">{n.message}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
+                      <p className="text-sm text-ink/70">{n.message}</p>
+                      <p className="text-xs text-stone mt-0.5">
                         {new Date(n.created_at).toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",

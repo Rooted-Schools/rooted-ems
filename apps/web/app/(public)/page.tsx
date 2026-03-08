@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "edge";
 
 export const metadata = {
-  title: "rootedschools | Enrollment Management",
+  title: "rootedschools | Enroll Today",
 };
 
 function formatCloseDate(dateStr: string): string {
@@ -259,7 +259,7 @@ export default async function HomePage() {
                     {school.isOpen ? (
                       <>
                         <Link
-                          href="/login"
+                          href={school.campusId ? `/login?campus=${school.campusId}` : "/login"}
                           className="inline-flex items-center text-sm font-medium text-white bg-rooted-green hover:bg-deep-green px-4 py-2 rounded-lg transition-colors"
                         >
                           Apply Now
