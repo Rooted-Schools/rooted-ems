@@ -105,7 +105,7 @@ export default async function HomePage() {
       grades: "Grades 6-12",
       logo: "/logos/rooted-cleveland.png",
       matchKey: "cleveland",
-      logoClass: "max-h-44",
+      logoClass: "max-h-56",
     },
   ];
 
@@ -219,7 +219,7 @@ export default async function HomePage() {
                       : "border-rooted-gray hover:border-stone/40"
                   }`}
                 >
-                  <div className="h-44 flex items-center justify-center mb-4">
+                  <div className="h-56 flex items-center justify-center mb-4">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={school.logo}
