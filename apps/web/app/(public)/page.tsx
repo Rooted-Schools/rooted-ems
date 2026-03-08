@@ -105,7 +105,7 @@ export default async function HomePage() {
       grades: "Grades 6-12",
       logo: "/logos/rooted-cleveland.png",
       matchKey: "cleveland",
-      logoClass: "max-h-56 scale-150",
+      logoClass: "max-h-48",
     },
   ];
 
@@ -211,12 +211,10 @@ export default async function HomePage() {
                 <div
                   key={school.name}
                   className={`group border-2 rounded-xl p-6 flex flex-col items-center text-center transition-all hover:shadow-lg ${
-                    school.isOpen
-                      ? `border-rooted-gray ${accent?.hoverBorder ?? "hover:border-rooted-green/40"}`
-                      : "border-rooted-gray hover:border-stone/40"
-                  }`}
+                    accent?.border ?? "border-rooted-gray"
+                  } ${accent?.hoverBorder ?? "hover:border-stone/40"}`}
                 >
-                  <div className="h-56 flex items-center justify-center mb-4">
+                  <div className="h-48 flex items-center justify-center mb-4 overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={school.logo}
