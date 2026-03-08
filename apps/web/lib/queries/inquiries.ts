@@ -17,6 +17,7 @@ export interface InquiryRow {
   campus_id: string | null;
   assigned_staff_name: string | null;
   assigned_staff_id: string | null;
+  application_id: string | null;
   created_at: string;
 }
 
@@ -58,7 +59,7 @@ export async function getStaffInquiries(
       `
       id, student_first_name, student_last_name, grade_applying,
       guardian_name, guardian_email, guardian_phone, source, notes,
-      status, campus_id, created_at, assigned_staff_id,
+      status, campus_id, created_at, assigned_staff_id, application_id,
       campus:campus_id (name),
       assigned_staff:assigned_staff_id (full_name)
     `
@@ -99,6 +100,7 @@ export async function getStaffInquiries(
       campus_id: (row.campus_id as string) ?? null,
       assigned_staff_name: staff?.full_name ?? null,
       assigned_staff_id: (row.assigned_staff_id as string) ?? null,
+      application_id: (row.application_id as string) ?? null,
       created_at: row.created_at as string,
     };
   });
@@ -154,7 +156,7 @@ export async function getInquiryDetail(
       `
       id, student_first_name, student_last_name, grade_applying,
       guardian_name, guardian_email, guardian_phone, source, notes,
-      status, campus_id, created_at, assigned_staff_id,
+      status, campus_id, created_at, assigned_staff_id, application_id,
       campus:campus_id (name),
       assigned_staff:assigned_staff_id (full_name)
     `
@@ -198,6 +200,7 @@ export async function getInquiryDetail(
     campus_id: (row.campus_id as string) ?? null,
     assigned_staff_name: staff?.full_name ?? null,
     assigned_staff_id: (row.assigned_staff_id as string) ?? null,
+    application_id: (row.application_id as string) ?? null,
     created_at: row.created_at as string,
     contact_logs: (logs ?? []).map((log: Record<string, unknown>) => {
       const createdBy = log.created_by as Record<string, string> | null;

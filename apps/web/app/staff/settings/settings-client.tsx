@@ -43,6 +43,14 @@ interface SchoolYear {
   id: string;
   name: string;
   is_current: boolean;
+  start_date?: string;
+  end_date?: string;
+}
+
+interface GradeLevel {
+  id: string;
+  grade: string;
+  campus_id: string;
 }
 
 interface SettingsClientProps {
@@ -51,6 +59,8 @@ interface SettingsClientProps {
   users: StaffUserRow[];
   packetRequirements: PacketRequirementRow[];
   schoolYears: SchoolYear[];
+  gradeLevels?: GradeLevel[];
+  systemSettings?: Record<string, string>;
   staffUserId: string;
   activeCampusId?: string;
 }
@@ -61,6 +71,8 @@ export function SettingsClient({
   users,
   packetRequirements,
   schoolYears,
+  gradeLevels = [],
+  systemSettings = {},
   staffUserId,
   activeCampusId,
 }: SettingsClientProps) {
@@ -74,11 +86,13 @@ export function SettingsClient({
       </div>
 
       <Tabs defaultValue="campus">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="campus">Campuses</TabsTrigger>
           <TabsTrigger value="enrollment">Enrollment Windows</TabsTrigger>
+          <TabsTrigger value="grades">School Years & Grades</TabsTrigger>
           <TabsTrigger value="registration">Registration</TabsTrigger>
           <TabsTrigger value="users">Staff Users</TabsTrigger>
+          <TabsTrigger value="preferences">Preferences</TabsTrigger>
         </TabsList>
 
         <TabsContent value="campus">
@@ -90,6 +104,14 @@ export function SettingsClient({
             windows={windows}
             campuses={campuses}
             schoolYears={schoolYears}
+          />
+        </TabsContent>
+
+        <TabsContent value="grades">
+          <SchoolYearsGradesTab
+            schoolYears={schoolYears}
+            gradeLevels={gradeLevels}
+            campuses={campuses}
           />
         </TabsContent>
 
@@ -108,6 +130,10 @@ export function SettingsClient({
             campuses={campuses}
             staffUserId={staffUserId}
           />
+        </TabsContent>
+
+        <TabsContent value="preferences">
+          <PreferencesTab settings={systemSettings} />
         </TabsContent>
       </Tabs>
     </div>
@@ -982,5 +1008,292 @@ function StaffUsersTab({
         </DialogContent>
       </Dialog>
     </Card>
+  );
+}
+
+// ─── School Years & Grades Tab ──────────────────────────
+
+function SchoolYearsGradesTab({
+  schoolYears,
+  gradeLevels,
+  campuses,
+}: {
+  schoolYears: SchoolYear[];
+  gradeLevels: GradeLevel[];
+  campuses: CampusRow[];
+}) {
+  const [selectedCampus, setSelectedCampus] = useState(campuses[0]?.id ?? "");
+
+  const campusGrades = gradeLevels
+    .filter((g) => g.campus_id === selectedCampus)
+    .sort((a, b) => {
+      const numA = parseInt(a.grade) || 0;
+      const numB = parseInt(b.grade) || 0;
+      return numA - numB;
+    });
+
+  return (
+    <div className="space-y-6">
+      {/* School Years */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">School Years</CardTitle>
+          <CardDescription>
+            Configured school years in the system. The current year is used as the default for enrollment windows and reports.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {schoolYears.length === 0 ? (
+            <EmptyState
+              icon="📅"
+              title="No school years configured"
+              description="School years are managed in the database."
+            />
+          ) : (
+            <div className="space-y-3">
+              {schoolYears.map((sy) => (
+                <div
+                  key={sy.id}
+                  className={`flex items-center justify-between p-3 rounded-md border ${
+                    sy.is_current ? "border-rooted-green/40 bg-rooted-green/5" : "border-gray-200"
+                  }`}
+                >
+                  <div>
+                    <p className="font-medium text-sm">{sy.name}</p>
+                    {sy.start_date && sy.end_date && (
+                      <p className="text-xs text-gray-500">
+                        {new Date(sy.start_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        {" — "}
+                        {new Date(sy.end_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {sy.is_current && (
+                      <Badge variant="success">Current</Badge>
+                    )}
+                    <Badge variant="outline" className="text-[10px] font-mono">
+                      {sy.id.slice(0, 8)}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Grade Levels */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Grade Levels</CardTitle>
+              <CardDescription>
+                Grade levels configured for each campus. These determine which grades families can apply for.
+              </CardDescription>
+            </div>
+            {campuses.length > 1 && (
+              <select
+                value={selectedCampus}
+                onChange={(e) => setSelectedCampus(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+              >
+                {campuses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {campusGrades.length === 0 ? (
+            <EmptyState
+              icon="🎓"
+              title="No grade levels configured"
+              description="Grade levels for this campus can be added in the database."
+            />
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {campusGrades.map((g) => (
+                <div
+                  key={g.id}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 bg-white"
+                >
+                  <span className="text-sm font-medium text-gray-900">
+                    Grade {g.grade}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-gray-400 mt-4">
+            {campusGrades.length} grade level{campusGrades.length !== 1 ? "s" : ""} configured for{" "}
+            {campuses.find((c) => c.id === selectedCampus)?.name ?? "this campus"}
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Preferences Tab ────────────────────────────────────
+
+function PreferencesTab({ settings }: { settings: Record<string, string> }) {
+  const PREFERENCE_SECTIONS = [
+    {
+      title: "Enrollment",
+      description: "Control enrollment behavior and defaults",
+      items: [
+        {
+          key: "auto_verify_documents",
+          label: "Auto-verify uploaded documents",
+          description: "Automatically mark family-uploaded documents as verified. Disable to require staff manual review.",
+          type: "toggle" as const,
+          default: "false",
+        },
+        {
+          key: "allow_late_applications",
+          label: "Allow late applications",
+          description: "Accept applications after the enrollment window close date.",
+          type: "toggle" as const,
+          default: "false",
+        },
+        {
+          key: "default_offer_expiry_days",
+          label: "Default offer expiration (days)",
+          description: "Number of days before an offer expires if the family doesn't respond.",
+          type: "number" as const,
+          default: "14",
+        },
+        {
+          key: "require_lottery_for_offers",
+          label: "Require lottery before offers",
+          description: "Prevent manual offers until a lottery has been run for the enrollment window.",
+          type: "toggle" as const,
+          default: "false",
+        },
+      ],
+    },
+    {
+      title: "Notifications",
+      description: "Control system notification behavior",
+      items: [
+        {
+          key: "notify_family_on_status_change",
+          label: "Notify families on status change",
+          description: "Send an in-app notification when an application status changes.",
+          type: "toggle" as const,
+          default: "true",
+        },
+        {
+          key: "notify_staff_on_new_application",
+          label: "Notify staff on new application",
+          description: "Alert assigned staff when a new application is submitted.",
+          type: "toggle" as const,
+          default: "true",
+        },
+        {
+          key: "notify_staff_on_new_inquiry",
+          label: "Notify staff on new inquiry",
+          description: "Alert staff when a new interest inquiry is received.",
+          type: "toggle" as const,
+          default: "true",
+        },
+      ],
+    },
+    {
+      title: "Display",
+      description: "Customize how data is displayed to staff",
+      items: [
+        {
+          key: "dashboard_default_view",
+          label: "Dashboard default time range",
+          description: "Default time period for dashboard stats and charts.",
+          type: "select" as const,
+          options: [
+            { value: "7d", label: "Last 7 days" },
+            { value: "30d", label: "Last 30 days" },
+            { value: "90d", label: "Last 90 days" },
+            { value: "all", label: "All time" },
+          ],
+          default: "30d",
+        },
+        {
+          key: "applications_per_page",
+          label: "Applications per page",
+          description: "Number of applications shown per page in list views.",
+          type: "number" as const,
+          default: "25",
+        },
+      ],
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {PREFERENCE_SECTIONS.map((section) => (
+        <Card key={section.title}>
+          <CardHeader>
+            <CardTitle className="text-base">{section.title}</CardTitle>
+            <CardDescription>{section.description}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="divide-y divide-gray-100">
+              {section.items.map((item) => {
+                const currentValue = settings[item.key] ?? item.default;
+                const isOn = currentValue === "true";
+
+                return (
+                  <div key={item.key} className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
+                    <div className="pr-4">
+                      <p className="text-sm font-medium text-gray-900">{item.label}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
+                    </div>
+                    <div className="flex-shrink-0">
+                      {item.type === "toggle" && (
+                        <label className="relative inline-flex items-center cursor-pointer" title={isOn ? "Enabled" : "Disabled"}>
+                          <input
+                            type="checkbox"
+                            checked={isOn}
+                            readOnly
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-rooted-green/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rooted-green" />
+                        </label>
+                      )}
+                      {item.type === "number" && (
+                        <input
+                          type="number"
+                          value={currentValue}
+                          readOnly
+                          className="w-20 px-3 py-1.5 border border-gray-300 rounded-md text-sm text-right focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                        />
+                      )}
+                      {item.type === "select" && "options" in item && (
+                        <select
+                          value={currentValue}
+                          disabled
+                          className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                        >
+                          {item.options?.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-400 mt-4 pt-3 border-t border-gray-100">
+              Preference changes require a database update. Contact your system administrator to modify these settings.
+            </p>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   );
 }

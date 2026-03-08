@@ -33,7 +33,6 @@ const NAV_SECTIONS: NavSection[] = [
   {
     items: [
       { label: "Dashboard", href: "/staff/dashboard", icon: "📊" },
-      { label: "Inbox", href: "/staff/inbox", icon: "📥", minRole: "enrollment_staff" },
     ],
   },
   {
@@ -42,10 +41,8 @@ const NAV_SECTIONS: NavSection[] = [
       { label: "Inquiries", href: "/staff/inquiries", icon: "💬", minRole: "enrollment_staff" },
       { label: "Applications", href: "/staff/applications", icon: "📋" },
       { label: "Students", href: "/staff/students", icon: "👤" },
-      { label: "Pipeline", href: "/staff/pipeline", icon: "🔄", minRole: "enrollment_staff" },
       { label: "Lottery", href: "/staff/lottery", icon: "🎲", minRole: "enrollment_manager" },
-      { label: "Offers", href: "/staff/offers", icon: "✉️", minRole: "enrollment_manager" },
-      { label: "Waitlist", href: "/staff/waitlist", icon: "📝", minRole: "enrollment_manager" },
+      { label: "Offers & Waitlist", href: "/staff/offers", icon: "✉️", minRole: "enrollment_manager" },
     ],
   },
   {
@@ -53,13 +50,12 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: "Enrollment", href: "/staff/enrollment", icon: "✅", minRole: "enrollment_staff" },
       { label: "Seat Management", href: "/staff/seats", icon: "🪑", minRole: "enrollment_manager" },
-      { label: "Communications", href: "/staff/communications", icon: "💬", minRole: "enrollment_staff" },
+      { label: "Communications", href: "/staff/communications", icon: "📬", minRole: "enrollment_staff" },
     ],
   },
   {
     title: "Analytics",
     items: [
-      { label: "Equity Dashboard", href: "/staff/equity", icon: "⚖️", minRole: "enrollment_manager" },
       { label: "Reports", href: "/staff/reports", icon: "📈" },
       { label: "Audit Trail", href: "/staff/audit", icon: "🔒" },
     ],

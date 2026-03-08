@@ -2,7 +2,7 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 import { createServerClient } from "@rooted-ems/database/server";
-import { getStaffOffers } from "@/lib/queries";
+import { getStaffOffers, getStaffWaitlist } from "@/lib/queries";
 import { OffersClient } from "./offers-client";
 import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 
@@ -18,9 +18,10 @@ export default async function StaffOffersPage({
 
   const supabase = await createServerClient();
 
-  // Fetch offers and eligible applicants in parallel
-  const [{ offers, stats }, { data: eligibleApps }] = await Promise.all([
+  // Fetch offers, waitlist, and eligible applicants in parallel
+  const [{ offers, stats }, waitlistData, { data: eligibleApps }] = await Promise.all([
     getStaffOffers(scopedCampusIds),
+    getStaffWaitlist(scopedCampusIds),
     supabase
       .from("application")
       .select(`
@@ -59,6 +60,8 @@ export default async function StaffOffersPage({
       stats={stats}
       staffUserId={session.user_id}
       eligibleApplicants={eligibleApplicants}
+      waitlistEntries={waitlistData.entries}
+      waitlistCampusCounts={waitlistData.campusCounts}
     />
   );
 }

@@ -9,6 +9,8 @@ import {
   expireOffer,
   createEnrollment,
   initializeRegistrationPacket,
+  promoteFromWaitlist,
+  removeFromWaitlist,
 } from "@/lib/mutations";
 
 export async function staffSendOffer(
@@ -124,6 +126,42 @@ export async function staffConvertToEnrollment(
     revalidatePath("/staff/enrollment");
     revalidatePath("/staff/applications");
     revalidatePath("/staff/seats");
+    revalidatePath("/staff/dashboard");
+  }
+
+  return result;
+}
+
+/* ─── Waitlist Actions ─── */
+
+export async function staffPromoteFromWaitlist(
+  waitlistPositionId: string,
+  offeredBy: string,
+  expiresAt: string
+) {
+  const result = await promoteFromWaitlist(waitlistPositionId, offeredBy, expiresAt);
+
+  if (!result.error) {
+    revalidatePath("/staff/offers");
+    revalidatePath("/staff/waitlist");
+    revalidatePath("/staff/applications");
+    revalidatePath("/staff/seats");
+    revalidatePath("/staff/dashboard");
+  }
+
+  return result;
+}
+
+export async function staffRemoveFromWaitlist(
+  waitlistPositionId: string,
+  reason: string
+) {
+  const result = await removeFromWaitlist(waitlistPositionId, reason);
+
+  if (!result.error) {
+    revalidatePath("/staff/offers");
+    revalidatePath("/staff/waitlist");
+    revalidatePath("/staff/applications");
     revalidatePath("/staff/dashboard");
   }
 

@@ -1,27 +1,13 @@
 export const runtime = "edge";
-export const dynamic = "force-dynamic";
 
-import { getStaffWaitlist } from "@/lib/queries";
-import { WaitlistClient } from "./waitlist-client";
-import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { redirect } from "next/navigation";
 
-export default async function StaffWaitlistPage({
+export default function StaffWaitlistPage({
   searchParams,
 }: {
   searchParams: { campus?: string };
 }) {
-  const session = await requireMinRole("enrollment_manager");
-  const accessibleIds = getAccessibleCampusIds(session);
-  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
-  const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
-
-  const { entries, campusCounts } = await getStaffWaitlist(scopedCampusIds);
-
-  return (
-    <WaitlistClient
-      entries={entries}
-      campusCounts={campusCounts}
-      staffUserId={session.user_id}
-    />
-  );
+  // Waitlist is now a tab within Offers & Waitlist page
+  const campusParam = searchParams?.campus ? `?campus=${searchParams.campus}` : "";
+  redirect(`/staff/offers${campusParam}`);
 }

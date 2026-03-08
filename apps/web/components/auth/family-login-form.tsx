@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { createBrowserClient } from "@rooted-ems/database";
 
@@ -8,13 +8,6 @@ type LoginMethod = "email" | "phone";
 
 /**
  * Create a plain Supabase client (implicit flow, no PKCE) for OTP operations.
- * The @supabase/ssr createBrowserClient uses PKCE by default, which adds a
- * code_challenge to signInWithOtp. This causes verifyOtp to fail with
- * "Token has expired or is invalid" because the PKCE code_verifier exchange
- * doesn't work correctly for direct OTP code entry.
- *
- * After successful OTP verification, we transfer the session to the SSR
- * browser client so that cookies are set for server-side rendering.
  */
 function createOtpClient() {
   return createClient(
@@ -32,7 +25,7 @@ function createOtpClient() {
 }
 
 export function FamilyLoginForm() {
-  const [method, setMethod] = useState<LoginMethod>("email");
+  const [method] = useState<LoginMethod>("email");
   const [value, setValue] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
@@ -40,10 +33,8 @@ export function FamilyLoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
 
-  // Keep a stable reference to the OTP client across renders
   const otpClientRef = useRef(createOtpClient());
 
-  // Cooldown timer after sending OTP
   useEffect(() => {
     if (cooldown <= 0) return;
     const timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
@@ -57,23 +48,15 @@ export function FamilyLoginForm() {
 
     try {
       const otpClient = otpClientRef.current;
-
-      const signInOptions =
-        method === "email"
-          ? { email: value }
-          : { phone: value };
-
-      const { error: authError } =
-        await otpClient.auth.signInWithOtp(signInOptions);
+      const signInOptions = method === "email" ? { email: value } : { phone: value };
+      const { error: authError } = await otpClient.auth.signInWithOtp(signInOptions);
 
       if (authError) {
         if (
           authError.message.toLowerCase().includes("rate limit") ||
           authError.message.toLowerCase().includes("too many")
         ) {
-          setError(
-            "Too many login attempts. Please wait a few minutes before trying again."
-          );
+          setError("Too many login attempts. Please wait a few minutes before trying again.");
           setCooldown(120);
         } else if (
           method === "phone" &&
@@ -81,9 +64,7 @@ export function FamilyLoginForm() {
             authError.message.toLowerCase().includes("not supported") ||
             authError.message.toLowerCase().includes("phone"))
         ) {
-          setError(
-            "Phone login is not available yet. Please use email instead."
-          );
+          setError("Phone login is not available yet. Please use email instead.");
         } else {
           setError(authError.message);
         }
@@ -106,21 +87,18 @@ export function FamilyLoginForm() {
 
     try {
       const otpClient = otpClientRef.current;
-
       const verifyOptions =
         method === "email"
           ? { email: value, token: otp, type: "email" as const }
           : { phone: value, token: otp, type: "sms" as const };
 
-      const { data, error: authError } =
-        await otpClient.auth.verifyOtp(verifyOptions);
+      const { data, error: authError } = await otpClient.auth.verifyOtp(verifyOptions);
 
       if (authError) {
         setError(authError.message);
         return;
       }
 
-      // Transfer session to the SSR browser client (sets cookies for SSR)
       if (data.session) {
         const ssrClient = createBrowserClient();
         await ssrClient.auth.setSession({
@@ -129,11 +107,34 @@ export function FamilyLoginForm() {
         });
       }
 
-      // Redirect to family dashboard on success
       window.location.href = "/family/dashboard";
     } catch {
       setError("Verification failed. Please try again.");
     } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSocialLogin(provider: "google" | "apple") {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const oauthClient = createBrowserClient();
+      const { error: authError } = await oauthClient.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=/family/dashboard`,
+          queryParams: provider === "google" ? { prompt: "select_account" } : undefined,
+        },
+      });
+
+      if (authError) {
+        setError(authError.message);
+        setLoading(false);
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
       setLoading(false);
     }
   }
@@ -154,27 +155,61 @@ export function FamilyLoginForm() {
           Sign in to manage your enrollment applications
         </p>
 
+        {/* Social Login Buttons */}
+        <div className="space-y-3 mb-6">
+          <button
+            type="button"
+            onClick={() => handleSocialLogin("google")}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-stone/30 rounded-md bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            <span className="text-sm font-medium text-ink">Continue with Google</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSocialLogin("apple")}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-stone/30 rounded-md bg-black hover:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+            </svg>
+            <span className="text-sm font-medium text-white">Continue with Apple</span>
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div className="relative mb-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-stone/20"></div>
+          </div>
+          <div className="relative flex justify-center text-xs">
+            <span className="bg-white px-3 text-stone">or sign in with email</span>
+          </div>
+        </div>
+
         {!otpSent ? (
           <form onSubmit={handleSendOtp} className="space-y-4">
-            {/* Email-only login — phone login coming soon */}
-
             <div>
               <label
                 htmlFor="login-value"
                 className="block text-sm font-medium text-ink/70 mb-1"
               >
-                {method === "email" ? "Email Address" : "Phone Number"}
+                Email Address
               </label>
               <input
                 id="login-value"
-                type={method === "email" ? "email" : "tel"}
+                type="email"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
-                placeholder={
-                  method === "email"
-                    ? "parent@example.com"
-                    : "+1 (555) 123-4567"
-                }
+                placeholder="parent@example.com"
                 required
                 className="w-full px-4 py-2 border border-stone/30 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
               />
@@ -201,16 +236,13 @@ export function FamilyLoginForm() {
         ) : (
           <form onSubmit={handleVerifyOtp} className="space-y-4">
             <p className="text-sm text-ink/60 text-center">
-              We sent a verification{" "}
-              {method === "email" ? "email" : "code"} to{" "}
+              We sent a verification email to{" "}
               <strong>{value}</strong>
             </p>
-            {method === "email" && (
-              <p className="text-xs text-stone text-center">
-                Enter the code from the email, or click the link in the
-                email to sign in directly.
-              </p>
-            )}
+            <p className="text-xs text-stone text-center">
+              Enter the code from the email, or click the link in the
+              email to sign in directly.
+            </p>
 
             <div>
               <label
@@ -255,7 +287,7 @@ export function FamilyLoginForm() {
                   setLoading(true);
                   setError(null);
                   const otpClient = otpClientRef.current;
-                  const opts = method === "email" ? { email: value } : { phone: value };
+                  const opts = { email: value };
                   const { error: resendErr } = await otpClient.auth.signInWithOtp(opts);
                   if (resendErr) {
                     if (resendErr.message.toLowerCase().includes("rate limit") || resendErr.message.toLowerCase().includes("too many")) {
@@ -286,7 +318,7 @@ export function FamilyLoginForm() {
                 }}
                 className="w-full text-sm text-stone hover:text-ink"
               >
-                Use a different {method === "email" ? "email" : "phone number"}
+                Use a different email
               </button>
             </div>
           </form>

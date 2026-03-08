@@ -1,17 +1,19 @@
 import { createServerClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 
-const VALID_STATUSES = ["new", "contacted", "applied", "lost"];
+// "applied" is NOT a valid manual status — it can only be set by the convert action
+const VALID_MANUAL_STATUSES = ["new", "contacted", "lost"];
 
 /**
  * Update the status of an inquiry.
+ * Note: "applied" status cannot be set manually — use convertInquiryToApplication instead.
  */
 export async function updateInquiryStatus(
   inquiryId: string,
   status: string
 ): Promise<MutationResult> {
-  if (!VALID_STATUSES.includes(status)) {
-    return { data: null, error: "Invalid inquiry status." };
+  if (!VALID_MANUAL_STATUSES.includes(status)) {
+    return { data: null, error: "Invalid inquiry status. Use the Convert action to mark as applied." };
   }
 
   const supabase = await createServerClient();
@@ -200,10 +202,10 @@ export async function convertInquiryToApplication(
     return { data: null, error: "Failed to create application." };
   }
 
-  // 6. Mark inquiry as applied and link to the student
+  // 6. Mark inquiry as applied and link to the application
   await supabase
     .from("inquiry")
-    .update({ status: "applied" })
+    .update({ status: "applied", application_id: app.id })
     .eq("id", inquiryId);
 
   // 7. Log the conversion as a contact event

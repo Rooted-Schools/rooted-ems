@@ -2,6 +2,7 @@
 
 import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -452,6 +453,17 @@ export function InquiriesClient({
                                       Lost
                                     </Button>
                                   </>
+                                )}
+                                {inq.status === "applied" && inq.application_id && (
+                                  <Link href={`/staff/applications/${inq.application_id}`}>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-rooted-green border-rooted-green/30 hover:bg-rooted-green/5"
+                                    >
+                                      View Application &rarr;
+                                    </Button>
+                                  </Link>
                                 )}
                                 {inq.status === "lost" && (
                                   <Button

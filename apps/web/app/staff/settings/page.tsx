@@ -16,12 +16,14 @@ export default async function StaffSettingsPage({
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const supabase = await createServerClient();
 
-  const [allCampuses, windows, users, { data: schoolYears }, packetRequirements] = await Promise.all([
+  const [allCampuses, windows, users, { data: schoolYears }, packetRequirements, { data: gradeLevels }, { data: settings }] = await Promise.all([
     getCampuses(),
     getStaffEnrollmentWindows(activeCampus),
     getStaffUsers(activeCampus),
-    supabase.from("school_year").select("id, name, is_current").order("start_date", { ascending: false }),
+    supabase.from("school_year").select("id, name, is_current, start_date, end_date").order("start_date", { ascending: false }),
     getStaffPacketRequirements(),
+    supabase.from("grade_level").select("id, grade, campus_id").order("grade"),
+    supabase.from("setting").select("key, value").limit(50),
   ]);
 
   // Scope campuses to accessible ones
@@ -39,7 +41,17 @@ export default async function StaffSettingsPage({
         id: sy.id as string,
         name: sy.name as string,
         is_current: sy.is_current as boolean,
+        start_date: (sy.start_date as string) ?? "",
+        end_date: (sy.end_date as string) ?? "",
       }))}
+      gradeLevels={(gradeLevels ?? []).map((g: Record<string, unknown>) => ({
+        id: g.id as string,
+        grade: g.grade as string,
+        campus_id: g.campus_id as string,
+      }))}
+      systemSettings={Object.fromEntries(
+        (settings ?? []).map((s: Record<string, string>) => [s.key, s.value])
+      )}
       staffUserId={session.user_id}
       activeCampusId={activeCampus ?? undefined}
     />
