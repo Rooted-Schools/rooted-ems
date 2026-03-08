@@ -105,7 +105,7 @@ export default async function HomePage() {
       grades: "Grades 6-12",
       logo: "/logos/rooted-cleveland.png",
       matchKey: "cleveland",
-      logoClass: "max-h-56",
+      logoClass: "max-h-56 scale-150",
     },
   ];
 
@@ -130,12 +130,9 @@ export default async function HomePage() {
       {/* ─── Header ─── */}
       <header className="bg-white border-b border-rooted-gray">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo.svg"
-            alt="rootedschools"
-            className="h-8"
-          />
+          <span className="text-2xl tracking-wide">
+            <span className="text-rooted-green font-bold">rooted</span><span className="text-ink font-medium">schools</span>
+          </span>
           <div className="flex items-center gap-3">
             <Link
               href="/login"
