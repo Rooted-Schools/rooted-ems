@@ -105,6 +105,7 @@ export default async function HomePage() {
       grades: "Grades 6-12",
       logo: "/logos/rooted-cleveland.png",
       matchKey: "cleveland",
+      logoClass: "max-h-44",
     },
   ];
 
@@ -218,12 +219,12 @@ export default async function HomePage() {
                       : "border-rooted-gray hover:border-stone/40"
                   }`}
                 >
-                  <div className="h-36 flex items-center justify-center mb-4">
+                  <div className="h-44 flex items-center justify-center mb-4">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={school.logo}
                       alt={school.name}
-                      className="max-h-36 max-w-full object-contain group-hover:scale-105 transition-transform"
+                      className={`${school.logoClass ?? "max-h-36"} max-w-full object-contain group-hover:scale-105 transition-transform`}
                     />
                   </div>
                   <p className="text-sm text-stone">{school.location}</p>
