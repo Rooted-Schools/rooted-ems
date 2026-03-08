@@ -16,6 +16,14 @@ export default async function SeatManagementPage({
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
   const supabase = await createServerClient();
 
+  // Get current school year(s)
+  const { data: currentYears } = await supabase
+    .from("school_year")
+    .select("id, name")
+    .eq("is_current", true);
+
+  const currentYearIds = (currentYears ?? []).map((y: Record<string, unknown>) => y.id as string);
+
   let planQuery = supabase
     .from("capacity_plan")
     .select(
@@ -29,6 +37,9 @@ export default async function SeatManagementPage({
     .order("campus_id")
     .order("grade_level_id");
 
+  if (currentYearIds.length > 0) {
+    planQuery = planQuery.in("school_year_id", currentYearIds);
+  }
   if (scopedCampusIds.length > 0) {
     planQuery = planQuery.in("campus_id", scopedCampusIds);
   }
