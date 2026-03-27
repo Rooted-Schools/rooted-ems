@@ -26,6 +26,7 @@
  *
  *   needs_info
  *     → submitted           (family resubmits after providing requested info)
+ *     → verified            (staff verifies directly after reviewing family response)
  *     → withdrawn
  *
  *   verified
@@ -92,7 +93,7 @@ export interface TransitionResult {
 const VALID_TRANSITIONS: Record<ApplicationStatusValue, ApplicationStatusValue[]> = {
   draft: ["submitted", "withdrawn"],
   submitted: ["needs_info", "verified", "withdrawn"],
-  needs_info: ["submitted", "withdrawn"],
+  needs_info: ["submitted", "verified", "withdrawn"],
   verified: ["lottery_assigned", "offered", "withdrawn"],
   lottery_assigned: ["offered", "waitlisted", "withdrawn"],
   offered: ["accepted", "declined", "expired", "withdrawn"],
