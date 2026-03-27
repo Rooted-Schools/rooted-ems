@@ -1,4 +1,4 @@
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { isValidTransition, type ApplicationStatusValue } from "@rooted-ems/utils";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
 
@@ -115,12 +115,16 @@ export interface UpdateApplicationInput {
 export async function createApplication(
   input: CreateApplicationInput
 ): Promise<MutationResult<{ id: string }>> {
-  const supabase = await createServerClient();
-
+  // Use the anon client only to verify the session — it reads cookies reliably.
+  const authClient = await createServerClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await authClient.auth.getUser();
   if (!user) return { data: null, error: "Not authenticated" };
+
+  // Use the service role client for all writes so RLS never blocks a
+  // legitimate Server Action. The auth check above already confirms identity.
+  const supabase = createServiceRoleClient();
 
   // 1. Upsert user_profile
   await supabase.from("user_profile").upsert(
