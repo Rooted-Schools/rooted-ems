@@ -10,6 +10,7 @@ import {
   getFamilyDashboardApps,
   getFamilyNotifications,
   getActiveEnrollmentWindows,
+  getFamilyPendingOffers,
 } from "@/lib/queries";
 import { getStatusConfig } from "@/lib/application-helpers";
 
@@ -22,10 +23,11 @@ export default async function FamilyDashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [apps, notifications, enrollmentWindows] = await Promise.all([
+  const [apps, notifications, enrollmentWindows, pendingOffers] = await Promise.all([
     getFamilyDashboardApps(user.id),
     getFamilyNotifications(user.id, 5),
     getActiveEnrollmentWindows(),
+    getFamilyPendingOffers(user.id),
   ]);
 
   const hasApps = apps.length > 0;
@@ -81,22 +83,42 @@ export default async function FamilyDashboardPage() {
       )}
 
       {/* ─── Urgent: offer pending ─── */}
-      {offeredCount > 0 && (
-        <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 flex items-start gap-3">
-          <span className="text-xl mt-0.5">🎉</span>
-          <div className="flex-1">
-            <p className="text-sm font-bold text-ink">
-              You have {offeredCount} seat offer{offeredCount > 1 ? "s" : ""} waiting!
-            </p>
-            <p className="text-sm text-ink/60 mt-0.5">
-              Respond before the deadline to secure your spot.
-            </p>
-          </div>
-          <Link href="/family/applications">
-            <Button size="sm" className="bg-rooted-green hover:bg-rooted-green/90 text-white shrink-0">
-              View Offer{offeredCount > 1 ? "s" : ""}
-            </Button>
-          </Link>
+      {pendingOffers.length > 0 && (
+        <div className="space-y-2">
+          {pendingOffers.map((offer) => (
+            <div
+              key={offer.id}
+              className={`rounded-lg p-4 flex items-start gap-3 border ${
+                offer.is_urgent
+                  ? "bg-red-50 border-red-300"
+                  : "bg-amber-50 border-amber-300"
+              }`}
+            >
+              <span className="text-xl mt-0.5">{offer.is_urgent ? "⏰" : "🎉"}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-ink">
+                  {offer.student_name} — {offer.campus_name}
+                </p>
+                <p className="text-sm text-ink/60 mt-0.5">
+                  {offer.is_urgent
+                    ? `Expires in ${offer.days_remaining === 0 ? "less than 1 day" : `${offer.days_remaining} day${offer.days_remaining === 1 ? "" : "s"}`} — respond now.`
+                    : `Respond within ${offer.days_remaining} days to secure your spot.`}
+                </p>
+              </div>
+              <Link href={`/family/offers/${offer.id}`} className="shrink-0">
+                <Button
+                  size="sm"
+                  className={
+                    offer.is_urgent
+                      ? "bg-red-600 hover:bg-red-700 text-white"
+                      : "bg-rooted-green hover:bg-rooted-green/90 text-white"
+                  }
+                >
+                  Respond
+                </Button>
+              </Link>
+            </div>
+          ))}
         </div>
       )}
 

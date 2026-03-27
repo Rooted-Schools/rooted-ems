@@ -45,15 +45,20 @@ export {
   getFamilyDashboardApps,
   getFamilyDocuments,
   getFamilyMessages,
+  getFamilyOfferDetail,
+  getFamilyPendingOffers,
   type FamilyNotification,
   type EnrollmentWindowInfo,
   type FamilyAppSummary,
   type FamilyDocumentRow,
   type FamilyMessageRow,
+  type FamilyOfferDetail,
+  type FamilyPendingOffer,
 } from "./family";
 
 // Staff management queries (lottery, offers, waitlist, enrollment, comms, settings)
 export {
+  getStaffPendingDocuments,
   getStaffLotteryRuns,
   getStaffLotteryDetail,
   getStaffOffers,
@@ -84,6 +89,8 @@ export {
   type StudentRow,
   type WorkQueueItem,
   type PacketRequirementRow,
+  type PendingDocumentRow,
+  type DocumentQueueStats,
 } from "./staff";
 
 // Inquiry queries

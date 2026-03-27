@@ -331,3 +331,173 @@ export async function getFamilyMessages(
     time_ago: formatRelativeTime(row.created_at as string),
   }));
 }
+
+// ─── Offer Types & Queries ───────────────────────────────
+
+export interface FamilyOfferDetail {
+  id: string;
+  status: string;
+  offered_at: string;
+  expires_at: string;
+  days_remaining: number | null;
+  hours_remaining: number | null;
+  is_expired: boolean;
+  is_urgent: boolean; // true when < 72 hours remain
+  student_name: string;
+  grade: string;
+  campus_name: string;
+  campus_id: string;
+  grade_level_id: string;
+  application_id: string;
+  guardian_id: string;
+}
+
+export interface FamilyPendingOffer {
+  id: string;
+  student_name: string;
+  grade: string;
+  campus_name: string;
+  expires_at: string;
+  days_remaining: number | null;
+  is_urgent: boolean;
+  application_id: string;
+}
+
+/**
+ * Fetch a single offer for a family user, verifying ownership via guardian.
+ * Returns null if the offer doesn't exist or doesn't belong to this user.
+ */
+export async function getFamilyOfferDetail(
+  offerId: string,
+  userId: string
+): Promise<FamilyOfferDetail | null> {
+  const supabase = await createServerClient();
+
+  // Find guardian IDs for this user
+  const { data: guardians } = await supabase
+    .from("guardian")
+    .select("id")
+    .eq("user_id", userId);
+
+  if (!guardians || guardians.length === 0) return null;
+  const guardianIds = guardians.map((g: Record<string, string>) => g.id);
+
+  // Fetch the offer, verifying it belongs to this family via application.guardian_id
+  const { data: offer, error } = await supabase
+    .from("offer")
+    .select(`
+      id, status, offered_at, expires_at,
+      campus_id, grade_level_id,
+      campus:campus_id (name),
+      grade_level:grade_level_id (grade),
+      application:application_id (
+        id, guardian_id,
+        student:student_id (first_name, last_name)
+      )
+    `)
+    .eq("id", offerId)
+    .single();
+
+  if (error || !offer) return null;
+
+  const app = offer.application as unknown as Record<string, unknown> | null;
+  const guardianId = app?.guardian_id as string | null;
+
+  // Ownership check — ensure this offer belongs to the authenticated family
+  if (!guardianId || !guardianIds.includes(guardianId)) return null;
+
+  const student = app?.student as Record<string, string> | null;
+  const campus = offer.campus as unknown as Record<string, string> | null;
+  const grade = offer.grade_level as unknown as Record<string, string> | null;
+
+  const now = Date.now();
+  const expiry = offer.expires_at ? new Date(offer.expires_at as string).getTime() : null;
+  const msRemaining = expiry ? expiry - now : null;
+  const hoursRemaining = msRemaining != null ? Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60))) : null;
+  const daysRemaining = msRemaining != null ? Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24))) : null;
+  const isExpired = msRemaining != null ? msRemaining <= 0 : false;
+  const isUrgent = daysRemaining != null ? daysRemaining <= 3 && !isExpired : false;
+
+  return {
+    id: offer.id as string,
+    status: offer.status as string,
+    offered_at: offer.offered_at as string,
+    expires_at: offer.expires_at as string,
+    days_remaining: daysRemaining,
+    hours_remaining: hoursRemaining,
+    is_expired: isExpired,
+    is_urgent: isUrgent,
+    student_name: student ? `${student.first_name} ${student.last_name}` : "Your student",
+    grade: grade?.grade ? `Grade ${grade.grade}` : "",
+    campus_name: campus?.name ?? "",
+    campus_id: offer.campus_id as string,
+    grade_level_id: offer.grade_level_id as string,
+    application_id: app?.id as string,
+    guardian_id: guardianId,
+  };
+}
+
+/**
+ * Fetch all pending offers for a family user.
+ */
+export async function getFamilyPendingOffers(
+  userId: string
+): Promise<FamilyPendingOffer[]> {
+  const supabase = await createServerClient();
+
+  const { data: guardians } = await supabase
+    .from("guardian")
+    .select("id")
+    .eq("user_id", userId);
+
+  if (!guardians || guardians.length === 0) return [];
+  const guardianIds = guardians.map((g: Record<string, string>) => g.id);
+
+  const { data: apps } = await supabase
+    .from("application")
+    .select("id")
+    .in("guardian_id", guardianIds);
+
+  if (!apps || apps.length === 0) return [];
+  const appIds = apps.map((a: Record<string, unknown>) => a.id as string);
+
+  const { data, error } = await supabase
+    .from("offer")
+    .select(`
+      id, status, expires_at,
+      campus:campus_id (name),
+      grade_level:grade_level_id (grade),
+      application:application_id (
+        id,
+        student:student_id (first_name, last_name)
+      )
+    `)
+    .in("application_id", appIds)
+    .eq("status", "pending")
+    .order("expires_at", { ascending: true });
+
+  if (error || !data) return [];
+
+  const now = Date.now();
+
+  return data.map((row: Record<string, unknown>) => {
+    const app = row.application as unknown as Record<string, unknown> | null;
+    const student = app?.student as Record<string, string> | null;
+    const campus = row.campus as unknown as Record<string, string> | null;
+    const grade = row.grade_level as unknown as Record<string, string> | null;
+    const expiry = row.expires_at ? new Date(row.expires_at as string).getTime() : null;
+    const msRemaining = expiry ? expiry - now : null;
+    const daysRemaining = msRemaining != null ? Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24))) : null;
+
+    return {
+      id: row.id as string,
+      student_name: student ? `${student.first_name} ${student.last_name}` : "Your student",
+      grade: grade?.grade ? `Grade ${grade.grade}` : "",
+      campus_name: campus?.name ?? "",
+      expires_at: row.expires_at as string,
+      days_remaining: daysRemaining,
+      is_urgent: daysRemaining != null && daysRemaining <= 3,
+      application_id: app?.id as string,
+    };
+  });
+}

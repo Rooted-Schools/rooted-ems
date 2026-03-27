@@ -128,6 +128,111 @@ export interface StaffUserRow {
   campus_id: string;
 }
 
+// ─── Document Queue Types & Query ───────────────────────
+
+export interface PendingDocumentRow {
+  id: string;
+  document_type: string;
+  file_name: string;
+  file_size: number | null;
+  status: string;
+  created_at: string;
+  student_name: string;
+  guardian_name: string;
+  guardian_email: string;
+  campus_name: string;
+  campus_id: string;
+  application_id: string;
+}
+
+export interface DocumentQueueStats {
+  total_pending: number;
+  total_today: number;
+  oldest_pending_days: number | null;
+}
+
+/**
+ * Fetch all documents in pending status for staff review.
+ * Scoped to the campuses the staff member can access.
+ */
+export async function getStaffPendingDocuments(
+  campusIds?: string[]
+): Promise<{ rows: PendingDocumentRow[]; stats: DocumentQueueStats }> {
+  const supabase = await createServerClient();
+
+  let query = supabase
+    .from("document")
+    .select(`
+      id, document_type, file_name, file_size, status, created_at,
+      application:application_id (
+        id, campus_id,
+        campus:campus_id (name),
+        student:student_id (first_name, last_name),
+        guardian:guardian_id (first_name, last_name, email)
+      )
+    `)
+    .eq("status", "pending")
+    .order("created_at", { ascending: true }); // oldest first — FIFO queue
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("[getStaffPendingDocuments]", error.message);
+    return { rows: [], stats: { total_pending: 0, total_today: 0, oldest_pending_days: null } };
+  }
+
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+  // Filter by campus access after the join (RLS handles security; this is for UI scoping)
+  const allRows = (data ?? []).map((row: Record<string, unknown>) => {
+    const app = row.application as unknown as Record<string, unknown> | null;
+    const campus = app?.campus as unknown as Record<string, string> | null;
+    const student = app?.student as Record<string, string> | null;
+    const guardian = app?.guardian as Record<string, string> | null;
+
+    return {
+      id: row.id as string,
+      document_type: row.document_type as string,
+      file_name: row.file_name as string,
+      file_size: row.file_size as number | null,
+      status: row.status as string,
+      created_at: row.created_at as string,
+      student_name: student ? `${student.first_name} ${student.last_name}` : "Unknown",
+      guardian_name: guardian ? `${guardian.first_name} ${guardian.last_name}` : "",
+      guardian_email: guardian?.email ?? "",
+      campus_name: campus?.name ?? "",
+      campus_id: (app?.campus_id as string) ?? "",
+      application_id: (app?.id as string) ?? "",
+    };
+  });
+
+  // Apply campus filter if provided
+  const rows = campusIds && campusIds.length > 0
+    ? allRows.filter((r) => campusIds.includes(r.campus_id))
+    : allRows;
+
+  // Compute stats
+  const totalToday = rows.filter(
+    (r) => new Date(r.created_at).getTime() >= todayStart
+  ).length;
+
+  let oldestDays: number | null = null;
+  if (rows.length > 0) {
+    const oldest = new Date(rows[0].created_at).getTime();
+    oldestDays = Math.floor((now.getTime() - oldest) / (1000 * 60 * 60 * 24));
+  }
+
+  return {
+    rows,
+    stats: {
+      total_pending: rows.length,
+      total_today: totalToday,
+      oldest_pending_days: oldestDays,
+    },
+  };
+}
+
 // ─── Lottery Queries ────────────────────────────────────
 
 export async function getStaffLotteryRuns(campusIds?: string[]): Promise<LotteryRunRow[]> {

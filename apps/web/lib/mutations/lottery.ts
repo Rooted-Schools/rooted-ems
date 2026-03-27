@@ -70,10 +70,33 @@ export async function createLotteryRun(
     .in("status", ["verified", "lottery_assigned"]);
 
   if (eligibleApps && eligibleApps.length > 0) {
+    const appIds = eligibleApps.map((a: Record<string, string>) => a.id);
+
+    // Fetch sibling preference answers for all eligible applications.
+    // Applications where hasSiblingEnrolled = "yes" receive priority_tier = 0
+    // (higher lottery priority). All others receive priority_tier = 1.
+    // This respects the sibling preference data collected on the application form.
+    const { data: siblingAnswers } = await supabase
+      .from("application_answer")
+      .select("application_id, answer_value")
+      .in("application_id", appIds)
+      .eq("question_key", "hasSiblingEnrolled");
+
+    const siblingSet = new Set(
+      (siblingAnswers ?? [])
+        .filter(
+          (a: Record<string, unknown>) =>
+            (a.answer_value as string)?.toLowerCase() === "yes"
+        )
+        .map((a: Record<string, unknown>) => a.application_id as string)
+    );
+
     const entries = eligibleApps.map((app: Record<string, string>) => ({
       lottery_run_id: run.id,
       application_id: app.id,
-      priority_tier: 0, // Default tier, can be updated later
+      // Tier 0 = sibling preference (higher priority in sort)
+      // Tier 1 = general pool
+      priority_tier: siblingSet.has(app.id) ? 0 : 1,
     }));
 
     const { error: entryError } = await supabase
@@ -85,7 +108,6 @@ export async function createLotteryRun(
     }
 
     // Update those applications to "lottery_assigned" status
-    const appIds = eligibleApps.map((a: Record<string, string>) => a.id);
     await supabase
       .from("application")
       .update({ status: "lottery_assigned", updated_at: new Date().toISOString() })
@@ -276,7 +298,7 @@ export async function finalizeLotteryRun(
   // Verify run is in preview status
   const { data: run, error: fetchError } = await supabase
     .from("lottery_run")
-    .select("id, status, total_seats")
+    .select("id, status, total_seats, campus_id")
     .eq("id", runId)
     .single();
 
