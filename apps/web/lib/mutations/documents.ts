@@ -1,5 +1,6 @@
 import { createServerClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
+import { AuditAction, logAuditEvent } from "@/lib/audit";
 
 // ─── Review Document (Staff) ───────────────────────────
 
@@ -18,9 +19,10 @@ export async function reviewDocument(
   } = await supabase.auth.getUser();
   if (!user) return { data: null, error: "Not authenticated" };
 
+  // Fetch document with campus context for audit
   const { data: doc } = await supabase
     .from("document")
-    .select("id, status")
+    .select("id, status, application_id, document_type, application:application_id (campus_id)")
     .eq("id", documentId)
     .single();
 
@@ -50,6 +52,26 @@ export async function reviewDocument(
     console.error("[reviewDocument]", error.message);
     return { data: null, error: "Failed to review document" };
   }
+
+  const campusId =
+    (doc.application as unknown as Record<string, string> | null)?.campus_id ?? null;
+
+  await logAuditEvent({
+    table_name: "document",
+    record_id: documentId,
+    action: AuditAction.StatusChange,
+    actor_id: user.id,
+    campus_id: campusId,
+    old_data: { status: "pending" },
+    new_data: {
+      status: decision,
+      ...(decision === "rejected" && rejectionReason ? { rejection_reason: rejectionReason } : {}),
+    },
+    metadata: {
+      application_id: doc.application_id ?? null,
+      document_type: doc.document_type ?? null,
+    },
+  });
 
   return { data: null, error: null };
 }
@@ -95,6 +117,21 @@ export async function createDocumentRecord(input: {
     console.error("[createDocumentRecord]", error?.message);
     return { data: null, error: "Failed to create document record" };
   }
+
+  await logAuditEvent({
+    table_name: "document",
+    record_id: doc.id,
+    action: AuditAction.Create,
+    actor_id: user.id,
+    campus_id: null, // not available without a join — low-risk omission for uploads
+    new_data: {
+      application_id: input.application_id,
+      document_type: input.document_type,
+      file_name: input.file_name,
+      file_size: input.file_size,
+      status: "pending",
+    },
+  });
 
   return { data: { id: doc.id }, error: null };
 }

@@ -1,4 +1,6 @@
 import { createServerClient } from "@rooted-ems/database/server";
+import { generateLotterySeed, runDeterministicLottery } from "@rooted-ems/utils";
+import { AuditAction, logAuditEvent } from "@/lib/audit";
 import type { MutationResult } from "./applications";
 
 // ─── Types ─────────────────────────────────────────────
@@ -94,17 +96,36 @@ export async function createLotteryRun(
   return { data: { id: run.id }, error: null };
 }
 
-// ─── Run Preview (Generate Random Numbers & Ranks) ─────
+// ─── Run Preview (Deterministic — Seeded & Reproducible) ───────────────────
+//
+// WHAT CHANGED FROM THE ORIGINAL:
+//   The original code used Math.random() and stored a seed that was never
+//   actually used to influence the random numbers. Every run was unreproducible.
+//
+//   This version:
+//   1. Generates a seed using crypto.randomUUID() for high-quality randomness
+//   2. Stores the seed in the database FIRST — before any results are computed
+//   3. Uses runDeterministicLottery() — a pure function that given the same
+//      seed always produces the same ranked output (djb2 hash per entry)
+//   4. Writes all entry updates in a single batch instead of N individual calls
+//
+//   To verify any run: take the stored random_seed, the entry IDs, and their
+//   priority tiers — call runDeterministicLottery(seed, entries, totalSeats)
+//   and the ranked output must be identical to what's stored.
 
 export async function runLotteryPreview(
   runId: string
 ): Promise<MutationResult> {
   const supabase = await createServerClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   // Verify run exists and is in draft or preview status
   const { data: run, error: fetchError } = await supabase
     .from("lottery_run")
-    .select("id, status, total_seats")
+    .select("id, status, total_seats, campus_id")
     .eq("id", runId)
     .single();
 
@@ -112,7 +133,7 @@ export async function runLotteryPreview(
     return { data: null, error: "Lottery run not found." };
   }
 
-  if (!["draft", "preview"].includes(run.status)) {
+  if (!["draft", "preview"].includes(run.status as string)) {
     return { data: null, error: `Cannot run preview — status is ${run.status}.` };
   }
 
@@ -126,56 +147,120 @@ export async function runLotteryPreview(
     return { data: null, error: "No entries found for this lottery run." };
   }
 
-  // Generate random numbers for each entry
-  const seed = Math.floor(Math.random() * 1000000).toString();
-  const withRandom = entries.map((entry: Record<string, unknown>) => ({
-    id: entry.id as string,
-    priority_tier: (entry.priority_tier as number) ?? 0,
-    random_number: Math.random(),
-  }));
+  // ── Step 1: Generate seed and store it BEFORE computing results ────────────
+  // Storing the seed first means: even if the update loop fails partway through,
+  // the stored seed can be used to re-run and get identical results.
+  const seed = generateLotterySeed();
 
-  // Sort by priority tier (lower = higher priority), then random number
-  withRandom.sort((a, b) => {
-    if (a.priority_tier !== b.priority_tier) return a.priority_tier - b.priority_tier;
-    return a.random_number - b.random_number;
-  });
+  const { error: seedError } = await supabase
+    .from("lottery_run")
+    .update({
+      random_seed: seed,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", runId);
 
-  // Assign ranks and selection status
-  const totalSeats = run.total_seats as number;
-  for (let i = 0; i < withRandom.length; i++) {
-    const entry = withRandom[i];
-    const rank = i + 1;
-    const isSelected = rank <= totalSeats;
-
-    const { error: updateError } = await supabase
-      .from("lottery_entry")
-      .update({
-        random_number: entry.random_number,
-        final_rank: rank,
-        is_selected: isSelected,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", entry.id);
-
-    if (updateError) {
-      console.error(`[runLotteryPreview] entry ${entry.id}`, updateError.message);
-    }
+  if (seedError) {
+    console.error("[runLotteryPreview] Failed to store seed", seedError.message);
+    return { data: null, error: "Failed to initialize lottery run." };
   }
 
-  // Update the run status and seed
+  // ── Step 2: Run the deterministic lottery algorithm ────────────────────────
+  const serviceEntries = (entries as Array<{ id: string; priority_tier: number }>).map((e) => ({
+    id: e.id,
+    priority_tier: e.priority_tier ?? 0,
+  }));
+
+  const { ranked } = runDeterministicLottery(seed, serviceEntries, run.total_seats as number);
+
+  // ── Step 3: Batch update all entries in one operation ─────────────────────
+  // The original code did N individual .update() calls — one per entry.
+  // This replaces them with upsert on the full set.
+  const now = new Date().toISOString();
+  const entryUpdates = ranked.map((entry) => ({
+    id: entry.id,
+    lottery_run_id: runId,
+    application_id: "", // populated from existing record — upsert key is id
+    priority_tier: entry.priority_tier,
+    random_number: entry.random_number,
+    final_rank: entry.final_rank,
+    is_selected: entry.is_selected,
+    updated_at: now,
+  }));
+
+  // Fetch existing application_id values to complete the upsert payload
+  const appIdMap = new Map(
+    (entries as Array<{ id: string; application_id?: string }>)
+      .map((e) => [e.id, e.application_id ?? ""])
+  );
+
+  const upsertRows = entryUpdates.map((row) => ({
+    ...row,
+    application_id: appIdMap.get(row.id) ?? "",
+  }));
+
+  // Re-fetch with application_id to build complete upsert rows
+  const { data: fullEntries } = await supabase
+    .from("lottery_entry")
+    .select("id, application_id, priority_tier")
+    .eq("lottery_run_id", runId);
+
+  const fullAppIdMap = new Map(
+    (fullEntries ?? []).map((e: Record<string, unknown>) => [
+      e.id as string,
+      e.application_id as string,
+    ])
+  );
+
+  const finalUpsertRows = ranked.map((entry) => ({
+    id: entry.id,
+    lottery_run_id: runId,
+    application_id: fullAppIdMap.get(entry.id) ?? "",
+    priority_tier: entry.priority_tier,
+    random_number: entry.random_number,
+    final_rank: entry.final_rank,
+    is_selected: entry.is_selected,
+    updated_at: now,
+  }));
+
+  const { error: upsertError } = await supabase
+    .from("lottery_entry")
+    .upsert(finalUpsertRows, { onConflict: "id" });
+
+  if (upsertError) {
+    console.error("[runLotteryPreview] entry upsert", upsertError.message);
+    return { data: null, error: "Failed to save lottery results." };
+  }
+
+  // ── Step 4: Update run status to preview ──────────────────────────────────
   const { error: runUpdateError } = await supabase
     .from("lottery_run")
     .update({
       status: "preview",
-      random_seed: seed,
       total_applicants: entries.length,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     })
     .eq("id", runId);
 
   if (runUpdateError) {
     return { data: null, error: "Failed to update run status." };
   }
+
+  // ── Step 5: Write audit event ─────────────────────────────────────────────
+  await logAuditEvent({
+    table_name: "lottery_run",
+    record_id: runId,
+    action: AuditAction.StatusChange,
+    actor_id: user?.id ?? null,
+    campus_id: run.campus_id as string,
+    old_data: { status: run.status },
+    new_data: { status: "preview", random_seed: seed, total_applicants: entries.length },
+    metadata: {
+      total_entries: entries.length,
+      total_seats: run.total_seats,
+      selected: ranked.filter((e) => e.is_selected).length,
+    },
+  });
 
   return { data: null, error: null };
 }
@@ -271,6 +356,21 @@ export async function finalizeLotteryRun(
   if (runUpdateError) {
     return { data: null, error: "Failed to finalize lottery run." };
   }
+
+  // Audit: lottery officially finalized — this is the most sensitive action
+  await logAuditEvent({
+    table_name: "lottery_run",
+    record_id: runId,
+    action: AuditAction.StatusChange,
+    actor_id: executedBy,
+    campus_id: run.campus_id as string ?? null,
+    old_data: { status: "preview" },
+    new_data: { status: "official", finalized_at: now },
+    metadata: {
+      total_seats: run.total_seats,
+      snapshots_written: snapshots.length,
+    },
+  });
 
   return { data: null, error: null };
 }

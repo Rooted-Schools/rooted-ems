@@ -1,5 +1,6 @@
 import { createServerClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
+import { AuditAction, logAuditEvent } from "@/lib/audit";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -42,12 +43,32 @@ export async function addToWaitlist(
     .update({ status: "waitlisted", updated_at: new Date().toISOString() })
     .eq("id", input.application_id);
 
+  // Fetch campus_id from the waitlist record for the audit event
+  const { data: wl } = await supabase
+    .from("waitlist")
+    .select("campus_id")
+    .eq("id", input.waitlist_id)
+    .single();
+
+  await logAuditEvent({
+    table_name: "waitlist_position",
+    record_id: data.id,
+    action: AuditAction.Create,
+    actor_id: null,
+    campus_id: (wl?.campus_id as string) ?? null,
+    new_data: {
+      waitlist_id: input.waitlist_id,
+      application_id: input.application_id,
+      position_number: input.position_number,
+    },
+  });
+
   return { data: { id: data.id }, error: null };
 }
 
 /**
  * Promote a student from the waitlist — removes them and creates an offer.
- * This is the most common waitlist action.
+ * This is the most common (and most consequential) waitlist action.
  */
 export async function promoteFromWaitlist(
   waitlistPositionId: string,
@@ -118,6 +139,21 @@ export async function promoteFromWaitlist(
     .update({ status: "offered", updated_at: new Date().toISOString() })
     .eq("id", pos.application_id as string);
 
+  await logAuditEvent({
+    table_name: "waitlist_position",
+    record_id: waitlistPositionId,
+    action: AuditAction.StatusChange,
+    actor_id: offeredBy,
+    campus_id: wl.campus_id,
+    old_data: { status: "active" },
+    new_data: { removal_reason: "promoted" },
+    metadata: {
+      application_id: pos.application_id,
+      offer_id: offer.id,
+      expires_at: expiresAt,
+    },
+  });
+
   return { data: { offer_id: offer.id }, error: null };
 }
 
@@ -126,14 +162,15 @@ export async function promoteFromWaitlist(
  */
 export async function removeFromWaitlist(
   waitlistPositionId: string,
-  reason: string
+  reason: string,
+  removedBy?: string
 ): Promise<MutationResult> {
   const supabase = await createServerClient();
 
-  // Fetch position to get the application_id before removing
+  // Fetch position to get the application_id and campus before removing
   const { data: position } = await supabase
     .from("waitlist_position")
-    .select("application_id")
+    .select("application_id, waitlist:waitlist_id (campus_id)")
     .eq("id", waitlistPositionId)
     .is("removed_at", null)
     .single();
@@ -158,6 +195,20 @@ export async function removeFromWaitlist(
       .update({ status: "withdrawn", updated_at: new Date().toISOString() })
       .eq("id", position.application_id);
   }
+
+  const campusId =
+    (position?.waitlist as unknown as Record<string, string> | null)?.campus_id ?? null;
+
+  await logAuditEvent({
+    table_name: "waitlist_position",
+    record_id: waitlistPositionId,
+    action: AuditAction.StatusChange,
+    actor_id: removedBy ?? null,
+    campus_id: campusId,
+    old_data: { status: "active" },
+    new_data: { removal_reason: reason },
+    metadata: { application_id: position?.application_id ?? null },
+  });
 
   return { data: null, error: null };
 }

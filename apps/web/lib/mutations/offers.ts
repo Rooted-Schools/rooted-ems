@@ -2,6 +2,7 @@ import { createServerClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 import { createEnrollment } from "./enrollment";
 import { initializeRegistrationPacket } from "./registration";
+import { AuditAction, logAuditEvent } from "@/lib/audit";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -67,6 +68,23 @@ export async function sendOffer(
   if (statusError) {
     console.error("[sendOffer] status update", statusError.message);
   }
+
+  await logAuditEvent({
+    table_name: "offer",
+    record_id: offer.id,
+    action: AuditAction.Create,
+    actor_id: input.offered_by,
+    campus_id: input.campus_id,
+    new_data: {
+      application_id: input.application_id,
+      status: "pending",
+      expires_at: input.expires_at,
+    },
+    metadata: {
+      from_status: app.status,
+      lottery_entry_id: input.lottery_entry_id ?? null,
+    },
+  });
 
   return { data: { id: offer.id }, error: null };
 }
@@ -175,18 +193,32 @@ export async function acceptOffer(
     }
   }
 
+  await logAuditEvent({
+    table_name: "offer",
+    record_id: offerId,
+    action: AuditAction.StatusChange,
+    actor_id: guardianId,
+    campus_id: offer.campus_id,
+    old_data: { status: "pending" },
+    new_data: { status: "accepted" },
+    metadata: {
+      application_id: offer.application_id,
+      acceptance_id: acceptance?.id ?? null,
+    },
+  });
+
   return { data: null, error: null };
 }
 
 /**
  * Decline an offer (called by family).
  */
-export async function declineOffer(offerId: string): Promise<MutationResult> {
+export async function declineOffer(offerId: string, declinedBy?: string): Promise<MutationResult> {
   const supabase = await createServerClient();
 
   const { data: offer, error: fetchError } = await supabase
     .from("offer")
-    .select("id, application_id, status")
+    .select("id, application_id, campus_id, status")
     .eq("id", offerId)
     .single();
 
@@ -216,6 +248,17 @@ export async function declineOffer(offerId: string): Promise<MutationResult> {
     .update({ status: "declined", updated_at: new Date().toISOString() })
     .eq("id", offer.application_id);
 
+  await logAuditEvent({
+    table_name: "offer",
+    record_id: offerId,
+    action: AuditAction.StatusChange,
+    actor_id: declinedBy ?? null,
+    campus_id: offer.campus_id ?? null,
+    old_data: { status: "pending" },
+    new_data: { status: "declined" },
+    metadata: { application_id: offer.application_id },
+  });
+
   return { data: null, error: null };
 }
 
@@ -231,7 +274,7 @@ export async function revokeOffer(
 
   const { data: offer, error: fetchError } = await supabase
     .from("offer")
-    .select("id, application_id, status")
+    .select("id, application_id, campus_id, status")
     .eq("id", offerId)
     .single();
 
@@ -275,6 +318,20 @@ export async function revokeOffer(
     .update({ status: revertStatus, updated_at: new Date().toISOString() })
     .eq("id", offer.application_id);
 
+  await logAuditEvent({
+    table_name: "offer",
+    record_id: offerId,
+    action: AuditAction.StatusChange,
+    actor_id: revokedBy,
+    campus_id: offer.campus_id ?? null,
+    old_data: { status: "pending" },
+    new_data: { status: "revoked", revoke_reason: reason ?? null },
+    metadata: {
+      application_id: offer.application_id,
+      reverted_app_status: revertStatus,
+    },
+  });
+
   return { data: null, error: null };
 }
 
@@ -287,7 +344,7 @@ export async function expireOffer(offerId: string): Promise<MutationResult> {
   // First check the offer is actually pending before expiring
   const { data: offer, error: fetchError } = await supabase
     .from("offer")
-    .select("id, application_id, status")
+    .select("id, application_id, campus_id, status")
     .eq("id", offerId)
     .single();
 
@@ -317,6 +374,17 @@ export async function expireOffer(offerId: string): Promise<MutationResult> {
     .from("application")
     .update({ status: "expired", updated_at: new Date().toISOString() })
     .eq("id", offer.application_id);
+
+  await logAuditEvent({
+    table_name: "offer",
+    record_id: offerId,
+    action: AuditAction.StatusChange,
+    actor_id: null, // cron-driven — no human actor
+    campus_id: offer.campus_id ?? null,
+    old_data: { status: "pending" },
+    new_data: { status: "expired" },
+    metadata: { application_id: offer.application_id, triggered_by: "cron" },
+  });
 
   return { data: null, error: null };
 }

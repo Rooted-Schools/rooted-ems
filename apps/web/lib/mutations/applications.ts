@@ -1,4 +1,6 @@
 import { createServerClient } from "@rooted-ems/database/server";
+import { isValidTransition, type ApplicationStatusValue } from "@rooted-ems/utils";
+import { AuditAction, logAuditEvent } from "@/lib/audit";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -820,8 +822,12 @@ export async function staffFastTrackEnroll(
 // ─── Update Application Status (Staff) ─────────────────
 
 /**
- * Change application status. Staff only. The status history trigger
- * in the database automatically logs the transition.
+ * Change application status. Staff only.
+ *
+ * Enforces the state machine — only valid transitions are allowed.
+ * The database trigger (fn_track_status_change) also records every
+ * status change in application_status_history automatically.
+ * We additionally write to audit_event here for cross-entity audit trail.
  */
 export async function updateApplicationStatus(
   applicationId: string,
@@ -843,32 +849,28 @@ export async function updateApplicationStatus(
 
   if (!app) return { data: null, error: "Application not found" };
 
-  // Validate transition
-  const validTransitions: Record<string, string[]> = {
-    submitted: ["verified", "needs_info"],
-    needs_info: ["verified"],
-    verified: ["lottery_assigned"],
-    lottery_assigned: ["offered", "waitlisted"],
-    offered: ["accepted", "declined"],
-    accepted: ["registered"],
-    waitlisted: ["offered"],
-  };
+  // ── State machine validation ───────────────────────────────────────────────
+  // Replaces the old manual validTransitions table which was incomplete
+  // (missing withdrawn, declined, expired terminal states and draft→submitted).
+  const transition = isValidTransition(
+    app.status as ApplicationStatusValue,
+    newStatus as ApplicationStatusValue
+  );
 
-  const allowed = validTransitions[app.status] ?? [];
-  if (!allowed.includes(newStatus)) {
-    return {
-      data: null,
-      error: `Invalid transition: ${app.status} → ${newStatus}`,
-    };
+  if (!transition.allowed) {
+    return { data: null, error: transition.reason ?? "Invalid status transition" };
   }
 
-  // Build update
-  const updates: Record<string, unknown> = { status: newStatus };
+  // ── Build update payload ───────────────────────────────────────────────────
+  const now = new Date().toISOString();
+  const updates: Record<string, unknown> = {
+    status: newStatus,
+    updated_at: now,
+  };
 
-  // Set reviewed_by/reviewed_at when verifying
   if (newStatus === "verified" || newStatus === "needs_info") {
     updates.reviewed_by = user.id;
-    updates.reviewed_at = new Date().toISOString();
+    updates.reviewed_at = now;
     if (reason) updates.review_notes = reason;
   }
 
@@ -881,6 +883,20 @@ export async function updateApplicationStatus(
     console.error("[updateApplicationStatus]", error.message);
     return { data: null, error: "Failed to update status" };
   }
+
+  // ── Audit log ─────────────────────────────────────────────────────────────
+  // Belt-and-suspenders: DB trigger also writes to application_status_history.
+  // This writes to audit_event for cross-entity querying.
+  await logAuditEvent({
+    table_name: "application",
+    record_id: applicationId,
+    action: AuditAction.StatusChange,
+    actor_id: user.id,
+    campus_id: app.campus_id as string ?? null,
+    old_data: { status: app.status },
+    new_data: { status: newStatus },
+    metadata: reason ? { reason } : undefined,
+  });
 
   return { data: null, error: null };
 }

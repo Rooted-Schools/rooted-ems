@@ -1,5 +1,6 @@
 import { createServerClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
+import { AuditAction, logAuditEvent } from "@/lib/audit";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -51,6 +52,25 @@ export async function createEnrollment(
       .eq("id", input.application_id);
   }
 
+  await logAuditEvent({
+    table_name: "enrollment",
+    record_id: data.id,
+    action: AuditAction.Create,
+    actor_id: null, // system-generated during acceptOffer flow
+    campus_id: input.campus_id,
+    new_data: {
+      student_id: input.student_id,
+      campus_id: input.campus_id,
+      grade_level_id: input.grade_level_id,
+      school_year_id: input.school_year_id,
+      status: "active",
+    },
+    metadata: {
+      application_id: input.application_id ?? null,
+      acceptance_id: input.acceptance_id ?? null,
+    },
+  });
+
   return { data: { id: data.id }, error: null };
 }
 
@@ -59,14 +79,15 @@ export async function createEnrollment(
  */
 export async function withdrawEnrollment(
   enrollmentId: string,
-  reason: string
+  reason: string,
+  withdrawnBy?: string
 ): Promise<MutationResult> {
   const supabase = await createServerClient();
 
-  // Fetch the enrollment to get the linked application_id
+  // Fetch the enrollment to get the linked application_id and campus
   const { data: enrollment, error: fetchError } = await supabase
     .from("enrollment")
-    .select("application_id")
+    .select("application_id, campus_id, student_id")
     .eq("id", enrollmentId)
     .single();
 
@@ -94,6 +115,20 @@ export async function withdrawEnrollment(
       .update({ status: "withdrawn", updated_at: new Date().toISOString() })
       .eq("id", enrollment.application_id);
   }
+
+  await logAuditEvent({
+    table_name: "enrollment",
+    record_id: enrollmentId,
+    action: AuditAction.StatusChange,
+    actor_id: withdrawnBy ?? null,
+    campus_id: (enrollment.campus_id as string) ?? null,
+    old_data: { status: "active" },
+    new_data: { status: "withdrawn", withdrawal_reason: reason },
+    metadata: {
+      application_id: enrollment.application_id ?? null,
+      student_id: enrollment.student_id ?? null,
+    },
+  });
 
   return { data: null, error: null };
 }
@@ -128,14 +163,15 @@ export async function syncEnrollmentSIS(
 export async function transferEnrollment(
   enrollmentId: string,
   newCampusId: string,
-  newGradeLevelId: string
+  newGradeLevelId: string,
+  transferredBy?: string
 ): Promise<MutationResult> {
   const supabase = await createServerClient();
 
   // Mark current enrollment as transferred
   const { data: current, error: fetchError } = await supabase
     .from("enrollment")
-    .select("student_id, school_year_id, acceptance_id, application_id")
+    .select("student_id, campus_id, grade_level_id, school_year_id, acceptance_id, application_id")
     .eq("id", enrollmentId)
     .single();
 
@@ -181,6 +217,20 @@ export async function transferEnrollment(
       })
       .eq("id", current.application_id);
   }
+
+  await logAuditEvent({
+    table_name: "enrollment",
+    record_id: enrollmentId,
+    action: AuditAction.StatusChange,
+    actor_id: transferredBy ?? null,
+    campus_id: current.campus_id ?? null,
+    old_data: { status: "active", campus_id: current.campus_id, grade_level_id: current.grade_level_id },
+    new_data: { status: "transferred", new_campus_id: newCampusId, new_grade_level_id: newGradeLevelId },
+    metadata: {
+      student_id: current.student_id,
+      application_id: current.application_id ?? null,
+    },
+  });
 
   return { data: null, error: null };
 }
