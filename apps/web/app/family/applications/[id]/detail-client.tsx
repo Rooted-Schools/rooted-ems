@@ -215,6 +215,28 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
         </div>
       </div>
 
+      {/* More Info Request — show staff's message when action is needed */}
+      {detail.status === "needs_info" && detail.review_notes && (
+        <Card className="border-amber-300 bg-amber-50">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl" aria-hidden="true">📋</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-amber-900">What we need from you</p>
+                <p className="text-sm text-amber-800 mt-1 whitespace-pre-wrap">{detail.review_notes}</p>
+                <div className="mt-3">
+                  <Link href="/family/documents">
+                    <Button size="sm" className="bg-amber-700 hover:bg-amber-800 text-white">
+                      Upload Requested Documents →
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Offer urgency card (special treatment) */}
       {isOffered && detail.offer_expires_at ? (() => {
         const expiresDate = new Date(detail.offer_expires_at + (detail.offer_expires_at.includes("T") ? "" : "T23:59:59"));
