@@ -1,4 +1,4 @@
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
 
@@ -91,12 +91,11 @@ export async function createDocumentRecord(input: {
   mime_type: string;
   storage_path: string;
 }): Promise<MutationResult<{ id: string }>> {
-  const supabase = await createServerClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const authClient = await createServerClient();
+  const { data: { user } } = await authClient.auth.getUser();
   if (!user) return { data: null, error: "Not authenticated" };
+
+  const supabase = createServiceRoleClient();
 
   const { data: doc, error } = await supabase
     .from("document")

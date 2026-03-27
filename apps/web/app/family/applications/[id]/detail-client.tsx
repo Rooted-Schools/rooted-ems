@@ -14,10 +14,11 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { useRef } from "react";
 import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationDetail } from "@/lib/queries";
-import { getSignedUrl } from "@/lib/storage/upload";
-import { familyWithdrawApplication, familyAcceptOffer, familyDeclineOffer } from "../actions";
+import { uploadFile, getSignedUrl, validateFile, formatFileSize } from "@/lib/storage/upload";
+import { familyWithdrawApplication, familyAcceptOffer, familyDeclineOffer, familySubmitResponse, familyCreateDocumentRecord } from "../actions";
 
 /* ─── Status guide — what happens at each stage ─── */
 function getStatusExplanation(status: string): { title: string; explanation: string; icon: string } {
@@ -83,6 +84,11 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [showDeclineDialog, setShowDeclineDialog] = useState(false);
   const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
+  const [responseText, setResponseText] = useState("");
+  const [responseFile, setResponseFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [submittingResponse, setSubmittingResponse] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const statusCfg = getStatusConfig(detail.status);
   const statusExplanation = getStatusExplanation(detail.status);
@@ -140,6 +146,49 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
 
   function handleWithdraw() {
     setShowWithdrawDialog(true);
+  }
+
+  async function handleSubmitResponse() {
+    if (!responseText.trim() && !responseFile) return;
+    setSubmittingResponse(true);
+    try {
+      // Send text response if provided
+      if (responseText.trim()) {
+        const textResult = await familySubmitResponse(detail.id, responseText.trim());
+        if (textResult.error) {
+          setFeedback({ type: "error", message: textResult.error });
+          return;
+        }
+      }
+      // Upload file if provided
+      if (responseFile) {
+        const uploadResult = await uploadFile(responseFile, detail.guardian_id);
+        if (uploadResult.error) {
+          setFeedback({ type: "error", message: uploadResult.error });
+          return;
+        }
+        const docResult = await familyCreateDocumentRecord({
+          application_id: detail.id,
+          student_id: detail.student_id,
+          document_type: "other",
+          file_name: uploadResult.fileName,
+          file_size: uploadResult.fileSize,
+          mime_type: uploadResult.mimeType,
+          storage_path: uploadResult.storagePath,
+        });
+        if (docResult.error) {
+          setFeedback({ type: "error", message: docResult.error });
+          return;
+        }
+      }
+      setFeedback({ type: "success", message: "Your response has been sent to the enrollment team." });
+      setResponseText("");
+      setResponseFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      router.refresh();
+    } finally {
+      setSubmittingResponse(false);
+    }
   }
 
   function confirmWithdraw() {
@@ -215,23 +264,60 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
         </div>
       </div>
 
-      {/* More Info Request — show staff's message when action is needed */}
-      {detail.status === "needs_info" && detail.review_notes && (
+      {/* More Info Request — message + inline response form */}
+      {detail.status === "needs_info" && (
         <Card className="border-amber-300 bg-amber-50">
-          <CardContent className="py-4">
-            <div className="flex items-start gap-3">
-              <span className="text-2xl" aria-hidden="true">📋</span>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-amber-900">What we need from you</p>
-                <p className="text-sm text-amber-800 mt-1 whitespace-pre-wrap">{detail.review_notes}</p>
-                <div className="mt-3">
-                  <Link href="/family/documents">
-                    <Button size="sm" className="bg-amber-700 hover:bg-amber-800 text-white">
-                      Upload Requested Documents →
-                    </Button>
-                  </Link>
+          <CardContent className="py-5 space-y-4">
+            {detail.review_notes && (
+              <div className="flex items-start gap-3">
+                <span className="text-2xl" aria-hidden="true">📋</span>
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">What the enrollment team needs from you</p>
+                  <p className="text-sm text-amber-800 mt-1 whitespace-pre-wrap">{detail.review_notes}</p>
                 </div>
               </div>
+            )}
+            <div className="space-y-3 pt-1">
+              <p className="text-sm font-medium text-amber-900">Your response</p>
+              <textarea
+                className="w-full border border-amber-300 rounded-md p-3 text-sm min-h-[100px] resize-none bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                placeholder="Type your response here… (optional if uploading a file)"
+                value={responseText}
+                onChange={(e) => setResponseText(e.target.value)}
+                disabled={submittingResponse}
+              />
+              <div>
+                <label className="block text-sm font-medium text-amber-900 mb-1">Attach a file (optional)</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  disabled={submittingResponse}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    if (f) {
+                      const err = validateFile(f);
+                      setFileError(err);
+                      setResponseFile(err ? null : f);
+                    } else {
+                      setResponseFile(null);
+                      setFileError(null);
+                    }
+                  }}
+                  className="w-full text-sm text-amber-900 file:mr-3 file:px-3 file:py-1 file:rounded file:border-0 file:bg-amber-100 file:text-amber-800 file:font-medium file:cursor-pointer"
+                />
+                {fileError && <p className="text-xs text-red-600 mt-1">{fileError}</p>}
+                {responseFile && !fileError && (
+                  <p className="text-xs text-amber-700 mt-1">{responseFile.name} ({formatFileSize(responseFile.size)})</p>
+                )}
+              </div>
+              <Button
+                onClick={handleSubmitResponse}
+                disabled={submittingResponse || (!responseText.trim() && !responseFile) || !!fileError}
+                className="bg-amber-700 hover:bg-amber-800 text-white"
+              >
+                {submittingResponse ? "Sending…" : "Send Response"}
+              </Button>
             </div>
           </CardContent>
         </Card>

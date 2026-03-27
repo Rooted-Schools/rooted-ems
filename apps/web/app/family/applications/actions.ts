@@ -12,6 +12,7 @@ import {
   type CreateApplicationInput,
   type UpdateApplicationInput,
 } from "@/lib/mutations";
+import { createFamilyResponse } from "@/lib/mutations/notes";
 
 // ─── Create Draft ──────────────────────────────────────
 
@@ -127,5 +128,13 @@ export async function familyCreateDocumentRecord(input: {
     revalidatePath(`/family/applications/${input.application_id}`);
   }
 
+  return result;
+}
+
+export async function familySubmitResponse(applicationId: string, message: string) {
+  const result = await createFamilyResponse(applicationId, message);
+  if (!result.error) {
+    revalidatePath(`/family/applications/${applicationId}`);
+  }
   return result;
 }

@@ -1,4 +1,4 @@
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 
 // ─── Create Note ───────────────────────────────────────
@@ -14,12 +14,11 @@ export async function createNote(input: {
   content: string;
   is_internal?: boolean;
 }): Promise<MutationResult<{ id: string }>> {
-  const supabase = await createServerClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const authClient = await createServerClient();
+  const { data: { user } } = await authClient.auth.getUser();
   if (!user) return { data: null, error: "Not authenticated" };
+
+  const supabase = createServiceRoleClient();
 
   const { data: note, error } = await supabase
     .from("note")
@@ -47,16 +46,49 @@ export async function createNote(input: {
 /**
  * Update note content. Only the author can update.
  */
+/**
+ * Save a family's text response to an info request.
+ * Stored as a non-internal note so staff can see it.
+ */
+export async function createFamilyResponse(
+  applicationId: string,
+  message: string
+): Promise<MutationResult<{ id: string }>> {
+  const authClient = await createServerClient();
+  const { data: { user } } = await authClient.auth.getUser();
+  if (!user) return { data: null, error: "Not authenticated" };
+
+  const supabase = createServiceRoleClient();
+
+  const { data: note, error } = await supabase
+    .from("note")
+    .insert({
+      entity_type: "application",
+      entity_id: applicationId,
+      content: message,
+      is_internal: false,
+      created_by: user.id,
+    })
+    .select("id")
+    .single();
+
+  if (error || !note) {
+    console.error("[createFamilyResponse]", error?.message);
+    return { data: null, error: "Failed to send response" };
+  }
+
+  return { data: { id: note.id }, error: null };
+}
+
 export async function updateNote(
   noteId: string,
   content: string
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const authClient = await createServerClient();
+  const { data: { user } } = await authClient.auth.getUser();
   if (!user) return { data: null, error: "Not authenticated" };
+
+  const supabase = createServiceRoleClient();
 
   const { error } = await supabase
     .from("note")
@@ -75,12 +107,11 @@ export async function updateNote(
 // ─── Delete Note ───────────────────────────────────────
 
 export async function deleteNote(noteId: string): Promise<MutationResult> {
-  const supabase = await createServerClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const authClient = await createServerClient();
+  const { data: { user } } = await authClient.auth.getUser();
   if (!user) return { data: null, error: "Not authenticated" };
+
+  const supabase = createServiceRoleClient();
 
   const { error } = await supabase
     .from("note")
