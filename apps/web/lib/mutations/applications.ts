@@ -203,7 +203,7 @@ export async function createApplication(
 
   if (gErr || !guardian) {
     console.error("[createApplication] guardian", gErr?.message);
-    return { data: null, error: `Failed to create guardian record: ${gErr?.message ?? "no data returned"}` };
+    return { data: null, error: "Failed to create guardian record" };
   }
 
   // 4. Create student

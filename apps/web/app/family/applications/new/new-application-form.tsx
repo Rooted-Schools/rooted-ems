@@ -704,9 +704,14 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
                   onChange={(e) => update({ guardianRelationship: e.target.value })}
                 >
                   <option value="">Select...</option>
-                  <option value="parent">Parent</option>
-                  <option value="step_parent">Step-Parent</option>
-                  <option value="grandparent">Grandparent</option>
+                  <option value="mother">Mother</option>
+                  <option value="father">Father</option>
+                  <option value="stepmother">Stepmother</option>
+                  <option value="stepfather">Stepfather</option>
+                  <option value="grandmother">Grandmother</option>
+                  <option value="grandfather">Grandfather</option>
+                  <option value="aunt">Aunt</option>
+                  <option value="uncle">Uncle</option>
                   <option value="foster_parent">Foster Parent</option>
                   <option value="legal_guardian">Legal Guardian</option>
                   <option value="other">Other</option>
