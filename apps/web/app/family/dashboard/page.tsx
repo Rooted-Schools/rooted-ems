@@ -154,10 +154,7 @@ export default async function FamilyDashboardPage() {
               Applications for {enrollmentWindow.campus_name} are being accepted
               until{" "}
               <span className="font-semibold">
-                {new Date(enrollmentWindow.close_date + "T00:00:00").toLocaleDateString(
-                  "en-US",
-                  { month: "long", day: "numeric", year: "numeric" }
-                )}
+                {enrollmentWindow.close_date}
               </span>
               .{" "}
               {draftCount > 0 && (
