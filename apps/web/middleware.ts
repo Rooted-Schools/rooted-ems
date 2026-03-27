@@ -26,8 +26,14 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresh the session on every request to keep it alive
-  const { data: { session } } = await supabase.auth.getSession();
-  const user = session?.user ?? null;
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getSession();
+    user = data?.session?.user ?? null;
+  } catch {
+    // If session check fails, treat as logged out — never crash
+    user = null;
+  }
 
   const pathname = request.nextUrl.pathname;
 
