@@ -574,7 +574,7 @@ export async function staffCreateApplication(
   input: CreateApplicationInput & { created_by_staff: string },
   options?: { autoSubmit?: boolean }
 ): Promise<MutationResult<{ id: string; student_id: string; guardian_id: string }>> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // 1. Create household (no family user link)
   const { data: household, error: hhErr } = await supabase
@@ -722,7 +722,7 @@ export async function staffCreateApplication(
 export async function staffFastTrackEnroll(
   input: CreateApplicationInput & { created_by_staff: string }
 ): Promise<MutationResult<{ application_id: string; enrollment_id: string }>> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // 1. Create the application (auto-submitted)
   const appResult = await staffCreateApplication(input, { autoSubmit: true });
@@ -835,12 +835,13 @@ export async function updateApplicationStatus(
   newStatus: string,
   reason?: string
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
-
+  const authClient = await createServerClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await authClient.auth.getUser();
   if (!user) return { data: null, error: "Not authenticated" };
+
+  const supabase = createServiceRoleClient();
 
   const { data: app } = await supabase
     .from("application")
