@@ -1,5 +1,3 @@
-export const runtime = "edge";
-
 import { createServerClient } from "@rooted-ems/database/server";
 import { redirect, notFound } from "next/navigation";
 import { getApplicationDetail } from "@/lib/queries";
@@ -19,7 +17,7 @@ export default async function FamilyApplicationDetailPage({
   if (!user) redirect("/login");
 
   const { id } = await params;
-  const detail = await getApplicationDetail(id);
+  const detail = await getApplicationDetail(id, user.id);
   if (!detail) notFound();
 
   return <FamilyApplicationDetailClient detail={detail} />;

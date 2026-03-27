@@ -1,4 +1,4 @@
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 
 // ─── Types ─────────────────────────────────────────────
 export interface ApplicationRow {
@@ -233,24 +233,32 @@ export function buildPipeline(stats: ApplicationStats): PipelineStage[] {
  * Fetch single application detail with related data.
  */
 export async function getApplicationDetail(
-  applicationId: string
+  applicationId: string,
+  userId?: string
 ): Promise<ApplicationDetail | null> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
-  const { data: app, error } = await supabase
+  let query = supabase
     .from("application")
     .select(
       `
       *,
       student:student_id (*),
-      guardian:guardian_id (*),
+      guardian:guardian_id (*, household:household_id (user_id)),
       campus:campus_id (name),
       grade_level:grade_level_id (grade),
       enrollment_window:enrollment_window_id (name)
     `
     )
-    .eq("id", applicationId)
-    .single();
+    .eq("id", applicationId);
+
+  const { data: app, error } = await query.single();
+
+  // If a userId was provided (family portal), verify ownership
+  if (app && userId) {
+    const householdUserId = (app.guardian as { household?: { user_id: string } } | null)?.household?.user_id;
+    if (householdUserId !== userId) return null;
+  }
 
   if (error || !app) {
     console.error("[getApplicationDetail]", error?.message);
