@@ -26,8 +26,8 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresh the session on every request to keep it alive
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: { user } } = await (supabase.auth as any).getUser();
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
 
   const pathname = request.nextUrl.pathname;
 
