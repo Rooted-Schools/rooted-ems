@@ -13,7 +13,8 @@ import {
   type UpdateApplicationInput,
 } from "@/lib/mutations";
 import { createFamilyResponse } from "@/lib/mutations/notes";
-import { updateApplicationStatus } from "@/lib/mutations";
+import { updateApplicationStatus, createEnrollment, initializeRegistrationPacket } from "@/lib/mutations";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 
 // ─── Create Draft ──────────────────────────────────────
 
@@ -132,15 +133,44 @@ export async function familyCreateDocumentRecord(input: {
   return result;
 }
 
-/** Fallback accept/decline when no offer record exists (legacy or direct-offer flow). */
+/** Fallback accept when no offer record exists — transitions status and creates enrollment. */
 export async function familyAcceptDirect(applicationId: string) {
+  const supabase = createServiceRoleClient();
+
+  // Fetch the application to get student/campus/grade/school_year
+  const { data: app } = await supabase
+    .from("application")
+    .select("student_id, campus_id, grade_level_id, enrollment_window:enrollment_window_id (school_year_id)")
+    .eq("id", applicationId)
+    .single();
+
   const result = await updateApplicationStatus(applicationId, "accepted");
-  if (!result.error) {
-    revalidatePath("/family/applications");
-    revalidatePath(`/family/applications/${applicationId}`);
-    revalidatePath("/family/dashboard");
-    revalidatePath("/family/registration");
+  if (result.error) return result;
+
+  // Create enrollment record
+  if (app?.student_id) {
+    const schoolYearId =
+      (app.enrollment_window as unknown as Record<string, string> | null)?.school_year_id ?? "";
+    const enrollResult = await createEnrollment({
+      student_id: app.student_id,
+      campus_id: app.campus_id,
+      grade_level_id: app.grade_level_id,
+      school_year_id: schoolYearId,
+      application_id: applicationId,
+    });
+    if (!enrollResult.error && enrollResult.data && schoolYearId) {
+      await initializeRegistrationPacket({
+        enrollment_id: enrollResult.data.id,
+        campus_id: app.campus_id,
+        school_year_id: schoolYearId,
+      });
+    }
   }
+
+  revalidatePath("/family/applications");
+  revalidatePath(`/family/applications/${applicationId}`);
+  revalidatePath("/family/dashboard");
+  revalidatePath("/family/registration");
   return result;
 }
 

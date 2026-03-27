@@ -21,7 +21,7 @@ async function promoteNextWaitlistCandidate(
   campusId: string,
   gradeLevelId: string
 ): Promise<void> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Resolve the waitlist for this campus + grade
   const { data: waitlistRows } = await supabase
@@ -157,7 +157,7 @@ export async function acceptOffer(
   offerId: string,
   guardianId: string
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Get the offer with full application details for enrollment creation
   const { data: offer, error: fetchError } = await supabase
@@ -273,7 +273,7 @@ export async function acceptOffer(
  * Decline an offer (called by family).
  */
 export async function declineOffer(offerId: string, declinedBy?: string): Promise<MutationResult> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const { data: offer, error: fetchError } = await supabase
     .from("offer")
@@ -335,7 +335,7 @@ export async function revokeOffer(
   revokedBy: string,
   reason?: string
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const { data: offer, error: fetchError } = await supabase
     .from("offer")
@@ -409,7 +409,7 @@ export async function revokeOffer(
  * Expire an offer (called by cron or manual staff action).
  */
 export async function expireOffer(offerId: string): Promise<MutationResult> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // First check the offer is actually pending before expiring
   const { data: offer, error: fetchError } = await supabase

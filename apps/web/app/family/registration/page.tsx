@@ -1,7 +1,7 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { redirect } from "next/navigation";
 import { RegistrationClient } from "./registration-client";
 
@@ -12,8 +12,11 @@ export default async function FamilyRegistrationPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Use service role for all data queries — anon client hits RLS
+  const db = createServiceRoleClient();
+
   // Find user's household
-  const { data: household } = await supabase
+  const { data: household } = await db
     .from("household")
     .select("id")
     .eq("user_id", user.id)
@@ -24,7 +27,7 @@ export default async function FamilyRegistrationPage() {
   }
 
   // Find active enrollments (with accepted/registered applications)
-  const { data: enrollments } = await supabase
+  const { data: enrollments } = await db
     .from("enrollment")
     .select(`
       id, status, enrolled_at, campus_id, school_year_id,
@@ -37,7 +40,7 @@ export default async function FamilyRegistrationPage() {
     .order("enrolled_at", { ascending: false });
 
   // Filter enrollments to ones belonging to this household's students
-  const { data: householdStudents } = await supabase
+  const { data: householdStudents } = await db
     .from("student")
     .select("id")
     .eq("household_id", household.id);
@@ -61,12 +64,12 @@ export default async function FamilyRegistrationPage() {
   const enrollmentData = await Promise.all(
     familyEnrollments.map(async (enr: Record<string, unknown>) => {
       const [{ data: items }, { data: packet }] = await Promise.all([
-        supabase
+        db
           .from("registration_item")
           .select("id, item_type, status, signed_at, verified_at, data")
           .eq("enrollment_id", enr.id as string)
           .order("item_type"),
-        supabase
+        db
           .from("registration_packet")
           .select("id, status, started_at, submitted_at, verified_at")
           .eq("enrollment_id", enr.id as string)
@@ -79,7 +82,7 @@ export default async function FamilyRegistrationPage() {
 
       let requirements: { item_type: string; name: string; description: string; is_required: boolean; sort_order: number }[] = [];
       if (enrCampusId && enrSchoolYearId) {
-        const { data: reqs } = await supabase
+        const { data: reqs } = await db
           .from("packet_requirement")
           .select("item_type, name, description, is_required, sort_order")
           .eq("campus_id", enrCampusId)
