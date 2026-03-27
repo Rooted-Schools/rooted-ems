@@ -298,12 +298,11 @@ export async function createApplication(
 export async function updateApplication(
   input: UpdateApplicationInput
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const authClient = await createServerClient();
+  const { data: { user } } = await authClient.auth.getUser();
   if (!user) return { data: null, error: "Not authenticated" };
+
+  const supabase = createServiceRoleClient();
 
   // Fetch current application to get student_id, guardian_id
   const { data: app, error: appErr } = await supabase
@@ -477,12 +476,11 @@ export async function updateApplication(
 export async function submitApplication(
   applicationId: string
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const authClient = await createServerClient();
+  const { data: { user } } = await authClient.auth.getUser();
   if (!user) return { data: null, error: "Not authenticated" };
+
+  const supabase = createServiceRoleClient();
 
   // Verify application is draft and belongs to user
   const { data: app } = await supabase
@@ -523,12 +521,11 @@ export async function withdrawApplication(
   applicationId: string,
   reason?: string
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const authClient = await createServerClient();
+  const { data: { user } } = await authClient.auth.getUser();
   if (!user) return { data: null, error: "Not authenticated" };
+
+  const supabase = createServiceRoleClient();
 
   const { data: app } = await supabase
     .from("application")
