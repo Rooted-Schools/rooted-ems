@@ -13,6 +13,7 @@ import {
   type UpdateApplicationInput,
 } from "@/lib/mutations";
 import { createFamilyResponse } from "@/lib/mutations/notes";
+import { updateApplicationStatus } from "@/lib/mutations";
 
 // ─── Create Draft ──────────────────────────────────────
 
@@ -128,6 +129,28 @@ export async function familyCreateDocumentRecord(input: {
     revalidatePath(`/family/applications/${input.application_id}`);
   }
 
+  return result;
+}
+
+/** Fallback accept/decline when no offer record exists (legacy or direct-offer flow). */
+export async function familyAcceptDirect(applicationId: string) {
+  const result = await updateApplicationStatus(applicationId, "accepted");
+  if (!result.error) {
+    revalidatePath("/family/applications");
+    revalidatePath(`/family/applications/${applicationId}`);
+    revalidatePath("/family/dashboard");
+    revalidatePath("/family/registration");
+  }
+  return result;
+}
+
+export async function familyDeclineDirect(applicationId: string) {
+  const result = await updateApplicationStatus(applicationId, "declined");
+  if (!result.error) {
+    revalidatePath("/family/applications");
+    revalidatePath(`/family/applications/${applicationId}`);
+    revalidatePath("/family/dashboard");
+  }
   return result;
 }
 

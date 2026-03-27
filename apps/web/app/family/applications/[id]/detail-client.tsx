@@ -18,7 +18,7 @@ import { useRef } from "react";
 import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationDetail } from "@/lib/queries";
 import { uploadFile, getSignedUrl, validateFile, formatFileSize } from "@/lib/storage/upload";
-import { familyWithdrawApplication, familyAcceptOffer, familyDeclineOffer, familySubmitResponse, familyCreateDocumentRecord } from "../actions";
+import { familyWithdrawApplication, familyAcceptOffer, familyDeclineOffer, familyAcceptDirect, familyDeclineDirect, familySubmitResponse, familyCreateDocumentRecord } from "../actions";
 
 /* ─── Status guide — what happens at each stage ─── */
 function getStatusExplanation(status: string): { title: string; explanation: string; icon: string } {
@@ -113,9 +113,10 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
   }
 
   function handleAcceptOffer() {
-    if (!detail.offer_id) return;
     startTransition(async () => {
-      const result = await familyAcceptOffer(detail.offer_id!, detail.guardian_id, detail.id);
+      const result = detail.offer_id
+        ? await familyAcceptOffer(detail.offer_id, detail.guardian_id, detail.id)
+        : await familyAcceptDirect(detail.id);
       if (result.error) {
         setFeedback({ type: "error", message: result.error });
       } else {
@@ -126,15 +127,15 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
   }
 
   function handleDeclineOffer() {
-    if (!detail.offer_id) return;
     setShowDeclineDialog(true);
   }
 
   function confirmDeclineOffer() {
-    if (!detail.offer_id) return;
     setShowDeclineDialog(false);
     startTransition(async () => {
-      const result = await familyDeclineOffer(detail.offer_id!, detail.id);
+      const result = detail.offer_id
+        ? await familyDeclineOffer(detail.offer_id, detail.id)
+        : await familyDeclineDirect(detail.id);
       if (result.error) {
         setFeedback({ type: "error", message: result.error });
       } else {
@@ -241,7 +242,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
               <Button>Continue Application</Button>
             </Link>
           )}
-          {isOffered && detail.offer_id && !offerExpired && (
+          {isOffered && !offerExpired && (
             <>
               <Button disabled={isPending} onClick={handleAcceptOffer}>
                 {isPending ? "Accepting..." : "Accept Offer"}
@@ -361,7 +362,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                     </div>
                   )}
                 </div>
-                {!isExpired && detail.offer_id && (
+                {!isExpired && (
                   <div className="flex flex-col gap-2 shrink-0">
                     <Button
                       disabled={isPending}
