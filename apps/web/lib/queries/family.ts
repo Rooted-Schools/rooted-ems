@@ -1,4 +1,4 @@
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { formatRelativeTime } from "./utils";
 
 // ─── Document Types ─────────────────────────────────────
@@ -71,7 +71,7 @@ export async function getFamilyNotifications(
   userId: string,
   limit: number = 10
 ): Promise<FamilyNotification[]> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const { data, error } = await supabase
     .from("notification")
@@ -103,7 +103,7 @@ export async function getFamilyNotifications(
 export async function getActiveEnrollmentWindows(
   campusId?: string
 ): Promise<EnrollmentWindowInfo[]> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
   const now = new Date();
   const nowIso = now.toISOString();
 
@@ -173,7 +173,7 @@ export async function getActiveEnrollmentWindows(
 export async function getFamilyDashboardApps(
   userId: string
 ): Promise<FamilyAppSummary[]> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Find guardian records for this user
   const { data: guardians } = await supabase
@@ -244,7 +244,7 @@ export async function getFamilyDashboardApps(
 export async function getFamilyDocuments(
   userId: string
 ): Promise<FamilyDocumentRow[]> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Find guardian IDs for this user
   const { data: guardians } = await supabase
@@ -307,7 +307,7 @@ export async function getFamilyMessages(
   userId: string,
   limit: number = 50
 ): Promise<FamilyMessageRow[]> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const { data, error } = await supabase
     .from("notification")
@@ -371,7 +371,7 @@ export async function getFamilyOfferDetail(
   offerId: string,
   userId: string
 ): Promise<FamilyOfferDetail | null> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Find guardian IDs for this user
   const { data: guardians } = await supabase
@@ -443,7 +443,7 @@ export async function getFamilyOfferDetail(
 export async function getFamilyPendingOffers(
   userId: string
 ): Promise<FamilyPendingOffer[]> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const { data: guardians } = await supabase
     .from("guardian")
