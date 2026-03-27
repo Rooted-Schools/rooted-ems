@@ -120,8 +120,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
       if (result.error) {
         setFeedback({ type: "error", message: result.error });
       } else {
-        setFeedback({ type: "success", message: "Offer accepted! Welcome to the rootedschools family." });
-        router.refresh();
+        router.push("/family/registration");
       }
     });
   }
