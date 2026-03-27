@@ -193,7 +193,7 @@ export default async function FamilyDashboardPage() {
               shortCode: "CRN",
             },
             {
-              name: "Rooted School Cleveland",
+              name: "Rooted Schools Cleveland",
               location: "Cleveland, OH",
               logo: "/logos/rooted-cleveland.png",
               shortCode: "RSC",
