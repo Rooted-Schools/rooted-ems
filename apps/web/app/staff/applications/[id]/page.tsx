@@ -23,5 +23,5 @@ export default async function StaffApplicationDetailPage({
     notFound();
   }
 
-  return <StaffApplicationDetailClient detail={detail} />;
+  return <StaffApplicationDetailClient detail={detail} userId={session.user.id} />;
 }

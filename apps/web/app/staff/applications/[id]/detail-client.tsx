@@ -30,6 +30,7 @@ import {
   staffWithdrawApplication,
   addApplicationNote,
   staffReviewDocument,
+  staffMakeOffer,
 } from "./actions";
 import { getSignedUrl } from "@/lib/storage/upload";
 
@@ -116,9 +117,17 @@ const WITHDRAWABLE = ["draft", "submitted", "needs_info", "verified", "lottery_a
 /* ─── Component Props ─── */
 interface StaffApplicationDetailClientProps {
   detail: ApplicationDetail;
+  userId: string;
 }
 
-export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailClientProps) {
+// Default offer expiry: 14 days from today
+function defaultExpiryDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + 14);
+  return d.toISOString().split("T")[0];
+}
+
+export function StaffApplicationDetailClient({ detail, userId }: StaffApplicationDetailClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [noteText, setNoteText] = useState("");
@@ -126,6 +135,8 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
   const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
   const [showMoreInfoDialog, setShowMoreInfoDialog] = useState(false);
   const [moreInfoMessage, setMoreInfoMessage] = useState("");
+  const [showOfferDialog, setShowOfferDialog] = useState(false);
+  const [offerExpiry, setOfferExpiry] = useState(defaultExpiryDate);
 
   const statusCfg = getStatusConfig(detail.status);
   const actions = getAvailableActions(detail.status);
@@ -143,12 +154,36 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
       setShowMoreInfoDialog(true);
       return;
     }
+    if (targetStatus === "offered") {
+      setShowOfferDialog(true);
+      return;
+    }
     startTransition(async () => {
       const result = await changeApplicationStatus(detail.id, targetStatus, reason);
       if (result.error) {
         showFeedback("error", result.error);
       } else {
         showFeedback("success", `Status updated to ${getStatusConfig(targetStatus).label}`);
+        router.refresh();
+      }
+    });
+  }
+
+  function confirmOffer() {
+    setShowOfferDialog(false);
+    startTransition(async () => {
+      const expiresAt = new Date(offerExpiry + "T23:59:59").toISOString();
+      const result = await staffMakeOffer(
+        detail.id,
+        detail.campus_id,
+        detail.grade_level_id,
+        expiresAt,
+        userId
+      );
+      if (result.error) {
+        showFeedback("error", result.error);
+      } else {
+        showFeedback("success", "Offer sent successfully.");
         router.refresh();
       }
     });
@@ -690,6 +725,33 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowMoreInfoDialog(false); setMoreInfoMessage(""); }}>Cancel</Button>
             <Button onClick={confirmMoreInfo} disabled={!moreInfoMessage.trim()}>Send Request</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Make Offer dialog */}
+      <Dialog open={showOfferDialog} onOpenChange={setShowOfferDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Make Offer</DialogTitle>
+            <DialogDescription>
+              Send a seat offer to {detail.student_name}&apos;s family. Set the deadline by which they must respond.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="block text-sm font-medium text-ink/70 mb-1">Offer Expires On</label>
+            <input
+              type="date"
+              value={offerExpiry}
+              onChange={(e) => setOfferExpiry(e.target.value)}
+              min={new Date().toISOString().split("T")[0]}
+              className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+            />
+            <p className="text-xs text-stone mt-1">Default is 14 days. Family must accept or decline by this date.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowOfferDialog(false)}>Cancel</Button>
+            <Button onClick={confirmOffer} disabled={!offerExpiry}>Send Offer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

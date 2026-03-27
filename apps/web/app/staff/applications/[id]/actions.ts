@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { updateApplicationStatus, withdrawApplication } from "@/lib/mutations";
 import { createNote } from "@/lib/mutations";
 import { reviewDocument } from "@/lib/mutations";
+import { sendOffer } from "@/lib/mutations/offers";
 
 // ─── Status Transition ─────────────────────────────────
 
@@ -74,6 +75,33 @@ export async function staffReviewDocument(
 
   if (!result.error) {
     revalidatePath(`/staff/applications/${applicationId}`);
+  }
+
+  return result;
+}
+
+// ─── Make Offer ────────────────────────────────────────
+
+export async function staffMakeOffer(
+  applicationId: string,
+  campusId: string,
+  gradeLevelId: string,
+  expiresAt: string,
+  offeredBy: string
+) {
+  const result = await sendOffer({
+    application_id: applicationId,
+    campus_id: campusId,
+    grade_level_id: gradeLevelId,
+    expires_at: expiresAt,
+    offered_by: offeredBy,
+  });
+
+  if (!result.error) {
+    revalidatePath(`/staff/applications/${applicationId}`);
+    revalidatePath("/staff/applications");
+    revalidatePath("/staff/offers");
+    revalidatePath("/staff/dashboard");
   }
 
   return result;

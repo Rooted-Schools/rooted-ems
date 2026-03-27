@@ -1,4 +1,4 @@
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 import { createEnrollment } from "./enrollment";
 import { initializeRegistrationPacket } from "./registration";
@@ -75,7 +75,7 @@ export interface SendOfferInput {
 export async function sendOffer(
   input: SendOfferInput
 ): Promise<MutationResult<{ id: string }>> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Verify application is in an offerable state
   const { data: app } = await supabase
@@ -84,7 +84,7 @@ export async function sendOffer(
     .eq("id", input.application_id)
     .single();
 
-  const offerableStatuses = ["verified", "lottery_assigned", "waitlisted"];
+  const offerableStatuses = ["verified", "lottery_assigned", "waitlisted", "needs_info", "offered"];
   if (!app || !offerableStatuses.includes(app.status)) {
     return { data: null, error: `Cannot send offer: application is in "${app?.status ?? "unknown"}" status.` };
   }
