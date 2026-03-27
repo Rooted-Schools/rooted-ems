@@ -4,6 +4,7 @@ import { createEnrollment } from "./enrollment";
 import { initializeRegistrationPacket } from "./registration";
 import { promoteFromWaitlist } from "./waitlist";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
+import { notifyFamilyOfOffer } from "@/lib/notify";
 
 // ─── Shared helper ─────────────────────────────────────────────────────────
 
@@ -134,6 +135,14 @@ export async function sendOffer(
       from_status: app.status,
       lottery_entry_id: input.lottery_entry_id ?? null,
     },
+  });
+
+  // Alert the family so they know to respond — campus name resolved by helper
+  await notifyFamilyOfOffer({
+    applicationId: input.application_id,
+    offerId: offer.id,
+    expiresAt: input.expires_at,
+    campusId: input.campus_id,
   });
 
   return { data: { id: offer.id }, error: null };

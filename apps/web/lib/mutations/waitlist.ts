@@ -1,6 +1,7 @@
 import { createServerClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
+import { notifyFamilyOfOffer } from "@/lib/notify";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -152,6 +153,14 @@ export async function promoteFromWaitlist(
       offer_id: offer.id,
       expires_at: expiresAt,
     },
+  });
+
+  // Notify the family immediately — they may have been waiting weeks
+  await notifyFamilyOfOffer({
+    applicationId: pos.application_id as string,
+    offerId: offer.id,
+    expiresAt,
+    campusId: wl.campus_id,
   });
 
   return { data: { offer_id: offer.id }, error: null };

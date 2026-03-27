@@ -96,7 +96,11 @@ export function DocumentQueueClient({ initialRows, stats, campusOptions }: Props
     }
 
     startTransition(async () => {
-      const result = await staffRejectDocument(rejectTarget.id, rejectReason.trim());
+      const result = await staffRejectDocument(rejectTarget.id, rejectReason.trim(), {
+        applicationId: rejectTarget.application_id,
+        documentType: rejectTarget.document_type,
+        campusId: rejectTarget.campus_id,
+      });
       if (result.error) {
         setRejectError(result.error);
       } else {
