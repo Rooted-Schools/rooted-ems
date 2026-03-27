@@ -1,7 +1,4 @@
-export const runtime = "edge";
-
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
 /** Validate redirect path to prevent open redirect attacks. */
@@ -17,6 +14,9 @@ function sanitizeRedirectPath(next: string | null, fallback: string): string {
  * The `next` query param determines where to redirect after login.
  * - Staff login passes `next=/staff/dashboard`
  * - Family login passes `next=/family/dashboard`
+ *
+ * Cookies are set directly on the NextResponse object so they are
+ * always written — regardless of runtime environment.
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -31,23 +31,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}${errorRedirect}?error=no_code`);
   }
 
-  const cookieStore = await cookies();
+  // Build the success redirect response first so we can set cookies on it.
+  const successResponse = NextResponse.redirect(`${origin}${next}`);
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
+        // Read cookies from the incoming request
         getAll() {
-          return cookieStore.getAll();
+          return request.cookies.getAll();
         },
-        setAll(cookiesToSet: Array<{ name: string; value: string; options?: Record<string, unknown> }>) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options as never)
-            );
-          } catch {
-            // Ignore errors in Server Components
-          }
+        // Write cookies directly onto the outgoing response — always works
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            successResponse.cookies.set(name, value, options as Parameters<typeof successResponse.cookies.set>[2])
+          );
         },
       },
     }
@@ -59,5 +59,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}${errorRedirect}?error=auth_failed`);
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  return successResponse;
 }
