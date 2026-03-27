@@ -124,6 +124,8 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
   const [noteText, setNoteText] = useState("");
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
+  const [showMoreInfoDialog, setShowMoreInfoDialog] = useState(false);
+  const [moreInfoMessage, setMoreInfoMessage] = useState("");
 
   const statusCfg = getStatusConfig(detail.status);
   const actions = getAvailableActions(detail.status);
@@ -136,9 +138,13 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
     setTimeout(() => setFeedback(null), 4000);
   }
 
-  function handleStatusChange(targetStatus: string) {
+  function handleStatusChange(targetStatus: string, reason?: string) {
+    if (targetStatus === "needs_info" && reason === undefined) {
+      setShowMoreInfoDialog(true);
+      return;
+    }
     startTransition(async () => {
-      const result = await changeApplicationStatus(detail.id, targetStatus);
+      const result = await changeApplicationStatus(detail.id, targetStatus, reason);
       if (result.error) {
         showFeedback("error", result.error);
       } else {
@@ -146,6 +152,13 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
         router.refresh();
       }
     });
+  }
+
+  function confirmMoreInfo() {
+    if (!moreInfoMessage.trim()) return;
+    setShowMoreInfoDialog(false);
+    handleStatusChange("needs_info", moreInfoMessage.trim());
+    setMoreInfoMessage("");
   }
 
   function handleWithdraw() {
@@ -658,6 +671,28 @@ export function StaffApplicationDetailClient({ detail }: StaffApplicationDetailC
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Request More Info dialog */}
+      <Dialog open={showMoreInfoDialog} onOpenChange={setShowMoreInfoDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request More Information</DialogTitle>
+            <DialogDescription>
+              Describe what you need from the family. They will see this message on their application.
+            </DialogDescription>
+          </DialogHeader>
+          <textarea
+            className="w-full border border-input rounded-md p-3 text-sm min-h-[120px] resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+            placeholder="e.g. Please provide a copy of your child's most recent report card and proof of address dated within the last 90 days."
+            value={moreInfoMessage}
+            onChange={(e) => setMoreInfoMessage(e.target.value)}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowMoreInfoDialog(false); setMoreInfoMessage(""); }}>Cancel</Button>
+            <Button onClick={confirmMoreInfo} disabled={!moreInfoMessage.trim()}>Send Request</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Withdraw confirmation dialog */}
       <Dialog open={showWithdrawDialog} onOpenChange={setShowWithdrawDialog}>
