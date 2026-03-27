@@ -94,7 +94,7 @@ export async function getStaffApplications(opts?: {
   limit?: number;
   offset?: number;
 }): Promise<{ data: ApplicationRow[]; count: number }> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
   const limit = opts?.limit ?? 50;
   const offset = opts?.offset ?? 0;
 
@@ -165,7 +165,7 @@ export async function getStaffApplications(opts?: {
 export async function getApplicationStats(
   campusId?: string
 ): Promise<ApplicationStats> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   let query = supabase
     .from("application")
@@ -447,7 +447,7 @@ export interface DraftApplicationData {
 export async function getDraftApplicationForEdit(
   applicationId: string
 ): Promise<DraftApplicationData | null> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const { data: app, error } = await supabase
     .from("application")
@@ -562,7 +562,7 @@ export async function getDraftApplicationForEdit(
 export async function getFamilyApplications(
   userId: string
 ): Promise<ApplicationRow[]> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Family sees applications linked through their guardian record
   // First find guardian IDs for this user
