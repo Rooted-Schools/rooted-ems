@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
           return request.cookies.getAll();
         },
         // Write cookies directly onto the outgoing response — always works
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: Array<{ name: string; value: string; options?: Record<string, unknown> }>) {
           cookiesToSet.forEach(({ name, value, options }) =>
             successResponse.cookies.set(name, value, options as Parameters<typeof successResponse.cookies.set>[2])
           );
