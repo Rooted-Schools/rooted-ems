@@ -8,19 +8,34 @@ import { createBrowserClient } from "@rooted-ems/database";
 interface FamilyHeaderProps {
   userEmail?: string | null;
   userPhone?: string | null;
+  pendingOfferCount?: number;
 }
 
-const NAV_LINKS = [
-  { href: "/family/dashboard", label: "Dashboard" },
-  { href: "/family/applications", label: "Applications" },
-  { href: "/family/documents", label: "Documents" },
-  { href: "/family/messages", label: "Messages" },
-  { href: "/family/registration", label: "Registration" },
-];
+interface NavLink {
+  href: string;
+  label: string;
+  badge?: number;
+}
 
-export function FamilyHeader({ userEmail, userPhone }: FamilyHeaderProps) {
+function buildNavLinks(pendingOfferCount = 0): NavLink[] {
+  return [
+    { href: "/family/dashboard", label: "Dashboard" },
+    { href: "/family/applications", label: "Applications" },
+    {
+      href: "/family/offers",
+      label: "Offers",
+      badge: pendingOfferCount > 0 ? pendingOfferCount : undefined,
+    },
+    { href: "/family/documents", label: "Documents" },
+    { href: "/family/messages", label: "Messages" },
+    { href: "/family/registration", label: "Registration" },
+  ];
+}
+
+export function FamilyHeader({ userEmail, userPhone, pendingOfferCount = 0 }: FamilyHeaderProps) {
   const pathname = usePathname();
   const supabase = useMemo(() => createBrowserClient(), []);
+  const NAV_LINKS = buildNavLinks(pendingOfferCount);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   async function handleLogout() {
@@ -48,9 +63,14 @@ export function FamilyHeader({ userEmail, userPhone }: FamilyHeaderProps) {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`text-sm transition-colors ${isActive ? "text-rooted-green font-semibold" : "text-ink/70 hover:text-rooted-green"}`}
+                className={`relative text-sm transition-colors ${isActive ? "text-rooted-green font-semibold" : "text-ink/70 hover:text-rooted-green"}`}
               >
                 {link.label}
+                {link.badge != null && (
+                  <span className="absolute -top-1.5 -right-3.5 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    {link.badge}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -96,9 +116,14 @@ export function FamilyHeader({ userEmail, userPhone }: FamilyHeaderProps) {
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileOpen(false)}
-                  className={`py-2.5 text-sm border-b border-stone/10 last:border-0 transition-colors ${isActive ? "text-rooted-green font-semibold" : "text-ink/70 hover:text-rooted-green"}`}
+                  className={`py-2.5 text-sm border-b border-stone/10 last:border-0 transition-colors flex items-center justify-between ${isActive ? "text-rooted-green font-semibold" : "text-ink/70 hover:text-rooted-green"}`}
                 >
                   {link.label}
+                  {link.badge != null && (
+                    <span className="min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                      {link.badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}
