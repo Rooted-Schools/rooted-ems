@@ -2,7 +2,57 @@ import { createServerClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 import { createEnrollment } from "./enrollment";
 import { initializeRegistrationPacket } from "./registration";
+import { promoteFromWaitlist } from "./waitlist";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
+
+// ─── Shared helper ─────────────────────────────────────────────────────────
+
+/**
+ * After a seat is vacated (offer declined, revoked, or expired) attempt to
+ * immediately promote the next eligible waitlist candidate for the same
+ * campus + grade.  Called synchronously so the family hears within minutes
+ * rather than waiting for the nightly cron job.
+ *
+ * Failures are logged but never propagated — the primary operation has
+ * already succeeded and must not be rolled back over a waitlist issue.
+ */
+async function promoteNextWaitlistCandidate(
+  campusId: string,
+  gradeLevelId: string
+): Promise<void> {
+  const supabase = await createServerClient();
+
+  // Resolve the waitlist for this campus + grade
+  const { data: waitlistRows } = await supabase
+    .from("waitlist")
+    .select("id")
+    .eq("campus_id", campusId)
+    .eq("grade_level_id", gradeLevelId)
+    .limit(1);
+
+  const waitlistId = waitlistRows?.[0]?.id as string | undefined;
+  if (!waitlistId) return;
+
+  const { data: posRows } = await supabase
+    .from("waitlist_position")
+    .select("id")
+    .eq("waitlist_id", waitlistId)
+    .is("removed_at", null)
+    .is("promoted_at", null)
+    .order("position_number", { ascending: true })
+    .limit(1);
+
+  const nextPositionId = posRows?.[0]?.id as string | undefined;
+  if (!nextPositionId) return;
+
+  // Give the promoted candidate 7 days to respond
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const result = await promoteFromWaitlist(nextPositionId, "system", expiresAt);
+  if (result.error) {
+    console.error("[promoteNextWaitlistCandidate]", result.error);
+  }
+}
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -218,7 +268,7 @@ export async function declineOffer(offerId: string, declinedBy?: string): Promis
 
   const { data: offer, error: fetchError } = await supabase
     .from("offer")
-    .select("id, application_id, campus_id, status")
+    .select("id, application_id, campus_id, grade_level_id, status")
     .eq("id", offerId)
     .single();
 
@@ -259,6 +309,12 @@ export async function declineOffer(offerId: string, declinedBy?: string): Promis
     metadata: { application_id: offer.application_id },
   });
 
+  // Seat is now available — immediately promote the next waitlist candidate
+  // so families don't wait until the nightly cron to hear the good news.
+  if (offer.campus_id && offer.grade_level_id) {
+    await promoteNextWaitlistCandidate(offer.campus_id, offer.grade_level_id);
+  }
+
   return { data: null, error: null };
 }
 
@@ -274,7 +330,7 @@ export async function revokeOffer(
 
   const { data: offer, error: fetchError } = await supabase
     .from("offer")
-    .select("id, application_id, campus_id, status")
+    .select("id, application_id, campus_id, grade_level_id, status")
     .eq("id", offerId)
     .single();
 
@@ -331,6 +387,11 @@ export async function revokeOffer(
       reverted_app_status: revertStatus,
     },
   });
+
+  // Seat is now available — immediately promote next waitlist candidate
+  if (offer.campus_id && offer.grade_level_id) {
+    await promoteNextWaitlistCandidate(offer.campus_id, offer.grade_level_id);
+  }
 
   return { data: null, error: null };
 }

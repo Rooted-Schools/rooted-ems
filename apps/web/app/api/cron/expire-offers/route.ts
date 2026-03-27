@@ -58,28 +58,30 @@ export async function GET(request: NextRequest) {
 
     expiredCount++;
 
-    // Try to promote the next person from the waitlist for this campus/grade
-    const { data: waitlistPos } = await supabase
-      .from("waitlist_position")
-      .select(`
-        id,
-        waitlist:waitlist_id (campus_id, grade_level_id)
-      `)
-      .is("removed_at", null)
-      .is("promoted_at", null)
-      .order("position_number", { ascending: true })
-      .limit(50);
+    // Find the waitlist for this specific campus+grade, then fetch the
+    // top-ranked unserved position. Scoped at the DB layer so we never
+    // miss a candidate because of an unrelated global limit.
+    const { data: waitlistRows } = await supabase
+      .from("waitlist")
+      .select("id")
+      .eq("campus_id", offer.campus_id)
+      .eq("grade_level_id", offer.grade_level_id)
+      .limit(1);
 
-    // Find the first active position matching this campus/grade
-    const nextPosition = (waitlistPos ?? []).find(
-      (p: Record<string, unknown>) => {
-        const wl = p.waitlist as unknown as Record<string, string> | null;
-        return (
-          wl?.campus_id === offer.campus_id &&
-          wl?.grade_level_id === offer.grade_level_id
-        );
-      }
-    );
+    const waitlistId = waitlistRows?.[0]?.id as string | undefined;
+
+    let nextPosition: { id: string } | null = null;
+    if (waitlistId) {
+      const { data: posRows } = await supabase
+        .from("waitlist_position")
+        .select("id")
+        .eq("waitlist_id", waitlistId)
+        .is("removed_at", null)
+        .is("promoted_at", null)
+        .order("position_number", { ascending: true })
+        .limit(1);
+      nextPosition = posRows?.[0] ?? null;
+    }
 
     if (nextPosition) {
       // Give the promoted student 7 days to respond
