@@ -37,7 +37,7 @@ interface PacketRequirement {
   sort_order: number;
 }
 
-interface EnrollmentRegistration {
+export interface EnrollmentRegistration {
   enrollment_id: string;
   student_name: string;
   campus_name: string;

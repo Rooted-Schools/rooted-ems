@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { redirect } from "next/navigation";
-import { RegistrationClient } from "./registration-client";
+import { RegistrationClient, type EnrollmentRegistration } from "./registration-client";
 
 export default async function FamilyRegistrationPage() {
   const supabase = await createServerClient();
@@ -138,5 +138,5 @@ export default async function FamilyRegistrationPage() {
     })
   );
 
-  return <RegistrationClient enrollments={enrollmentData} />;
+  return <RegistrationClient enrollments={enrollmentData as EnrollmentRegistration[]} />;
 }
