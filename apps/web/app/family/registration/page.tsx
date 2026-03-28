@@ -12,102 +12,127 @@ export default async function FamilyRegistrationPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Use service role for all data queries — anon client hits RLS
   const db = createServiceRoleClient();
 
-  // Find user's household
-  const { data: household } = await db
-    .from("household")
+  // Find guardian records for this user
+  const { data: guardians } = await db
+    .from("guardian")
     .select("id")
-    .eq("user_id", user.id)
-    .single();
+    .eq("user_id", user.id);
 
-  if (!household) {
-    redirect("/family/dashboard");
+  if (!guardians || guardians.length === 0) {
+    return <RegistrationClient enrollments={[]} />;
   }
 
-  // Find active enrollments (with accepted/registered applications)
-  const { data: enrollments } = await db
-    .from("enrollment")
+  const guardianIds = guardians.map((g: Record<string, string>) => g.id);
+
+  // Find accepted/registered applications for this family
+  const { data: acceptedApps } = await db
+    .from("application")
     .select(`
-      id, status, enrolled_at, campus_id, school_year_id,
+      id, status, campus_id, grade_level_id,
       student:student_id (id, first_name, last_name),
       campus:campus_id (name),
       grade_level:grade_level_id (grade),
-      school_year:school_year_id (name)
+      enrollment_window:enrollment_window_id (school_year_id, school_year:school_year_id (name))
     `)
-    .in("status", ["pending", "active"])
-    .order("enrolled_at", { ascending: false });
+    .in("guardian_id", guardianIds)
+    .in("status", ["accepted", "registered"])
+    .order("updated_at", { ascending: false });
 
-  // Filter enrollments to ones belonging to this household's students
-  const { data: householdStudents } = await db
-    .from("student")
-    .select("id")
-    .eq("household_id", household.id);
-
-  const studentIds = (householdStudents ?? []).map(
-    (s: Record<string, unknown>) => s.id as string
-  );
-
-  const familyEnrollments = (enrollments ?? []).filter(
-    (e: Record<string, unknown>) => {
-      const student = e.student as Record<string, unknown> | null;
-      return student && studentIds.includes(student.id as string);
-    }
-  );
-
-  if (familyEnrollments.length === 0) {
-    redirect("/family/dashboard");
+  if (!acceptedApps || acceptedApps.length === 0) {
+    return <RegistrationClient enrollments={[]} />;
   }
 
-  // Fetch registration items and packet requirements for each enrollment
+  // For each accepted application, find or create an enrollment record
   const enrollmentData = await Promise.all(
-    familyEnrollments.map(async (enr: Record<string, unknown>) => {
-      const [{ data: items }, { data: packet }] = await Promise.all([
-        db
-          .from("registration_item")
-          .select("id, item_type, status, signed_at, verified_at, data")
-          .eq("enrollment_id", enr.id as string)
-          .order("item_type"),
-        db
-          .from("registration_packet")
-          .select("id, status, started_at, submitted_at, verified_at")
-          .eq("enrollment_id", enr.id as string)
-          .single(),
-      ]);
+    acceptedApps.map(async (app: Record<string, unknown>) => {
+      const student = app.student as Record<string, string> | null;
+      const campus = app.campus as Record<string, string> | null;
+      const grade = app.grade_level as Record<string, string> | null;
+      const enrollmentWindow = app.enrollment_window as Record<string, unknown> | null;
+      const schoolYear = enrollmentWindow?.school_year as Record<string, string> | null;
+      const schoolYearId = (enrollmentWindow?.school_year_id as string) ?? "";
 
-      // Fetch requirements for this campus/year using IDs from the enrollment
-      const enrCampusId = enr.campus_id as string;
-      const enrSchoolYearId = enr.school_year_id as string;
+      // Look for an existing enrollment for this application
+      let enrollmentId: string | null = null;
+      const { data: existingEnrollment } = await db
+        .from("enrollment")
+        .select("id, status")
+        .eq("application_id", app.id as string)
+        .maybeSingle();
 
-      let requirements: { item_type: string; name: string; description: string; is_required: boolean; sort_order: number }[] = [];
-      if (enrCampusId && enrSchoolYearId) {
-        const { data: reqs } = await db
-          .from("packet_requirement")
-          .select("item_type, name, description, is_required, sort_order")
-          .eq("campus_id", enrCampusId)
-          .eq("school_year_id", enrSchoolYearId)
-          .eq("is_active", true)
-          .order("sort_order");
-        requirements = (reqs ?? []) as { item_type: string; name: string; description: string; is_required: boolean; sort_order: number }[];
+      if (existingEnrollment) {
+        enrollmentId = existingEnrollment.id;
+      } else if (student?.id && schoolYearId) {
+        // Create enrollment record on the fly for accepted apps without one
+        const { data: newEnrollment } = await db
+          .from("enrollment")
+          .insert({
+            student_id: student.id,
+            campus_id: app.campus_id as string,
+            grade_level_id: app.grade_level_id as string,
+            school_year_id: schoolYearId,
+            application_id: app.id as string,
+            status: "pending",
+            enrolled_at: new Date().toISOString(),
+          })
+          .select("id")
+          .single();
+        if (newEnrollment) {
+          enrollmentId = newEnrollment.id;
+          // Initialize registration packet
+          await db.from("registration_packet").insert({
+            enrollment_id: enrollmentId,
+            campus_id: app.campus_id as string,
+            school_year_id: schoolYearId,
+            status: "not_started",
+          });
+        }
       }
 
-      const student = enr.student as Record<string, string> | null;
-      const grade = enr.grade_level as Record<string, string> | null;
-      const campus = enr.campus as Record<string, string> | null;
-      const schoolYear = enr.school_year as Record<string, string> | null;
+      // Fetch packet and items if we have an enrollment
+      let packet = null;
+      let items: unknown[] = [];
+      let requirements: { item_type: string; name: string; description: string; is_required: boolean; sort_order: number }[] = [];
+
+      if (enrollmentId) {
+        const [{ data: packetData }, { data: itemData }] = await Promise.all([
+          db
+            .from("registration_packet")
+            .select("id, status, started_at, submitted_at, verified_at")
+            .eq("enrollment_id", enrollmentId)
+            .maybeSingle(),
+          db
+            .from("registration_item")
+            .select("id, item_type, status, signed_at, verified_at, data")
+            .eq("enrollment_id", enrollmentId)
+            .order("item_type"),
+        ]);
+        packet = packetData ?? null;
+        items = itemData ?? [];
+
+        if (schoolYearId && app.campus_id) {
+          const { data: reqs } = await db
+            .from("packet_requirement")
+            .select("item_type, name, description, is_required, sort_order")
+            .eq("campus_id", app.campus_id as string)
+            .eq("school_year_id", schoolYearId)
+            .eq("is_active", true)
+            .order("sort_order");
+          requirements = (reqs ?? []) as typeof requirements;
+        }
+      }
 
       return {
-        enrollment_id: enr.id as string,
-        student_name: student
-          ? `${student.first_name} ${student.last_name}`
-          : "Unknown",
+        enrollment_id: enrollmentId ?? (app.id as string),
+        student_name: student ? `${student.first_name} ${student.last_name}` : "Unknown",
         campus_name: campus?.name ?? "",
         grade: grade?.grade ?? "",
         school_year: schoolYear?.name ?? "",
-        enrollment_status: enr.status as string,
-        packet: packet ?? null,
-        items: items ?? [],
+        enrollment_status: existingEnrollment?.status ?? "pending",
+        packet,
+        items,
         requirements,
       };
     })
