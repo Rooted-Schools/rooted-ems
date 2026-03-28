@@ -1,4 +1,4 @@
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 
 // ─── Types ─────────────────────────────────────────────
@@ -23,7 +23,7 @@ export interface CompleteRegistrationItemInput {
 export async function initializeRegistrationPacket(
   input: InitializePacketInput
 ): Promise<MutationResult<{ packet_id: string; items_created: number }>> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Check if packet already exists
   const { data: existing } = await supabase
@@ -95,7 +95,7 @@ export async function initializeRegistrationPacket(
 export async function completeRegistrationItem(
   input: CompleteRegistrationItemInput
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const { error } = await supabase
     .from("registration_item")
@@ -159,7 +159,7 @@ export async function completeRegistrationItem(
 export async function submitRegistrationPacket(
   enrollmentId: string
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Check all items are submitted or verified
   const { data: pendingItems } = await supabase
@@ -213,7 +213,7 @@ export async function verifyRegistrationItem(
   itemId: string,
   verifiedBy: string
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const { error } = await supabase
     .from("registration_item")

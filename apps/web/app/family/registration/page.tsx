@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { redirect } from "next/navigation";
 import { RegistrationClient, type EnrollmentRegistration } from "./registration-client";
+import { initializeRegistrationPacket } from "@/lib/mutations/registration";
 
 export default async function FamilyRegistrationPage() {
   const supabase = await createServerClient();
@@ -81,12 +82,11 @@ export default async function FamilyRegistrationPage() {
           .single();
         if (newEnrollment) {
           enrollmentId = newEnrollment.id;
-          // Initialize registration packet
-          await db.from("registration_packet").insert({
+          // Initialize packet + items
+          await initializeRegistrationPacket({
             enrollment_id: enrollmentId,
             campus_id: app.campus_id as string,
             school_year_id: schoolYearId,
-            status: "not_started",
           });
         }
       }
@@ -111,6 +111,22 @@ export default async function FamilyRegistrationPage() {
         ]);
         packet = packetData ?? null;
         items = (itemData ?? []) as typeof items;
+
+        // If packet exists but no items yet, seed them now
+        if (packet && items.length === 0 && schoolYearId && app.campus_id) {
+          await initializeRegistrationPacket({
+            enrollment_id: enrollmentId,
+            campus_id: app.campus_id as string,
+            school_year_id: schoolYearId,
+          });
+          // Re-fetch items after seeding
+          const { data: seededItems } = await db
+            .from("registration_item")
+            .select("id, item_type, status, signed_at, verified_at, data")
+            .eq("enrollment_id", enrollmentId)
+            .order("item_type");
+          items = (seededItems ?? []) as typeof items;
+        }
 
         if (schoolYearId && app.campus_id) {
           const { data: reqs } = await db
