@@ -1,4 +1,4 @@
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
 
@@ -22,7 +22,7 @@ export interface CreateEnrollmentInput {
 export async function createEnrollment(
   input: CreateEnrollmentInput
 ): Promise<MutationResult<{ id: string }>> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const { data, error } = await supabase
     .from("enrollment")
@@ -82,7 +82,7 @@ export async function withdrawEnrollment(
   reason: string,
   withdrawnBy?: string
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Fetch the enrollment to get the linked application_id and campus
   const { data: enrollment, error: fetchError } = await supabase
@@ -140,7 +140,7 @@ export async function syncEnrollmentSIS(
   enrollmentId: string,
   sisStudentId: string
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const { error } = await supabase
     .from("enrollment")
@@ -166,7 +166,7 @@ export async function transferEnrollment(
   newGradeLevelId: string,
   transferredBy?: string
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Mark current enrollment as transferred
   const { data: current, error: fetchError } = await supabase
