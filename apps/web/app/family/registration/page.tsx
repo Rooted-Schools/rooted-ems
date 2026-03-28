@@ -92,8 +92,8 @@ export default async function FamilyRegistrationPage() {
       }
 
       // Fetch packet and items if we have an enrollment
-      let packet = null;
-      let items: unknown[] = [];
+      let packet: { id: string; status: string; started_at: string | null; submitted_at: string | null; verified_at: string | null } | null = null;
+      let items: { id: string; item_type: string; status: string; signed_at: string | null; verified_at: string | null; data: Record<string, unknown> }[] = [];
       let requirements: { item_type: string; name: string; description: string; is_required: boolean; sort_order: number }[] = [];
 
       if (enrollmentId) {
@@ -110,7 +110,7 @@ export default async function FamilyRegistrationPage() {
             .order("item_type"),
         ]);
         packet = packetData ?? null;
-        items = itemData ?? [];
+        items = (itemData ?? []) as typeof items;
 
         if (schoolYearId && app.campus_id) {
           const { data: reqs } = await db
