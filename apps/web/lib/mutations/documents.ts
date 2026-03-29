@@ -1,7 +1,7 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
-import { notifyFamilyDocumentVerified } from "@/lib/notify";
+import { notifyFamilyDocumentVerified, notifyStaffDocumentUploaded } from "@/lib/notify";
 
 // ─── Review Document (Staff) ───────────────────────────
 
@@ -144,6 +144,19 @@ export async function createDocumentRecord(input: {
       status: "pending",
     },
   });
+
+  // Notify staff there's a new document to review — look up campus_id first
+  const { data: appRow } = await supabase
+    .from("application")
+    .select("campus_id")
+    .eq("id", input.application_id)
+    .single();
+  if (appRow?.campus_id) {
+    notifyStaffDocumentUploaded({
+      campusId: appRow.campus_id as string,
+      documentType: input.document_type,
+    }).catch(() => {});
+  }
 
   return { data: { id: doc.id }, error: null };
 }

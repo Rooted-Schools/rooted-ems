@@ -1,6 +1,6 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
-import { notifyFamilyRegistrationReady, notifyFamilyRegistrationSubmitted } from "@/lib/notify";
+import { notifyFamilyRegistrationReady, notifyFamilyRegistrationSubmitted, notifyStaffRegistrationSubmitted } from "@/lib/notify";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -294,11 +294,17 @@ export async function submitRegistrationPacket(
       .eq("id", enrollment.application_id);
   }
 
-  // Notify family that their packet was received — fire and forget
+  // Notify family confirmation + staff to begin verification — fire and forget
   notifyFamilyRegistrationSubmitted({
     enrollmentId,
     campusId: enrollment?.campus_id as string | undefined,
   }).catch(() => {});
+  if (enrollment?.campus_id) {
+    notifyStaffRegistrationSubmitted({
+      campusId: enrollment.campus_id as string,
+      enrollmentId,
+    }).catch(() => {});
+  }
 
   return { data: null, error: null };
 }

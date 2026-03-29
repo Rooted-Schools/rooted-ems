@@ -321,3 +321,133 @@ export async function notifyFamilyRegistrationComplete({
     logTag: "notifyFamilyRegistrationComplete",
   });
 }
+
+// ─── Staff notifications ──────────────────────────────────────────────────────
+
+/**
+ * Get all staff auth user IDs assigned to a campus.
+ */
+async function getStaffUserIdsForCampus(campusId: string): Promise<string[]> {
+  const supabase = createServiceRoleClient();
+  const { data } = await supabase
+    .from("user_campus_role")
+    .select("user_id")
+    .eq("campus_id", campusId);
+  return (data ?? []).map((r: Record<string, string>) => r.user_id).filter(Boolean);
+}
+
+async function notifyStaff(params: {
+  campusId: string;
+  subject: string;
+  body: string;
+  link: string;
+  logTag: string;
+}): Promise<void> {
+  const userIds = await getStaffUserIdsForCampus(params.campusId);
+  if (userIds.length === 0) return;
+  const result = await sendNotification({
+    recipientUserIds: userIds,
+    campusId: params.campusId,
+    channel: "in_app",
+    subject: params.subject,
+    body: params.body,
+    link: params.link,
+  });
+  if (result.error) console.error(`[${params.logTag}]`, result.error);
+}
+
+/** Family submits a new application — alert enrollment staff to begin review. */
+export async function notifyStaffNewApplication({
+  campusId,
+  studentName,
+  applicationId,
+}: {
+  campusId: string;
+  studentName?: string;
+  applicationId: string;
+}): Promise<void> {
+  await notifyStaff({
+    campusId,
+    subject: `New application${studentName ? ` from ${studentName}` : ""} submitted`,
+    body: `A new enrollment application has been submitted${studentName ? ` for ${studentName}` : ""}. Review it to begin the verification process.`,
+    link: `/staff/applications/${applicationId}`,
+    logTag: "notifyStaffNewApplication",
+  });
+}
+
+/** Family accepts a seat offer — alert staff to prepare enrollment. */
+export async function notifyStaffOfferAccepted({
+  campusId,
+  studentName,
+  applicationId,
+}: {
+  campusId: string;
+  studentName?: string;
+  applicationId: string;
+}): Promise<void> {
+  await notifyStaff({
+    campusId,
+    subject: `Offer accepted${studentName ? ` by ${studentName}` : ""}`,
+    body: `${studentName ?? "A family"} has accepted their seat offer. Their registration packet has been created and is ready for them to complete.`,
+    link: `/staff/applications/${applicationId}`,
+    logTag: "notifyStaffOfferAccepted",
+  });
+}
+
+/** Family declines a seat offer — alert staff so they can promote the waitlist. */
+export async function notifyStaffOfferDeclined({
+  campusId,
+  studentName,
+  applicationId,
+}: {
+  campusId: string;
+  studentName?: string;
+  applicationId: string;
+}): Promise<void> {
+  await notifyStaff({
+    campusId,
+    subject: `Offer declined${studentName ? ` by ${studentName}` : ""}`,
+    body: `${studentName ?? "A family"} has declined their seat offer. The next waitlist candidate has been automatically promoted if available.`,
+    link: `/staff/applications/${applicationId}`,
+    logTag: "notifyStaffOfferDeclined",
+  });
+}
+
+/** Family uploads a document — alert staff there's something to review. */
+export async function notifyStaffDocumentUploaded({
+  campusId,
+  documentType,
+  studentName,
+}: {
+  campusId: string;
+  documentType: string;
+  studentName?: string;
+}): Promise<void> {
+  const readableType = documentType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  await notifyStaff({
+    campusId,
+    subject: `Document uploaded: ${readableType}${studentName ? ` for ${studentName}` : ""}`,
+    body: `A new document (${readableType}) has been uploaded${studentName ? ` for ${studentName}` : ""} and is pending review.`,
+    link: `/staff/documents`,
+    logTag: "notifyStaffDocumentUploaded",
+  });
+}
+
+/** Family submits their registration packet — alert staff to begin verification. */
+export async function notifyStaffRegistrationSubmitted({
+  campusId,
+  studentName,
+  enrollmentId,
+}: {
+  campusId: string;
+  studentName?: string;
+  enrollmentId: string;
+}): Promise<void> {
+  await notifyStaff({
+    campusId,
+    subject: `Registration packet submitted${studentName ? ` for ${studentName}` : ""}`,
+    body: `${studentName ?? "A student"}'s registration packet has been submitted and is ready for staff verification.`,
+    link: `/staff/enrollment`,
+    logTag: "notifyStaffRegistrationSubmitted",
+  });
+}

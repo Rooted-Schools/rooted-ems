@@ -6,6 +6,7 @@ import {
   notifyFamilyApplicationVerified,
   notifyFamilyNeedsInfo,
   notifyFamilyApplicationWaitlisted,
+  notifyStaffNewApplication,
 } from "@/lib/notify";
 
 // ─── Types ─────────────────────────────────────────────
@@ -910,6 +911,7 @@ export async function updateApplicationStatus(
   const campusId = app.campus_id as string | undefined;
   if (newStatus === "submitted") {
     notifyFamilyApplicationReceived({ applicationId, campusId }).catch(() => {});
+    if (campusId) notifyStaffNewApplication({ campusId, applicationId }).catch(() => {});
   } else if (newStatus === "verified") {
     notifyFamilyApplicationVerified({ applicationId, campusId }).catch(() => {});
   } else if (newStatus === "needs_info") {

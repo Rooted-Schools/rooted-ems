@@ -4,7 +4,7 @@ import { createEnrollment } from "./enrollment";
 import { initializeRegistrationPacket } from "./registration";
 import { promoteFromWaitlist } from "./waitlist";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
-import { notifyFamilyOfOffer } from "@/lib/notify";
+import { notifyFamilyOfOffer, notifyStaffOfferAccepted, notifyStaffOfferDeclined } from "@/lib/notify";
 
 // ─── Shared helper ─────────────────────────────────────────────────────────
 
@@ -266,6 +266,13 @@ export async function acceptOffer(
     },
   });
 
+  if (offer.campus_id && offer.application_id) {
+    notifyStaffOfferAccepted({
+      campusId: offer.campus_id,
+      applicationId: offer.application_id,
+    }).catch(() => {});
+  }
+
   return { data: null, error: null };
 }
 
@@ -322,6 +329,13 @@ export async function declineOffer(offerId: string, declinedBy?: string): Promis
   // so families don't wait until the nightly cron to hear the good news.
   if (offer.campus_id && offer.grade_level_id) {
     await promoteNextWaitlistCandidate(offer.campus_id, offer.grade_level_id);
+  }
+
+  if (offer.campus_id && offer.application_id) {
+    notifyStaffOfferDeclined({
+      campusId: offer.campus_id,
+      applicationId: offer.application_id,
+    }).catch(() => {});
   }
 
   return { data: null, error: null };
