@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import React, { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -172,6 +172,87 @@ const packetStatusConfig: Record<string, { label: string; variant: "default" | "
   submitted: { label: "Submitted — Awaiting Review", variant: "default" },
   complete: { label: "Complete", variant: "success" },
 };
+
+/* ─── Registration item data display ─── */
+// Fields that are internal housekeeping — never shown to staff
+const SKIP_KEYS = new Set(["acknowledged", "completed_at"]);
+
+function labelFromKey(key: string) {
+  return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function RegistrationItemDetail({
+  data,
+  itemType,
+}: {
+  data: Record<string, unknown>;
+  itemType: string;
+}) {
+  const rows: { label: string; value: React.ReactNode }[] = [];
+
+  // Helper: renders a single primitive value
+  function renderValue(val: unknown, key: string): React.ReactNode {
+    if (val === null || val === undefined || val === "") return null;
+    if (typeof val === "boolean") return val ? "Yes" : "No";
+    if (Array.isArray(val)) {
+      const items = val.filter(Boolean);
+      return items.length ? items.join(", ") : null;
+    }
+    if (typeof val === "object") return null; // handled by flattening below
+    const str = String(val);
+    // Treat as file path / storage key
+    if (key === "storage_path" || key === "file_name") return str;
+    // ISO datetime → human readable
+    if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
+      return new Date(str).toLocaleString("en-US", {
+        month: "short", day: "numeric", year: "numeric",
+        hour: "numeric", minute: "2-digit",
+      });
+    }
+    return str;
+  }
+
+  // Flatten top-level: if the value is an object, recurse into its keys
+  function collect(obj: Record<string, unknown>, prefix = "") {
+    for (const [key, val] of Object.entries(obj)) {
+      if (SKIP_KEYS.has(key)) continue;
+      if (val === null || val === undefined || val === "") continue;
+
+      if (typeof val === "object" && !Array.isArray(val)) {
+        // Nested object (e.g. form_data) — recurse without adding the parent label
+        collect(val as Record<string, unknown>);
+      } else {
+        const label = labelFromKey(prefix ? `${prefix} ${key}` : key);
+        const rendered = renderValue(val, key);
+        if (rendered !== null) rows.push({ label, value: rendered });
+      }
+    }
+  }
+
+  collect(data);
+
+  if (rows.length === 0) {
+    return (
+      <p className="text-xs text-stone italic">
+        {data.acknowledged ? "Family acknowledged this item." : "No detail submitted."}
+      </p>
+    );
+  }
+
+  return (
+    <div>
+      <p className="text-xs font-semibold text-stone uppercase tracking-wider mb-2">Family Submission</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1">
+        {rows.map(({ label, value }) => (
+          <div key={label} className="flex gap-2 text-sm py-0.5 border-b border-rooted-gray/60 last:border-0">
+            <span className="text-stone min-w-[130px] shrink-0 text-xs pt-0.5">{label}</span>
+            <span className="text-ink font-medium break-words">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /* ─── Component Props ─── */
 interface StaffApplicationDetailClientProps {
@@ -842,36 +923,8 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
                               {/* Expandable row — shows what the family submitted */}
                               {isExpanded && hasData && (
                                 <TableRow key={`${item.id}-expand`} className="bg-rooted-gray-light/40">
-                                  <TableCell colSpan={5} className="py-3 px-6">
-                                    <div className="space-y-1">
-                                      <p className="text-xs font-semibold text-stone uppercase tracking-wider mb-2">Family Submission</p>
-                                      {Object.entries(item.data).map(([key, val]) => {
-                                        if (!val || val === "" || (Array.isArray(val) && val.length === 0)) return null;
-                                        const displayKey = key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-                                        if (Array.isArray(val)) {
-                                          return (
-                                            <div key={key} className="flex gap-2 text-sm">
-                                              <span className="text-stone min-w-[140px] shrink-0">{displayKey}:</span>
-                                              <span className="text-ink">{val.join(", ")}</span>
-                                            </div>
-                                          );
-                                        }
-                                        if (typeof val === "string" && (val.startsWith("http") || val.includes("/"))) {
-                                          return (
-                                            <div key={key} className="flex gap-2 text-sm">
-                                              <span className="text-stone min-w-[140px] shrink-0">{displayKey}:</span>
-                                              <a href={val as string} target="_blank" rel="noopener noreferrer" className="text-rooted-green hover:underline">View file</a>
-                                            </div>
-                                          );
-                                        }
-                                        return (
-                                          <div key={key} className="flex gap-2 text-sm">
-                                            <span className="text-stone min-w-[140px] shrink-0">{displayKey}:</span>
-                                            <span className="text-ink">{String(val)}</span>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
+                                  <TableCell colSpan={5} className="py-4 px-6">
+                                    <RegistrationItemDetail data={item.data} itemType={item.item_type} />
                                   </TableCell>
                                 </TableRow>
                               )}
