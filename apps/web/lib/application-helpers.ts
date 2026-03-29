@@ -16,6 +16,8 @@ export const APPLICATION_STATUS_CONFIG: Record<
   accepted: { label: "Accepted", variant: "success" },
   waitlisted: { label: "Waitlisted", variant: "warning" },
   registered: { label: "Registered", variant: "success" },
+  placement_review: { label: "Placement Review", variant: "default" },
+  enrolled: { label: "Enrolled", variant: "success" },
   declined: { label: "Declined", variant: "destructive" },
   expired: { label: "Expired", variant: "destructive" },
   withdrawn: { label: "Withdrawn", variant: "outline" },

@@ -696,7 +696,8 @@ export interface RegistrationItemRow {
   status: string; // pending | submitted | verified
   signed_at: string | null;
   verified_at: string | null;
-  verified_by: string | null;
+  verified_by: string | null;       // UUID
+  verified_by_name: string | null;  // resolved full name from user_profile
   data: Record<string, unknown>;
 }
 
@@ -744,10 +745,10 @@ export async function getRegistrationPacketForApplication(
   }
   if (!packet) return null;
 
-  // Fetch items
+  // Fetch items — join verified_by to user_profile for display name
   const { data: items, error: itemsError } = await supabase
     .from("registration_item")
-    .select("id, item_type, status, signed_at, verified_at, verified_by, data")
+    .select("id, item_type, status, signed_at, verified_at, verified_by, data, verifier:verified_by(full_name)")
     .eq("enrollment_id", enrollment.id)
     .order("item_type");
 
@@ -762,15 +763,19 @@ export async function getRegistrationPacketForApplication(
     started_at: (packet.started_at as string) ?? null,
     submitted_at: (packet.submitted_at as string) ?? null,
     verified_at: (packet.verified_at as string) ?? null,
-    items: (items ?? []).map((row: Record<string, unknown>) => ({
-      id: row.id as string,
-      item_type: row.item_type as string,
-      status: row.status as string,
-      signed_at: (row.signed_at as string) ?? null,
-      verified_at: (row.verified_at as string) ?? null,
-      verified_by: (row.verified_by as string) ?? null,
-      data: (row.data as Record<string, unknown>) ?? {},
-    })),
+    items: (items ?? []).map((row: Record<string, unknown>) => {
+      const verifier = row.verifier as Record<string, unknown> | null;
+      return {
+        id: row.id as string,
+        item_type: row.item_type as string,
+        status: row.status as string,
+        signed_at: (row.signed_at as string) ?? null,
+        verified_at: (row.verified_at as string) ?? null,
+        verified_by: (row.verified_by as string) ?? null,
+        verified_by_name: (verifier?.full_name as string) ?? null,
+        data: (row.data as Record<string, unknown>) ?? {},
+      };
+    }),
   };
 }
 

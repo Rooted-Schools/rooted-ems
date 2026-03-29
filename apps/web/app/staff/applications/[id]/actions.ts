@@ -1,11 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { updateApplicationStatus, withdrawApplication } from "@/lib/mutations";
-import { createNote } from "@/lib/mutations";
-import { reviewDocument } from "@/lib/mutations";
+import { updateApplicationStatus, withdrawApplication, createNote, reviewDocument } from "@/lib/mutations";
 import { sendOffer } from "@/lib/mutations/offers";
-import { verifyRegistrationItem } from "@/lib/mutations/registration";
+import { verifyRegistrationItem, skipRegistrationItem } from "@/lib/mutations/registration";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { getSession } from "@/lib/auth/get-session";
 
 // ─── Status Transition ─────────────────────────────────
@@ -123,7 +122,78 @@ export async function staffVerifyRegistrationItem(
   if (!result.error) {
     revalidatePath(`/staff/applications/${applicationId}`);
     revalidatePath("/staff/enrollment");
+    revalidatePath("/staff/dashboard");
   }
 
   return result;
+}
+
+// ─── Skip Optional Registration Item ──────────────────
+
+export async function staffSkipRegistrationItem(
+  itemId: string,
+  applicationId: string
+) {
+  const session = await getSession();
+  if (!session?.user_id) return { data: null, error: "Not authenticated" };
+
+  const result = await skipRegistrationItem(itemId, session.user_id);
+
+  if (!result.error) {
+    revalidatePath(`/staff/applications/${applicationId}`);
+    revalidatePath("/staff/enrollment");
+    revalidatePath("/staff/dashboard");
+  }
+
+  return result;
+}
+
+// ─── Complete Academic Audit ───────────────────────────
+
+export async function staffCompleteAcademicAudit(
+  applicationId: string,
+  campusId: string,
+  auditData: {
+    confirmedGrade: string;
+    placementNotes: string;
+    academicSupports: string[];
+    reviewedBy: string;
+  }
+) {
+  // Record audit as an internal note
+  const noteContent = [
+    `📋 ACADEMIC AUDIT COMPLETE`,
+    `Confirmed Grade: ${auditData.confirmedGrade}`,
+    auditData.academicSupports.length > 0
+      ? `Academic Supports: ${auditData.academicSupports.join(", ")}`
+      : null,
+    auditData.placementNotes ? `Notes: ${auditData.placementNotes}` : null,
+    `Reviewed by: ${auditData.reviewedBy}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  await createNote({
+    entity_type: "application",
+    entity_id: applicationId,
+    campus_id: campusId,
+    content: noteContent,
+    is_internal: true,
+  });
+
+  // Advance status to enrolled
+  const supabase = createServiceRoleClient();
+  const { error } = await supabase
+    .from("application")
+    .update({ status: "enrolled", updated_at: new Date().toISOString() })
+    .eq("id", applicationId);
+
+  if (error) return { data: null, error: error.message };
+
+  revalidatePath(`/staff/applications/${applicationId}`);
+  revalidatePath("/staff/applications");
+  revalidatePath("/staff/enrollment");
+  revalidatePath("/staff/dashboard");
+
+  return { data: null, error: null };
 }

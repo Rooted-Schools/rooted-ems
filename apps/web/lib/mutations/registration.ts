@@ -287,12 +287,8 @@ export async function submitRegistrationPacket(
     return { data: null, error: "Failed to submit registration packet." };
   }
 
-  if (enrollment?.application_id) {
-    await supabase
-      .from("application")
-      .update({ status: "registered", updated_at: new Date().toISOString() })
-      .eq("id", enrollment.application_id);
-  }
+  // NOTE: application status stays "accepted" here.
+  // It will move to "placement_review" only after staff verify all registration items.
 
   // Notify family confirmation + staff to begin verification — fire and forget
   notifyFamilyRegistrationSubmitted({
@@ -341,13 +337,16 @@ export async function verifyRegistrationItem(
     .single();
 
   if (item) {
-    const { data: unverified } = await supabase
+    // Packet is complete when NO items remain in "submitted" state
+    // (pending = optional items never touched — those don't block completion)
+    const { data: stillSubmitted } = await supabase
       .from("registration_item")
       .select("id")
       .eq("enrollment_id", item.enrollment_id)
-      .neq("status", "verified");
+      .eq("status", "submitted");
 
-    if (!unverified || unverified.length === 0) {
+    if (!stillSubmitted || stillSubmitted.length === 0) {
+      // Mark packet complete
       await supabase
         .from("registration_packet")
         .update({
@@ -355,6 +354,88 @@ export async function verifyRegistrationItem(
           verified_at: new Date().toISOString(),
         })
         .eq("enrollment_id", item.enrollment_id);
+
+      // Move application to placement_review — next step is academic audit
+      const { data: enrollment } = await supabase
+        .from("enrollment")
+        .select("application_id")
+        .eq("id", item.enrollment_id)
+        .single();
+
+      if (enrollment?.application_id) {
+        await supabase
+          .from("application")
+          .update({ status: "placement_review", updated_at: new Date().toISOString() })
+          .eq("id", enrollment.application_id as string);
+      }
+    }
+  }
+
+  return { data: null, error: null };
+}
+
+/**
+ * Skip (waive) an optional registration item that the family hasn't completed.
+ * Marks it as verified so it doesn't block packet completion.
+ * Only valid for items in "pending" status — items the family hasn't touched.
+ */
+export async function skipRegistrationItem(
+  itemId: string,
+  skippedBy: string
+): Promise<MutationResult> {
+  const supabase = createServiceRoleClient();
+
+  const { data: existing } = await supabase
+    .from("registration_item")
+    .select("status, enrollment_id")
+    .eq("id", itemId)
+    .single();
+
+  if (!existing) return { data: null, error: "Item not found." };
+  if ((existing as Record<string, unknown>).status !== "pending") {
+    return { data: null, error: "Only pending (unsubmitted) items can be skipped." };
+  }
+
+  const { error } = await supabase
+    .from("registration_item")
+    .update({
+      status: "verified",
+      verified_at: new Date().toISOString(),
+      verified_by: skippedBy,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", itemId);
+
+  if (error) {
+    console.error("[skipRegistrationItem]", error.message);
+    return { data: null, error: "Failed to skip item." };
+  }
+
+  // Run the same completion check — skipping may complete the packet
+  const enrollmentId = (existing as Record<string, unknown>).enrollment_id as string;
+  const { data: stillSubmitted } = await supabase
+    .from("registration_item")
+    .select("id")
+    .eq("enrollment_id", enrollmentId)
+    .eq("status", "submitted");
+
+  if (!stillSubmitted || stillSubmitted.length === 0) {
+    await supabase
+      .from("registration_packet")
+      .update({ status: "complete", verified_at: new Date().toISOString() })
+      .eq("enrollment_id", enrollmentId);
+
+    const { data: enrollment } = await supabase
+      .from("enrollment")
+      .select("application_id")
+      .eq("id", enrollmentId)
+      .single();
+
+    if (enrollment?.application_id) {
+      await supabase
+        .from("application")
+        .update({ status: "placement_review", updated_at: new Date().toISOString() })
+        .eq("id", enrollment.application_id as string);
     }
   }
 

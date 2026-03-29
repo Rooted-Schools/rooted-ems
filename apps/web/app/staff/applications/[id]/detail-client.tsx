@@ -32,6 +32,8 @@ import {
   staffReviewDocument,
   staffMakeOffer,
   staffVerifyRegistrationItem,
+  staffSkipRegistrationItem,
+  staffCompleteAcademicAudit,
 } from "./actions";
 import type { RegistrationPacketDetail } from "@/lib/queries";
 import { getSignedUrl } from "@/lib/storage/upload";
@@ -101,9 +103,11 @@ function getAvailableActions(status: string): { label: string; variant: "default
         { label: "Record Decline", variant: "outline", targetStatus: "declined" },
       ];
     case "accepted":
-      return [
-        { label: "Mark as Registered", variant: "default", targetStatus: "registered" },
-      ];
+      return [];  // Family needs to submit registration packet first
+    case "registered":
+      return [];  // Awaiting staff verification of registration items
+    case "placement_review":
+      return [];  // Academic audit handled in the dedicated panel below
     case "waitlisted":
       return [
         { label: "Make Offer", variant: "default", targetStatus: "offered" },
@@ -195,6 +199,11 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
   const [moreInfoMessage, setMoreInfoMessage] = useState("");
   const [showOfferDialog, setShowOfferDialog] = useState(false);
   const [offerExpiry, setOfferExpiry] = useState(defaultExpiryDate);
+  const [expandedItem, setExpandedItem] = useState<string | null>(null);
+  // Academic audit form state
+  const [auditGrade, setAuditGrade] = useState(detail.grade ?? "");
+  const [auditNotes, setAuditNotes] = useState("");
+  const [auditSupports, setAuditSupports] = useState<string[]>([]);
 
   const statusCfg = getStatusConfig(detail.status);
   const actions = getAvailableActions(detail.status);
@@ -403,6 +412,66 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
                 <p className="text-sm font-semibold text-ink">Application Verified</p>
                 <p className="text-xs text-ink/60 mt-0.5">
                   This application is verified and ready to be assigned to a lottery run or given a direct offer.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {detail.status === "accepted" && (
+        <Card className="border-blue-200 bg-blue-50/30">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl" aria-hidden="true">📋</span>
+              <div>
+                <p className="text-sm font-semibold text-ink">Awaiting Registration Packet</p>
+                <p className="text-xs text-ink/60 mt-0.5">
+                  The family has accepted their offer. They are working on completing their registration packet. Check the Registration tab for progress.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {detail.status === "registered" && (
+        <Card className="border-blue-200 bg-blue-50/40">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl" aria-hidden="true">📬</span>
+              <div>
+                <p className="text-sm font-semibold text-ink">Registration Packet Submitted — Awaiting Verification</p>
+                <p className="text-xs text-ink/60 mt-0.5">
+                  The family has submitted all required registration items. Go to the <strong>Registration tab</strong> to verify each item. Once all are verified, the student moves to Placement Review.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {detail.status === "placement_review" && (
+        <Card className="border-purple-200 bg-purple-50/30">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl" aria-hidden="true">🎓</span>
+              <div>
+                <p className="text-sm font-semibold text-ink">Pending Academic Audit</p>
+                <p className="text-xs text-ink/60 mt-0.5">
+                  All registration paperwork has been verified. Complete the Academic Audit in the Registration tab to confirm grade placement and finalize enrollment.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {detail.status === "enrolled" && (
+        <Card className="border-green-300 bg-green-50/40">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl" aria-hidden="true">🌱</span>
+              <div>
+                <p className="text-sm font-semibold text-ink">Fully Enrolled</p>
+                <p className="text-xs text-ink/60 mt-0.5">
+                  Academic audit complete. This student is fully enrolled. See the Notes tab for placement details.
                 </p>
               </div>
             </div>
@@ -648,24 +717,26 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
                 const submittedCount = registrationPacket.items.filter((i) => i.status === "submitted" || i.status === "verified").length;
                 const verifiedCount = registrationPacket.items.filter((i) => i.status === "verified").length;
                 const totalItems = registrationPacket.items.length;
+                const pendingOptional = registrationPacket.items.filter((i) => i.status === "pending").length;
                 return (
                   <Card>
                     <CardContent className="py-4">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl" aria-hidden="true">
-                            {registrationPacket.packet_status === "complete" ? "🎓" :
-                             registrationPacket.packet_status === "submitted" ? "📋" :
-                             registrationPacket.packet_status === "in_progress" ? "🔄" : "⏳"}
-                          </span>
-                          <div>
-                            <p className="text-sm font-semibold text-ink">Registration Packet: <Badge variant={pCfg.variant}>{pCfg.label}</Badge></p>
-                            <p className="text-xs text-stone mt-0.5">
-                              {totalItems > 0 ? `${submittedCount} of ${totalItems} items completed · ${verifiedCount} verified` : "No items yet"}
-                              {registrationPacket.submitted_at && ` · Submitted ${formatDateTime(registrationPacket.submitted_at)}`}
-                              {registrationPacket.verified_at && ` · Verified ${formatDateTime(registrationPacket.verified_at)}`}
-                            </p>
-                          </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl" aria-hidden="true">
+                          {registrationPacket.packet_status === "complete" ? "🎓" :
+                           registrationPacket.packet_status === "submitted" ? "📋" :
+                           registrationPacket.packet_status === "in_progress" ? "🔄" : "⏳"}
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-ink">
+                            Registration Packet: <Badge variant={pCfg.variant}>{pCfg.label}</Badge>
+                          </p>
+                          <p className="text-xs text-stone mt-0.5">
+                            {totalItems > 0 ? `${submittedCount} of ${totalItems} items completed · ${verifiedCount} verified` : "No items yet"}
+                            {pendingOptional > 0 && ` · ${pendingOptional} optional item${pendingOptional > 1 ? "s" : ""} not submitted (use Skip to waive)`}
+                            {registrationPacket.submitted_at && ` · Submitted ${formatDateTime(registrationPacket.submitted_at)}`}
+                            {registrationPacket.verified_at && ` · All verified ${formatDateTime(registrationPacket.verified_at)}`}
+                          </p>
                         </div>
                       </div>
                     </CardContent>
@@ -678,7 +749,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
                 <CardHeader>
                   <CardTitle className="text-base">Registration Items</CardTitle>
                   <CardDescription>
-                    Verify each item after reviewing the family&apos;s submission. When all items are verified, the packet is marked complete.
+                    Click any row to see what the family submitted. Verify submitted items, or Skip optional items the family didn&apos;t complete.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="px-0">
@@ -690,55 +761,121 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
                         <TableRow>
                           <TableHead>Item</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Completed</TableHead>
+                          <TableHead>Family Submitted</TableHead>
                           <TableHead>Verified By</TableHead>
-                          <TableHead className="w-28"></TableHead>
+                          <TableHead className="w-36"></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {registrationPacket.items.map((item) => {
                           const cfg = regItemStatusConfig[item.status] ?? regItemStatusConfig.pending;
+                          const isExpanded = expandedItem === item.id;
+                          const hasData = item.data && Object.keys(item.data).length > 0;
                           return (
-                            <TableRow key={item.id}>
-                              <TableCell className="font-medium">
-                                {ITEM_TYPE_LABELS[item.item_type] ?? item.item_type.replace(/_/g, " ")}
-                              </TableCell>
-                              <TableCell>
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.color}`}>
-                                  {cfg.label}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-stone text-sm">
-                                {item.signed_at ? formatDateTime(item.signed_at) : "—"}
-                              </TableCell>
-                              <TableCell className="text-stone text-sm">
-                                {item.verified_at ? formatDateTime(item.verified_at) : "—"}
-                              </TableCell>
-                              <TableCell>
-                                {item.status === "submitted" && (
-                                  <Button
-                                    size="sm"
-                                    disabled={isPending}
-                                    onClick={() => {
-                                      startTransition(async () => {
-                                        const result = await staffVerifyRegistrationItem(item.id, detail.id);
-                                        if (result.error) {
-                                          showFeedback("error", result.error);
-                                        } else {
-                                          showFeedback("success", `${ITEM_TYPE_LABELS[item.item_type] ?? item.item_type} verified`);
-                                          router.refresh();
+                            <>
+                              <TableRow
+                                key={item.id}
+                                className={hasData ? "cursor-pointer hover:bg-rooted-gray-light/60" : ""}
+                                onClick={() => hasData ? setExpandedItem(isExpanded ? null : item.id) : undefined}
+                              >
+                                <TableCell className="font-medium">
+                                  <div className="flex items-center gap-1.5">
+                                    {hasData && (
+                                      <span className="text-stone text-xs">{isExpanded ? "▼" : "▶"}</span>
+                                    )}
+                                    {ITEM_TYPE_LABELS[item.item_type] ?? item.item_type.replace(/_/g, " ")}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.color}`}>
+                                    {cfg.label}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-stone text-sm">
+                                  {item.signed_at ? formatDateTime(item.signed_at) : "—"}
+                                </TableCell>
+                                <TableCell className="text-stone text-sm">
+                                  {item.verified_by_name
+                                    ? <span className="text-ink/70">{item.verified_by_name}<br /><span className="text-xs text-stone">{formatDateTime(item.verified_at)}</span></span>
+                                    : item.verified_at ? formatDateTime(item.verified_at) : "—"}
+                                </TableCell>
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex gap-1">
+                                    {item.status === "submitted" && (
+                                      <Button
+                                        size="sm"
+                                        disabled={isPending}
+                                        onClick={() => {
+                                          startTransition(async () => {
+                                            const result = await staffVerifyRegistrationItem(item.id, detail.id);
+                                            if (result.error) showFeedback("error", result.error);
+                                            else { showFeedback("success", `${ITEM_TYPE_LABELS[item.item_type] ?? item.item_type} verified`); router.refresh(); }
+                                          });
+                                        }}
+                                      >
+                                        Verify
+                                      </Button>
+                                    )}
+                                    {item.status === "pending" && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isPending}
+                                        onClick={() => {
+                                          if (!confirm(`Skip "${ITEM_TYPE_LABELS[item.item_type] ?? item.item_type}"? This waives the requirement and marks it as complete.`)) return;
+                                          startTransition(async () => {
+                                            const result = await staffSkipRegistrationItem(item.id, detail.id);
+                                            if (result.error) showFeedback("error", result.error);
+                                            else { showFeedback("success", `${ITEM_TYPE_LABELS[item.item_type] ?? item.item_type} skipped`); router.refresh(); }
+                                          });
+                                        }}
+                                      >
+                                        Skip
+                                      </Button>
+                                    )}
+                                    {item.status === "verified" && (
+                                      <span className="text-xs text-green-600 font-medium">✓ Done</span>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                              {/* Expandable row — shows what the family submitted */}
+                              {isExpanded && hasData && (
+                                <TableRow key={`${item.id}-expand`} className="bg-rooted-gray-light/40">
+                                  <TableCell colSpan={5} className="py-3 px-6">
+                                    <div className="space-y-1">
+                                      <p className="text-xs font-semibold text-stone uppercase tracking-wider mb-2">Family Submission</p>
+                                      {Object.entries(item.data).map(([key, val]) => {
+                                        if (!val || val === "" || (Array.isArray(val) && val.length === 0)) return null;
+                                        const displayKey = key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+                                        if (Array.isArray(val)) {
+                                          return (
+                                            <div key={key} className="flex gap-2 text-sm">
+                                              <span className="text-stone min-w-[140px] shrink-0">{displayKey}:</span>
+                                              <span className="text-ink">{val.join(", ")}</span>
+                                            </div>
+                                          );
                                         }
-                                      });
-                                    }}
-                                  >
-                                    Verify
-                                  </Button>
-                                )}
-                                {item.status === "verified" && (
-                                  <span className="text-xs text-green-600 font-medium">✓ Verified</span>
-                                )}
-                              </TableCell>
-                            </TableRow>
+                                        if (typeof val === "string" && (val.startsWith("http") || val.includes("/"))) {
+                                          return (
+                                            <div key={key} className="flex gap-2 text-sm">
+                                              <span className="text-stone min-w-[140px] shrink-0">{displayKey}:</span>
+                                              <a href={val as string} target="_blank" rel="noopener noreferrer" className="text-rooted-green hover:underline">View file</a>
+                                            </div>
+                                          );
+                                        }
+                                        return (
+                                          <div key={key} className="flex gap-2 text-sm">
+                                            <span className="text-stone min-w-[140px] shrink-0">{displayKey}:</span>
+                                            <span className="text-ink">{String(val)}</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </>
                           );
                         })}
                       </TableBody>
@@ -746,6 +883,97 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
                   )}
                 </CardContent>
               </Card>
+
+              {/* Academic Audit Panel — shows when packet is complete and ready for placement */}
+              {(detail.status === "placement_review" || detail.status === "enrolled") && (
+                <Card className={detail.status === "enrolled" ? "border-green-200 bg-green-50/20" : "border-blue-200 bg-blue-50/20"}>
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl" aria-hidden="true">🎓</span>
+                      <div>
+                        <CardTitle className="text-base">Academic Audit & Placement</CardTitle>
+                        <CardDescription>
+                          {detail.status === "enrolled"
+                            ? "Academic audit is complete. See Notes tab for audit details."
+                            : "Registration is verified. Complete the academic audit to confirm enrollment and placement."}
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  {detail.status === "placement_review" && (
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-medium text-stone uppercase tracking-wider mb-1">
+                            Confirmed Grade Level
+                          </label>
+                          <select
+                            value={auditGrade}
+                            onChange={(e) => setAuditGrade(e.target.value)}
+                            className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                          >
+                            {["6","7","8","9","10","11","12"].map((g) => (
+                              <option key={g} value={g}>Grade {g}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-stone uppercase tracking-wider mb-1">
+                            Academic Supports Identified
+                          </label>
+                          <div className="space-y-1">
+                            {["IEP", "504 Plan", "ELL/ESL", "Reading Intervention", "Math Intervention", "Behavioral Support", "None"].map((s) => (
+                              <label key={s} className="flex items-center gap-2 text-sm cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={auditSupports.includes(s)}
+                                  onChange={(e) => setAuditSupports(prev =>
+                                    e.target.checked ? [...prev, s] : prev.filter((x) => x !== s)
+                                  )}
+                                  className="rounded"
+                                />
+                                {s}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-stone uppercase tracking-wider mb-1">
+                          Placement Notes
+                        </label>
+                        <textarea
+                          value={auditNotes}
+                          onChange={(e) => setAuditNotes(e.target.value)}
+                          placeholder="Any relevant academic history, transcript review notes, placement rationale, or concerns to flag for the teaching team..."
+                          rows={3}
+                          className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 resize-none"
+                        />
+                      </div>
+                      <div className="flex justify-end">
+                        <Button
+                          disabled={isPending || !auditGrade}
+                          onClick={() => {
+                            startTransition(async () => {
+                              const session = { email: "Staff" }; // display name placeholder
+                              const result = await staffCompleteAcademicAudit(detail.id, detail.campus_id, {
+                                confirmedGrade: auditGrade,
+                                placementNotes: auditNotes,
+                                academicSupports: auditSupports,
+                                reviewedBy: detail.campus_name,
+                              });
+                              if (result.error) showFeedback("error", result.error);
+                              else { showFeedback("success", "Academic audit complete — student is now fully enrolled."); router.refresh(); }
+                            });
+                          }}
+                        >
+                          Complete Audit & Confirm Enrollment
+                        </Button>
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+              )}
             </div>
           </TabsContent>
         )}

@@ -128,6 +128,8 @@ export async function familyCreateDocumentRecord(input: {
     revalidatePath("/family/documents");
     revalidatePath("/family/applications");
     revalidatePath(`/family/applications/${input.application_id}`);
+    // Also bust the staff view so the document shows immediately
+    revalidatePath(`/staff/applications/${input.application_id}`);
   }
 
   return result;
