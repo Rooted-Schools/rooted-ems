@@ -89,6 +89,65 @@ export async function initializeRegistrationPacket(
 }
 
 /**
+ * Seed registration_item rows for an enrollment whose packet already exists
+ * but whose items were never created (e.g. due to a prior RLS failure).
+ * Safe to call multiple times — skips item_types that already have a row.
+ */
+export async function seedMissingRegistrationItems(input: {
+  enrollment_id: string;
+  packet_id: string;
+  campus_id: string;
+  school_year_id: string;
+}): Promise<MutationResult<{ items_created: number }>> {
+  const supabase = createServiceRoleClient();
+
+  // Fetch requirements for this campus/year
+  const { data: requirements } = await supabase
+    .from("packet_requirement")
+    .select("item_type")
+    .eq("campus_id", input.campus_id)
+    .eq("school_year_id", input.school_year_id)
+    .eq("is_active", true)
+    .order("sort_order");
+
+  if (!requirements || requirements.length === 0) {
+    return { data: { items_created: 0 }, error: null };
+  }
+
+  // Find which item_types already have rows
+  const { data: existing } = await supabase
+    .from("registration_item")
+    .select("item_type")
+    .eq("enrollment_id", input.enrollment_id);
+
+  const existingTypes = new Set((existing ?? []).map((r: { item_type: string }) => r.item_type));
+
+  const missing = requirements.filter(
+    (req: { item_type: string }) => !existingTypes.has(req.item_type)
+  );
+
+  if (missing.length === 0) {
+    return { data: { items_created: 0 }, error: null };
+  }
+
+  const inserts = missing.map((req: { item_type: string }) => ({
+    enrollment_id: input.enrollment_id,
+    item_type: req.item_type,
+    status: "pending",
+    data: {},
+  }));
+
+  const { error } = await supabase.from("registration_item").insert(inserts);
+
+  if (error) {
+    console.error("[seedMissingRegistrationItems]", error.message);
+    return { data: null, error: "Failed to seed registration items." };
+  }
+
+  return { data: { items_created: missing.length }, error: null };
+}
+
+/**
  * Complete (submit) a registration item.
  * Sets status to "submitted" with optional data payload.
  */

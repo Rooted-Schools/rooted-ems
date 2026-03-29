@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { redirect } from "next/navigation";
 import { RegistrationClient, type EnrollmentRegistration } from "./registration-client";
-import { initializeRegistrationPacket } from "@/lib/mutations/registration";
+import { initializeRegistrationPacket, seedMissingRegistrationItems } from "@/lib/mutations/registration";
 
 export default async function FamilyRegistrationPage() {
   const supabase = await createServerClient();
@@ -112,10 +112,13 @@ export default async function FamilyRegistrationPage() {
         packet = packetData ?? null;
         items = (itemData ?? []) as typeof items;
 
-        // If packet exists but no items yet, seed them now
+        // If packet exists but has no items, seed them now.
+        // initializeRegistrationPacket returns early if a packet exists, so we
+        // call seedMissingRegistrationItems which is safe to call at any time.
         if (packet && items.length === 0 && schoolYearId && app.campus_id) {
-          await initializeRegistrationPacket({
+          await seedMissingRegistrationItems({
             enrollment_id: enrollmentId,
+            packet_id: packet.id,
             campus_id: app.campus_id as string,
             school_year_id: schoolYearId,
           });
