@@ -30,6 +30,7 @@ interface DocumentRow {
   verified_at: string | null;
   application_id: string | null;
   student_name: string;
+  rejection_reason: string | null;
 }
 
 interface FamilyApp {
@@ -203,6 +204,11 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
                           {" "}&middot; Uploaded {formatDate(doc.created_at)}
                           {" "}&middot; {doc.student_name}
                         </p>
+                        {doc.status === "rejected" && doc.rejection_reason && (
+                          <p className="text-xs text-red-600 mt-1 font-medium">
+                            ⚠️ Reason: {doc.rejection_reason}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">

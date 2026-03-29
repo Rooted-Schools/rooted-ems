@@ -14,6 +14,7 @@ export interface FamilyDocumentRow {
   verified_at: string | null;
   application_id: string | null;
   student_name: string;
+  rejection_reason: string | null;
 }
 
 export interface FamilyMessageRow {
@@ -277,7 +278,7 @@ export async function getFamilyDocuments(
   // Fetch documents for these applications
   const { data: docs, error } = await supabase
     .from("document")
-    .select("id, document_type, file_name, file_size, storage_path, status, created_at, verified_at, application_id")
+    .select("id, document_type, file_name, file_size, storage_path, status, created_at, verified_at, application_id, rejection_reason")
     .in("application_id", appIds)
     .order("created_at", { ascending: false });
 
@@ -297,6 +298,7 @@ export async function getFamilyDocuments(
     verified_at: d.verified_at as string | null,
     application_id: d.application_id as string | null,
     student_name: appStudentMap[d.application_id as string] ?? "Unknown",
+    rejection_reason: (d.rejection_reason as string) ?? null,
   }));
 }
 

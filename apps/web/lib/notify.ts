@@ -9,7 +9,7 @@
  * primary operation that triggered it.
  */
 
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { sendNotification } from "@/lib/mutations";
 
 // ─── Guardian lookup ─────────────────────────────────────────────────────────
@@ -19,7 +19,7 @@ import { sendNotification } from "@/lib/mutations";
  * Returns null if the lookup fails — callers degrade gracefully.
  */
 async function getGuardianUserId(applicationId: string): Promise<string | null> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const { data } = await supabase
     .from("application")
