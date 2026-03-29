@@ -19,6 +19,7 @@ import {
   familyCompleteRegistrationItem,
   familySubmitRegistrationPacket,
 } from "./actions";
+import { getPolicyText } from "./policy-content";
 
 interface RegistrationItem {
   id: string;
@@ -41,6 +42,7 @@ export interface EnrollmentRegistration {
   enrollment_id: string;
   student_name: string;
   campus_name: string;
+  campus_id: string;
   grade: string;
   school_year: string;
   enrollment_status: string;
@@ -982,19 +984,29 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
                   </div>
                 ))}
 
-                {config.mode === "acknowledge" && (
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={completionAck}
-                      onChange={(e) => setCompletionAck(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
-                    />
-                    <span className="text-sm text-ink/70">
-                      I have read and agree to the above. I understand this is a binding acknowledgement.
-                    </span>
-                  </label>
-                )}
+                {config.mode === "acknowledge" && (() => {
+                  const policyText = getPolicyText(enrollment.campus_id, completionTarget.itemType);
+                  return (
+                    <>
+                      {policyText && (
+                        <div className="max-h-64 overflow-y-auto rounded-lg border border-stone/20 bg-rooted-gray/30 p-4">
+                          <p className="text-sm text-ink/80 whitespace-pre-wrap leading-relaxed">{policyText}</p>
+                        </div>
+                      )}
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={completionAck}
+                          onChange={(e) => setCompletionAck(e.target.checked)}
+                          className="mt-0.5 w-4 h-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
+                        />
+                        <span className="text-sm text-ink/70">
+                          I have read and agree to the above. I understand this is a binding acknowledgement.
+                        </span>
+                      </label>
+                    </>
+                  );
+                })()}
 
                 {config.mode === "upload" && (
                   <div className="space-y-3">

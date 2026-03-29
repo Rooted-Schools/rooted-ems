@@ -147,6 +147,7 @@ export default async function FamilyRegistrationPage() {
         enrollment_id: enrollmentId ?? (app.id as string),
         student_name: student ? `${student.first_name} ${student.last_name}` : "Unknown",
         campus_name: campus?.name ?? "",
+        campus_id: (app.campus_id as string) ?? "",
         grade: grade?.grade ?? "",
         school_year: schoolYear?.name ?? "",
         enrollment_status: existingEnrollment?.status ?? "pending",
