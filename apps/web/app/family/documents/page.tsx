@@ -2,7 +2,7 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { getFamilyDocuments } from "@/lib/queries";
 import { DocumentsClient } from "./documents-client";
 
@@ -13,10 +13,12 @@ export default async function FamilyDocumentsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const db = createServiceRoleClient();
+
   // Fetch documents and applications in parallel
   const [documents, { data: guardians }] = await Promise.all([
     getFamilyDocuments(user.id),
-    supabase.from("guardian").select("id").eq("user_id", user.id),
+    db.from("guardian").select("id").eq("user_id", user.id),
   ]);
 
   // Get applications (non-draft) for the family
@@ -24,7 +26,7 @@ export default async function FamilyDocumentsPage() {
   let applications: { id: string; student_name: string; student_id: string }[] = [];
 
   if (guardianIds.length > 0) {
-    const { data: apps } = await supabase
+    const { data: apps } = await db
       .from("application")
       .select("id, student:student_id (id, first_name, last_name)")
       .in("guardian_id", guardianIds)

@@ -84,7 +84,7 @@ export default async function FamilyRegistrationPage() {
           enrollmentId = newEnrollment.id;
           // Initialize packet + items
           await initializeRegistrationPacket({
-            enrollment_id: enrollmentId,
+            enrollment_id: enrollmentId!,
             campus_id: app.campus_id as string,
             school_year_id: schoolYearId,
           });
