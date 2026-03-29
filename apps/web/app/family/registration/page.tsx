@@ -22,7 +22,7 @@ export default async function FamilyRegistrationPage() {
     .eq("user_id", user.id);
 
   if (!guardians || guardians.length === 0) {
-    return <RegistrationClient enrollments={[]} />;
+    return <RegistrationClient enrollments={[]} userId={user.id} />;
   }
 
   const guardianIds = guardians.map((g: Record<string, string>) => g.id);
@@ -42,7 +42,7 @@ export default async function FamilyRegistrationPage() {
     .order("updated_at", { ascending: false });
 
   if (!acceptedApps || acceptedApps.length === 0) {
-    return <RegistrationClient enrollments={[]} />;
+    return <RegistrationClient enrollments={[]} userId={user.id} />;
   }
 
   // For each accepted application, find or create an enrollment record
