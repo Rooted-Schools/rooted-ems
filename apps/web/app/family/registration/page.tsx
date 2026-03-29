@@ -145,6 +145,8 @@ export default async function FamilyRegistrationPage() {
 
       return {
         enrollment_id: enrollmentId ?? (app.id as string),
+        application_id: app.id as string,
+        student_id: student?.id ?? "",
         student_name: student ? `${student.first_name} ${student.last_name}` : "Unknown",
         campus_name: campus?.name ?? "",
         campus_id: (app.campus_id as string) ?? "",
@@ -158,5 +160,5 @@ export default async function FamilyRegistrationPage() {
     })
   );
 
-  return <RegistrationClient enrollments={enrollmentData as EnrollmentRegistration[]} />;
+  return <RegistrationClient enrollments={enrollmentData as EnrollmentRegistration[]} userId={user.id} />;
 }

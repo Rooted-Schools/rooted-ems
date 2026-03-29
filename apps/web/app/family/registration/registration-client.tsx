@@ -20,6 +20,8 @@ import {
   familySubmitRegistrationPacket,
 } from "./actions";
 import { getPolicyText } from "./policy-content";
+import { uploadFile, validateFile, formatFileSize } from "@/lib/storage/upload";
+import { familyCreateDocumentRecord } from "@/app/family/applications/actions";
 
 interface RegistrationItem {
   id: string;
@@ -40,6 +42,8 @@ interface PacketRequirement {
 
 export interface EnrollmentRegistration {
   enrollment_id: string;
+  application_id: string;
+  student_id: string;
   student_name: string;
   campus_name: string;
   campus_id: string;
@@ -59,6 +63,7 @@ export interface EnrollmentRegistration {
 
 interface RegistrationClientProps {
   enrollments: EnrollmentRegistration[];
+  userId: string;
 }
 
 const ITEM_ICONS: Record<string, string> = {
@@ -439,7 +444,7 @@ function getButtonLabel(itemType: string): string {
   return "Review & Agree";
 }
 
-export function RegistrationClient({ enrollments }: RegistrationClientProps) {
+export function RegistrationClient({ enrollments, userId }: RegistrationClientProps) {
   const router = useRouter();
   const [activeEnrollment, setActiveEnrollment] = useState(0);
   const [loadingItem, setLoadingItem] = useState<string | null>(null);
@@ -450,6 +455,8 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
   const [completionTarget, setCompletionTarget] = useState<{ itemId: string; itemType: string; itemName: string } | null>(null);
   const [completionForm, setCompletionForm] = useState<Record<string, string | boolean>>({});
   const [completionAck, setCompletionAck] = useState(false);
+  const [uploadSelectedFile, setUploadSelectedFile] = useState<File | null>(null);
+  const [uploadValidationError, setUploadValidationError] = useState<string | null>(null);
 
   if (enrollments.length === 0) {
     return (
@@ -488,6 +495,8 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
     setCompletionTarget({ itemId, itemType, itemName });
     setCompletionForm({});
     setCompletionAck(false);
+    setUploadSelectedFile(null);
+    setUploadValidationError(null);
     setError(null);
     setCompletionOpen(true);
   }
@@ -511,6 +520,27 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
       payload.form_data = { ...completionForm };
     }
 
+    if (config.mode === "upload" && uploadSelectedFile) {
+      const uploadResult = await uploadFile(uploadSelectedFile, userId);
+      if (uploadResult.error) {
+        setError(uploadResult.error);
+        setLoadingItem(null);
+        setCompletionOpen(true); // re-open so they can try again
+        return;
+      }
+      await familyCreateDocumentRecord({
+        application_id: enrollment.application_id,
+        student_id: enrollment.student_id,
+        document_type: itemType,
+        file_name: uploadResult.fileName,
+        file_size: uploadResult.fileSize,
+        mime_type: uploadResult.mimeType,
+        storage_path: uploadResult.storagePath,
+      });
+      payload.storage_path = uploadResult.storagePath;
+      payload.file_name = uploadResult.fileName;
+    }
+
     const result = await familyCompleteRegistrationItem(itemId, payload);
 
     if (result.error) {
@@ -521,6 +551,8 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
     }
     setLoadingItem(null);
     setCompletionTarget(null);
+    setUploadSelectedFile(null);
+    setUploadValidationError(null);
   }
 
   async function handleSubmitPacket() {
@@ -931,7 +963,7 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
               )
             : config.mode === "acknowledge"
               ? completionAck
-              : completionAck; // upload mode: user confirms they uploaded
+              : !!uploadSelectedFile && !uploadValidationError; // upload mode: file selected and valid
 
         return (
           <Dialog open={completionOpen} onOpenChange={setCompletionOpen}>
@@ -1010,26 +1042,55 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
 
                 {config.mode === "upload" && (
                   <div className="space-y-3">
-                    <div className="bg-rooted-green/5 border border-rooted-green/20 rounded-lg p-3">
-                      <p className="text-sm text-ink/70">
-                        Please upload the required document on the{" "}
-                        <a href="/family/documents" className="text-rooted-green hover:underline font-medium">
-                          Documents page
-                        </a>
-                        , then return here to confirm.
-                      </p>
-                    </div>
-                    <label className="flex items-start gap-3 cursor-pointer">
+                    <div
+                      className={`rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
+                        uploadSelectedFile
+                          ? "border-rooted-green/40 bg-rooted-green/5"
+                          : "border-stone/30 hover:border-stone/50"
+                      }`}
+                    >
                       <input
-                        type="checkbox"
-                        checked={completionAck}
-                        onChange={(e) => setCompletionAck(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
+                        type="file"
+                        id="reg-upload-input"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const err = validateFile(file);
+                          setUploadValidationError(err);
+                          setUploadSelectedFile(err ? null : file);
+                        }}
                       />
-                      <span className="text-sm text-ink/70">
-                        I have uploaded the required document.
-                      </span>
-                    </label>
+                      {uploadSelectedFile ? (
+                        <div className="space-y-1">
+                          <p className="text-2xl">✅</p>
+                          <p className="text-sm font-medium text-ink">{uploadSelectedFile.name}</p>
+                          <p className="text-xs text-stone">{formatFileSize(uploadSelectedFile.size)}</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUploadSelectedFile(null);
+                              setUploadValidationError(null);
+                              const input = document.getElementById("reg-upload-input") as HTMLInputElement;
+                              if (input) input.value = "";
+                            }}
+                            className="text-xs text-rooted-green hover:underline mt-1"
+                          >
+                            Choose a different file
+                          </button>
+                        </div>
+                      ) : (
+                        <label htmlFor="reg-upload-input" className="cursor-pointer block">
+                          <p className="text-2xl mb-2">📎</p>
+                          <p className="text-sm font-medium text-ink">Click to choose a file</p>
+                          <p className="text-xs text-stone mt-1">PDF, JPEG, or PNG — max 10MB</p>
+                        </label>
+                      )}
+                    </div>
+                    {uploadValidationError && (
+                      <p className="text-xs text-red-600">{uploadValidationError}</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -1043,7 +1104,7 @@ export function RegistrationClient({ enrollments }: RegistrationClientProps) {
                   disabled={!canSubmit}
                   className="bg-rooted-green hover:bg-rooted-green/90 text-white"
                 >
-                  {config.mode === "form" ? "Submit" : "Confirm"}
+                  {config.mode === "form" ? "Submit" : config.mode === "upload" ? "Upload & Complete" : "Confirm"}
                 </Button>
               </DialogFooter>
             </DialogContent>
