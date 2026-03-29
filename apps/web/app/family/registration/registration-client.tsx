@@ -175,7 +175,7 @@ type FieldDef = {
 type CompletionConfig =
   | { mode: "form"; title: string; description: string; fields: FieldDef[] }
   | { mode: "acknowledge"; title: string; description: string }
-  | { mode: "upload"; title: string; description: string };
+  | { mode: "upload"; title: string; description: string; examples: string[] };
 
 const ITEM_COMPLETION_CONFIG: Record<string, CompletionConfig> = {
   // ─── Data Entry Forms ───
@@ -350,82 +350,166 @@ const ITEM_COMPLETION_CONFIG: Record<string, CompletionConfig> = {
   immunization_records: {
     mode: "upload",
     title: "Immunization Records",
-    description: "Upload your child's current immunization records from their healthcare provider.",
+    description: "Upload your child's current immunization records.",
+    examples: [
+      "Immunization card from your doctor or health department",
+      "Official vaccination record from a previous school",
+      "Letter from a physician listing all vaccines received",
+    ],
   },
   proof_of_residency: {
     mode: "upload",
     title: "Proof of Residency",
-    description: "Upload a utility bill, lease agreement, or other proof of your current address.",
+    description: "Upload a document showing your current home address.",
+    examples: [
+      "Utility bill (gas, water, electric, internet) — must be recent",
+      "Current lease or rental agreement",
+      "Mortgage statement or property tax bill",
+      "Official government mail or bank statement with your address",
+    ],
   },
   proof_of_age: {
     mode: "upload",
     title: "Proof of Age / Birth Certificate",
     description: "Upload your child's birth certificate or other official proof of age.",
+    examples: [
+      "Birth certificate (original or certified copy)",
+      "U.S. passport or passport card",
+      "Hospital birth record",
+      "Baptism certificate or religious record showing date of birth",
+    ],
   },
   parent_id: {
     mode: "upload",
     title: "Parent/Guardian ID",
     description: "Upload a government-issued photo ID for the enrolling parent or guardian.",
+    examples: [
+      "Driver's license or state-issued ID card",
+      "U.S. passport or passport card",
+      "Military ID",
+      "Permanent Resident Card (Green Card)",
+    ],
   },
   custody_docs: {
     mode: "upload",
     title: "Custody Documentation",
-    description: "Upload any relevant custody or guardianship documentation.",
+    description: "Upload legal documentation establishing custody or guardianship.",
+    examples: [
+      "Court-issued custody order or parenting plan",
+      "Adoption decree",
+      "Guardianship papers",
+      "Divorce decree with custody provisions",
+    ],
   },
   student_photo: {
     mode: "upload",
     title: "Student Photo",
-    description: "Upload a recent photo of your child for school identification purposes.",
+    description: "Upload a recent, clear photo of your child.",
+    examples: [
+      "School photo from this year or last year",
+      "Clear smartphone photo — face visible, plain background preferred",
+      "Portrait-style photo (shoulders up)",
+    ],
   },
   sports_physical: {
     mode: "upload",
     title: "Sports Physical",
-    description: "Upload a completed sports physical form if your child plans to participate in athletics.",
+    description: "Upload a completed sports physical form signed by your child's doctor.",
+    examples: [
+      "Pre-participation physical exam (PPE) form signed by a physician",
+      "School sports physical form completed at a clinic or doctor's office",
+      "Must be dated within the last 12 months",
+    ],
   },
   previous_school_records: {
     mode: "upload",
     title: "Previous School Records",
-    description: "Upload transcripts, report cards, or other records from your child's previous school.",
+    description: "Upload records from your child's most recent school.",
+    examples: [
+      "Most recent report card or progress report",
+      "Official transcripts",
+      "Letter from the previous school confirming enrollment and grades",
+      "Standardized test score reports",
+    ],
   },
   iep_records: {
     mode: "upload",
     title: "IEP Records",
-    description: "Upload your child's current Individualized Education Program (IEP) documents.",
+    description: "Upload your child's current Individualized Education Program (IEP).",
+    examples: [
+      "Current IEP document signed by the school team",
+      "Must include goals, services, and accommodations pages",
+      "Most recent annual review or re-evaluation report",
+    ],
   },
   "504_plan": {
     mode: "upload",
     title: "504 Plan",
-    description: "Upload your child's current 504 Plan documents.",
+    description: "Upload your child's current 504 accommodation plan.",
+    examples: [
+      "Current 504 Plan document with accommodation details",
+      "Eligibility determination letter from the previous school",
+      "Supporting documentation (doctor's note, evaluation) if plan is being established",
+    ],
   },
   mckinney_vento: {
     mode: "upload",
     title: "McKinney-Vento Questionnaire",
-    description: "Upload the completed McKinney-Vento Housing Questionnaire if applicable.",
+    description: "Upload the completed McKinney-Vento Housing Questionnaire.",
+    examples: [
+      "Completed questionnaire form (available from the school office or enrollment team)",
+      "Contact us if you need a copy of this form — we'll send one to you",
+    ],
   },
   lthc_form: {
     mode: "upload",
     title: "Licensed Treatment Health Certificate",
     description: "Upload the completed LTHC form signed by your child's healthcare provider.",
+    examples: [
+      "LTHC form completed and signed by your child's physician",
+      "Available from the school office if you need a blank copy",
+      "Must include diagnosis, treatment plan, and provider signature",
+    ],
   },
   sc_health_exam: {
     mode: "upload",
     title: "SC Health Examination",
-    description: "Upload the South Carolina health examination form completed by your child's physician.",
+    description: "Upload the South Carolina health examination form.",
+    examples: [
+      "SC DHEC Health Examination form (DHEC Form 1148) completed by a physician",
+      "Must be signed by a licensed healthcare provider",
+      "Required for all students entering SC schools for the first time",
+    ],
   },
   sc_dental_screen: {
     mode: "upload",
     title: "SC Dental Screening",
-    description: "Upload the South Carolina dental screening form.",
+    description: "Upload the South Carolina dental screening certificate.",
+    examples: [
+      "Dental screening certificate completed by a licensed dentist or dental hygienist",
+      "Required within 12 months of school entry",
+      "Contact the school office if you need help accessing dental screening services",
+    ],
   },
   oh_custody_affidavit: {
     mode: "upload",
     title: "Ohio Custody Affidavit",
-    description: "Upload the completed Ohio custody affidavit if applicable.",
+    description: "Upload the completed Ohio Affidavit of Custody if applicable.",
+    examples: [
+      "Ohio Affidavit of Custody form (available from the school office)",
+      "Must be signed and notarized",
+      "Required when a non-parent guardian is enrolling a student",
+    ],
   },
   wa_health_exam: {
     mode: "upload",
     title: "WA Health Examination",
-    description: "Upload the Washington state health examination form completed by your child's physician.",
+    description: "Upload the Washington state health examination form.",
+    examples: [
+      "Washington State health exam form completed by your child's physician",
+      "Certificate of Immunization Status (CIS) if not submitted separately",
+      "Must be signed by a licensed healthcare provider",
+    ],
   },
 };
 
@@ -1042,6 +1126,19 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
 
                 {config.mode === "upload" && (
                   <div className="space-y-3">
+                    {config.examples.length > 0 && (
+                      <div className="rounded-lg bg-blue-50 border border-blue-100 px-4 py-3">
+                        <p className="text-xs font-semibold text-blue-800 mb-1.5">What to upload:</p>
+                        <ul className="space-y-1">
+                          {config.examples.map((ex) => (
+                            <li key={ex} className="flex items-start gap-2 text-xs text-blue-700">
+                              <span className="mt-0.5 shrink-0">•</span>
+                              <span>{ex}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     <div
                       className={`rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
                         uploadSelectedFile
