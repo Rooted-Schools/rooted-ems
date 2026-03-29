@@ -5,6 +5,8 @@ import { updateApplicationStatus, withdrawApplication } from "@/lib/mutations";
 import { createNote } from "@/lib/mutations";
 import { reviewDocument } from "@/lib/mutations";
 import { sendOffer } from "@/lib/mutations/offers";
+import { verifyRegistrationItem } from "@/lib/mutations/registration";
+import { getSession } from "@/lib/auth/get-session";
 
 // ─── Status Transition ─────────────────────────────────
 
@@ -102,6 +104,25 @@ export async function staffMakeOffer(
     revalidatePath("/staff/applications");
     revalidatePath("/staff/offers");
     revalidatePath("/staff/dashboard");
+  }
+
+  return result;
+}
+
+// ─── Verify Registration Item ──────────────────────────
+
+export async function staffVerifyRegistrationItem(
+  itemId: string,
+  applicationId: string
+) {
+  const session = await getSession();
+  if (!session?.user_id) return { data: null, error: "Not authenticated" };
+
+  const result = await verifyRegistrationItem(itemId, session.user_id);
+
+  if (!result.error) {
+    revalidatePath(`/staff/applications/${applicationId}`);
+    revalidatePath("/staff/enrollment");
   }
 
   return result;

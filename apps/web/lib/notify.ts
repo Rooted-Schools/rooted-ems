@@ -443,11 +443,23 @@ export async function notifyStaffRegistrationSubmitted({
   studentName?: string;
   enrollmentId: string;
 }): Promise<void> {
+  // Try to resolve application_id so the link goes directly to the registration review tab
+  const supabase = createServiceRoleClient();
+  const { data: row } = await supabase
+    .from("enrollment")
+    .select("application_id")
+    .eq("id", enrollmentId)
+    .single();
+  const applicationId = (row as unknown as Record<string, string> | null)?.application_id;
+  const link = applicationId
+    ? `/staff/applications/${applicationId}?tab=registration`
+    : `/staff/enrollment`;
+
   await notifyStaff({
     campusId,
     subject: `Registration packet submitted${studentName ? ` for ${studentName}` : ""}`,
     body: `${studentName ?? "A student"}'s registration packet has been submitted and is ready for staff verification.`,
-    link: `/staff/enrollment`,
+    link,
     logTag: "notifyStaffRegistrationSubmitted",
   });
 }

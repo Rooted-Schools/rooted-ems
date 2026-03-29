@@ -64,6 +64,7 @@ export {
   getStaffOffers,
   getStaffWaitlist,
   getStaffEnrollments,
+  getRegistrationPacketForApplication,
   getStaffCommunications,
   getStaffMessageTemplates,
   getNotificationRecipients,
@@ -91,6 +92,8 @@ export {
   type PacketRequirementRow,
   type PendingDocumentRow,
   type DocumentQueueStats,
+  type RegistrationPacketDetail,
+  type RegistrationItemRow,
 } from "./staff";
 
 // Inquiry queries

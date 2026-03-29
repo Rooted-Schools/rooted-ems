@@ -1,7 +1,7 @@
 export const runtime = "edge";
 
 import { notFound } from "next/navigation";
-import { getApplicationDetail } from "@/lib/queries";
+import { getApplicationDetail, getRegistrationPacketForApplication } from "@/lib/queries";
 import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 import { StaffApplicationDetailClient } from "./detail-client";
 
@@ -14,7 +14,12 @@ export default async function StaffApplicationDetailPage({
 }) {
   const { id } = await params;
   const session = await requireStaffSession();
-  const detail = await getApplicationDetail(id);
+
+  const [detail, registrationPacket] = await Promise.all([
+    getApplicationDetail(id),
+    getRegistrationPacketForApplication(id),
+  ]);
+
   if (!detail) notFound();
 
   // Verify the staff user has access to this application's campus
@@ -23,5 +28,11 @@ export default async function StaffApplicationDetailPage({
     notFound();
   }
 
-  return <StaffApplicationDetailClient detail={detail} userId={session.user_id} />;
+  return (
+    <StaffApplicationDetailClient
+      detail={detail}
+      userId={session.user_id}
+      registrationPacket={registrationPacket}
+    />
+  );
 }

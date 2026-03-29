@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,13 +20,22 @@ import { staffWithdrawEnrollment, staffSyncSIS } from "./actions";
 
 interface EnrollmentRow {
   id: string;
+  application_id: string | null;
   status: string;
   student_name: string;
   grade: string;
   campus_name: string;
   enrolled_at: string | null;
   sis_id: string | null;
+  packet_status: string | null;
 }
+
+const packetStatusConfig: Record<string, { label: string; variant: "default" | "secondary" | "warning" | "success" }> = {
+  pending: { label: "Not Started", variant: "secondary" },
+  in_progress: { label: "In Progress", variant: "warning" },
+  submitted: { label: "Submitted", variant: "default" },
+  complete: { label: "Complete", variant: "success" },
+};
 
 interface EnrollmentStats {
   total: number;
@@ -171,9 +181,10 @@ export function EnrollmentClient({
                   <TableHead>Grade</TableHead>
                   <TableHead>Campus</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Registration</TableHead>
                   <TableHead>SIS ID</TableHead>
                   <TableHead>Enrolled</TableHead>
-                  <TableHead className="w-40">Actions</TableHead>
+                  <TableHead className="w-48">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -192,6 +203,20 @@ export function EnrollmentClient({
                       <TableCell>{enrollment.campus_name}</TableCell>
                       <TableCell>
                         <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {enrollment.packet_status ? (
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant={(packetStatusConfig[enrollment.packet_status] ?? packetStatusConfig.pending).variant}>
+                              {(packetStatusConfig[enrollment.packet_status] ?? packetStatusConfig.pending).label}
+                            </Badge>
+                            {enrollment.packet_status === "submitted" && (
+                              <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" title="Awaiting review" />
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-stone">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {enrollment.sis_id ? (
@@ -229,16 +254,28 @@ export function EnrollmentClient({
                         {enrollment.enrolled_at ?? "—"}
                       </TableCell>
                       <TableCell>
-                        {isActive && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={isLoading}
-                            onClick={() => handleWithdraw(enrollment.id)}
-                          >
-                            Withdraw
-                          </Button>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {enrollment.application_id && enrollment.packet_status && (
+                            <Link
+                              href={`/staff/applications/${enrollment.application_id}?tab=registration`}
+                              className="no-underline"
+                            >
+                              <Button variant="outline" size="sm">
+                                Review
+                              </Button>
+                            </Link>
+                          )}
+                          {isActive && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={isLoading}
+                              onClick={() => handleWithdraw(enrollment.id)}
+                            >
+                              Withdraw
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

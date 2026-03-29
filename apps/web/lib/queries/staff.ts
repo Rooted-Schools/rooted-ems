@@ -1,4 +1,4 @@
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 
 // ─── Student Types ─────────────────────────────────────
 
@@ -73,12 +73,14 @@ export interface WaitlistCampusCount {
 
 export interface EnrollmentRow {
   id: string;
+  application_id: string | null;
   student_name: string;
   grade: string;
   campus_name: string;
   status: string;
   enrolled_at: string | null;
   sis_id: string | null;
+  packet_status: string | null; // null = no packet yet
 }
 
 export interface EnrollmentStats {
@@ -618,15 +620,16 @@ export async function getStaffEnrollments(campusIds?: string[]): Promise<{
   enrollments: EnrollmentRow[];
   stats: EnrollmentStats;
 }> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   let query = supabase
     .from("enrollment")
     .select(`
-      id, status, enrolled_at, sis_student_id,
+      id, status, enrolled_at, sis_student_id, application_id,
       student:student_id (first_name, last_name),
       campus:campus_id (name),
-      grade_level:grade_level_id (grade)
+      grade_level:grade_level_id (grade),
+      registration_packet (status)
     `)
     .order("enrolled_at", { ascending: false, nullsFirst: false });
 
@@ -650,9 +653,13 @@ export async function getStaffEnrollments(campusIds?: string[]): Promise<{
     const student = row.student as unknown as Record<string, string> | null;
     const campus = row.campus as Record<string, string> | null;
     const grade = row.grade_level as Record<string, string> | null;
+    const packet = row.registration_packet as Array<Record<string, string>> | Record<string, string> | null;
+    // Supabase returns 1:1 FK joins as object or array depending on RLS; handle both
+    const packetObj = Array.isArray(packet) ? packet[0] : packet;
 
     return {
       id: row.id as string,
+      application_id: (row.application_id as string) ?? null,
       student_name: student
         ? `${student.first_name} ${student.last_name}`
         : "Unknown",
@@ -667,6 +674,7 @@ export async function getStaffEnrollments(campusIds?: string[]): Promise<{
           })
         : null,
       sis_id: (row.sis_student_id as string) ?? null,
+      packet_status: packetObj?.status ?? null,
     };
   });
 
@@ -678,6 +686,92 @@ export async function getStaffEnrollments(campusIds?: string[]): Promise<{
   };
 
   return { enrollments, stats };
+}
+
+// ─── Registration Packet Types & Queries ───────────────
+
+export interface RegistrationItemRow {
+  id: string;
+  item_type: string;
+  status: string; // pending | submitted | verified
+  signed_at: string | null;
+  verified_at: string | null;
+  verified_by: string | null;
+  data: Record<string, unknown>;
+}
+
+export interface RegistrationPacketDetail {
+  packet_id: string;
+  packet_status: string; // pending | in_progress | submitted | complete
+  started_at: string | null;
+  submitted_at: string | null;
+  verified_at: string | null;
+  items: RegistrationItemRow[];
+}
+
+/**
+ * Fetch the registration packet for a given application (via enrollment).
+ * Returns null if no enrollment or packet exists yet.
+ */
+export async function getRegistrationPacketForApplication(
+  applicationId: string
+): Promise<RegistrationPacketDetail | null> {
+  const supabase = createServiceRoleClient();
+
+  // Find enrollment for this application
+  const { data: enrollment, error: enrollError } = await supabase
+    .from("enrollment")
+    .select("id")
+    .eq("application_id", applicationId)
+    .maybeSingle();
+
+  if (enrollError) {
+    console.error("[getRegistrationPacketForApplication] enrollment", enrollError.message);
+    return null;
+  }
+  if (!enrollment) return null;
+
+  // Fetch packet
+  const { data: packet, error: packetError } = await supabase
+    .from("registration_packet")
+    .select("id, status, started_at, submitted_at, verified_at")
+    .eq("enrollment_id", enrollment.id)
+    .maybeSingle();
+
+  if (packetError) {
+    console.error("[getRegistrationPacketForApplication] packet", packetError.message);
+    return null;
+  }
+  if (!packet) return null;
+
+  // Fetch items
+  const { data: items, error: itemsError } = await supabase
+    .from("registration_item")
+    .select("id, item_type, status, signed_at, verified_at, verified_by, data")
+    .eq("enrollment_id", enrollment.id)
+    .order("item_type");
+
+  if (itemsError) {
+    console.error("[getRegistrationPacketForApplication] items", itemsError.message);
+    return null;
+  }
+
+  return {
+    packet_id: packet.id as string,
+    packet_status: packet.status as string,
+    started_at: (packet.started_at as string) ?? null,
+    submitted_at: (packet.submitted_at as string) ?? null,
+    verified_at: (packet.verified_at as string) ?? null,
+    items: (items ?? []).map((row: Record<string, unknown>) => ({
+      id: row.id as string,
+      item_type: row.item_type as string,
+      status: row.status as string,
+      signed_at: (row.signed_at as string) ?? null,
+      verified_at: (row.verified_at as string) ?? null,
+      verified_by: (row.verified_by as string) ?? null,
+      data: (row.data as Record<string, unknown>) ?? {},
+    })),
+  };
 }
 
 // ─── Message Template Types ─────────────────────────────

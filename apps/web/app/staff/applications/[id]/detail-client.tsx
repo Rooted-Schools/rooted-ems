@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +31,9 @@ import {
   addApplicationNote,
   staffReviewDocument,
   staffMakeOffer,
+  staffVerifyRegistrationItem,
 } from "./actions";
+import type { RegistrationPacketDetail } from "@/lib/queries";
 import { getSignedUrl } from "@/lib/storage/upload";
 
 /* ─── Document status badge ─── */
@@ -114,10 +116,64 @@ function getAvailableActions(status: string): { label: string; variant: "default
 /* ─── Withdrawable statuses ─── */
 const WITHDRAWABLE = ["draft", "submitted", "needs_info", "verified", "lottery_assigned", "waitlisted"];
 
+/* ─── Registration item type labels ─── */
+const ITEM_TYPE_LABELS: Record<string, string> = {
+  emergency_contact: "Emergency Contact",
+  medical_info: "Medical Information",
+  medication_auth: "Medication Authorization",
+  food_allergy_plan: "Food Allergy Plan",
+  pickup_auth: "Authorized Pickup",
+  home_language_survey: "Home Language Survey",
+  transport: "Transportation",
+  before_after_care: "Before & After Care",
+  frl_app: "Free/Reduced Lunch",
+  military_family: "Military Family",
+  income_verification: "Income Verification",
+  tech_policy: "Technology Policy",
+  handbook_ack: "Handbook Acknowledgment",
+  discipline_policy: "Discipline Policy",
+  media_release: "Media Release",
+  field_trip: "Field Trip Authorization",
+  internet_safety: "Internet Safety",
+  anti_bullying: "Anti-Bullying Policy",
+  uniform_policy: "Uniform Policy",
+  ferpa_consent: "FERPA Consent",
+  immunization_records: "Immunization Records",
+  proof_of_residency: "Proof of Residency",
+  proof_of_age: "Proof of Age",
+  parent_id: "Parent / Guardian ID",
+  custody_docs: "Custody Documents",
+  student_photo: "Student Photo",
+  sports_physical: "Sports Physical",
+  previous_school_records: "Previous School Records",
+  iep_records: "IEP / Special Education Records",
+  "504_plan": "504 Plan",
+  mckinney_vento: "McKinney-Vento",
+  lthc_form: "Long-Term Health Condition Form",
+  sc_health_exam: "SC Health Examination",
+  sc_dental_screen: "SC Dental Screening",
+  oh_custody_affidavit: "OH Custody Affidavit",
+  wa_health_exam: "WA Health Examination",
+};
+
+const regItemStatusConfig: Record<string, { label: string; color: string }> = {
+  pending: { label: "Pending", color: "text-amber-700 bg-amber-50 border-amber-200" },
+  submitted: { label: "Submitted", color: "text-blue-700 bg-blue-50 border-blue-200" },
+  verified: { label: "Verified", color: "text-green-700 bg-green-50 border-green-200" },
+};
+
+const packetStatusConfig: Record<string, { label: string; variant: "default" | "secondary" | "warning" | "success" | "destructive" }> = {
+  pending: { label: "Not Started", variant: "secondary" },
+  in_progress: { label: "In Progress", variant: "warning" },
+  submitted: { label: "Submitted — Awaiting Review", variant: "default" },
+  complete: { label: "Complete", variant: "success" },
+};
+
 /* ─── Component Props ─── */
 interface StaffApplicationDetailClientProps {
   detail: ApplicationDetail;
   userId: string;
+  registrationPacket: RegistrationPacketDetail | null;
 }
 
 // Default offer expiry: 14 days from today
@@ -127,8 +183,10 @@ function defaultExpiryDate() {
   return d.toISOString().split("T")[0];
 }
 
-export function StaffApplicationDetailClient({ detail, userId }: StaffApplicationDetailClientProps) {
+export function StaffApplicationDetailClient({ detail, userId, registrationPacket }: StaffApplicationDetailClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const defaultTab = searchParams.get("tab") ?? "overview";
   const [isPending, startTransition] = useTransition();
   const [noteText, setNoteText] = useState("");
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -405,7 +463,7 @@ export function StaffApplicationDetailClient({ detail, userId }: StaffApplicatio
       </div>
 
       {/* Tabbed content */}
-      <Tabs defaultValue="overview">
+      <Tabs defaultValue={defaultTab}>
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="documents">
@@ -414,6 +472,14 @@ export function StaffApplicationDetailClient({ detail, userId }: StaffApplicatio
               <span className="ml-1.5 w-2 h-2 rounded-full bg-amber-400 inline-block" />
             )}
           </TabsTrigger>
+          {registrationPacket && (
+            <TabsTrigger value="registration">
+              Registration
+              {registrationPacket.packet_status === "submitted" && (
+                <span className="ml-1.5 w-2 h-2 rounded-full bg-blue-500 inline-block" />
+              )}
+            </TabsTrigger>
+          )}
           <TabsTrigger value="notes">Notes ({detail.notes.length})</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
@@ -571,6 +637,118 @@ export function StaffApplicationDetailClient({ detail, userId }: StaffApplicatio
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── Registration Tab ── */}
+        {registrationPacket && (
+          <TabsContent value="registration">
+            <div className="space-y-4">
+              {/* Packet status banner */}
+              {(() => {
+                const pCfg = packetStatusConfig[registrationPacket.packet_status] ?? packetStatusConfig.pending;
+                const submittedCount = registrationPacket.items.filter((i) => i.status === "submitted" || i.status === "verified").length;
+                const verifiedCount = registrationPacket.items.filter((i) => i.status === "verified").length;
+                const totalItems = registrationPacket.items.length;
+                return (
+                  <Card>
+                    <CardContent className="py-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl" aria-hidden="true">
+                            {registrationPacket.packet_status === "complete" ? "🎓" :
+                             registrationPacket.packet_status === "submitted" ? "📋" :
+                             registrationPacket.packet_status === "in_progress" ? "🔄" : "⏳"}
+                          </span>
+                          <div>
+                            <p className="text-sm font-semibold text-ink">Registration Packet: <Badge variant={pCfg.variant}>{pCfg.label}</Badge></p>
+                            <p className="text-xs text-stone mt-0.5">
+                              {totalItems > 0 ? `${submittedCount} of ${totalItems} items completed · ${verifiedCount} verified` : "No items yet"}
+                              {registrationPacket.submitted_at && ` · Submitted ${formatDateTime(registrationPacket.submitted_at)}`}
+                              {registrationPacket.verified_at && ` · Verified ${formatDateTime(registrationPacket.verified_at)}`}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+
+              {/* Items table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Registration Items</CardTitle>
+                  <CardDescription>
+                    Verify each item after reviewing the family&apos;s submission. When all items are verified, the packet is marked complete.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="px-0">
+                  {registrationPacket.items.length === 0 ? (
+                    <p className="text-center text-stone py-8 text-sm">No registration items found.</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Item</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Completed</TableHead>
+                          <TableHead>Verified By</TableHead>
+                          <TableHead className="w-28"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {registrationPacket.items.map((item) => {
+                          const cfg = regItemStatusConfig[item.status] ?? regItemStatusConfig.pending;
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell className="font-medium">
+                                {ITEM_TYPE_LABELS[item.item_type] ?? item.item_type.replace(/_/g, " ")}
+                              </TableCell>
+                              <TableCell>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.color}`}>
+                                  {cfg.label}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-stone text-sm">
+                                {item.signed_at ? formatDateTime(item.signed_at) : "—"}
+                              </TableCell>
+                              <TableCell className="text-stone text-sm">
+                                {item.verified_at ? formatDateTime(item.verified_at) : "—"}
+                              </TableCell>
+                              <TableCell>
+                                {item.status === "submitted" && (
+                                  <Button
+                                    size="sm"
+                                    disabled={isPending}
+                                    onClick={() => {
+                                      startTransition(async () => {
+                                        const result = await staffVerifyRegistrationItem(item.id, detail.id);
+                                        if (result.error) {
+                                          showFeedback("error", result.error);
+                                        } else {
+                                          showFeedback("success", `${ITEM_TYPE_LABELS[item.item_type] ?? item.item_type} verified`);
+                                          router.refresh();
+                                        }
+                                      });
+                                    }}
+                                  >
+                                    Verify
+                                  </Button>
+                                )}
+                                {item.status === "verified" && (
+                                  <span className="text-xs text-green-600 font-medium">✓ Verified</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        )}
 
         {/* ── Notes Tab ── */}
         <TabsContent value="notes">

@@ -97,19 +97,19 @@ const QUEUE_ITEMS = [
     key: "submitted",
     label: "New Submissions",
     dotColor: "bg-blue-500",
-    href: "/staff/applications",
+    href: "/staff/applications?status=submitted",
   },
   {
     key: "needs_info",
     label: "Missing Info",
     dotColor: "bg-amber-500",
-    href: "/staff/applications",
+    href: "/staff/applications?status=needs_info",
   },
   {
     key: "verified",
     label: "Verified — Ready",
     dotColor: "bg-orange-500",
-    href: "/staff/applications",
+    href: "/staff/applications?status=verified",
   },
   {
     key: "offered",
@@ -195,30 +195,34 @@ export default async function StaffDashboardPage({
             </CardContent>
           </Card>
         </Link>
-        <Card className="border-t-4 border-t-rooted-green">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
-              Total Applicants
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{stats.totalApplications}</p>
-            <p className="text-xs text-stone mt-1">{currentSY?.name ?? "current cycle"}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-t-4 border-t-amber-500">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
-              Pending Review
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-amber-600">
-              {stats.pendingReview}
-            </p>
-            <p className="text-xs text-stone mt-1">need attention</p>
-          </CardContent>
-        </Card>
+        <Link href="/staff/applications" className="no-underline">
+          <Card className="border-t-4 border-t-rooted-green hover:shadow-md transition-shadow h-full cursor-pointer">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
+                Total Applicants
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold">{stats.totalApplications}</p>
+              <p className="text-xs text-stone mt-1">{currentSY?.name ?? "current cycle"}</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/staff/applications?status=submitted" className="no-underline">
+          <Card className="border-t-4 border-t-amber-500 hover:shadow-md transition-shadow h-full cursor-pointer">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
+                Pending Review
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-amber-600">
+                {stats.pendingReview}
+              </p>
+              <p className="text-xs text-stone mt-1">need attention</p>
+            </CardContent>
+          </Card>
+        </Link>
         <Card className="border-t-4 border-t-blue-500">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
@@ -237,19 +241,21 @@ export default async function StaffDashboardPage({
             </Link>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-emerald-600">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
-              Enrolled
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-rooted-green">
-              {stats.enrolled}
-            </p>
-            <p className="text-xs text-stone mt-1">students registered</p>
-          </CardContent>
-        </Card>
+        <Link href="/staff/enrollment" className="no-underline">
+          <Card className="border-t-4 border-t-emerald-600 hover:shadow-md transition-shadow h-full cursor-pointer">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
+                Enrolled
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-rooted-green">
+                {stats.enrolled}
+              </p>
+              <p className="text-xs text-stone mt-1">students registered</p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Application Flow Diagram */}
@@ -267,16 +273,23 @@ export default async function StaffDashboardPage({
                 pipeline.find(
                   (p) => p.label.toLowerCase().replace(/\s/g, "_") === stage.key
                 )?.count ?? 0;
+              const href = stage.key === "draft"
+                ? "/staff/applications?status=draft"
+                : stage.key === "registered"
+                ? "/staff/enrollment"
+                : `/staff/applications?status=${stage.key}`;
               return (
                 <div key={stage.key} className="flex items-center">
-                  <div
-                    className={`px-3 py-2.5 rounded-lg ${stage.color} min-w-[85px] text-center`}
-                  >
-                    <p className="text-[10px] font-semibold uppercase tracking-wide">
-                      {stage.label}
-                    </p>
-                    <p className="text-lg font-bold">{count}</p>
-                  </div>
+                  <Link href={href} className="no-underline">
+                    <div
+                      className={`px-3 py-2.5 rounded-lg ${stage.color} min-w-[85px] text-center hover:opacity-80 hover:shadow-sm transition-all cursor-pointer`}
+                    >
+                      <p className="text-[10px] font-semibold uppercase tracking-wide">
+                        {stage.label}
+                      </p>
+                      <p className="text-lg font-bold">{count}</p>
+                    </div>
+                  </Link>
                   {i < FLOW_STAGES.length - 1 && (
                     <svg
                       className="w-4 h-4 text-stone/50 shrink-0 mx-0.5"
