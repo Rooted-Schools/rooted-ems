@@ -197,3 +197,22 @@ export async function staffCompleteAcademicAudit(
 
   return { data: null, error: null };
 }
+
+// ─── Generate Signed URL (service-role, bypasses storage RLS) ──────────────
+
+export async function staffGetSignedUrl(
+  storagePath: string
+): Promise<{ url: string | null; error: string | null }> {
+  if (!storagePath) return { url: null, error: "No file path provided." };
+
+  const session = await getSession();
+  if (!session?.user_id) return { url: null, error: "Not authenticated." };
+
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase.storage
+    .from("documents")
+    .createSignedUrl(storagePath, 3600); // 1-hour link
+
+  if (error) return { url: null, error: error.message };
+  return { url: data.signedUrl, error: null };
+}

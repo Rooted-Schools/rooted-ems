@@ -34,9 +34,9 @@ import {
   staffVerifyRegistrationItem,
   staffSkipRegistrationItem,
   staffCompleteAcademicAudit,
+  staffGetSignedUrl,
 } from "./actions";
 import type { RegistrationPacketDetail } from "@/lib/queries";
-import { getSignedUrl } from "@/lib/storage/upload";
 
 /* ─── Document status badge ─── */
 const docStatusConfig: Record<string, { label: string; variant: "success" | "warning" | "destructive" }> = {
@@ -181,6 +181,35 @@ function labelFromKey(key: string) {
   return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/* ─── View File Button ─── */
+function ViewFileButton({ storagePath, fileName }: { storagePath: string; fileName?: string }) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleClick() {
+    setLoading(true);
+    const { url, error } = await staffGetSignedUrl(storagePath);
+    setLoading(false);
+    if (error || !url) {
+      alert("Could not generate file link. The file may have been moved or deleted.");
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={loading}
+      className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline disabled:opacity-50 transition-colors"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+      </svg>
+      {loading ? "Loading…" : (fileName || "View File")}
+    </button>
+  );
+}
+
 function RegistrationItemDetail({
   data,
   itemType,
@@ -189,6 +218,18 @@ function RegistrationItemDetail({
   itemType: string;
 }) {
   const rows: { label: string; value: React.ReactNode }[] = [];
+
+  // Helper: search an object (recursively) for a string value by key
+  function findStr(obj: Record<string, unknown>, key: string): string | null {
+    if (key in obj && typeof obj[key] === "string") return obj[key] as string;
+    for (const val of Object.values(obj)) {
+      if (val && typeof val === "object" && !Array.isArray(val)) {
+        const found = findStr(val as Record<string, unknown>, key);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
 
   // Helper: renders a single primitive value
   function renderValue(val: unknown, key: string): React.ReactNode {
@@ -200,8 +241,6 @@ function RegistrationItemDetail({
     }
     if (typeof val === "object") return null; // handled by flattening below
     const str = String(val);
-    // Treat as file path / storage key
-    if (key === "storage_path" || key === "file_name") return str;
     // ISO datetime → human readable
     if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
       return new Date(str).toLocaleString("en-US", {
@@ -212,19 +251,30 @@ function RegistrationItemDetail({
     return str;
   }
 
-  // Flatten top-level: if the value is an object, recurse into its keys
-  function collect(obj: Record<string, unknown>, prefix = "") {
+  // Detect file upload — storage_path + optional file_name anywhere in data
+  const storagePath = findStr(data, "storage_path");
+  const fileName = findStr(data, "file_name") ?? undefined;
+  if (storagePath) {
+    rows.push({
+      label: "Uploaded File",
+      value: <ViewFileButton storagePath={storagePath} fileName={fileName} />,
+    });
+  }
+
+  // Flatten remaining keys: skip file fields already handled above
+  const FILE_KEYS = new Set(["storage_path", "file_name"]);
+
+  function collect(obj: Record<string, unknown>) {
     for (const [key, val] of Object.entries(obj)) {
-      if (SKIP_KEYS.has(key)) continue;
+      if (SKIP_KEYS.has(key) || FILE_KEYS.has(key)) continue;
       if (val === null || val === undefined || val === "") continue;
 
       if (typeof val === "object" && !Array.isArray(val)) {
         // Nested object (e.g. form_data) — recurse without adding the parent label
         collect(val as Record<string, unknown>);
       } else {
-        const label = labelFromKey(prefix ? `${prefix} ${key}` : key);
         const rendered = renderValue(val, key);
-        if (rendered !== null) rows.push({ label, value: rendered });
+        if (rendered !== null) rows.push({ label: labelFromKey(key), value: rendered });
       }
     }
   }
@@ -750,7 +800,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
                                 disabled={!doc.storage_path}
                                 onClick={async () => {
                                   if (!doc.storage_path) return;
-                                  const { url, error } = await getSignedUrl(doc.storage_path);
+                                  const { url, error } = await staffGetSignedUrl(doc.storage_path);
                                   if (url) window.open(url, "_blank");
                                   else if (error) setFeedback({ type: "error", message: error });
                                 }}
