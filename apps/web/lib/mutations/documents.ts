@@ -12,12 +12,15 @@ export async function reviewDocument(
   decision: "verified" | "rejected",
   rejectionReason?: string
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
-
+  // Auth check via user session
+  const authClient = await createServerClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await authClient.auth.getUser();
   if (!user) return { data: null, error: "Not authenticated" };
+
+  // Service role bypasses RLS — staff must be able to read any family's document
+  const supabase = createServiceRoleClient();
 
   // Fetch document with campus context for audit
   const { data: doc } = await supabase
