@@ -9,6 +9,7 @@ interface FamilyHeaderProps {
   userEmail?: string | null;
   userPhone?: string | null;
   pendingOfferCount?: number;
+  unreadNotificationCount?: number;
 }
 
 interface NavLink {
@@ -32,7 +33,7 @@ function buildNavLinks(pendingOfferCount = 0): NavLink[] {
   ];
 }
 
-export function FamilyHeader({ userEmail, userPhone, pendingOfferCount = 0 }: FamilyHeaderProps) {
+export function FamilyHeader({ userEmail, userPhone, pendingOfferCount = 0, unreadNotificationCount = 0 }: FamilyHeaderProps) {
   const pathname = usePathname();
   const supabase = useMemo(() => createBrowserClient(), []);
   const NAV_LINKS = buildNavLinks(pendingOfferCount);
@@ -75,6 +76,17 @@ export function FamilyHeader({ userEmail, userPhone, pendingOfferCount = 0 }: Fa
             );
           })}
           <div className="flex items-center gap-3 ml-4 pl-4 border-l border-stone/20">
+            {/* Notification bell */}
+            <Link href="/family/messages" className="relative text-ink/50 hover:text-rooted-green transition-colors" aria-label="Notifications">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              {unreadNotificationCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                </span>
+              )}
+            </Link>
             <span className="text-sm text-stone truncate max-w-[140px]">
               {userEmail ?? userPhone ?? ""}
             </span>

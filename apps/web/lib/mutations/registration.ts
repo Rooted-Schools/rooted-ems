@@ -1,5 +1,6 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
+import { notifyFamilyRegistrationReady, notifyFamilyRegistrationSubmitted } from "@/lib/notify";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -83,6 +84,19 @@ export async function initializeRegistrationPacket(
     } else {
       itemsCreated = requirements.length;
     }
+  }
+
+  // Notify family that their registration packet is ready to complete
+  const { data: enrollmentRow } = await supabase
+    .from("enrollment")
+    .select("application_id")
+    .eq("id", input.enrollment_id)
+    .single();
+  if (enrollmentRow?.application_id) {
+    notifyFamilyRegistrationReady({
+      applicationId: enrollmentRow.application_id as string,
+      campusId: input.campus_id,
+    }).catch(() => {});
   }
 
   return { data: { packet_id: packet.id, items_created: itemsCreated }, error: null };
@@ -279,6 +293,12 @@ export async function submitRegistrationPacket(
       .update({ status: "registered", updated_at: new Date().toISOString() })
       .eq("id", enrollment.application_id);
   }
+
+  // Notify family that their packet was received — fire and forget
+  notifyFamilyRegistrationSubmitted({
+    enrollmentId,
+    campusId: enrollment?.campus_id as string | undefined,
+  }).catch(() => {});
 
   return { data: null, error: null };
 }

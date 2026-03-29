@@ -1,6 +1,12 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { isValidTransition, type ApplicationStatusValue } from "@rooted-ems/utils";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
+import {
+  notifyFamilyApplicationReceived,
+  notifyFamilyApplicationVerified,
+  notifyFamilyNeedsInfo,
+  notifyFamilyApplicationWaitlisted,
+} from "@/lib/notify";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -899,6 +905,23 @@ export async function updateApplicationStatus(
     new_data: { status: newStatus },
     metadata: reason ? { reason } : undefined,
   });
+
+  // Fire family notification based on new status — fire and forget
+  const campusId = app.campus_id as string | undefined;
+  if (newStatus === "submitted") {
+    notifyFamilyApplicationReceived({ applicationId, campusId }).catch(() => {});
+  } else if (newStatus === "verified") {
+    notifyFamilyApplicationVerified({ applicationId, campusId }).catch(() => {});
+  } else if (newStatus === "needs_info") {
+    notifyFamilyNeedsInfo({
+      applicationId,
+      applicationIdForLink: applicationId,
+      message: reason,
+      campusId,
+    }).catch(() => {});
+  } else if (newStatus === "waitlisted") {
+    notifyFamilyApplicationWaitlisted({ applicationId, campusId }).catch(() => {});
+  }
 
   return { data: null, error: null };
 }

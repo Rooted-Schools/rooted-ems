@@ -1,6 +1,7 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
+import { notifyFamilyDocumentVerified } from "@/lib/notify";
 
 // ─── Review Document (Staff) ───────────────────────────
 
@@ -75,6 +76,15 @@ export async function reviewDocument(
       document_type: doc.document_type ?? null,
     },
   });
+
+  // Notify family when document is verified — fire and forget
+  if (decision === "verified" && doc.application_id) {
+    notifyFamilyDocumentVerified({
+      applicationId: doc.application_id,
+      documentType: doc.document_type,
+      campusId: campusId ?? undefined,
+    }).catch(() => {});
+  }
 
   return { data: null, error: null };
 }
