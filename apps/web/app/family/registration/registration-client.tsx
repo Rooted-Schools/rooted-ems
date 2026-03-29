@@ -565,7 +565,12 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
     itemsByType[item.item_type] = item;
   }
 
-  // Check if all items are completed
+  // Required items must all be done to submit; optional items can be skipped
+  const requiredRequirements = enrollment.requirements.filter((r) => r.is_required);
+  const allRequiredComplete = requiredRequirements.every((req) => {
+    const item = itemsByType[req.item_type];
+    return item && (item.status === "submitted" || item.status === "verified");
+  });
   const allItemsComplete = enrollment.requirements.every((req) => {
     const item = itemsByType[req.item_type];
     return item && (item.status === "submitted" || item.status === "verified");
@@ -708,9 +713,9 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                   Welcome to Registration!
                 </p>
                 <p className="text-sm text-ink/60 mt-0.5">
-                  {allItemsComplete
-                    ? "All items are complete — submit your packet below to finalize enrollment."
-                    : `Complete the ${totalRequired > 0 ? totalRequired + " required" : ""} items below to finalize ${enrollment.student_name}'s enrollment at ${enrollment.campus_name}. You can complete items in any order.`}
+                  {allRequiredComplete
+                    ? "All required items are complete — submit your packet below to finalize enrollment. Optional items can still be completed after submission."
+                    : `Complete the ${totalRequired > 0 ? totalRequired + " required" : ""} items below to finalize ${enrollment.student_name}'s enrollment at ${enrollment.campus_name}. Optional items can be skipped. You can complete items in any order.`}
                 </p>
               </div>
             </div>
@@ -767,7 +772,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
               variant={
                 packetSubmitted
                   ? "default"
-                  : allItemsComplete
+                  : allRequiredComplete
                     ? "success"
                     : "secondary"
               }
@@ -776,7 +781,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                 ? enrollment.packet?.status === "complete"
                   ? "Complete"
                   : "Under Review"
-                : allItemsComplete
+                : allRequiredComplete
                   ? "Ready to Submit"
                   : `${completedCount}/${totalItems} Done`}
             </Badge>
@@ -974,7 +979,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
       )}
 
       {/* Submit Packet Button */}
-      {allItemsComplete && !packetSubmitted && (
+      {allRequiredComplete && !packetSubmitted && (
         <Card className="border-rooted-green bg-rooted-green/5 shadow-md">
           <CardContent className="py-5">
             <div className="flex items-center justify-between">
@@ -982,10 +987,12 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                 <span className="text-2xl" aria-hidden="true">🎉</span>
                 <div>
                   <p className="text-base font-bold text-ink">
-                    All Items Complete!
+                    {allItemsComplete ? "All Items Complete!" : "Required Items Complete!"}
                   </p>
                   <p className="text-sm text-ink/60">
-                    Submit your registration packet to finalize {enrollment.student_name}&apos;s enrollment.
+                    {allItemsComplete
+                      ? `Submit your registration packet to finalize ${enrollment.student_name}'s enrollment.`
+                      : `All required items are done. Submit now — you can complete any optional items later.`}
                   </p>
                 </div>
               </div>

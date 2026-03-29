@@ -220,18 +220,43 @@ export async function submitRegistrationPacket(
 ): Promise<MutationResult> {
   const supabase = createServiceRoleClient();
 
-  // Check all items are submitted or verified
-  const { data: pendingItems } = await supabase
-    .from("registration_item")
-    .select("id, item_type")
-    .eq("enrollment_id", enrollmentId)
-    .eq("status", "pending");
+  // Get enrollment campus + school year so we can look up which items are required
+  const { data: enrollment } = await supabase
+    .from("enrollment")
+    .select("campus_id, school_year_id, application_id")
+    .eq("id", enrollmentId)
+    .single();
 
-  if (pendingItems && pendingItems.length > 0) {
-    return {
-      data: null,
-      error: `${pendingItems.length} required item(s) still pending.`,
-    };
+  if (!enrollment) {
+    return { data: null, error: "Enrollment not found." };
+  }
+
+  // Find which item types are marked required for this campus/year
+  const { data: requiredReqs } = await supabase
+    .from("packet_requirement")
+    .select("item_type")
+    .eq("campus_id", enrollment.campus_id)
+    .eq("school_year_id", enrollment.school_year_id)
+    .eq("is_required", true)
+    .eq("is_active", true);
+
+  const requiredTypes = (requiredReqs ?? []).map((r: Record<string, string>) => r.item_type);
+
+  // Only block submission if a *required* item is still pending
+  if (requiredTypes.length > 0) {
+    const { data: pendingRequired } = await supabase
+      .from("registration_item")
+      .select("id, item_type")
+      .eq("enrollment_id", enrollmentId)
+      .eq("status", "pending")
+      .in("item_type", requiredTypes);
+
+    if (pendingRequired && pendingRequired.length > 0) {
+      return {
+        data: null,
+        error: `${pendingRequired.length} required item(s) still need to be completed.`,
+      };
+    }
   }
 
   // Update packet status
@@ -247,13 +272,6 @@ export async function submitRegistrationPacket(
     console.error("[submitRegistrationPacket]", error.message);
     return { data: null, error: "Failed to submit registration packet." };
   }
-
-  // Update application status to "registered" if enrollment has an application
-  const { data: enrollment } = await supabase
-    .from("enrollment")
-    .select("application_id")
-    .eq("id", enrollmentId)
-    .single();
 
   if (enrollment?.application_id) {
     await supabase
