@@ -382,7 +382,7 @@ export async function getApplicationDetail(
         content: n.content as string,
         is_internal: n.is_internal as boolean,
         created_by_name: author
-          ? `${author.first_name} ${author.last_name}`
+          ? (`${author.first_name ?? ""} ${author.last_name ?? ""}`.trim() || "Staff Member")
           : "System",
         created_at: n.created_at as string,
       };

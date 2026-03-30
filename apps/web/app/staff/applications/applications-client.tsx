@@ -44,26 +44,28 @@ function formatDate(dateStr: string | null) {
 }
 
 function ApplicationTableRow({ app }: { app: ApplicationRow }) {
+  const router = useRouter();
   const statusConfig = getStatusConfig(app.status);
 
   return (
-    <Link href={`/staff/applications/${app.id}`} className="contents">
-      <TableRow className="cursor-pointer hover:bg-rooted-gray-light">
-        <TableCell className="font-medium">{app.student_name}</TableCell>
-        <TableCell className="text-stone">{app.guardian_name}</TableCell>
-        <TableCell>{getGradeLabel(app.grade)}</TableCell>
-        <TableCell>{app.campus_name}</TableCell>
-        <TableCell>
-          <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
-        </TableCell>
-        <TableCell className="text-stone">
-          {formatDate(app.submitted_at)}
-        </TableCell>
-        <TableCell className="text-stone">
-          {formatDate(app.updated_at)}
-        </TableCell>
-      </TableRow>
-    </Link>
+    <TableRow
+      className="cursor-pointer hover:bg-rooted-gray-light"
+      onClick={() => router.push(`/staff/applications/${app.id}`)}
+    >
+      <TableCell className="font-medium">{app.student_name}</TableCell>
+      <TableCell className="text-stone">{app.guardian_name}</TableCell>
+      <TableCell>{getGradeLabel(app.grade)}</TableCell>
+      <TableCell>{app.campus_name}</TableCell>
+      <TableCell>
+        <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
+      </TableCell>
+      <TableCell className="text-stone">
+        {formatDate(app.submitted_at)}
+      </TableCell>
+      <TableCell className="text-stone">
+        {formatDate(app.updated_at)}
+      </TableCell>
+    </TableRow>
   );
 }
 
