@@ -477,6 +477,82 @@ export async function notifyStaffRegistrationSubmitted({
   });
 }
 
+/** Family responds to a needs_info request — alert the assigned staff member or all enrollment managers. */
+export async function notifyStaffOfFamilyResponse(applicationId: string): Promise<void> {
+  const supabase = createServiceRoleClient();
+
+  // Look up campus_id, assigned_staff_id, and student name in one query
+  const { data, error } = await supabase
+    .from("application")
+    .select("campus_id, assigned_staff_id, student:student_id (first_name, last_name)")
+    .eq("id", applicationId)
+    .single();
+
+  if (error) {
+    console.error("[notifyStaffOfFamilyResponse] failed to load application", error.message, { applicationId });
+    return;
+  }
+
+  const row = data as unknown as {
+    campus_id: string | null;
+    assigned_staff_id: string | null;
+    student: { first_name?: string; last_name?: string } | null;
+  } | null;
+
+  if (!row?.campus_id) {
+    console.warn("[notifyStaffOfFamilyResponse] no campus_id on application", { applicationId });
+    return;
+  }
+
+  const studentName = row.student
+    ? [row.student.first_name, row.student.last_name].filter(Boolean).join(" ") || undefined
+    : undefined;
+
+  const subject = "Family responded to information request";
+  const body = studentName
+    ? `${studentName}'s family has submitted a response to your information request. Review the application to continue processing.`
+    : "A family has submitted a response to an information request. Review the application to continue processing.";
+  const link = `/staff/applications/${applicationId}`;
+
+  if (row.assigned_staff_id) {
+    // Notify the assigned staff member directly
+    await notify({
+      userId: row.assigned_staff_id,
+      subject,
+      body,
+      link,
+      campusId: row.campus_id,
+      logTag: "notifyStaffOfFamilyResponse",
+    });
+  } else {
+    // Fall back to all enrollment_managers for the campus
+    const { data: roleRows } = await supabase
+      .from("user_campus_role")
+      .select("user_id")
+      .eq("campus_id", row.campus_id)
+      .eq("role", "enrollment_manager");
+
+    const userIds = ((roleRows ?? []) as Array<{ user_id: string }>)
+      .map((r) => r.user_id)
+      .filter(Boolean);
+
+    if (userIds.length === 0) {
+      console.warn("[notifyStaffOfFamilyResponse] no enrollment_managers found for campus", { campusId: row.campus_id });
+      return;
+    }
+
+    const result = await sendNotification({
+      recipientUserIds: userIds,
+      campusId: row.campus_id,
+      channel: "in_app",
+      subject,
+      body,
+      link,
+    });
+    if (result.error) console.error("[notifyStaffOfFamilyResponse]", result.error);
+  }
+}
+
 /** Student fully enrolled after academic audit — send family a celebratory message. */
 export async function notifyFamilyStudentEnrolled({
   applicationId,
