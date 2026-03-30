@@ -6,7 +6,7 @@ import { sendOffer } from "@/lib/mutations/offers";
 import { verifyRegistrationItem, skipRegistrationItem } from "@/lib/mutations/registration";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { getSession } from "@/lib/auth/get-session";
-import { notifyFamilyStudentEnrolled } from "@/lib/notify";
+import { notifyFamilyStudentEnrolled, notifyFamilyNeedsInfo } from "@/lib/notify";
 
 // ─── Status Transition ─────────────────────────────────
 
@@ -21,6 +21,27 @@ export async function changeApplicationStatus(
     revalidatePath(`/staff/applications/${applicationId}`);
     revalidatePath("/staff/applications");
     revalidatePath("/staff/dashboard");
+
+    // When staff requests more info, notify the family — non-blocking so a
+    // notification failure never prevents the status transition from succeeding.
+    if (newStatus === "needs_info") {
+      const supabase = createServiceRoleClient();
+      supabase
+        .from("application")
+        .select("campus_id")
+        .eq("id", applicationId)
+        .single()
+        .then(({ data: app }) => {
+          notifyFamilyNeedsInfo({
+            applicationId,
+            applicationIdForLink: applicationId,
+            message: reason,
+            campusId: app?.campus_id ?? undefined,
+          }).catch((err) =>
+            console.error("[changeApplicationStatus] notifyFamilyNeedsInfo failed", err)
+          );
+        });
+    }
   }
 
   return result;
