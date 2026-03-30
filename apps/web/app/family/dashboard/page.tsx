@@ -179,6 +179,7 @@ export default async function FamilyDashboardPage() {
               location: "Vancouver, WA",
               logo: "/logos/rooted-vancouver.png",
               shortCode: "RSV",
+              containerClass: "h-24 flex items-center justify-center mb-3",
               logoClass: "max-h-24 max-w-full object-contain",
             },
             {
@@ -186,6 +187,7 @@ export default async function FamilyDashboardPage() {
               location: "Columbia, SC",
               logo: "/logos/cr-neal-academy.png",
               shortCode: "CRN",
+              containerClass: "h-24 flex items-center justify-center mb-3",
               logoClass: "max-h-24 max-w-full object-contain",
             },
             {
@@ -193,7 +195,8 @@ export default async function FamilyDashboardPage() {
               location: "Cleveland, OH",
               logo: "/logos/rooted-cleveland.png",
               shortCode: "RSC",
-              logoClass: "h-20 w-44 object-contain",
+              containerClass: "h-32 flex items-center justify-center mb-3",
+              logoClass: "h-full w-auto object-contain",
             },
           ].map((school) => {
             const campusWindow = enrollmentWindows.find(
@@ -203,7 +206,7 @@ export default async function FamilyDashboardPage() {
             const cardContent = (
               <Card className={`transition-shadow border-2 ${isOpen ? "hover:shadow-md cursor-pointer group hover:border-rooted-green/40" : "opacity-75"}`}>
                 <CardContent className="py-6 flex flex-col items-center text-center">
-                  <div className="h-24 flex items-center justify-center mb-3">
+                  <div className={school.containerClass}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={school.logo}
