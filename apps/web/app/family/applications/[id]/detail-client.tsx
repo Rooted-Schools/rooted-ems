@@ -437,49 +437,76 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
           </div>
         </CardHeader>
         <CardContent>
-          {detail.documents.length === 0 ? (
-            <div className="text-center py-6">
-              <p className="text-sm text-stone">No documents uploaded yet.</p>
-              <Link href="/family/documents" className="text-xs text-rooted-green hover:underline mt-1 inline-block">
-                Go to Documents page to upload →
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {detail.documents.map((doc) => {
-                const dcfg = docStatusConfig[doc.status] ?? docStatusConfig.pending;
-                return (
-                  <div
-                    key={doc.id}
-                    className="flex items-center justify-between p-3 rounded-md border border-stone/20"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-lg" aria-hidden="true">📄</span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-ink truncate">
-                          {doc.file_name}
-                        </p>
-                        <p className="text-xs text-stone">
-                          Uploaded {formatDate(doc.created_at)}
-                        </p>
+          {(() => {
+            // Hide rejected docs that have been superseded by a newer re-upload of the same type
+            const visibleDocs = detail.documents.filter((doc) => {
+              if (doc.status !== "rejected") return true;
+              return !detail.documents.some(
+                (other) =>
+                  other.id !== doc.id &&
+                  other.document_type === doc.document_type &&
+                  new Date(other.created_at) > new Date(doc.created_at)
+              );
+            });
+
+            if (visibleDocs.length === 0) {
+              return (
+                <div className="text-center py-6">
+                  <p className="text-sm text-stone">No documents uploaded yet.</p>
+                  <Link href="/family/documents" className="text-xs text-rooted-green hover:underline mt-1 inline-block">
+                    Go to Documents page to upload →
+                  </Link>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-2">
+                {visibleDocs.map((doc) => {
+                  const dcfg = docStatusConfig[doc.status] ?? docStatusConfig.pending;
+                  return (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between p-3 rounded-md border border-stone/20"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-lg" aria-hidden="true">📄</span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-ink truncate">
+                            {doc.file_name}
+                          </p>
+                          <p className="text-xs text-stone">
+                            Uploaded {formatDate(doc.created_at)}
+                          </p>
+                          {doc.status === "rejected" && doc.rejection_reason && (
+                            <p className="text-xs text-red-600 mt-0.5 font-medium">
+                              ⚠️ {doc.rejection_reason}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge variant={dcfg.variant}>{dcfg.label}</Badge>
+                        {doc.status === "rejected" && (
+                          <Link href="/family/documents">
+                            <Button size="sm">Re-upload</Button>
+                          </Link>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewDocument(doc.storage_path)}
+                          disabled={!doc.storage_path}
+                        >
+                          View
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Badge variant={dcfg.variant}>{dcfg.label}</Badge>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewDocument(doc.storage_path)}
-                        disabled={!doc.storage_path}
-                      >
-                        View
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
