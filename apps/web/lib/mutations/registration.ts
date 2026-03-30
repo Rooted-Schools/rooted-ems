@@ -356,22 +356,63 @@ export async function verifyRegistrationItem(
         .eq("enrollment_id", item.enrollment_id);
 
       // Move application to placement_review — next step is academic audit
-      const { data: enrollment } = await supabase
-        .from("enrollment")
-        .select("application_id")
-        .eq("id", item.enrollment_id)
-        .single();
-
-      if (enrollment?.application_id) {
-        await supabase
-          .from("application")
-          .update({ status: "placement_review", updated_at: new Date().toISOString() })
-          .eq("id", enrollment.application_id as string);
-      }
+      await advanceApplicationAfterPacketComplete(item.enrollment_id, supabase);
     }
   }
 
   return { data: null, error: null };
+}
+
+/**
+ * Advance the linked application to placement_review once its packet is complete.
+ * Tries enrollment.application_id first; falls back to matching by student/campus/year
+ * for older records where application_id was not set on the enrollment row.
+ */
+async function advanceApplicationAfterPacketComplete(
+  enrollmentId: string,
+  supabase: ReturnType<typeof createServiceRoleClient>
+) {
+  const { data: enrollment } = await supabase
+    .from("enrollment")
+    .select("application_id, student_id, campus_id, school_year_id")
+    .eq("id", enrollmentId)
+    .single();
+
+  if (!enrollment) return;
+
+  // Primary path — application_id set directly on enrollment
+  if (enrollment.application_id) {
+    await supabase
+      .from("application")
+      .update({ status: "placement_review", updated_at: new Date().toISOString() })
+      .eq("id", enrollment.application_id as string)
+      .in("status", ["accepted", "registered"]); // only advance if not already past this point
+    return;
+  }
+
+  // Fallback — find the application by matching student + campus + school_year
+  const { data: app } = await supabase
+    .from("application")
+    .select("id")
+    .eq("student_id", enrollment.student_id as string)
+    .eq("campus_id", enrollment.campus_id as string)
+    .in("status", ["accepted", "registered"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (app) {
+    await supabase
+      .from("application")
+      .update({ status: "placement_review", updated_at: new Date().toISOString() })
+      .eq("id", app.id);
+
+    // Also patch the enrollment so future cascades use the fast path
+    await supabase
+      .from("enrollment")
+      .update({ application_id: app.id })
+      .eq("id", enrollmentId);
+  }
 }
 
 /**
@@ -425,18 +466,7 @@ export async function skipRegistrationItem(
       .update({ status: "complete", verified_at: new Date().toISOString() })
       .eq("enrollment_id", enrollmentId);
 
-    const { data: enrollment } = await supabase
-      .from("enrollment")
-      .select("application_id")
-      .eq("id", enrollmentId)
-      .single();
-
-    if (enrollment?.application_id) {
-      await supabase
-        .from("application")
-        .update({ status: "placement_review", updated_at: new Date().toISOString() })
-        .eq("id", enrollment.application_id as string);
-    }
+    await advanceApplicationAfterPacketComplete(enrollmentId, supabase);
   }
 
   return { data: null, error: null };

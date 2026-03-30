@@ -35,6 +35,7 @@ import {
   staffSkipRegistrationItem,
   staffCompleteAcademicAudit,
   staffGetSignedUrl,
+  staffConfirmPacketComplete,
 } from "./actions";
 import type { RegistrationPacketDetail } from "@/lib/queries";
 
@@ -907,6 +908,32 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
                           </p>
                         </div>
                       </div>
+                      {/* Manual advance button — shown when packet is complete but status hasn't moved */}
+                      {registrationPacket.packet_status === "complete" &&
+                        ["accepted", "registered"].includes(detail.status) && (
+                          <div className="mt-3 pt-3 border-t border-stone/20">
+                            <p className="text-xs text-stone mb-2">
+                              All items verified. Click below to advance this student to Placement Review (academic audit).
+                            </p>
+                            <Button
+                              size="sm"
+                              disabled={isPending}
+                              onClick={() => {
+                                startTransition(async () => {
+                                  const result = await staffConfirmPacketComplete(detail.id);
+                                  if (result.error) {
+                                    showFeedback("error", result.error);
+                                  } else {
+                                    showFeedback("success", "Student advanced to Placement Review.");
+                                    router.refresh();
+                                  }
+                                });
+                              }}
+                            >
+                              ✓ Confirm Verification Complete → Move to Placement Review
+                            </Button>
+                          </div>
+                        )}
                     </CardContent>
                   </Card>
                 );

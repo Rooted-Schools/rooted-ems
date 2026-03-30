@@ -198,6 +198,27 @@ export async function staffCompleteAcademicAudit(
   return { data: null, error: null };
 }
 
+// ─── Manually advance packet-complete application to placement_review ─────
+
+export async function staffConfirmPacketComplete(applicationId: string) {
+  const supabase = createServiceRoleClient();
+
+  const { error } = await supabase
+    .from("application")
+    .update({ status: "placement_review", updated_at: new Date().toISOString() })
+    .eq("id", applicationId)
+    .in("status", ["accepted", "registered"]);
+
+  if (error) return { data: null, error: error.message };
+
+  revalidatePath(`/staff/applications/${applicationId}`);
+  revalidatePath("/staff/applications");
+  revalidatePath("/staff/enrollment");
+  revalidatePath("/staff/dashboard");
+
+  return { data: null, error: null };
+}
+
 // ─── Generate Signed URL (service-role, bypasses storage RLS) ──────────────
 
 export async function staffGetSignedUrl(
