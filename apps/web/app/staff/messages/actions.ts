@@ -1,12 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 
 export async function markStaffNotificationsRead(notificationIds: string[]) {
   if (notificationIds.length === 0) return { error: null };
 
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Auth check — only mark notifications belonging to the current user
   const { data: { user } } = await supabase.auth.getUser();

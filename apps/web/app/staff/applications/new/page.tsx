@@ -1,7 +1,7 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { getCampuses, getActiveEnrollmentWindows } from "@/lib/queries";
 import { requireStaffSession } from "@/lib/auth/get-session";
 import { StaffNewApplicationForm } from "./new-staff-application";
@@ -9,7 +9,7 @@ import { StaffNewApplicationForm } from "./new-staff-application";
 export default async function StaffNewApplicationPage() {
   const session = await requireStaffSession();
 
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Fetch all campuses (CMO-level: all campuses, not just assigned)
   const [campuses, windows] = await Promise.all([

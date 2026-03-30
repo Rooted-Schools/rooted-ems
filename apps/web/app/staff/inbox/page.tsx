@@ -1,7 +1,7 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -69,7 +69,7 @@ export default async function StaffInboxPage({
   const accessibleIds = getAccessibleCampusIds(session);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   let appQuery = supabase
     .from("application")

@@ -10,7 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import {
   getStaffDashboardStats,
   getApplicationStats,
@@ -25,7 +25,7 @@ export const dynamic = "force-dynamic";
 
 // Work queue counts (campus-scoped)
 async function getWorkQueueCounts(campusIds?: string[]) {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
   let query = supabase
     .from("application")
     .select("status")
@@ -135,7 +135,7 @@ export default async function StaffDashboardPage({
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
 
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const [stats, appStats, deadlines, recentActivity, queueCounts, inquiryStats, { data: currentSY }] =
     await Promise.all([

@@ -1,7 +1,7 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { getStaffEnrollmentWindows, getStaffUsers, getCampuses, getStaffPacketRequirements } from "@/lib/queries";
 import { SettingsClient } from "./settings-client";
 import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
@@ -14,7 +14,7 @@ export default async function StaffSettingsPage({
   const session = await requireMinRole("enrollment_manager");
   const accessibleIds = getAccessibleCampusIds(session);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const [allCampuses, windows, users, { data: schoolYears }, packetRequirements, { data: gradeLevels }, { data: settings }] = await Promise.all([
     getCampuses(),

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 
 export async function staffUpdateCapacity(
@@ -10,7 +10,7 @@ export async function staffUpdateCapacity(
 ): Promise<{ error: string | null }> {
   try {
     const session = await requireStaffSession();
-    const supabase = await createServerClient();
+    const supabase = createServiceRoleClient();
 
     // Verify the capacity plan belongs to a campus the user can access
     const accessibleCampusIds = getAccessibleCampusIds(session);

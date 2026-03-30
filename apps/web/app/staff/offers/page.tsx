@@ -1,7 +1,7 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { getStaffOffers, getStaffWaitlist } from "@/lib/queries";
 import { OffersClient } from "./offers-client";
 import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
@@ -16,7 +16,7 @@ export default async function StaffOffersPage({
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
 
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Build eligible applicants query with optional campus scope
   let eligibleQuery = supabase

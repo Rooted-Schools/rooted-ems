@@ -1,13 +1,13 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { redirect } from "next/navigation";
 import { getStaffPendingDocuments, getCampuses } from "@/lib/queries";
 import { DocumentQueueClient } from "./documents-client";
 
 export default async function StaffDocumentsPage() {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

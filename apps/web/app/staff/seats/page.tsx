@@ -1,7 +1,7 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 import { SeatsClient } from "./seats-client";
 
@@ -14,7 +14,7 @@ export default async function SeatManagementPage({
   const accessibleIds = getAccessibleCampusIds(session);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Get current school year(s)
   const { data: currentYears } = await supabase

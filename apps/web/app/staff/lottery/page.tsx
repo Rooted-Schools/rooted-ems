@@ -2,7 +2,7 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -28,7 +28,7 @@ export default async function StaffLotteryPage({
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
 
   // Fetch lottery runs + data for the creation dialog
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
   const [runs, campuses] = await Promise.all([
     getStaffLotteryRuns(scopedCampusIds),
     getCampuses(),

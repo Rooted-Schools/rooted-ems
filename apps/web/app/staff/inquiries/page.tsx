@@ -1,6 +1,6 @@
 export const runtime = "edge";
 
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { getStaffInquiries, getInquiryStats, getCampuses } from "@/lib/queries";
 import { InquiriesClient } from "./inquiries-client";
 import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
@@ -17,7 +17,7 @@ export default async function StaffInquiriesPage({
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
 
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const [inquiries, stats, allCampuses, gradeData, windowData] = await Promise.all([
     getStaffInquiries(scopedCampusIds),
