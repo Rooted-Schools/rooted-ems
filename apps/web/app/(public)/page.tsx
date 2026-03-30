@@ -14,24 +14,41 @@ function formatCloseDate(dateStr: string): string {
 }
 
 /* Campus accent color classes keyed by matchKey */
-const campusAccent: Record<string, { border: string; bg: string; text: string; hoverBorder: string }> = {
+const campusAccent: Record<string, {
+  topBorder: string;
+  border: string;
+  hoverBorder: string;
+  badgeBg: string;
+  badgeBorder: string;
+  badgeText: string;
+  dot: string;
+}> = {
   vancouver: {
-    border: "border-campus-vancouver/40",
-    bg: "bg-campus-vancouver/10",
-    text: "text-campus-vancouver",
-    hoverBorder: "hover:border-campus-vancouver/60",
+    topBorder: "border-t-rooted-green",
+    border: "border-rooted-green/30",
+    hoverBorder: "hover:border-rooted-green/60",
+    badgeBg: "bg-rooted-green/10",
+    badgeBorder: "border-rooted-green/30",
+    badgeText: "text-rooted-green",
+    dot: "bg-rooted-green",
   },
   neal: {
-    border: "border-campus-neal/40",
-    bg: "bg-campus-neal/10",
-    text: "text-campus-neal",
-    hoverBorder: "hover:border-campus-neal/60",
+    topBorder: "border-t-amber-500",
+    border: "border-amber-300/60",
+    hoverBorder: "hover:border-amber-400",
+    badgeBg: "bg-amber-50",
+    badgeBorder: "border-amber-300",
+    badgeText: "text-amber-700",
+    dot: "bg-amber-500",
   },
   cleveland: {
-    border: "border-campus-cleveland/40",
-    bg: "bg-campus-cleveland/10",
-    text: "text-campus-cleveland",
-    hoverBorder: "hover:border-campus-cleveland/60",
+    topBorder: "border-t-blue-500",
+    border: "border-blue-300/60",
+    hoverBorder: "hover:border-blue-400",
+    badgeBg: "bg-blue-50",
+    badgeBorder: "border-blue-300",
+    badgeText: "text-blue-700",
+    dot: "bg-blue-500",
   },
 };
 
@@ -210,9 +227,9 @@ export default async function HomePage() {
               return (
                 <div
                   key={school.name}
-                  className={`group border-2 rounded-xl p-6 flex flex-col items-center text-center transition-all hover:shadow-lg ${
-                    accent?.border ?? "border-rooted-gray"
-                  } ${accent?.hoverBorder ?? "hover:border-stone/40"}`}
+                  className={`group border-2 border-t-4 rounded-xl p-6 flex flex-col items-center text-center transition-all hover:shadow-lg ${
+                    accent?.topBorder ?? "border-t-stone"
+                  } ${accent?.border ?? "border-rooted-gray"} ${accent?.hoverBorder ?? "hover:border-stone/40"}`}
                 >
                   <div className="h-48 flex items-center justify-center mb-4 overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -227,9 +244,9 @@ export default async function HomePage() {
 
                   {/* Enrollment Status Badge — campus accent color */}
                   {school.isOpen ? (
-                    <div className={`mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full ${accent?.bg ?? "bg-rooted-green/10"} border ${accent?.border ?? "border-rooted-green/20"}`}>
-                      <span className={`w-2 h-2 rounded-full ${accent?.text ? accent.text.replace("text-", "bg-") : "bg-rooted-green"} animate-pulse`} />
-                      <span className={`text-xs font-semibold ${accent?.text ?? "text-rooted-green"}`}>
+                    <div className={`mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full border ${accent?.badgeBg ?? "bg-rooted-green/10"} ${accent?.badgeBorder ?? "border-rooted-green/30"}`}>
+                      <span className={`w-2 h-2 rounded-full animate-pulse ${accent?.dot ?? "bg-rooted-green"}`} />
+                      <span className={`text-xs font-semibold ${accent?.badgeText ?? "text-rooted-green"}`}>
                         Open Enrollment
                       </span>
                     </div>
