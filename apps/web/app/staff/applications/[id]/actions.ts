@@ -6,6 +6,7 @@ import { sendOffer } from "@/lib/mutations/offers";
 import { verifyRegistrationItem, skipRegistrationItem } from "@/lib/mutations/registration";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { getSession } from "@/lib/auth/get-session";
+import { notifyFamilyStudentEnrolled } from "@/lib/notify";
 
 // ─── Status Transition ─────────────────────────────────
 
@@ -181,7 +182,7 @@ export async function staffCompleteAcademicAudit(
     is_internal: true,
   });
 
-  // Advance status to enrolled
+  // Advance application status to enrolled
   const supabase = createServiceRoleClient();
   const { error } = await supabase
     .from("application")
@@ -190,10 +191,37 @@ export async function staffCompleteAcademicAudit(
 
   if (error) return { data: null, error: error.message };
 
+  // Activate the enrollment record so it shows "Active" on the enrollment page
+  await supabase
+    .from("enrollment")
+    .update({ status: "active", updated_at: new Date().toISOString() })
+    .eq("application_id", applicationId);
+
+  // Fetch student name for the notification
+  const { data: app } = await supabase
+    .from("application")
+    .select("student:student_id (first_name, last_name)")
+    .eq("id", applicationId)
+    .single();
+
+  const student = (app as unknown as Record<string, unknown>)?.student as Record<string, string> | null;
+  const studentName = student ? `${student.first_name} ${student.last_name}` : undefined;
+  const gradeLabel = auditData.confirmedGrade ?? undefined;
+
+  // Fire celebratory notification — never block on this
+  notifyFamilyStudentEnrolled({
+    applicationId,
+    studentName,
+    campusId,
+    gradeLabel,
+  }).catch(() => {});
+
   revalidatePath(`/staff/applications/${applicationId}`);
   revalidatePath("/staff/applications");
   revalidatePath("/staff/enrollment");
   revalidatePath("/staff/dashboard");
+  revalidatePath("/family/dashboard");
+  revalidatePath("/family/registration");
 
   return { data: null, error: null };
 }

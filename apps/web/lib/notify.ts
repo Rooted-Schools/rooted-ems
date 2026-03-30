@@ -463,3 +463,29 @@ export async function notifyStaffRegistrationSubmitted({
     logTag: "notifyStaffRegistrationSubmitted",
   });
 }
+
+/** Student fully enrolled after academic audit — send family a celebratory message. */
+export async function notifyFamilyStudentEnrolled({
+  applicationId,
+  studentName,
+  campusId,
+  gradeLabel,
+}: {
+  applicationId: string;
+  studentName?: string;
+  campusId?: string;
+  gradeLabel?: string;
+}): Promise<void> {
+  const userId = await getGuardianUserId(applicationId);
+  if (!userId) return;
+  const campusName = await resolveCampusName(campusId);
+  const grade = gradeLabel ? ` in ${gradeLabel}` : "";
+  await notify({
+    userId,
+    subject: `🎉 ${studentName ?? "Your student"} is officially enrolled at ${campusName}!`,
+    body: `Congratulations! ${studentName ?? "Your student"} is now fully enrolled${grade} at ${campusName}. Welcome to the Rooted Schools family — we can't wait to see them thrive. Check your enrollment portal for next steps and important information.`,
+    link: `/family/applications/${applicationId}`,
+    campusId,
+    logTag: "notifyFamilyStudentEnrolled",
+  });
+}
