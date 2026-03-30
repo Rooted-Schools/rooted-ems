@@ -33,7 +33,6 @@ const STEPS = [
   { id: "student", label: "Student Info" },
   { id: "guardian", label: "Guardian & Household" },
   { id: "preferences", label: "Preferences & Services" },
-  { id: "documents", label: "Documents" },
   { id: "review", label: "Review & Submit" },
 ] as const;
 
@@ -1112,66 +1111,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
         </Card>
       )}
 
-      {/* ───── Step 5: Documents ───── */}
-      {currentStep.id === "documents" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Required Documents</CardTitle>
-            <CardDescription>
-              Upload the following documents for your application. Accepted
-              formats: PDF, JPG, PNG (max 10 MB each).
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg bg-rooted-gray-light/50 border border-stone/10 p-4 space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="text-2xl">📄</div>
-                <div>
-                  <p className="text-sm font-medium text-ink">
-                    Documents can be uploaded after you submit
-                  </p>
-                  <p className="text-xs text-stone mt-1">
-                    Submit your application first, then upload documents from the{" "}
-                    <Link href="/family/documents" className="text-rooted-green hover:underline font-medium">
-                      Documents
-                    </Link>{" "}
-                    page. Required documents must be uploaded before enrollment is finalized.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-ink mb-2">You will need to provide:</p>
-              {[
-                { name: "Birth Certificate or Proof of Age", required: true },
-                { name: "Proof of Residency", required: true },
-                { name: "Immunization Records", required: true },
-                { name: "Previous School Records", required: false },
-                { name: "IEP / 504 Plan (if applicable)", required: false },
-                { name: "Custody Documentation (if applicable)", required: false },
-                { name: "McKinney-Vento Documentation (if applicable)", required: false },
-                { name: "Income Verification (if applicable)", required: false },
-                { name: "Parent / Guardian Photo ID", required: false },
-              ].map((doc) => (
-                <div
-                  key={doc.name}
-                  className="flex items-center gap-2 py-1.5 px-3 text-sm"
-                >
-                  <span className="text-stone">
-                    {doc.required ? "☐" : "○"}
-                  </span>
-                  <span className={doc.required ? "text-ink" : "text-stone"}>
-                    {doc.name}
-                    {doc.required && <span className="text-red-500 ml-0.5">*</span>}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ───── Step 6: Review & Submit ───── */}
+      {/* ───── Step 5: Review & Submit ───── */}
       {currentStep.id === "review" && (
         <Card>
           <CardHeader>
@@ -1221,6 +1161,39 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
                 {form.hasPhysicalTherapy === "yes" && <ReviewRow label="Physical Therapy" value="Yes" />}
                 {form.specialServicesNotes && <ReviewRow label="Notes" value={form.specialServicesNotes} />}
               </ReviewSection>
+            </div>
+
+            {/* Document checklist notice */}
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-amber-800 mb-2">📋 Documents you'll need to upload after submitting</p>
+              <p className="text-xs text-amber-700 mb-3">
+                Submit your application now — you'll upload these from the{" "}
+                <Link href="/family/documents" className="font-medium underline">Documents</Link>{" "}
+                page after. Required documents must be on file before enrollment is finalized.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                {[
+                  { name: "Birth Certificate or Proof of Age", required: true },
+                  { name: "Proof of Residency", required: true },
+                  { name: "Immunization Records", required: true },
+                  { name: "Previous School Records", required: false },
+                  { name: "IEP / 504 Plan (if applicable)", required: false },
+                  { name: "Custody Documentation (if applicable)", required: false },
+                  { name: "McKinney-Vento Documentation (if applicable)", required: false },
+                  { name: "Income Verification (if applicable)", required: false },
+                  { name: "Parent / Guardian Photo ID", required: false },
+                ].map((doc) => (
+                  <div key={doc.name} className="flex items-center gap-1.5 text-xs py-0.5">
+                    <span className={doc.required ? "text-amber-700" : "text-amber-500"}>
+                      {doc.required ? "●" : "○"}
+                    </span>
+                    <span className={doc.required ? "text-amber-800 font-medium" : "text-amber-700"}>
+                      {doc.name}
+                      {doc.required && <span className="text-red-500 ml-0.5">*</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <hr className="border-stone/20" />
