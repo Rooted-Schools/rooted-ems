@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createEnrollment, withdrawEnrollment, syncEnrollmentSIS } from "@/lib/mutations";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
+import { notifyFamilyStudentEnrolled } from "@/lib/notify";
 
 export async function staffCreateEnrollment(
   studentId: string,
@@ -56,4 +58,40 @@ export async function staffSyncSIS(
   }
 
   return result;
+}
+
+// ─── Activate a stuck pending enrollment ───────────────────────────────────────
+
+export async function staffActivateEnrollment(
+  enrollmentId: string,
+  applicationId?: string | null
+): Promise<{ data: null; error: string | null }> {
+  const supabase = createServiceRoleClient();
+
+  const { error } = await supabase
+    .from("enrollment")
+    .update({ status: "active", updated_at: new Date().toISOString() })
+    .eq("id", enrollmentId)
+    .eq("status", "pending");
+
+  if (error) return { data: null, error: error.message };
+
+  // Also sync application status to enrolled if linked
+  if (applicationId) {
+    await supabase
+      .from("application")
+      .update({ status: "enrolled", updated_at: new Date().toISOString() })
+      .eq("id", applicationId)
+      .in("status", ["accepted", "registered", "placement_review"]);
+
+    // Fire enrollment notification (non-blocking)
+    notifyFamilyStudentEnrolled({ applicationId }).catch(() => {});
+  }
+
+  revalidatePath("/staff/enrollment");
+  revalidatePath("/staff/applications");
+  revalidatePath("/staff/dashboard");
+  revalidatePath("/family/dashboard");
+
+  return { data: null, error: null };
 }

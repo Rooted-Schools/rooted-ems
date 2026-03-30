@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { staffWithdrawEnrollment, staffSyncSIS } from "./actions";
+import { staffWithdrawEnrollment, staffSyncSIS, staffActivateEnrollment } from "./actions";
 
 interface EnrollmentRow {
   id: string;
@@ -86,6 +86,16 @@ export function EnrollmentClient({
     setLoading(enrollmentId);
     setError(null);
     const result = await staffWithdrawEnrollment(enrollmentId, "Withdrawn by staff.");
+    if (result.error) setError(result.error);
+    else router.refresh();
+    setLoading(null);
+  }
+
+  async function handleActivate(enrollmentId: string, applicationId?: string | null) {
+    if (!confirm("Activate this enrollment? This will also notify the family.")) return;
+    setLoading(enrollmentId);
+    setError(null);
+    const result = await staffActivateEnrollment(enrollmentId, applicationId);
     if (result.error) setError(result.error);
     else router.refresh();
     setLoading(null);
@@ -254,7 +264,7 @@ export function EnrollmentClient({
                         {enrollment.enrolled_at ?? "—"}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 flex-wrap">
                           {enrollment.application_id && enrollment.packet_status && (
                             <Link
                               href={`/staff/applications/${enrollment.application_id}?tab=registration`}
@@ -264,6 +274,16 @@ export function EnrollmentClient({
                                 Review
                               </Button>
                             </Link>
+                          )}
+                          {enrollment.status === "pending" && enrollment.packet_status === "complete" && (
+                            <Button
+                              size="sm"
+                              className="bg-rooted-green text-white hover:bg-rooted-green/90"
+                              disabled={isLoading}
+                              onClick={() => handleActivate(enrollment.id, enrollment.application_id)}
+                            >
+                              Activate
+                            </Button>
                           )}
                           {isActive && (
                             <Button
