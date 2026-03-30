@@ -555,10 +555,16 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
           <CardContent className="py-4">
             <div className="flex items-start gap-3">
               <span className="text-2xl" aria-hidden="true">⚠️</span>
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-ink">Waiting for Family Response</p>
-                <p className="text-xs text-ink/60 mt-0.5">
-                  Additional information or documents have been requested from the family. Once they respond, review and mark as Verified.
+                {detail.review_notes && (
+                  <div className="mt-2 p-2.5 bg-amber-100/60 rounded-md border border-amber-200">
+                    <p className="text-xs font-medium text-amber-800 mb-0.5">Message sent to family:</p>
+                    <p className="text-xs text-amber-900 italic">&ldquo;{detail.review_notes}&rdquo;</p>
+                  </div>
+                )}
+                <p className="text-xs text-ink/60 mt-2">
+                  An in-app notification was sent. The family can view it under <strong>Messages</strong> in their portal. Once they respond or upload documents, mark this application as Verified.
                 </p>
               </div>
             </div>

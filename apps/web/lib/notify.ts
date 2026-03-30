@@ -20,13 +20,26 @@ import { sendNotification } from "@/lib/mutations";
  */
 async function getGuardianUserId(applicationId: string): Promise<string | null> {
   const supabase = createServiceRoleClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("application")
-    .select("guardian:guardian_id (user_id)")
+    .select("guardian_id, guardian:guardian_id (user_id)")
     .eq("id", applicationId)
     .single();
-  const guardian = (data as unknown as Record<string, unknown> | null)?.guardian as Record<string, string> | null;
-  return guardian?.user_id ?? null;
+  if (error) {
+    console.error("[getGuardianUserId] query error", error.message, { applicationId });
+    return null;
+  }
+  const row = data as unknown as Record<string, unknown> | null;
+  const guardian = row?.guardian as Record<string, string> | null;
+  const userId = guardian?.user_id ?? null;
+  if (!userId) {
+    console.warn("[getGuardianUserId] no user_id found", {
+      applicationId,
+      guardian_id: row?.guardian_id ?? null,
+      guardian,
+    });
+  }
+  return userId;
 }
 
 /**
