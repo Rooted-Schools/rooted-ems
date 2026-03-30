@@ -1,7 +1,7 @@
 /**
  * Communication mutations – send in-app notifications and log messages.
  */
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 
 // ─── Types ──────────────────────────────────────────────
@@ -48,7 +48,7 @@ export interface UpdateTemplateInput {
 export async function sendNotification(
   input: SendNotificationInput
 ): Promise<MutationResult<{ sentCount: number }>> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const { recipientUserIds, campusId, channel, subject, body, link, templateId } = input;
 
@@ -136,7 +136,7 @@ export async function sendNotification(
 export async function createMessageTemplate(
   input: CreateTemplateInput
 ): Promise<MutationResult<{ id: string }>> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const { data, error } = await supabase
     .from("message_template")
@@ -163,7 +163,7 @@ export async function createMessageTemplate(
 export async function updateMessageTemplate(
   input: UpdateTemplateInput
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const updates: Record<string, unknown> = {};
   if (input.name !== undefined) updates.name = input.name;
@@ -188,7 +188,7 @@ export async function updateMessageTemplate(
 export async function deleteMessageTemplate(
   templateId: string
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Soft-delete: set is_active to false
   const { error } = await supabase
