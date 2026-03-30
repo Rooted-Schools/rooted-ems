@@ -195,8 +195,8 @@ export default async function FamilyDashboardPage() {
               location: "Cleveland, OH",
               logo: "/logos/rooted-cleveland.png",
               shortCode: "RSC",
-              containerClass: "h-32 flex items-center justify-center mb-3",
-              logoClass: "h-full w-auto object-contain",
+              containerClass: "h-36 flex items-center justify-center mb-3",
+              logoClass: "w-36 h-36 object-contain",
             },
           ].map((school) => {
             const campusWindow = enrollmentWindows.find(
