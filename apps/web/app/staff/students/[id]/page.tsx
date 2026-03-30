@@ -1,7 +1,7 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ export default async function StudentDetailPage({
 }) {
   const { id } = await Promise.resolve(params);
   const session = await requireStaffSession();
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
   const accessibleCampusIds = getAccessibleCampusIds(session);
 
   // Fetch student with household info

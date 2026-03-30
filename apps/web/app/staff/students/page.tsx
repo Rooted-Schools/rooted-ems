@@ -1,7 +1,7 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 import { StudentsClient } from "./students-client";
 
@@ -14,7 +14,7 @@ export default async function StaffStudentsPage({
   const accessibleIds = getAccessibleCampusIds(session);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   let appQuery = supabase
     .from("application")
