@@ -1,25 +1,13 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-import { createServiceRoleClient } from "@rooted-ems/database/server";
-import { redirect } from "next/navigation";
 import { getStaffPendingDocuments, getCampuses } from "@/lib/queries";
 import { DocumentQueueClient } from "./documents-client";
+import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 
 export default async function StaffDocumentsPage() {
-  const supabase = createServiceRoleClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/staff-login");
-
-  // Fetch the staff member's accessible campus IDs via their roles
-  const { data: roles } = await supabase
-    .from("staff_campus_role")
-    .select("campus_id")
-    .eq("user_id", user.id);
-
-  const campusIds = (roles ?? []).map((r: Record<string, string>) => r.campus_id);
+  const session = await requireStaffSession();
+  const campusIds = getAccessibleCampusIds(session);
 
   const [{ rows, stats }, allCampuses] = await Promise.all([
     getStaffPendingDocuments(campusIds.length > 0 ? campusIds : undefined),
