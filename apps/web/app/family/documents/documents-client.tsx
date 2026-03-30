@@ -86,7 +86,15 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showUpload, setShowUpload] = useState(false);
+  const [prefilledDocType, setPrefilledDocType] = useState<string | undefined>();
+  const [prefilledAppId, setPrefilledAppId] = useState<string | undefined>();
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  function handleReupload(doc: DocumentRow) {
+    setPrefilledDocType(doc.document_type);
+    setPrefilledAppId(doc.application_id ?? undefined);
+    setShowUpload(true);
+  }
 
   async function handleViewDocument(storagePath: string) {
     if (!storagePath) return;
@@ -211,8 +219,16 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0">
                       <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                      {doc.status === "rejected" && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleReupload(doc)}
+                        >
+                          Re-upload
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -233,10 +249,18 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
       {/* Upload Dialog */}
       <UploadDialog
         open={showUpload}
-        onOpenChange={setShowUpload}
+        onOpenChange={(open) => {
+          setShowUpload(open);
+          if (!open) {
+            setPrefilledDocType(undefined);
+            setPrefilledAppId(undefined);
+          }
+        }}
         applications={applications}
         userId={userId}
         isPending={isPending}
+        initialDocType={prefilledDocType}
+        initialAppId={prefilledAppId}
         onUploadComplete={(message) => {
           setFeedback({ type: "success", message });
           startTransition(() => {
@@ -259,6 +283,8 @@ function UploadDialog({
   applications,
   userId,
   isPending,
+  initialDocType,
+  initialAppId,
   onUploadComplete,
   onError,
 }: {
@@ -267,26 +293,28 @@ function UploadDialog({
   applications: FamilyApp[];
   userId: string;
   isPending: boolean;
+  initialDocType?: string;
+  initialAppId?: string;
   onUploadComplete: (message: string) => void;
   onError: (message: string) => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [selectedApp, setSelectedApp] = useState(applications[0]?.id ?? "");
-  const [docType, setDocType] = useState("birth_certificate");
+  const [selectedApp, setSelectedApp] = useState(initialAppId ?? applications[0]?.id ?? "");
+  const [docType, setDocType] = useState(initialDocType ?? "birth_certificate");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Reset form state when dialog closes
+  // Sync initial values when dialog opens (handles re-upload pre-fill)
   useEffect(() => {
-    if (!open) {
-      setSelectedApp(applications[0]?.id ?? "");
-      setDocType("birth_certificate");
+    if (open) {
+      setSelectedApp(initialAppId ?? applications[0]?.id ?? "");
+      setDocType(initialDocType ?? "birth_certificate");
       setSelectedFile(null);
       setValidationError(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  }, [open, applications]);
+  }, [open, initialDocType, initialAppId, applications]);
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -357,9 +385,11 @@ function UploadDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Upload Document</DialogTitle>
+          <DialogTitle>{initialDocType ? "Re-upload Document" : "Upload Document"}</DialogTitle>
           <DialogDescription>
-            Upload a document for one of your enrollment applications. Accepted formats: PDF, JPEG, PNG. Max 10MB.
+            {initialDocType
+              ? "Upload a new version of this document. The document type has been pre-selected based on the rejected file."
+              : "Upload a document for one of your enrollment applications. Accepted formats: PDF, JPEG, PNG. Max 10MB."}
           </DialogDescription>
         </DialogHeader>
 
