@@ -35,7 +35,6 @@ export default async function FamilyDashboardPage() {
   const offeredCount = apps.filter((a) => a.status === "offered").length;
   const acceptedCount = apps.filter((a) => a.status === "accepted").length;
   const registeredCount = apps.filter((a) => a.status === "registered").length;
-  const enrollmentWindow = enrollmentWindows[0] ?? null;
 
   // Determine farthest stage for dynamic stepper
   const statusOrder = ["draft", "submitted", "needs_info", "verified", "lottery_assigned", "offered", "accepted", "registered"];
@@ -142,36 +141,31 @@ export default async function FamilyDashboardPage() {
         </div>
       )}
 
-      {/* ─── Alert banner: open enrollment ─── */}
-      {enrollmentWindow && (
-        <div className="bg-rooted-green/10 border border-rooted-green/30 rounded-lg p-4 flex items-start gap-3">
+      {/* ─── Alert banners: one per open enrollment window ─── */}
+      {enrollmentWindows.map((ew) => (
+        <div key={ew.campus_name} className="bg-rooted-green/10 border border-rooted-green/30 rounded-lg p-4 flex items-start gap-3">
           <span className="text-xl mt-0.5">📅</span>
           <div>
             <p className="text-sm font-medium text-ink">
-              {enrollmentWindow.name} is open
+              {ew.name} is open
             </p>
             <p className="text-sm text-ink/60 mt-0.5">
-              Applications for {enrollmentWindow.campus_name} are being accepted
-              until{" "}
-              <span className="font-semibold">
-                {enrollmentWindow.close_date}
-              </span>
-              .{" "}
+              Applications for {ew.campus_name} are being accepted until{" "}
+              <span className="font-semibold">{ew.close_date}</span>.{" "}
               {draftCount > 0 && (
                 <span className="text-amber-700">
-                  You have {draftCount} draft application
-                  {draftCount > 1 ? "s" : ""} to complete.
+                  You have {draftCount} draft application{draftCount > 1 ? "s" : ""} to complete.
                 </span>
               )}
             </p>
           </div>
-          {enrollmentWindow.days_remaining != null && (
+          {ew.days_remaining != null && (
             <Badge variant="success" className="shrink-0 ml-auto">
-              {enrollmentWindow.days_remaining} days left
+              {ew.days_remaining} days left
             </Badge>
           )}
         </div>
-      )}
+      ))}
 
       {/* ─── Our Schools — Clickable logos ─── */}
       <div>
@@ -185,18 +179,21 @@ export default async function FamilyDashboardPage() {
               location: "Vancouver, WA",
               logo: "/logos/rooted-vancouver.png",
               shortCode: "RSV",
+              logoClass: "max-h-24 max-w-full object-contain",
             },
             {
               name: "C.R. Neal Academy",
               location: "Columbia, SC",
               logo: "/logos/cr-neal-academy.png",
               shortCode: "CRN",
+              logoClass: "max-h-24 max-w-full object-contain",
             },
             {
               name: "Rooted Schools Cleveland",
               location: "Cleveland, OH",
               logo: "/logos/rooted-cleveland.png",
               shortCode: "RSC",
+              logoClass: "h-20 w-44 object-contain",
             },
           ].map((school) => {
             const campusWindow = enrollmentWindows.find(
@@ -211,7 +208,7 @@ export default async function FamilyDashboardPage() {
                     <img
                       src={school.logo}
                       alt={school.name}
-                      className={`max-h-24 max-w-full object-contain ${isOpen ? "group-hover:scale-105 transition-transform" : ""}`}
+                      className={`${school.logoClass} ${isOpen ? "group-hover:scale-105 transition-transform" : ""}`}
                     />
                   </div>
                   <p className="text-xs text-stone mt-1">
