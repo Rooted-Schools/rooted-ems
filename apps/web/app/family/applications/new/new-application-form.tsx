@@ -406,7 +406,6 @@ export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplic
     student: !!form.firstName && !!form.lastName && !!form.dateOfBirth,
     guardian: !!form.guardianFirstName && !!form.guardianLastName && !!form.guardianEmail && !!form.guardianPhone,
     preferences: true,
-    documents: true,
     review: form.agreeTerms && form.dataSharingConsent && !!form.signatureName,
   };
 
