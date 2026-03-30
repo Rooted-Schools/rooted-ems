@@ -141,31 +141,6 @@ export default async function FamilyDashboardPage() {
         </div>
       )}
 
-      {/* ─── Alert banners: one per open enrollment window ─── */}
-      {enrollmentWindows.map((ew) => (
-        <div key={ew.campus_name} className="bg-rooted-green/10 border border-rooted-green/30 rounded-lg p-4 flex items-start gap-3">
-          <span className="text-xl mt-0.5">📅</span>
-          <div>
-            <p className="text-sm font-medium text-ink">
-              {ew.name} is open
-            </p>
-            <p className="text-sm text-ink/60 mt-0.5">
-              Applications for {ew.campus_name} are being accepted until{" "}
-              <span className="font-semibold">{ew.close_date}</span>.{" "}
-              {draftCount > 0 && (
-                <span className="text-amber-700">
-                  You have {draftCount} draft application{draftCount > 1 ? "s" : ""} to complete.
-                </span>
-              )}
-            </p>
-          </div>
-          {ew.days_remaining != null && (
-            <Badge variant="success" className="shrink-0 ml-auto">
-              {ew.days_remaining} days left
-            </Badge>
-          )}
-        </div>
-      ))}
 
       {/* ─── Our Schools — Clickable logos ─── */}
       <div>
@@ -183,7 +158,9 @@ export default async function FamilyDashboardPage() {
               logoClass: "max-h-24 max-w-full object-contain",
               borderColor: "border-t-rooted-green",
               hoverBorder: "hover:border-rooted-green/50",
-              badgeClass: "mt-2 bg-rooted-green/10 text-rooted-green border-rooted-green/30",
+              badgeClass: "bg-rooted-green/10 text-rooted-green border-rooted-green/30",
+              footerClass: "bg-rooted-green/5 border-t border-rooted-green/20",
+              daysClass: "bg-rooted-green text-white",
             },
             {
               name: "C.R. Neal Academy",
@@ -194,18 +171,22 @@ export default async function FamilyDashboardPage() {
               logoClass: "max-h-24 max-w-full object-contain",
               borderColor: "border-t-amber-600",
               hoverBorder: "hover:border-amber-400/50",
-              badgeClass: "mt-2 bg-amber-50 text-amber-700 border-amber-300",
+              badgeClass: "bg-amber-50 text-amber-700 border-amber-300",
+              footerClass: "bg-amber-50 border-t border-amber-200",
+              daysClass: "bg-amber-500 text-white",
             },
             {
               name: "Rooted Schools Cleveland",
               location: "Cleveland, OH",
               logo: "/logos/rooted-cleveland.png",
               shortCode: "RSC",
-              containerClass: "h-36 flex items-center justify-center mb-3",
-              logoClass: "w-36 h-36 object-contain",
+              containerClass: "w-36 mx-auto aspect-square flex items-center justify-center mb-2",
+              logoClass: "w-full h-full object-contain",
               borderColor: "border-t-blue-600",
               hoverBorder: "hover:border-blue-400/50",
-              badgeClass: "mt-2 bg-blue-50 text-blue-700 border-blue-300",
+              badgeClass: "bg-blue-50 text-blue-700 border-blue-300",
+              footerClass: "bg-blue-50 border-t border-blue-200",
+              daysClass: "bg-blue-600 text-white",
             },
           ].map((school) => {
             const campusWindow = enrollmentWindows.find(
@@ -213,7 +194,7 @@ export default async function FamilyDashboardPage() {
             );
             const isOpen = !!campusWindow;
             const cardContent = (
-              <Card className={`transition-shadow border-2 border-t-4 ${school.borderColor} ${isOpen ? `hover:shadow-md cursor-pointer group ${school.hoverBorder}` : "opacity-75"}`}>
+              <Card className={`transition-shadow border-2 border-t-4 overflow-hidden ${school.borderColor} ${isOpen ? `hover:shadow-md cursor-pointer group ${school.hoverBorder}` : "opacity-75"}`}>
                 <CardContent className="py-6 flex flex-col items-center text-center">
                   <div className={school.containerClass}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -223,19 +204,23 @@ export default async function FamilyDashboardPage() {
                       className={`${school.logoClass} ${isOpen ? "group-hover:scale-105 transition-transform" : ""}`}
                     />
                   </div>
-                  <p className="text-xs text-stone mt-1">
-                    {school.location}
-                  </p>
-                  {isOpen ? (
-                    <Badge variant="outline" className={school.badgeClass}>
-                      Accepting Applications
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="mt-2">
-                      Coming Soon
-                    </Badge>
-                  )}
+                  <p className="text-xs text-stone mt-1">{school.location}</p>
+                  <Badge variant="outline" className={`mt-2 ${isOpen ? school.badgeClass : ""}`}>
+                    {isOpen ? "Accepting Applications" : "Coming Soon"}
+                  </Badge>
                 </CardContent>
+                {isOpen && campusWindow && (
+                  <div className={`${school.footerClass} px-4 py-2.5 flex items-center justify-between`}>
+                    <p className="text-xs text-ink/60">
+                      Apply by <span className="font-semibold text-ink">{campusWindow.close_date}</span>
+                    </p>
+                    {campusWindow.days_remaining != null && (
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${school.daysClass}`}>
+                        {campusWindow.days_remaining}d left
+                      </span>
+                    )}
+                  </div>
+                )}
               </Card>
             );
 
