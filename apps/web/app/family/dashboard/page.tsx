@@ -181,6 +181,9 @@ export default async function FamilyDashboardPage() {
               shortCode: "RSV",
               containerClass: "h-24 flex items-center justify-center mb-3",
               logoClass: "max-h-24 max-w-full object-contain",
+              borderColor: "border-t-rooted-green",
+              hoverBorder: "hover:border-rooted-green/50",
+              badgeClass: "mt-2 bg-rooted-green/10 text-rooted-green border-rooted-green/30",
             },
             {
               name: "C.R. Neal Academy",
@@ -189,6 +192,9 @@ export default async function FamilyDashboardPage() {
               shortCode: "CRN",
               containerClass: "h-24 flex items-center justify-center mb-3",
               logoClass: "max-h-24 max-w-full object-contain",
+              borderColor: "border-t-amber-600",
+              hoverBorder: "hover:border-amber-400/50",
+              badgeClass: "mt-2 bg-amber-50 text-amber-700 border-amber-300",
             },
             {
               name: "Rooted Schools Cleveland",
@@ -197,6 +203,9 @@ export default async function FamilyDashboardPage() {
               shortCode: "RSC",
               containerClass: "h-36 flex items-center justify-center mb-3",
               logoClass: "w-36 h-36 object-contain",
+              borderColor: "border-t-blue-600",
+              hoverBorder: "hover:border-blue-400/50",
+              badgeClass: "mt-2 bg-blue-50 text-blue-700 border-blue-300",
             },
           ].map((school) => {
             const campusWindow = enrollmentWindows.find(
@@ -204,7 +213,7 @@ export default async function FamilyDashboardPage() {
             );
             const isOpen = !!campusWindow;
             const cardContent = (
-              <Card className={`transition-shadow border-2 ${isOpen ? "hover:shadow-md cursor-pointer group hover:border-rooted-green/40" : "opacity-75"}`}>
+              <Card className={`transition-shadow border-2 border-t-4 ${school.borderColor} ${isOpen ? `hover:shadow-md cursor-pointer group ${school.hoverBorder}` : "opacity-75"}`}>
                 <CardContent className="py-6 flex flex-col items-center text-center">
                   <div className={school.containerClass}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -218,7 +227,7 @@ export default async function FamilyDashboardPage() {
                     {school.location}
                   </p>
                   {isOpen ? (
-                    <Badge variant="success" className="mt-2">
+                    <Badge variant="outline" className={school.badgeClass}>
                       Accepting Applications
                     </Badge>
                   ) : (
