@@ -255,10 +255,14 @@ export async function getApplicationDetail(
 
   const { data: app, error } = await query.single();
 
-  // If a userId was provided (family portal), verify ownership
+  // If a userId was provided (family portal), verify ownership.
+  // Accept a match on either guardian.user_id (set at signup) OR
+  // household.user_id (set on household creation) — both are valid
+  // ownership signals and either may be null depending on the auth path.
   if (app && userId) {
-    const householdUserId = (app.guardian as { household?: { user_id: string } } | null)?.household?.user_id;
-    if (householdUserId !== userId) return null;
+    const guardianUserId = (app.guardian as { user_id?: string | null } | null)?.user_id;
+    const householdUserId = (app.guardian as { household?: { user_id?: string | null } } | null)?.household?.user_id;
+    if (guardianUserId !== userId && householdUserId !== userId) return null;
   }
 
   if (error || !app) {
