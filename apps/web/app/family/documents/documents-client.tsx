@@ -55,12 +55,29 @@ const docStatusConfig: Record<string, { label: string; variant: "success" | "war
 };
 
 const documentTypes = [
+  // Identity & Enrollment
   { value: "birth_certificate", label: "Birth Certificate / Proof of Age" },
   { value: "proof_of_residency", label: "Proof of Residency" },
+  { value: "parent_id", label: "Parent / Guardian ID" },
+  { value: "custody_docs", label: "Custody Documentation" },
+  // Health & Medical
   { value: "immunization_records", label: "Immunization Records" },
-  { value: "school_records", label: "Previous School Records" },
-  { value: "iep_504_plan", label: "IEP / 504 Plan" },
-  { value: "custody_documentation", label: "Custody Documentation" },
+  { value: "health_exam", label: "Health / Physical Examination" },
+  { value: "dental_screening", label: "Dental Screening" },
+  { value: "medication_auth", label: "Medication Authorization" },
+  { value: "food_allergy_plan", label: "Food Allergy / Health Plan" },
+  { value: "lthc_form", label: "Long-Term Health Condition Form" },
+  { value: "sports_physical", label: "Sports Physical" },
+  // Academic & Special Services
+  { value: "school_records", label: "Previous School Records / Transcripts" },
+  { value: "iep_records", label: "IEP / Special Education Records" },
+  { value: "504_plan", label: "504 Plan" },
+  { value: "mckinney_vento", label: "McKinney-Vento (Homeless / Transitional)" },
+  // Family & Household
+  { value: "income_verification", label: "Income Verification (FRL)" },
+  { value: "military_family", label: "Military Family Documentation" },
+  { value: "student_photo", label: "Student Photo" },
+  // Other
   { value: "other", label: "Other" },
 ];
 

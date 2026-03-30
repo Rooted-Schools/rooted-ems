@@ -43,6 +43,7 @@ export interface DocumentRow {
   status: string;
   created_at: string;
   verified_at: string | null;
+  rejection_reason: string | null;
 }
 
 export interface TimelineEntry {
@@ -268,7 +269,7 @@ export async function getApplicationDetail(
   // Fetch documents
   const { data: docs } = await supabase
     .from("document")
-    .select("id, document_type, file_name, storage_path, status, created_at, verified_at")
+    .select("id, document_type, file_name, storage_path, status, created_at, verified_at, rejection_reason")
     .eq("application_id", applicationId)
     .order("created_at", { ascending: false });
 
@@ -355,6 +356,7 @@ export async function getApplicationDetail(
       status: d.status as string,
       created_at: d.created_at as string,
       verified_at: d.verified_at as string | null,
+      rejection_reason: (d.rejection_reason as string) ?? null,
     })),
     timeline: (history ?? []).map((h: Record<string, unknown>) => {
       const changer = h.changed_by as Record<string, string> | null;

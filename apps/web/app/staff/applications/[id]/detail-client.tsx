@@ -331,6 +331,9 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
   const [showOfferDialog, setShowOfferDialog] = useState(false);
   const [offerExpiry, setOfferExpiry] = useState(defaultExpiryDate);
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
+  const [showRejectDocDialog, setShowRejectDocDialog] = useState(false);
+  const [rejectDocId, setRejectDocId] = useState<string | null>(null);
+  const [rejectDocReason, setRejectDocReason] = useState("");
   // Academic audit form state
   const [auditGrade, setAuditGrade] = useState(detail.grade ?? "");
   const [auditNotes, setAuditNotes] = useState("");
@@ -427,15 +430,42 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
   }
 
   function handleDocumentReview(docId: string, decision: "verified" | "rejected") {
+    if (decision === "rejected") {
+      setRejectDocId(docId);
+      setRejectDocReason("");
+      setShowRejectDocDialog(true);
+      return;
+    }
     startTransition(async () => {
-      const result = await staffReviewDocument(docId, detail.id, decision);
+      const result = await staffReviewDocument(docId, detail.id, "verified");
       if (result.error) {
         showFeedback("error", result.error);
       } else {
-        showFeedback("success", `Document ${decision}`);
+        showFeedback("success", "Document verified.");
         router.refresh();
       }
     });
+  }
+
+  function confirmRejectDoc() {
+    if (!rejectDocId) return;
+    setShowRejectDocDialog(false);
+    startTransition(async () => {
+      const result = await staffReviewDocument(
+        rejectDocId,
+        detail.id,
+        "rejected",
+        rejectDocReason.trim() || undefined
+      );
+      if (result.error) {
+        showFeedback("error", result.error);
+      } else {
+        showFeedback("success", "Document rejected — family will be notified to re-upload.");
+        router.refresh();
+      }
+    });
+    setRejectDocId(null);
+    setRejectDocReason("");
   }
 
   return (
@@ -780,7 +810,14 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-2">
                               <span aria-hidden="true">📄</span>
-                              {doc.file_name}
+                              <div>
+                                {doc.file_name}
+                                {doc.status === "rejected" && doc.rejection_reason && (
+                                  <p className="text-xs text-red-600 font-normal mt-0.5">
+                                    Reason: {doc.rejection_reason}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell className="text-stone capitalize">
@@ -1278,6 +1315,44 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowWithdrawDialog(false)}>Cancel</Button>
             <Button variant="destructive" onClick={confirmWithdraw}>Withdraw Application</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject document dialog */}
+      <Dialog open={showRejectDocDialog} onOpenChange={(open) => {
+        setShowRejectDocDialog(open);
+        if (!open) { setRejectDocId(null); setRejectDocReason(""); }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Document</DialogTitle>
+            <DialogDescription>
+              Tell the family what needs to be corrected so they can re-upload the right file.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-3">
+            <label className="block text-sm font-medium text-ink/70">
+              Reason for rejection <span className="text-stone font-normal">(shown to the family)</span>
+            </label>
+            <textarea
+              value={rejectDocReason}
+              onChange={(e) => setRejectDocReason(e.target.value)}
+              placeholder="e.g. Document is blurry — please re-scan and upload a clearer copy."
+              rows={3}
+              className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 resize-none"
+            />
+            <p className="text-xs text-stone">
+              Optional but strongly recommended — families can only act on specific feedback.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRejectDocDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmRejectDoc} disabled={isPending}>
+              Reject Document
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
