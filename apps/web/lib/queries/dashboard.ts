@@ -1,4 +1,4 @@
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { formatRelativeTime } from "./utils";
 
 // ─── Types ─────────────────────────────────────────────
@@ -34,7 +34,7 @@ export interface UpcomingDeadline {
 export async function getStaffDashboardStats(
   campusId?: string
 ): Promise<DashboardStats> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Count applications by status
   let appQuery = supabase
@@ -102,7 +102,7 @@ export async function getRecentActivity(opts?: {
   campusId?: string;
   limit?: number;
 }): Promise<RecentActivityItem[]> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
   const limit = opts?.limit ?? 10;
 
   // Fetch recent status changes
@@ -202,7 +202,7 @@ export async function getRecentActivity(opts?: {
 export async function getUpcomingDeadlines(
   campusId?: string
 ): Promise<UpcomingDeadline[]> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
   const now = new Date().toISOString();
 
   let query = supabase
