@@ -1,4 +1,4 @@
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 
 // ─── Enrollment Window Mutations ────────────────────────
@@ -17,7 +17,7 @@ export async function createEnrollmentWindow(
   input: CreateEnrollmentWindowInput
 ): Promise<MutationResult<{ id: string }>> {
   try {
-    const supabase = await createServerClient();
+    const supabase = createServiceRoleClient();
 
     const { data, error } = await supabase
       .from("enrollment_window")
@@ -45,7 +45,7 @@ export async function updateEnrollmentWindowStatus(
   status: "draft" | "open" | "closed" | "archived"
 ): Promise<MutationResult> {
   try {
-    const supabase = await createServerClient();
+    const supabase = createServiceRoleClient();
 
     const { error } = await supabase
       .from("enrollment_window")
@@ -65,41 +65,56 @@ export interface AssignStaffRoleInput {
   user_email: string;
   campus_id: string;
   role: "system_admin" | "enrollment_manager" | "enrollment_staff" | "compliance_auditor";
-  assigned_by: string; // user_profile.id of the assigning admin
+  assigned_by: string;
 }
 
+/**
+ * Invite a staff user by email. Creates the auth user (sends invite email),
+ * creates their user_profile as staff, and assigns their campus role —
+ * all before they ever log in.
+ */
 export async function assignStaffRole(
   input: AssignStaffRoleInput
-): Promise<MutationResult<{ id: string }>> {
+): Promise<MutationResult<{ id: string; invited: boolean }>> {
   try {
-    const supabase = await createServerClient();
+    const supabase = createServiceRoleClient();
 
-    // Look up user_profile by email
-    const { data: profile, error: profileError } = await supabase
-      .from("user_profile")
-      .select("id")
-      .eq("email", input.user_email)
-      .single();
+    // Check if auth user already exists
+    const { data: existingList } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+    const existingAuthUser = existingList?.users?.find(
+      (u) => u.email?.toLowerCase() === input.user_email.toLowerCase()
+    );
 
-    if (profileError || !profile) {
-      return {
-        data: null,
-        error: `No user found with email "${input.user_email}". They must log in at least once first.`,
-      };
+    let authUserId: string;
+    let invited = false;
+
+    if (existingAuthUser) {
+      authUserId = existingAuthUser.id;
+    } else {
+      // Invite via Supabase Auth — creates user + sends invite email
+      const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
+        input.user_email,
+        {
+          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/staff/dashboard`,
+        }
+      );
+      if (inviteError) return { data: null, error: inviteError.message };
+      authUserId = inviteData.user.id;
+      invited = true;
     }
 
-    // Mark as staff
-    await supabase
-      .from("user_profile")
-      .update({ is_staff: true })
-      .eq("id", profile.id);
+    // Ensure user_profile exists and is flagged as staff
+    await supabase.from("user_profile").upsert(
+      { id: authUserId, email: input.user_email, is_staff: true },
+      { onConflict: "id" }
+    );
 
-    // Assign role
+    // Assign campus role
     const { data, error } = await supabase
       .from("user_campus_role")
       .upsert(
         {
-          user_id: profile.id,
+          user_id: authUserId,
           campus_id: input.campus_id,
           role: input.role,
           assigned_by: input.assigned_by,
@@ -110,17 +125,41 @@ export async function assignStaffRole(
       .single();
 
     if (error) return { data: null, error: error.message };
-    return { data: { id: data.id }, error: null };
+    return { data: { id: data.id, invited }, error: null };
   } catch (err) {
-    return { data: null, error: "Failed to assign staff role" };
+    return { data: null, error: "Failed to invite staff user" };
   }
 }
 
-export async function removeStaffRole(
-  roleId: string
+export async function editStaffRole(
+  roleId: string,
+  updates: { role?: string; campus_id?: string }
 ): Promise<MutationResult> {
   try {
-    const supabase = await createServerClient();
+    const supabase = createServiceRoleClient();
+
+    const { error } = await supabase
+      .from("user_campus_role")
+      .update(updates)
+      .eq("id", roleId);
+
+    if (error) return { data: null, error: error.message };
+    return { data: null, error: null };
+  } catch (err) {
+    return { data: null, error: "Failed to update staff role" };
+  }
+}
+
+export async function removeStaffRole(roleId: string): Promise<MutationResult> {
+  try {
+    const supabase = createServiceRoleClient();
+
+    // Grab the user_id before deleting
+    const { data: roleRow } = await supabase
+      .from("user_campus_role")
+      .select("user_id")
+      .eq("id", roleId)
+      .single();
 
     const { error } = await supabase
       .from("user_campus_role")
@@ -128,9 +167,25 @@ export async function removeStaffRole(
       .eq("id", roleId);
 
     if (error) return { data: null, error: error.message };
+
+    // If user has no remaining roles, remove staff flag
+    if (roleRow?.user_id) {
+      const { data: remaining } = await supabase
+        .from("user_campus_role")
+        .select("id")
+        .eq("user_id", roleRow.user_id);
+
+      if (!remaining || remaining.length === 0) {
+        await supabase
+          .from("user_profile")
+          .update({ is_staff: false })
+          .eq("id", roleRow.user_id);
+      }
+    }
+
     return { data: null, error: null };
   } catch (err) {
-    return { data: null, error: "Failed to remove staff role" };
+    return { data: null, error: "Failed to remove staff user" };
   }
 }
 
@@ -141,7 +196,7 @@ export async function updatePacketRequirement(
   updates: { is_active?: boolean; is_required?: boolean }
 ): Promise<MutationResult> {
   try {
-    const supabase = await createServerClient();
+    const supabase = createServiceRoleClient();
 
     const { error } = await supabase
       .from("packet_requirement")
@@ -163,7 +218,7 @@ export async function bulkUpdatePacketRequirements(
   updates: { is_active?: boolean; is_required?: boolean }
 ): Promise<MutationResult> {
   try {
-    const supabase = await createServerClient();
+    const supabase = createServiceRoleClient();
 
     const { error } = await supabase
       .from("packet_requirement")

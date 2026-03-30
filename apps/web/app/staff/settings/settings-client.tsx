@@ -21,6 +21,7 @@ import {
   staffCreateEnrollmentWindow,
   staffUpdateWindowStatus,
   staffAssignRole,
+  staffEditRole,
   staffRemoveRole,
   staffUpdatePacketRequirement,
 } from "./actions";
@@ -741,6 +742,10 @@ function StaffUsersTab({
         role,
         assigned_by: staffUserId,
       });
+      if (!result.error && result.data?.invited) {
+        setFeedback({ type: "success", message: `Invite sent to ${email.trim().toLowerCase()}. They will receive an email to set up their account.` });
+        return;
+      }
       if (result.error) {
         setFeedback({ type: "error", message: result.error });
       } else {
@@ -783,35 +788,14 @@ function StaffUsersTab({
         return;
       }
 
-      // Assign new role first (upsert), then remove old if campus changed
-      const assignResult = await staffAssignRole({
-        user_email: editingUser.email,
+      // Edit the existing role record directly
+      const editResult = await staffEditRole(editingUser.id, {
+        role: editRole,
         campus_id: editCampusId,
-        role: editRole as "enrollment_staff" | "enrollment_manager" | "system_admin" | "compliance_auditor",
-        assigned_by: staffUserId,
       });
-      if (assignResult.error) {
-        setFeedback({ type: "error", message: assignResult.error });
+      if (editResult.error) {
+        setFeedback({ type: "error", message: editResult.error });
         return;
-      }
-
-      // If campus changed, remove old campus role after new one is created
-      if (campusChanged) {
-        const removeResult = await staffRemoveRole(editingUser.id);
-        if (removeResult.error) {
-          // New role already assigned — warn but don't block
-          setFeedback({ type: "error", message: `New role assigned but failed to remove old role: ${removeResult.error}` });
-          router.refresh();
-          return;
-        }
-      } else if (roleChanged) {
-        // Same campus, different role — remove old role entry
-        const removeResult = await staffRemoveRole(editingUser.id);
-        if (removeResult.error) {
-          setFeedback({ type: "error", message: `New role assigned but failed to remove old role: ${removeResult.error}` });
-          router.refresh();
-          return;
-        }
       }
 
       setFeedback({ type: "success", message: `Updated ${editingUser.full_name}'s role.` });
@@ -832,13 +816,13 @@ function StaffUsersTab({
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button>Assign Role</Button>
+              <Button>Invite Staff</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Assign Staff Role</DialogTitle>
+                <DialogTitle>Invite Staff Member</DialogTitle>
                 <DialogDescription>
-                  Assign a campus role to a user. They must have logged in at least once.
+                  Enter their email and role. They'll receive an invite email to set up their account — no prior login required.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">

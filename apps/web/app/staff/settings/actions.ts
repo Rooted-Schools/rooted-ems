@@ -5,6 +5,7 @@ import {
   createEnrollmentWindow,
   updateEnrollmentWindowStatus,
   assignStaffRole,
+  editStaffRole,
   removeStaffRole,
   updatePacketRequirement,
   bulkUpdatePacketRequirements,
@@ -33,6 +34,17 @@ export async function staffUpdateWindowStatus(
 
 export async function staffAssignRole(input: AssignStaffRoleInput) {
   const result = await assignStaffRole(input);
+  if (!result.error) {
+    revalidatePath("/staff/settings");
+  }
+  return result;
+}
+
+export async function staffEditRole(
+  roleId: string,
+  updates: { role?: string; campus_id?: string }
+) {
+  const result = await editStaffRole(roleId, updates);
   if (!result.error) {
     revalidatePath("/staff/settings");
   }

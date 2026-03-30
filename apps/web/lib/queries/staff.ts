@@ -1219,7 +1219,7 @@ export async function getStaffStudents(campusIds?: string[]): Promise<StudentRow
 }
 
 export async function getStaffUsers(campusId?: string): Promise<StaffUserRow[]> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   let query = supabase
     .from("user_campus_role")
