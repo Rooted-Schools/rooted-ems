@@ -1,6 +1,7 @@
 import { createServerClient } from "@rooted-ems/database/server";
 import type { AuthSession, CampusRoleMap } from "@rooted-ems/types";
 import { StaffRole } from "@rooted-ems/types";
+import { redirect } from "next/navigation";
 
 /**
  * Get the current auth session with campus role map.
@@ -55,24 +56,29 @@ export async function getSession(): Promise<AuthSession | null> {
 }
 
 /**
- * Get the current session or throw a redirect.
+ * Get the current session or redirect to login.
  * Use in server components/actions that require auth.
  */
 export async function requireSession(): Promise<AuthSession> {
   const session = await getSession();
   if (!session) {
-    throw new Error("UNAUTHORIZED");
+    redirect("/login");
   }
   return session;
 }
 
 /**
  * Require that the user is a staff member.
+ * Unauthenticated users → /staff-login
+ * Authenticated non-staff users → /login
  */
 export async function requireStaffSession(): Promise<AuthSession> {
-  const session = await requireSession();
+  const session = await getSession();
+  if (!session) {
+    redirect("/staff-login");
+  }
   if (!session.is_staff) {
-    throw new Error("FORBIDDEN");
+    redirect("/login");
   }
   return session;
 }
@@ -164,7 +170,7 @@ export function hasMinRole(session: AuthSession, minRole: string): boolean {
 export async function requireMinRole(minRole: string): Promise<AuthSession> {
   const session = await requireStaffSession();
   if (!hasMinRole(session, minRole)) {
-    throw new Error("FORBIDDEN");
+    redirect("/staff/dashboard"); // Authenticated but insufficient role
   }
   return session;
 }
@@ -175,7 +181,7 @@ export async function requireMinRole(minRole: string): Promise<AuthSession> {
 export async function requireCMOAccess(): Promise<AuthSession> {
   const session = await requireStaffSession();
   if (!isCMOAdmin(session)) {
-    throw new Error("FORBIDDEN");
+    redirect("/staff/dashboard"); // Authenticated but insufficient role
   }
   return session;
 }
