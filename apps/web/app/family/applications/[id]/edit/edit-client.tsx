@@ -35,7 +35,6 @@ const STEPS = [
   { id: "student", label: "Student Info" },
   { id: "guardian", label: "Guardian & Household" },
   { id: "preferences", label: "Preferences & Services" },
-  { id: "documents", label: "Documents" },
   { id: "review", label: "Review & Submit" },
 ] as const;
 
@@ -344,7 +343,6 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
     student: !!form.firstName && !!form.lastName && !!form.dateOfBirth,
     guardian: !!form.guardianFirstName && !!form.guardianLastName && !!form.guardianEmail && !!form.guardianPhone,
     preferences: true,
-    documents: true,
     review: form.agreeTerms && form.dataSharingConsent && !!form.signatureName,
   };
 
@@ -643,36 +641,7 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
         </Card>
       )}
 
-      {/* ───── Step 5: Documents ───── */}
-      {currentStep.id === "documents" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Required Documents</CardTitle>
-            <CardDescription>Upload the following documents for your application. Accepted formats: PDF, JPG, PNG (max 10 MB each).</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {[
-              { name: "Birth Certificate or Proof of Age", desc: "Birth certificate, passport, or baptismal record", required: true },
-              { name: "Proof of Residency", desc: "Utility bill, lease agreement, or mortgage statement", required: true },
-              { name: "Immunization Records", desc: "Current immunization record from your healthcare provider", required: true },
-              { name: "Previous School Records", desc: "Report cards or transcripts from prior school", required: false },
-              { name: "IEP / 504 Plan", desc: "If applicable, upload current plan documentation", required: false },
-              { name: "Custody Documentation", desc: "If applicable, upload custody or guardianship documents", required: false },
-            ].map((doc) => (
-              <div key={doc.name} className="flex items-start justify-between gap-4 p-3 border border-stone/20 rounded-md">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-ink">{doc.name}{doc.required && <span className="text-red-500 ml-0.5">*</span>}</p>
-                  <p className="text-xs text-stone mt-0.5">{doc.desc}</p>
-                </div>
-                <Button variant="outline" size="sm" className="shrink-0" disabled>Upload</Button>
-              </div>
-            ))}
-            <p className="text-xs text-stone">You can submit your application now and upload documents from the <Link href="/family/documents" className="text-rooted-green hover:underline font-medium">Documents</Link> page after saving. Required documents must be uploaded before enrollment is finalized.</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ───── Step 6: Review & Submit ───── */}
+      {/* ───── Step 5: Review & Submit ───── */}
       {currentStep.id === "review" && (
         <Card>
           <CardHeader>
@@ -710,6 +679,39 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
                 {form.specialServicesNotes && <ReviewRow label="Notes" value={form.specialServicesNotes} />}
               </ReviewSection>
             </div>
+            {/* Document checklist notice */}
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-amber-800 mb-2">📋 Documents you'll need to upload after submitting</p>
+              <p className="text-xs text-amber-700 mb-3">
+                Submit your application now — you'll upload these from the{" "}
+                <Link href="/family/documents" className="font-medium underline">Documents</Link>{" "}
+                page after. Required documents must be on file before enrollment is finalized.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                {[
+                  { name: "Birth Certificate or Proof of Age", required: true },
+                  { name: "Proof of Residency", required: true },
+                  { name: "Immunization Records", required: true },
+                  { name: "Previous School Records", required: false },
+                  { name: "IEP / 504 Plan (if applicable)", required: false },
+                  { name: "Custody Documentation (if applicable)", required: false },
+                  { name: "McKinney-Vento Documentation (if applicable)", required: false },
+                  { name: "Income Verification (if applicable)", required: false },
+                  { name: "Parent / Guardian Photo ID", required: false },
+                ].map((doc) => (
+                  <div key={doc.name} className="flex items-center gap-1.5 text-xs py-0.5">
+                    <span className={doc.required ? "text-amber-700" : "text-amber-500"}>
+                      {doc.required ? "●" : "○"}
+                    </span>
+                    <span className={doc.required ? "text-amber-800 font-medium" : "text-amber-700"}>
+                      {doc.name}
+                      {doc.required && <span className="text-red-500 ml-0.5">*</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <hr className="border-stone/20" />
             <div className="space-y-3">
               <div className="flex items-start gap-2">
