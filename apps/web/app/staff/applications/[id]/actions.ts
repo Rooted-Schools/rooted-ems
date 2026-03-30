@@ -191,18 +191,40 @@ export async function staffCompleteAcademicAudit(
 
   if (error) return { data: null, error: error.message };
 
-  // Activate the enrollment record so it shows "Active" on the enrollment page
-  await supabase
-    .from("enrollment")
-    .update({ status: "active", updated_at: new Date().toISOString() })
-    .eq("application_id", applicationId);
-
-  // Fetch student name for the notification
+  // Fetch application details (student + campus) for enrollment activation + notification
   const { data: app } = await supabase
     .from("application")
-    .select("student:student_id (first_name, last_name)")
+    .select("student_id, campus_id, student:student_id (first_name, last_name)")
     .eq("id", applicationId)
     .single();
+
+  // Activate the enrollment record — try application_id first, fall back to student+campus match
+  const primaryUpdate = await supabase
+    .from("enrollment")
+    .update({ status: "active", updated_at: new Date().toISOString() })
+    .eq("application_id", applicationId)
+    .select("id");
+
+  const noneUpdated = !primaryUpdate.data || primaryUpdate.data.length === 0;
+  if (noneUpdated && app?.student_id) {
+    // Fallback: match by student + campus for legacy records without application_id set
+    const { data: fallbackEnrollment } = await supabase
+      .from("enrollment")
+      .select("id")
+      .eq("student_id", app.student_id as string)
+      .eq("campus_id", app.campus_id as string)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (fallbackEnrollment) {
+      await supabase
+        .from("enrollment")
+        .update({ status: "active", application_id: applicationId, updated_at: new Date().toISOString() })
+        .eq("id", fallbackEnrollment.id);
+    }
+  }
 
   const student = (app as unknown as Record<string, unknown>)?.student as Record<string, string> | null;
   const studentName = student ? `${student.first_name} ${student.last_name}` : undefined;
