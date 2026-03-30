@@ -189,7 +189,16 @@ export async function familyDeclineDirect(applicationId: string) {
 export async function familySubmitResponse(applicationId: string, message: string) {
   const result = await createFamilyResponse(applicationId, message);
   if (!result.error) {
+    // Move status back to submitted so staff can see the family responded
+    // and so the "needs info" form disappears for the family
+    await updateApplicationStatus(
+      applicationId,
+      "submitted",
+      "Family responded to information request"
+    );
     revalidatePath(`/family/applications/${applicationId}`);
+    revalidatePath("/family/applications");
+    revalidatePath("/family/dashboard");
   }
   return result;
 }

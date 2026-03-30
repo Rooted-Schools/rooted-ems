@@ -88,6 +88,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
   const [responseFile, setResponseFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [submittingResponse, setSubmittingResponse] = useState(false);
+  const [inlineResponseFeedback, setInlineResponseFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const statusCfg = getStatusConfig(detail.status);
@@ -151,12 +152,13 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
   async function handleSubmitResponse() {
     if (!responseText.trim() && !responseFile) return;
     setSubmittingResponse(true);
+    setInlineResponseFeedback(null);
     try {
       // Send text response if provided
       if (responseText.trim()) {
         const textResult = await familySubmitResponse(detail.id, responseText.trim());
         if (textResult.error) {
-          setFeedback({ type: "error", message: textResult.error });
+          setInlineResponseFeedback({ type: "error", message: textResult.error });
           return;
         }
       }
@@ -164,7 +166,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
       if (responseFile) {
         const uploadResult = await uploadFile(responseFile, detail.guardian_id);
         if (uploadResult.error) {
-          setFeedback({ type: "error", message: uploadResult.error });
+          setInlineResponseFeedback({ type: "error", message: uploadResult.error });
           return;
         }
         const docResult = await familyCreateDocumentRecord({
@@ -177,11 +179,11 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
           storage_path: uploadResult.storagePath,
         });
         if (docResult.error) {
-          setFeedback({ type: "error", message: docResult.error });
+          setInlineResponseFeedback({ type: "error", message: docResult.error });
           return;
         }
       }
-      setFeedback({ type: "success", message: "Your response has been sent to the enrollment team." });
+      setInlineResponseFeedback({ type: "success", message: "✅ Your response has been sent! The enrollment team will follow up." });
       setResponseText("");
       setResponseFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -318,6 +320,13 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
               >
                 {submittingResponse ? "Sending…" : "Send Response"}
               </Button>
+              {inlineResponseFeedback && (
+                <p className={`text-sm font-medium mt-1 ${
+                  inlineResponseFeedback.type === "success" ? "text-green-700" : "text-red-700"
+                }`}>
+                  {inlineResponseFeedback.message}
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
