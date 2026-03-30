@@ -107,6 +107,18 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
   const [prefilledAppId, setPrefilledAppId] = useState<string | undefined>();
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
+  // Hide rejected docs that have already been superseded by a newer re-upload of the same type
+  const visibleDocuments = documents.filter((doc) => {
+    if (doc.status !== "rejected") return true;
+    return !documents.some(
+      (other) =>
+        other.id !== doc.id &&
+        other.document_type === doc.document_type &&
+        other.application_id === doc.application_id &&
+        new Date(other.created_at) > new Date(doc.created_at)
+    );
+  });
+
   function handleReupload(doc: DocumentRow) {
     setPrefilledDocType(doc.document_type);
     setPrefilledAppId(doc.application_id ?? undefined);
@@ -143,10 +155,10 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
       </div>
 
       {/* Document status summary */}
-      {documents.length > 0 && (() => {
-        const pending = documents.filter(d => d.status === "pending").length;
-        const verified = documents.filter(d => d.status === "verified").length;
-        const rejected = documents.filter(d => d.status === "rejected").length;
+      {visibleDocuments.length > 0 && (() => {
+        const pending = visibleDocuments.filter(d => d.status === "pending").length;
+        const verified = visibleDocuments.filter(d => d.status === "verified").length;
+        const rejected = visibleDocuments.filter(d => d.status === "rejected").length;
         return (
           <div className="flex gap-4">
             {pending > 0 && (
@@ -183,7 +195,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
         </div>
       )}
 
-      {documents.length === 0 ? (
+      {visibleDocuments.length === 0 ? (
         <Card>
           <CardContent className="py-8">
             <EmptyState
@@ -202,12 +214,12 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
           <CardHeader>
             <CardTitle className="text-base">Your Documents</CardTitle>
             <CardDescription>
-              {documents.length} document{documents.length !== 1 ? "s" : ""} across your applications.
+              {visibleDocuments.length} document{visibleDocuments.length !== 1 ? "s" : ""} across your applications.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {documents.map((doc) => {
+              {visibleDocuments.map((doc) => {
                 const cfg = docStatusConfig[doc.status] ?? docStatusConfig.pending;
                 const sizeStr = doc.file_size ? formatFileSize(doc.file_size) : "";
                 return (
