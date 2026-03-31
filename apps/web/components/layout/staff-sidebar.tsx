@@ -63,6 +63,7 @@ const NAV_SECTIONS: NavSection[] = [
   },
   {
     items: [
+      { label: "Team", href: "/staff/team", icon: "👥", minRole: "system_admin" },
       { label: "Settings", href: "/staff/settings", icon: "⚙️", minRole: "enrollment_manager" },
     ],
   },
