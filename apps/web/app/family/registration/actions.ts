@@ -5,6 +5,7 @@ import {
   completeRegistrationItem,
   submitRegistrationPacket,
 } from "@/lib/mutations";
+import { requireSession } from "@/lib/auth/get-session";
 
 /**
  * Family completes a single registration item (e.g., emergency contact form, handbook ack).
@@ -13,6 +14,7 @@ export async function familyCompleteRegistrationItem(
   itemId: string,
   data?: Record<string, unknown>
 ) {
+  await requireSession();
   const result = await completeRegistrationItem({ item_id: itemId, data });
 
   if (!result.error) {
@@ -27,6 +29,7 @@ export async function familyCompleteRegistrationItem(
  * Family submits the entire registration packet (after all items are completed).
  */
 export async function familySubmitRegistrationPacket(enrollmentId: string) {
+  await requireSession();
   const result = await submitRegistrationPacket(enrollmentId);
 
   if (!result.error) {

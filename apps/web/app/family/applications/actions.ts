@@ -16,10 +16,12 @@ import { createFamilyResponse } from "@/lib/mutations/notes";
 import { updateApplicationStatus, createEnrollment, initializeRegistrationPacket } from "@/lib/mutations";
 import { notifyStaffOfFamilyResponse } from "@/lib/notify";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
+import { requireSession } from "@/lib/auth/get-session";
 
 // ─── Create Draft ──────────────────────────────────────
 
 export async function familyCreateApplication(input: CreateApplicationInput) {
+  await requireSession();
   const result = await createApplication(input);
 
   if (!result.error) {
@@ -33,6 +35,7 @@ export async function familyCreateApplication(input: CreateApplicationInput) {
 // ─── Update Draft ──────────────────────────────────────
 
 export async function familyUpdateApplication(input: UpdateApplicationInput) {
+  await requireSession();
   const result = await updateApplication(input);
 
   if (!result.error) {
@@ -46,6 +49,7 @@ export async function familyUpdateApplication(input: UpdateApplicationInput) {
 // ─── Submit ────────────────────────────────────────────
 
 export async function familySubmitApplication(applicationId: string) {
+  await requireSession();
   const result = await submitApplication(applicationId);
 
   if (!result.error) {
@@ -63,6 +67,7 @@ export async function familyWithdrawApplication(
   applicationId: string,
   reason?: string
 ) {
+  await requireSession();
   const result = await withdrawApplication(applicationId, reason);
 
   if (!result.error) {
@@ -81,6 +86,7 @@ export async function familyAcceptOffer(
   guardianId: string,
   applicationId: string
 ) {
+  await requireSession();
   const result = await acceptOffer(offerId, guardianId);
 
   if (!result.error) {
@@ -101,6 +107,7 @@ export async function familyDeclineOffer(
   offerId: string,
   applicationId: string
 ) {
+  await requireSession();
   const result = await declineOffer(offerId);
 
   if (!result.error) {
@@ -123,6 +130,7 @@ export async function familyCreateDocumentRecord(input: {
   mime_type: string;
   storage_path: string;
 }) {
+  await requireSession();
   const result = await createDocumentRecord(input);
 
   if (!result.error) {
@@ -138,6 +146,7 @@ export async function familyCreateDocumentRecord(input: {
 
 /** Fallback accept when no offer record exists — transitions status and creates enrollment. */
 export async function familyAcceptDirect(applicationId: string) {
+  await requireSession();
   const supabase = createServiceRoleClient();
 
   // Fetch the application to get student/campus/grade/school_year
@@ -178,6 +187,7 @@ export async function familyAcceptDirect(applicationId: string) {
 }
 
 export async function familyDeclineDirect(applicationId: string) {
+  await requireSession();
   const result = await updateApplicationStatus(applicationId, "declined");
   if (!result.error) {
     revalidatePath("/family/applications");
@@ -188,6 +198,7 @@ export async function familyDeclineDirect(applicationId: string) {
 }
 
 export async function familySubmitResponse(applicationId: string, message: string) {
+  await requireSession();
   const result = await createFamilyResponse(applicationId, message);
   if (!result.error) {
     // Move status back to submitted so staff can see the family responded

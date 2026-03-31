@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireStaffSession } from "@/lib/auth/get-session";
 import {
   staffCreateApplication,
   staffFastTrackEnroll,
@@ -14,6 +15,7 @@ import {
 export async function staffCreateApplicationAction(
   input: CreateApplicationInput & { created_by_staff: string }
 ) {
+  await requireStaffSession();
   const result = await staffCreateApplication(input, { autoSubmit: true });
 
   if (!result.error) {
@@ -31,6 +33,7 @@ export async function staffCreateApplicationAction(
 export async function staffFastTrackEnrollAction(
   input: CreateApplicationInput & { created_by_staff: string }
 ) {
+  await requireStaffSession();
   const result = await staffFastTrackEnroll(input);
 
   if (!result.error) {

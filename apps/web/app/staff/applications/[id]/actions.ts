@@ -5,7 +5,7 @@ import { updateApplicationStatus, withdrawApplication, createNote, reviewDocumen
 import { sendOffer } from "@/lib/mutations/offers";
 import { verifyRegistrationItem, skipRegistrationItem } from "@/lib/mutations/registration";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
-import { getSession } from "@/lib/auth/get-session";
+import { requireStaffSession } from "@/lib/auth/get-session";
 import { notifyFamilyStudentEnrolled, notifyFamilyNeedsInfo } from "@/lib/notify";
 
 // ─── Status Transition ─────────────────────────────────
@@ -15,6 +15,7 @@ export async function changeApplicationStatus(
   newStatus: string,
   reason?: string
 ) {
+  await requireStaffSession();
   const result = await updateApplicationStatus(applicationId, newStatus, reason);
 
   if (!result.error) {
@@ -53,6 +54,7 @@ export async function staffWithdrawApplication(
   applicationId: string,
   reason?: string
 ) {
+  await requireStaffSession();
   const result = await withdrawApplication(applicationId, reason);
 
   if (!result.error) {
@@ -71,6 +73,7 @@ export async function addApplicationNote(
   campusId: string,
   content: string
 ) {
+  await requireStaffSession();
   const result = await createNote({
     entity_type: "application",
     entity_id: applicationId,
@@ -94,6 +97,7 @@ export async function staffReviewDocument(
   decision: "verified" | "rejected",
   rejectionReason?: string
 ) {
+  await requireStaffSession();
   const result = await reviewDocument(documentId, decision, rejectionReason);
 
   if (!result.error) {
@@ -112,6 +116,7 @@ export async function staffMakeOffer(
   expiresAt: string,
   offeredBy: string
 ) {
+  await requireStaffSession();
   const result = await sendOffer({
     application_id: applicationId,
     campus_id: campusId,
@@ -136,8 +141,7 @@ export async function staffVerifyRegistrationItem(
   itemId: string,
   applicationId: string
 ) {
-  const session = await getSession();
-  if (!session?.user_id) return { data: null, error: "Not authenticated" };
+  const session = await requireStaffSession();
 
   const result = await verifyRegistrationItem(itemId, session.user_id);
 
@@ -156,8 +160,7 @@ export async function staffSkipRegistrationItem(
   itemId: string,
   applicationId: string
 ) {
-  const session = await getSession();
-  if (!session?.user_id) return { data: null, error: "Not authenticated" };
+  const session = await requireStaffSession();
 
   const result = await skipRegistrationItem(itemId, session.user_id);
 
@@ -182,6 +185,7 @@ export async function staffCompleteAcademicAudit(
     reviewedBy: string;
   }
 ) {
+  await requireStaffSession();
   // Record audit as an internal note
   const noteContent = [
     `📋 ACADEMIC AUDIT COMPLETE`,
@@ -272,6 +276,7 @@ export async function staffCompleteAcademicAudit(
 // ─── Manually advance packet-complete application to placement_review ─────
 
 export async function staffConfirmPacketComplete(applicationId: string) {
+  await requireStaffSession();
   const supabase = createServiceRoleClient();
 
   const { error } = await supabase
@@ -297,8 +302,7 @@ export async function staffGetSignedUrl(
 ): Promise<{ url: string | null; error: string | null }> {
   if (!storagePath) return { url: null, error: "No file path provided." };
 
-  const session = await getSession();
-  if (!session?.user_id) return { url: null, error: "Not authenticated." };
+  await requireStaffSession();
 
   const supabase = createServiceRoleClient();
   const { data, error } = await supabase.storage

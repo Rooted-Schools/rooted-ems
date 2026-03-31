@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireStaffSession } from "@/lib/auth/get-session";
 import {
   updateInquiryStatus,
   assignInquiryStaff,
@@ -9,12 +10,14 @@ import {
 } from "@/lib/mutations";
 
 export async function updateInquiryStatusAction(inquiryId: string, status: string) {
+  await requireStaffSession();
   const result = await updateInquiryStatus(inquiryId, status);
   if (!result.error) revalidatePath("/staff/inquiries");
   return result;
 }
 
 export async function assignInquiryStaffAction(inquiryId: string, staffId: string) {
+  await requireStaffSession();
   const result = await assignInquiryStaff(inquiryId, staffId);
   if (!result.error) revalidatePath("/staff/inquiries");
   return result;
@@ -26,6 +29,7 @@ export async function addContactLogAction(
   notes: string | null,
   staffId: string
 ) {
+  await requireStaffSession();
   const result = await addContactLog(inquiryId, channel, notes, staffId);
   if (!result.error) revalidatePath("/staff/inquiries");
   return result;
@@ -37,6 +41,7 @@ export async function convertInquiryAction(
   gradeLevelId: string,
   staffUserId: string
 ) {
+  await requireStaffSession();
   const result = await convertInquiryToApplication(
     inquiryId,
     enrollmentWindowId,

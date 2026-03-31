@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireStaffSession } from "@/lib/auth/get-session";
 import {
   sendOffer,
   acceptOffer,
@@ -20,6 +21,7 @@ export async function staffSendOffer(
   expiresAt: string,
   offeredBy: string
 ) {
+  await requireStaffSession();
   const result = await sendOffer({
     application_id: applicationId,
     campus_id: campusId,
@@ -42,6 +44,7 @@ export async function staffRevokeOffer(
   revokedBy: string,
   reason?: string
 ) {
+  await requireStaffSession();
   const result = await revokeOffer(offerId, revokedBy, reason);
 
   if (!result.error) {
@@ -55,6 +58,7 @@ export async function staffRevokeOffer(
 }
 
 export async function staffExpireOffer(offerId: string) {
+  await requireStaffSession();
   const result = await expireOffer(offerId);
 
   if (!result.error) {
@@ -71,6 +75,7 @@ export async function staffAcceptOfferOnBehalf(
   offerId: string,
   guardianId: string
 ) {
+  await requireStaffSession();
   const result = await acceptOffer(offerId, guardianId);
 
   if (!result.error) {
@@ -85,6 +90,7 @@ export async function staffAcceptOfferOnBehalf(
 }
 
 export async function staffDeclineOfferOnBehalf(offerId: string) {
+  await requireStaffSession();
   const result = await declineOffer(offerId);
 
   if (!result.error) {
@@ -106,6 +112,7 @@ export async function staffConvertToEnrollment(
   schoolYearId: string,
   applicationId: string
 ) {
+  await requireStaffSession();
   const result = await createEnrollment({
     student_id: studentId,
     campus_id: campusId,
@@ -139,6 +146,7 @@ export async function staffPromoteFromWaitlist(
   offeredBy: string,
   expiresAt: string
 ) {
+  await requireStaffSession();
   const result = await promoteFromWaitlist(waitlistPositionId, offeredBy, expiresAt);
 
   if (!result.error) {
@@ -156,6 +164,7 @@ export async function staffRemoveFromWaitlist(
   waitlistPositionId: string,
   reason: string
 ) {
+  await requireStaffSession();
   const result = await removeFromWaitlist(waitlistPositionId, reason);
 
   if (!result.error) {

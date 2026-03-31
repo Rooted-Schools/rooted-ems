@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireStaffSession } from "@/lib/auth/get-session";
 import {
   createLotteryRun,
   runLotteryPreview,
@@ -13,6 +14,7 @@ import {
 // ─── Create Draft Lottery Run ─────────────────────────
 
 export async function staffCreateLotteryRun(input: CreateLotteryRunInput) {
+  await requireStaffSession();
   const result = await createLotteryRun(input);
 
   if (!result.error) {
@@ -26,6 +28,7 @@ export async function staffCreateLotteryRun(input: CreateLotteryRunInput) {
 // ─── Run Preview ──────────────────────────────────────
 
 export async function staffRunLotteryPreview(runId: string) {
+  await requireStaffSession();
   const result = await runLotteryPreview(runId);
 
   if (!result.error) {
@@ -39,11 +42,13 @@ export async function staffRunLotteryPreview(runId: string) {
 // ─── Finalize as Official ─────────────────────────────
 
 export async function staffFinalizeLottery(runId: string, executedBy: string) {
+  await requireStaffSession();
   const result = await finalizeLotteryRun(runId, executedBy);
 
   if (!result.error) {
     revalidatePath("/staff/lottery");
     revalidatePath(`/staff/lottery/${runId}`);
+    revalidatePath("/staff/dashboard");
   }
 
   return result;
@@ -52,6 +57,7 @@ export async function staffFinalizeLottery(runId: string, executedBy: string) {
 // ─── Archive Lottery Run ──────────────────────────────
 
 export async function staffArchiveLottery(runId: string) {
+  await requireStaffSession();
   const result = await archiveLotteryRun(runId);
 
   if (!result.error) {
@@ -69,6 +75,7 @@ export async function staffSendLotteryOffers(
   expiresAt: string,
   offeredBy: string
 ) {
+  await requireStaffSession();
   const result = await sendOffersFromLottery(runId, expiresAt, offeredBy);
 
   if (!result.error) {

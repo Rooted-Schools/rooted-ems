@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireStaffSession } from "@/lib/auth/get-session";
 import { createEnrollment, withdrawEnrollment, syncEnrollmentSIS } from "@/lib/mutations";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { notifyFamilyStudentEnrolled } from "@/lib/notify";
@@ -13,6 +14,7 @@ export async function staffCreateEnrollment(
   acceptanceId?: string,
   applicationId?: string
 ) {
+  await requireStaffSession();
   const result = await createEnrollment({
     student_id: studentId,
     campus_id: campusId,
@@ -35,6 +37,7 @@ export async function staffWithdrawEnrollment(
   enrollmentId: string,
   reason: string
 ) {
+  await requireStaffSession();
   const result = await withdrawEnrollment(enrollmentId, reason);
 
   if (!result.error) {
@@ -51,6 +54,7 @@ export async function staffSyncSIS(
   enrollmentId: string,
   sisStudentId: string
 ) {
+  await requireStaffSession();
   const result = await syncEnrollmentSIS(enrollmentId, sisStudentId);
 
   if (!result.error) {
@@ -66,6 +70,7 @@ export async function staffActivateEnrollment(
   enrollmentId: string,
   applicationId?: string | null
 ): Promise<{ data: null; error: string | null }> {
+  await requireStaffSession();
   const supabase = createServiceRoleClient();
 
   const { error } = await supabase

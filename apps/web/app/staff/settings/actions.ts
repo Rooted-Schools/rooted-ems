@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireStaffSession } from "@/lib/auth/get-session";
 import {
   createEnrollmentWindow,
   updateEnrollmentWindowStatus,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/mutations/settings";
 
 export async function staffCreateEnrollmentWindow(input: CreateEnrollmentWindowInput) {
+  await requireStaffSession();
   const result = await createEnrollmentWindow(input);
   if (!result.error) {
     revalidatePath("/staff/settings");
@@ -25,6 +27,7 @@ export async function staffUpdateWindowStatus(
   windowId: string,
   status: "draft" | "open" | "closed" | "archived"
 ) {
+  await requireStaffSession();
   const result = await updateEnrollmentWindowStatus(windowId, status);
   if (!result.error) {
     revalidatePath("/staff/settings");
@@ -33,6 +36,7 @@ export async function staffUpdateWindowStatus(
 }
 
 export async function staffAssignRole(input: AssignStaffRoleInput) {
+  await requireStaffSession();
   const result = await assignStaffRole(input);
   if (!result.error) {
     revalidatePath("/staff/settings");
@@ -44,6 +48,7 @@ export async function staffEditRole(
   roleId: string,
   updates: { role?: string; campus_id?: string }
 ) {
+  await requireStaffSession();
   const result = await editStaffRole(roleId, updates);
   if (!result.error) {
     revalidatePath("/staff/settings");
@@ -52,6 +57,7 @@ export async function staffEditRole(
 }
 
 export async function staffRemoveRole(roleId: string) {
+  await requireStaffSession();
   const result = await removeStaffRole(roleId);
   if (!result.error) {
     revalidatePath("/staff/settings");
@@ -63,6 +69,7 @@ export async function staffUpdatePacketRequirement(
   requirementId: string,
   updates: { is_active?: boolean; is_required?: boolean }
 ) {
+  await requireStaffSession();
   const result = await updatePacketRequirement(requirementId, updates);
   if (!result.error) {
     revalidatePath("/staff/settings");
@@ -75,6 +82,7 @@ export async function staffBulkUpdatePacketRequirements(
   requirementIds: string[],
   updates: { is_active?: boolean; is_required?: boolean }
 ) {
+  await requireStaffSession();
   const result = await bulkUpdatePacketRequirements(requirementIds, updates);
   if (!result.error) {
     revalidatePath("/staff/settings");

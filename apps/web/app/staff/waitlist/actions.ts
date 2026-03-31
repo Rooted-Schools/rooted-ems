@@ -2,12 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { promoteFromWaitlist, removeFromWaitlist } from "@/lib/mutations";
+import { requireStaffSession } from "@/lib/auth/get-session";
 
 export async function staffPromoteFromWaitlist(
   waitlistPositionId: string,
   offeredBy: string,
   expiresAt: string
 ) {
+  await requireStaffSession();
   const result = await promoteFromWaitlist(waitlistPositionId, offeredBy, expiresAt);
 
   if (!result.error) {
@@ -25,6 +27,7 @@ export async function staffRemoveFromWaitlist(
   waitlistPositionId: string,
   reason: string
 ) {
+  await requireStaffSession();
   const result = await removeFromWaitlist(waitlistPositionId, reason);
 
   if (!result.error) {
