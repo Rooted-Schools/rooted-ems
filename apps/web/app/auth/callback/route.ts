@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { NextResponse, type NextRequest } from "next/server";
 
 /** Validate redirect path to prevent open redirect attacks. */
@@ -53,10 +54,27 @@ export async function GET(request: NextRequest) {
     }
   );
 
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  const { data: sessionData, error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
     return NextResponse.redirect(`${origin}${errorRedirect}?error=auth_failed`);
+  }
+
+  // For staff routes: verify the authenticated user has is_staff = true.
+  // A valid Google account is not the same as a provisioned staff account.
+  if (!isFamily && sessionData?.user) {
+    const adminClient = createServiceRoleClient();
+    const { data: profile } = await adminClient
+      .from("user_profile")
+      .select("is_staff")
+      .eq("id", sessionData.user.id)
+      .single();
+
+    if (!profile?.is_staff) {
+      // Sign the user back out so they don't remain logged into a staff-less session
+      await supabase.auth.signOut();
+      return NextResponse.redirect(`${origin}/staff-login?error=not_staff`);
+    }
   }
 
   return successResponse;

@@ -7,6 +7,10 @@ import { createBrowserClient } from "@rooted-ems/database";
 const ERROR_MESSAGES: Record<string, string> = {
   no_campus_access:
     "Your account is not assigned to any school campus. Please contact your school administrator to request access.",
+  not_staff:
+    "This Google account is not set up as a staff account. Please contact your administrator to provision your access.",
+  auth_failed:
+    "Authentication failed. Please try again or contact your administrator.",
 };
 
 export function StaffLoginForm() {
