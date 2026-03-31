@@ -119,9 +119,13 @@ export function resolveActiveCampus(
   // Single-campus staff always see only their campus
   if (accessible.length === 1) return accessible[0];
 
-  // Multi-campus staff: use selection, or undefined for "all"
-  if (selectedCampusId && accessible.includes(selectedCampusId)) {
-    return selectedCampusId;
+  // Honor an explicit campus selection when provided
+  if (selectedCampusId && selectedCampusId !== "all") {
+    // Global/CMO admin with no explicit role assignments can access any campus;
+    // scoped staff can only select campuses in their accessible list.
+    if (accessible.length === 0 || accessible.includes(selectedCampusId)) {
+      return selectedCampusId;
+    }
   }
 
   return undefined; // "All campuses"
