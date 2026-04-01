@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { markNotificationsRead } from "./actions";
+import { useLocale } from "@/lib/i18n/locale-context";
 
 interface FamilyMessage {
   id: string;
@@ -22,6 +23,7 @@ interface MessagesClientProps {
 }
 
 export function MessagesClient({ messages }: MessagesClientProps) {
+  const { t } = useLocale();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [filter, setFilter] = useState<"all" | "unread">("all");
@@ -51,7 +53,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-ink">Messages</h1>
+          <h1 className="text-2xl font-bold text-ink">{t("nav.messages")}</h1>
           <p className="text-sm text-stone mt-1">
             Notifications and updates about your enrollment applications.
           </p>
@@ -63,7 +65,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
             onClick={handleMarkAllRead}
             disabled={isPending}
           >
-            {isPending ? "Marking..." : "Mark all read"}
+            {isPending ? t("msgs.marking") : t("msgs.markAllRead")}
           </Button>
         )}
       </div>
@@ -86,7 +88,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-amber-600">{unreadCount}</p>
-                  <p className="text-xs text-stone">Unread</p>
+                  <p className="text-xs text-stone">{t("msgs.unread")}</p>
                 </div>
               </div>
             </CardContent>
@@ -99,7 +101,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-ink/60">{readCount}</p>
-                  <p className="text-xs text-stone">Read</p>
+                  <p className="text-xs text-stone">{t("msgs.read")}</p>
                 </div>
               </div>
             </CardContent>
@@ -112,7 +114,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
           <CardContent className="py-12">
             <EmptyState
               icon="📬"
-              title="No messages yet"
+              title={t("msgs.noMessages")}
               description="You will receive notifications here when there are updates to your enrollment applications — like status changes, document requests, or seat offers."
             />
           </CardContent>
@@ -120,9 +122,9 @@ export function MessagesClient({ messages }: MessagesClientProps) {
       ) : displayed.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center">
-            <p className="text-sm text-stone">All caught up! No unread messages.</p>
+            <p className="text-sm text-stone">{t("msgs.allCaughtUp")}</p>
             <Button variant="outline" size="sm" className="mt-3" onClick={() => setFilter("all")}>
-              Show all messages
+              {t("msgs.showAll")}
             </Button>
           </CardContent>
         </Card>
@@ -132,7 +134,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-base">
-                  {filter === "unread" ? "Unread Messages" : "All Messages"}
+                  {filter === "unread" ? t("msgs.unreadMessages") : t("msgs.allMessages")}
                 </CardTitle>
                 <CardDescription>
                   {displayed.length} message{displayed.length !== 1 ? "s" : ""}
@@ -141,7 +143,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
                       onClick={() => setFilter("all")}
                       className="ml-2 text-rooted-green hover:underline"
                     >
-                      Show all
+                      {t("msgs.showAll")}
                     </button>
                   )}
                 </CardDescription>
@@ -219,7 +221,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
                           disabled={isPending}
                           className="text-xs text-stone hover:text-ink/60 transition-colors"
                         >
-                          Mark as read
+                          {t("msgs.markRead")}
                         </button>
                       )}
                     </div>

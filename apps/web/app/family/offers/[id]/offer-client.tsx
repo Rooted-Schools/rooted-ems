@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import type { FamilyOfferDetail } from "@/lib/queries";
 import { familyAcceptOffer, familyDeclineOffer } from "../../applications/actions";
+import { useLocale } from "@/lib/i18n/locale-context";
 
 interface Props {
   offer: FamilyOfferDetail;
@@ -34,6 +35,7 @@ function formatExpiry(isoString: string): string {
 }
 
 export function OfferResponseClient({ offer, guardianId }: Props) {
+  const { t } = useLocale();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showAcceptDialog, setShowAcceptDialog] = useState(false);
@@ -47,14 +49,14 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
       <Card>
         <CardContent className="py-10 text-center space-y-4">
           <div className="text-4xl">✅</div>
-          <h2 className="text-xl font-bold text-ink">Offer Accepted</h2>
+          <h2 className="text-xl font-bold text-ink">{t("offers.offerAccepted")}</h2>
           <p className="text-sm text-stone max-w-xs mx-auto">
             You have already accepted the offer for {offer.student_name} at{" "}
             {offer.campus_name}. Complete registration to finalize enrollment.
           </p>
           <Link href="/family/registration">
             <Button className="bg-rooted-green hover:bg-rooted-green/90 text-white">
-              Go to Registration
+              {t("offers.goToReg")}
             </Button>
           </Link>
         </CardContent>
@@ -67,13 +69,13 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
       <Card>
         <CardContent className="py-10 text-center space-y-4">
           <div className="text-4xl">🚫</div>
-          <h2 className="text-xl font-bold text-ink">Offer Declined</h2>
+          <h2 className="text-xl font-bold text-ink">{t("offers.offerDeclined")}</h2>
           <p className="text-sm text-stone max-w-xs mx-auto">
             You previously declined this offer for {offer.student_name}. If
             this was a mistake, please contact the school directly.
           </p>
           <Link href="/family/dashboard">
-            <Button variant="outline">Return to Dashboard</Button>
+            <Button variant="outline">{t("common.backToDashboard")}</Button>
           </Link>
         </CardContent>
       </Card>
@@ -85,13 +87,13 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
       <Card>
         <CardContent className="py-10 text-center space-y-4">
           <div className="text-4xl">⏰</div>
-          <h2 className="text-xl font-bold text-ink">Offer Expired</h2>
+          <h2 className="text-xl font-bold text-ink">{t("offers.offerExpired")}</h2>
           <p className="text-sm text-stone max-w-xs mx-auto">
             The offer deadline for {offer.student_name} has passed. Please
             contact the school to ask about your options.
           </p>
           <Link href="/family/dashboard">
-            <Button variant="outline">Return to Dashboard</Button>
+            <Button variant="outline">{t("common.backToDashboard")}</Button>
           </Link>
         </CardContent>
       </Card>
@@ -132,7 +134,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
       <div className="bg-rooted-green/10 border border-rooted-green/30 rounded-xl p-6 text-center space-y-2">
         <div className="text-5xl">🎉</div>
         <h1 className="text-2xl font-bold text-ink">
-          Congratulations!
+          {t("offers.congratulations")}
         </h1>
         <p className="text-sm text-ink/70">
           {offer.student_name} has been offered a seat at{" "}
@@ -143,24 +145,24 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
       {/* ── Offer details card ── */}
       <Card>
         <CardHeader className="pb-2">
-          <h2 className="text-base font-semibold text-ink">Offer Details</h2>
+          <h2 className="text-base font-semibold text-ink">{t("offers.offerDetails")}</h2>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">Student</p>
+              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">{t("offers.student")}</p>
               <p className="font-medium text-ink">{offer.student_name}</p>
             </div>
             <div>
-              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">Grade</p>
+              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">{t("offers.grade")}</p>
               <p className="font-medium text-ink">{offer.grade}</p>
             </div>
             <div>
-              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">School</p>
+              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">{t("offers.school")}</p>
               <p className="font-medium text-ink">{offer.campus_name}</p>
             </div>
             <div>
-              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">Deadline</p>
+              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">{t("offers.deadline")}</p>
               <div>
                 {offer.is_urgent ? (
                   <Badge variant="destructive" className="text-xs">
@@ -213,7 +215,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
           onClick={() => setShowAcceptDialog(true)}
           disabled={isPending}
         >
-          Accept Offer
+          {t("offers.accept")}
         </Button>
         <Button
           size="lg"
@@ -222,7 +224,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
           onClick={() => setShowDeclineDialog(true)}
           disabled={isPending}
         >
-          Decline Offer
+          {t("offers.decline")}
         </Button>
       </div>
 
@@ -251,7 +253,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
       <Dialog open={showAcceptDialog} onOpenChange={setShowAcceptDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Accept the Offer?</DialogTitle>
+            <DialogTitle>{t("offers.acceptTitle")}</DialogTitle>
             <DialogDescription>
               You are accepting the enrollment offer for{" "}
               <strong>{offer.student_name}</strong> at{" "}
@@ -265,14 +267,14 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
               onClick={() => setShowAcceptDialog(false)}
               disabled={isPending}
             >
-              Cancel
+              {t("reg.dialog.cancel")}
             </Button>
             <Button
               className="bg-rooted-green hover:bg-rooted-green/90 text-white"
               onClick={handleAccept}
               disabled={isPending}
             >
-              {isPending ? "Accepting…" : "Yes, Accept Offer"}
+              {isPending ? t("offers.accepting") : t("offers.yesAccept")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -282,7 +284,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
       <Dialog open={showDeclineDialog} onOpenChange={setShowDeclineDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Decline the Offer?</DialogTitle>
+            <DialogTitle>{t("offers.declineTitle")}</DialogTitle>
             <DialogDescription>
               Are you sure you want to decline the offer for{" "}
               <strong>{offer.student_name}</strong> at{" "}
@@ -297,14 +299,14 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
               onClick={() => setShowDeclineDialog(false)}
               disabled={isPending}
             >
-              Keep Offer
+              {t("offers.keepOffer")}
             </Button>
             <Button
               variant="destructive"
               onClick={handleDecline}
               disabled={isPending}
             >
-              {isPending ? "Declining…" : "Yes, Decline Offer"}
+              {isPending ? t("offers.declining") : t("offers.yesDecline")}
             </Button>
           </DialogFooter>
         </DialogContent>

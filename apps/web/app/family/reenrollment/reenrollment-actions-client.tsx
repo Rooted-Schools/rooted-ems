@@ -3,12 +3,14 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { familyAcceptReenrollment, familyDeclineReenrollment } from "./actions";
+import { useLocale } from "@/lib/i18n/locale-context";
 
 interface ReenrollmentActionsProps {
   applicationId: string;
 }
 
 export function ReenrollmentActions({ applicationId }: ReenrollmentActionsProps) {
+  const { t } = useLocale();
   const [accepting, setAccepting] = React.useState(false);
   const [declining, setDeclining] = React.useState(false);
   const [done, setDone] = React.useState<"accepted" | "declined" | null>(null);
@@ -42,7 +44,7 @@ export function ReenrollmentActions({ applicationId }: ReenrollmentActionsProps)
     return (
       <div className="bg-rooted-green/10 border border-rooted-green/30 rounded-lg px-4 py-3">
         <p className="text-sm font-medium text-rooted-green">
-          Re-enrollment accepted. Your registration packet will be ready shortly.
+          {t("reenroll.acceptSuccess")}
         </p>
       </div>
     );
@@ -52,7 +54,7 @@ export function ReenrollmentActions({ applicationId }: ReenrollmentActionsProps)
     return (
       <div className="bg-stone/10 border border-stone/20 rounded-lg px-4 py-3">
         <p className="text-sm text-stone">
-          You have declined this re-enrollment offer.
+          {t("reenroll.declineSuccess")}
         </p>
       </div>
     );
@@ -71,14 +73,14 @@ export function ReenrollmentActions({ applicationId }: ReenrollmentActionsProps)
           disabled={accepting || declining}
           className="bg-rooted-green hover:bg-rooted-green/90 text-white"
         >
-          {accepting ? "Accepting..." : "Accept Re-enrollment"}
+          {accepting ? t("reenroll.accepting") : t("reenroll.acceptLabel")}
         </Button>
         <Button
           variant="outline"
           onClick={handleDecline}
           disabled={accepting || declining}
         >
-          {declining ? "Declining..." : "Decline"}
+          {declining ? t("reenroll.declining") : t("reenroll.decline")}
         </Button>
       </div>
     </div>

@@ -16,6 +16,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { uploadFile, getSignedUrl, formatFileSize, validateFile } from "@/lib/storage/upload";
 import { familyCreateDocumentRecord } from "@/app/family/applications/actions";
+import { useLocale } from "@/lib/i18n/locale-context";
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -47,11 +48,12 @@ interface DocumentsClientProps {
 
 // ─── Constants ──────────────────────────────────────────
 
-const docStatusConfig: Record<string, { label: string; variant: "success" | "warning" | "destructive" | "secondary" }> = {
-  pending: { label: "Pending Review", variant: "warning" },
-  verified: { label: "Verified", variant: "success" },
-  rejected: { label: "Needs Re-upload", variant: "destructive" },
-  expired: { label: "Expired", variant: "secondary" },
+type DocStatusKey = "pending" | "verified" | "rejected" | "expired";
+const docStatusVariant: Record<DocStatusKey, "success" | "warning" | "destructive" | "secondary"> = {
+  pending: "warning",
+  verified: "success",
+  rejected: "destructive",
+  expired: "secondary",
 };
 
 const documentTypes = [
@@ -100,6 +102,7 @@ function formatDocType(type: string): string {
 // ─── Main Component ─────────────────────────────────────
 
 export function DocumentsClient({ documents, applications, userId }: DocumentsClientProps) {
+  const { t } = useLocale();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showUpload, setShowUpload] = useState(false);
@@ -141,7 +144,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-ink">Documents</h1>
+          <h1 className="text-2xl font-bold text-ink">{t("nav.documents")}</h1>
           <p className="text-sm text-stone mt-1">
             Uploaded documents for your enrollment applications.
           </p>
@@ -150,7 +153,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
           onClick={() => setShowUpload(true)}
           disabled={applications.length === 0}
         >
-          Upload Document
+          {t("docs.upload")}
         </Button>
       </div>
 
@@ -164,19 +167,19 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
             {pending > 0 && (
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                <span className="text-sm text-ink/60">{pending} pending review</span>
+                <span className="text-sm text-ink/60">{pending} {t("docs.status.pending").toLowerCase()}</span>
               </div>
             )}
             {verified > 0 && (
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                <span className="text-sm text-ink/60">{verified} verified</span>
+                <span className="text-sm text-ink/60">{verified} {t("common.verified").toLowerCase()}</span>
               </div>
             )}
             {rejected > 0 && (
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                <span className="text-sm text-red-600 font-medium">{rejected} need re-upload</span>
+                <span className="text-sm text-red-600 font-medium">{rejected} {t("docs.status.rejected").toLowerCase()}</span>
               </div>
             )}
           </div>
@@ -200,7 +203,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
           <CardContent className="py-8">
             <EmptyState
               icon="📄"
-              title="No documents yet"
+              title={t("docs.noDocs")}
               description={
                 applications.length === 0
                   ? "Start an enrollment application to upload documents."
@@ -212,7 +215,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Your Documents</CardTitle>
+            <CardTitle className="text-base">{t("docs.yourDocs")}</CardTitle>
             <CardDescription>
               {visibleDocuments.length} document{visibleDocuments.length !== 1 ? "s" : ""} across your applications.
             </CardDescription>
@@ -220,7 +223,9 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
           <CardContent>
             <div className="space-y-3">
               {visibleDocuments.map((doc) => {
-                const cfg = docStatusConfig[doc.status] ?? docStatusConfig.pending;
+                const statusKey = (doc.status in docStatusVariant ? doc.status : "pending") as DocStatusKey;
+                const statusVariant = docStatusVariant[statusKey];
+                const statusLabel = doc.status === "verified" ? t("common.verified") : doc.status === "rejected" ? t("docs.status.rejected") : doc.status === "expired" ? t("docs.status.expired") : t("docs.status.pending");
                 const sizeStr = doc.file_size ? formatFileSize(doc.file_size) : "";
                 return (
                   <div
@@ -249,13 +254,13 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                      <Badge variant={statusVariant}>{statusLabel}</Badge>
                       {doc.status === "rejected" && (
                         <Button
                           size="sm"
                           onClick={() => handleReupload(doc)}
                         >
-                          Re-upload
+                          {t("docs.reupload")}
                         </Button>
                       )}
                       <Button
@@ -264,7 +269,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
                         onClick={() => handleViewDocument(doc.storage_path)}
                         disabled={!doc.storage_path}
                       >
-                        View
+                        {t("docs.view")}
                       </Button>
                     </div>
                   </div>
@@ -327,6 +332,7 @@ function UploadDialog({
   onUploadComplete: (message: string) => void;
   onError: (message: string) => void;
 }) {
+  const { t } = useLocale();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedApp, setSelectedApp] = useState(initialAppId ?? applications[0]?.id ?? "");
   const [docType, setDocType] = useState(initialDocType ?? "birth_certificate");
@@ -488,13 +494,13 @@ function UploadDialog({
             onClick={() => onOpenChange(false)}
             disabled={uploading}
           >
-            Cancel
+            {t("reg.dialog.cancel")}
           </Button>
           <Button
             onClick={handleUpload}
             disabled={uploading || !selectedFile || !selectedApp || !!validationError}
           >
-            {uploading ? "Uploading..." : "Upload"}
+            {uploading ? t("reg.upload.uploading") : t("docs.upload")}
           </Button>
         </DialogFooter>
       </DialogContent>

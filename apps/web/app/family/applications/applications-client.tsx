@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import Link from "next/link";
 import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationRow } from "@/lib/queries";
+import { useLocale } from "@/lib/i18n/locale-context";
 
 function getStatusMessage(status: string): string {
   switch (status) {
@@ -54,30 +55,31 @@ interface FamilyApplicationsClientProps {
 }
 
 export function FamilyApplicationsClient({ applications }: FamilyApplicationsClientProps) {
+  const { t } = useLocale();
   const hasApplications = applications.length > 0;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-ink">My Applications</h1>
+          <h1 className="text-2xl font-bold text-ink">{t("apps.heading")}</h1>
           <p className="text-sm text-stone mt-1">
             Track the status of your children&apos;s enrollment applications.
           </p>
         </div>
         <Link href="/family/applications/new">
-          <Button>Start New Application</Button>
+          <Button>{t("dashboard.startNewApplication")}</Button>
         </Link>
       </div>
 
       {!hasApplications ? (
         <EmptyState
           icon="📝"
-          title="No applications yet"
+          title={t("apps.noApplications")}
           description="Start a new application to enroll your child at a rootedschool campus."
         >
           <Link href="/family/applications/new">
-            <Button>Start New Application</Button>
+            <Button>{t("apps.startApplication")}</Button>
           </Link>
         </EmptyState>
       ) : (
@@ -125,7 +127,7 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
                   {needsAction && (
                     <div className="bg-white border border-amber-200 rounded-md p-3">
                       <p className="text-xs font-medium text-amber-800 mb-1">
-                        Action needed
+                        {t("apps.actionNeeded")}
                       </p>
                       <p className="text-sm text-ink/70">
                         {isDraft
@@ -140,19 +142,19 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
                   <div className="flex items-center justify-between pt-2 border-t border-rooted-gray">
                     <div className="flex gap-4 text-xs text-stone">
                       {app.submitted_at && (
-                        <span>Submitted: {formatDate(app.submitted_at)}</span>
+                        <span>{t("apps.submitted")}: {formatDate(app.submitted_at)}</span>
                       )}
-                      <span>Updated: {formatDate(app.updated_at)}</span>
+                      <span>{t("apps.lastUpdated")}: {formatDate(app.updated_at)}</span>
                     </div>
                     <div className="flex gap-2">
                       {isDraft ? (
                         <Link href={`/family/applications/${app.id}/edit`}>
-                          <Button size="sm">Continue Application</Button>
+                          <Button size="sm">{t("apps.continueApp")}</Button>
                         </Link>
                       ) : (
                         <Link href={`/family/applications/${app.id}`}>
                           <Button variant="outline" size="sm">
-                            View Details
+                            {t("apps.viewDetails")}
                           </Button>
                         </Link>
                       )}

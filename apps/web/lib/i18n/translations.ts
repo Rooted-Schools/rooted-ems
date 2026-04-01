@@ -50,6 +50,10 @@ const dict = {
   "dashboard.enrollmentOpen":       { en: "Enrollment is now open",      es: "Las inscripciones ya están abiertas" },
   "dashboard.applyNow":             { en: "Apply Now",                   es: "Solicitar Ahora" },
   "dashboard.yourProgress":         { en: "Your Progress",              es: "Tu Progreso" },
+  "dashboard.completeReg":          { en: "Complete Registration",       es: "Completar Registro" },
+  "dashboard.goToReg":              { en: "Go to Registration",          es: "Ir al Registro" },
+  "dashboard.respond":              { en: "Respond",                     es: "Responder" },
+  "dashboard.ourSchools":           { en: "Our Schools",                 es: "Nuestras Escuelas" },
 
   // ─── Enrollment Steps ─────────────────────────────────────────────────────
   "steps.applied":        { en: "Applied",        es: "Solicitado" },
@@ -135,10 +139,52 @@ const dict = {
   "reenroll.heading":     { en: "Re-enrollment Offers",    es: "Ofertas de Re-matrícula" },
   "reenroll.noOffers":    { en: "No re-enrollment offers.", es: "Sin ofertas de re-matrícula." },
   "reenroll.noOffersDetail": { en: "Your school will send re-enrollment offers when seats are confirmed for the upcoming year.", es: "Su escuela enviará ofertas de re-matrícula cuando los cupos se confirmen para el próximo año." },
-  "reenroll.accept":      { en: "Accept & Enroll",         es: "Aceptar y Matricularse" },
-  "reenroll.decline":     { en: "Decline",                 es: "Rechazar" },
-  "reenroll.accepting":   { en: "Accepting...",            es: "Aceptando..." },
-  "reenroll.declining":   { en: "Rechazando...",           es: "Rechazando..." },
+  "reenroll.accept":         { en: "Accept & Enroll",         es: "Aceptar y Matricularse" },
+  "reenroll.acceptLabel":    { en: "Accept Re-enrollment",    es: "Aceptar Re-matrícula" },
+  "reenroll.decline":        { en: "Decline",                 es: "Rechazar" },
+  "reenroll.accepting":      { en: "Accepting...",            es: "Aceptando..." },
+  "reenroll.declining":      { en: "Declining...",            es: "Rechazando..." },
+  "reenroll.acceptSuccess":  { en: "Re-enrollment accepted. Your registration packet will be ready shortly.", es: "Re-matrícula aceptada. Su paquete de registro estará listo en breve." },
+  "reenroll.declineSuccess": { en: "You have declined this re-enrollment offer.", es: "Ha rechazado esta oferta de re-matrícula." },
+
+  // ─── Documents ───────────────────────────────────────────────────────────────
+  "docs.upload":           { en: "Upload Document",      es: "Cargar Documento" },
+  "docs.yourDocs":         { en: "Your Documents",        es: "Sus Documentos" },
+  "docs.noDocs":           { en: "No documents yet",      es: "Aún no hay documentos" },
+  "docs.reupload":         { en: "Re-upload",             es: "Volver a Cargar" },
+  "docs.view":             { en: "View",                  es: "Ver" },
+  "docs.status.pending":   { en: "Pending Review",        es: "En Revisión" },
+  "docs.status.rejected":  { en: "Needs Re-upload",       es: "Necesita Nueva Carga" },
+  "docs.status.expired":   { en: "Expired",               es: "Expirado" },
+
+  // ─── Messages ─────────────────────────────────────────────────────────────
+  "msgs.unread":           { en: "Unread",                es: "No Leídos" },
+  "msgs.read":             { en: "Read",                  es: "Leídos" },
+  "msgs.markAllRead":      { en: "Mark all read",          es: "Marcar todo como leído" },
+  "msgs.marking":          { en: "Marking...",             es: "Marcando..." },
+  "msgs.markRead":         { en: "Mark as read",           es: "Marcar como leído" },
+  "msgs.allMessages":      { en: "All Messages",           es: "Todos los Mensajes" },
+  "msgs.unreadMessages":   { en: "Unread Messages",        es: "Mensajes No Leídos" },
+  "msgs.noMessages":       { en: "No messages yet",        es: "Aún no hay mensajes" },
+  "msgs.showAll":          { en: "Show all messages",      es: "Mostrar todos" },
+  "msgs.allCaughtUp":      { en: "All caught up! No unread messages.", es: "¡Todo al día! Sin mensajes no leídos." },
+  "msgs.viewDetails":      { en: "View Details",           es: "Ver Detalles" },
+
+  // ─── Offers (extended) ────────────────────────────────────────────────────
+  "offers.congratulations": { en: "Congratulations!",     es: "¡Felicitaciones!" },
+  "offers.offerAccepted":   { en: "Offer Accepted",       es: "Oferta Aceptada" },
+  "offers.offerDeclined":   { en: "Offer Declined",       es: "Oferta Rechazada" },
+  "offers.offerExpired":    { en: "Offer Expired",        es: "Oferta Expirada" },
+  "offers.goToReg":         { en: "Go to Registration",   es: "Ir al Registro" },
+  "offers.offerDetails":    { en: "Offer Details",        es: "Detalles de la Oferta" },
+  "offers.acceptTitle":     { en: "Accept the Offer?",    es: "¿Aceptar la Oferta?" },
+  "offers.declineTitle":    { en: "Decline the Offer?",   es: "¿Rechazar la Oferta?" },
+  "offers.yesAccept":       { en: "Yes, Accept Offer",    es: "Sí, Aceptar Oferta" },
+  "offers.yesDecline":      { en: "Yes, Decline Offer",   es: "Sí, Rechazar Oferta" },
+  "offers.keepOffer":       { en: "Keep Offer",           es: "Mantener Oferta" },
+  "offers.student":         { en: "Student",              es: "Estudiante" },
+  "offers.school":          { en: "School",               es: "Escuela" },
+  "offers.deadline":        { en: "Deadline",             es: "Fecha Límite" },
 
   // ─── Applications ─────────────────────────────────────────────────────────
   "apps.heading":           { en: "My Applications",        es: "Mis Solicitudes" },
@@ -151,6 +197,8 @@ const dict = {
   "apps.status":            { en: "Status",                 es: "Estado" },
   "apps.submitted":         { en: "Submitted",              es: "Enviada" },
   "apps.lastUpdated":       { en: "Last updated",           es: "Última actualización" },
+  "apps.continueApp":       { en: "Continue Application",   es: "Continuar Solicitud" },
+  "apps.actionNeeded":      { en: "Action needed",           es: "Acción requerida" },
 
   // ─── Common ───────────────────────────────────────────────────────────────
   "common.backToDashboard": { en: "Back to Dashboard", es: "Volver al Panel" },

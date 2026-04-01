@@ -13,6 +13,8 @@ import {
   getFamilyPendingOffers,
 } from "@/lib/queries";
 import { getStatusConfig } from "@/lib/application-helpers";
+import { getLocale } from "@/lib/i18n/get-locale";
+import { tx } from "@/lib/i18n/translations";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +24,9 @@ export default async function FamilyDashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const locale = await getLocale();
+  const t = (key: Parameters<typeof tx>[0]) => tx(key, locale);
 
   const [apps, notifications, enrollmentWindows, pendingOffers] = await Promise.all([
     getFamilyDashboardApps(user.id),
@@ -55,14 +60,14 @@ export default async function FamilyDashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-ink">
-            Welcome back, {displayName}
+            {t("dashboard.welcomeBack")}, {displayName}
           </h1>
           <p className="text-sm text-stone mt-1">
             {user.email}
           </p>
         </div>
         <Link href="/family/applications/new">
-          <Button>Start New Application</Button>
+          <Button>{t("dashboard.startNewApplication")}</Button>
         </Link>
       </div>
 
@@ -72,7 +77,7 @@ export default async function FamilyDashboardPage() {
           <span className="text-xl mt-0.5">🎓</span>
           <div>
             <p className="text-sm font-bold text-ink">
-              Welcome to the rootedschools family!
+              {t("dashboard.welcomeFamily")}
             </p>
             <p className="text-sm text-ink/60 mt-0.5">
               {registeredCount} student{registeredCount > 1 ? "s are" : " is"} enrolled and registered. Check your school for orientation details.
@@ -113,7 +118,7 @@ export default async function FamilyDashboardPage() {
                       : "bg-rooted-green hover:bg-rooted-green/90 text-white"
                   }
                 >
-                  Respond
+                  {t("dashboard.respond")}
                 </Button>
               </Link>
             </div>
@@ -127,7 +132,7 @@ export default async function FamilyDashboardPage() {
           <span className="text-xl mt-0.5">📝</span>
           <div className="flex-1">
             <p className="text-sm font-bold text-ink">
-              Complete Registration
+              {t("dashboard.completeReg")}
             </p>
             <p className="text-sm text-ink/60 mt-0.5">
               You have {acceptedCount} accepted enrollment{acceptedCount > 1 ? "s" : ""}. Complete the registration packet to finalize enrollment.
@@ -135,7 +140,7 @@ export default async function FamilyDashboardPage() {
           </div>
           <Link href="/family/registration">
             <Button size="sm" variant="outline" className="shrink-0">
-              Go to Registration
+              {t("dashboard.goToReg")}
             </Button>
           </Link>
         </div>
@@ -145,7 +150,7 @@ export default async function FamilyDashboardPage() {
       {/* ─── Our Schools — Clickable logos ─── */}
       <div>
         <h2 className="text-base font-semibold text-ink mb-3">
-          Our Schools
+          {t("dashboard.ourSchools")}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
