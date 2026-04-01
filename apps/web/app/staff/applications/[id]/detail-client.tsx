@@ -176,7 +176,7 @@ const packetStatusConfig: Record<string, { label: string; variant: "default" | "
 
 /* ─── Registration item data display ─── */
 // Fields that are internal housekeeping — never shown to staff
-const SKIP_KEYS = new Set(["acknowledged", "completed_at"]);
+const SKIP_KEYS = new Set(["acknowledged", "completed_at", "signature_data_url"]);
 
 function labelFromKey(key: string) {
   return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -250,6 +250,21 @@ function RegistrationItemDetail({
       });
     }
     return str;
+  }
+
+  // Detect e-signature
+  const signatureDataUrl = findStr(data, "signature_data_url");
+  if (signatureDataUrl) {
+    rows.push({
+      label: "Signature",
+      value: (
+        <img
+          src={signatureDataUrl}
+          alt="Family signature"
+          className="max-h-16 border border-stone/20 rounded bg-white"
+        />
+      ),
+    });
   }
 
   // Detect file upload — storage_path + optional file_name anywhere in data

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,9 @@ import {
   familySubmitRegistrationPacket,
 } from "./actions";
 import { getPolicyText } from "./policy-content";
+import { SignaturePad } from "@/components/ui/signature-pad";
+import { useLocale } from "@/lib/i18n/locale-context";
+import { type TranslationKey } from "@/lib/i18n/translations";
 import { uploadFile, validateFile, formatFileSize } from "@/lib/storage/upload";
 import { familyCreateDocumentRecord } from "@/app/family/applications/actions";
 
@@ -105,21 +108,13 @@ const ITEM_ICONS: Record<string, string> = {
   wa_health_exam: "🩺",
 };
 
-const STATUS_DISPLAY: Record<
-  string,
-  { label: string; color: string }
-> = {
-  pending: { label: "Not Started", color: "bg-rooted-gray text-ink/60" },
-  submitted: { label: "Submitted", color: "bg-blue-100 text-blue-800" },
-  verified: { label: "Verified", color: "bg-green-100 text-green-800" },
-};
 
-/* ─── Categorize items for grouped display ─── */
-const ITEM_CATEGORIES: Record<string, { label: string; icon: string }> = {
-  health: { label: "Health & Medical", icon: "🏥" },
-  policies: { label: "Policies & Agreements", icon: "📋" },
-  records: { label: "Records & Documents", icon: "📄" },
-  services: { label: "Services & Preferences", icon: "⚙️" },
+/* ─── Category icons (labels come from translations) ─── */
+const ITEM_CATEGORY_ICONS: Record<string, string> = {
+  health:   "🏥",
+  policies: "📋",
+  records:  "📄",
+  services: "⚙️",
 };
 
 const ITEM_TO_CATEGORY: Record<string, string> = {
@@ -521,15 +516,16 @@ function getCompletionConfig(itemType: string): CompletionConfig {
   };
 }
 
-function getButtonLabel(itemType: string): string {
+function getButtonLabel(itemType: string, t: (key: TranslationKey) => string): string {
   const config = getCompletionConfig(itemType);
-  if (config.mode === "form") return "Fill Out";
-  if (config.mode === "upload") return "Upload";
-  return "Review & Agree";
+  if (config.mode === "form") return t("reg.btn.fillOut");
+  if (config.mode === "upload") return t("reg.btn.upload");
+  return t("reg.btn.reviewAgree");
 }
 
 export function RegistrationClient({ enrollments, userId }: RegistrationClientProps) {
   const router = useRouter();
+  const { t } = useLocale();
   const [activeEnrollment, setActiveEnrollment] = useState(0);
   const [loadingItem, setLoadingItem] = useState<string | null>(null);
   const [submittingPacket, setSubmittingPacket] = useState(false);
@@ -541,6 +537,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
   const [completionAck, setCompletionAck] = useState(false);
   const [uploadSelectedFile, setUploadSelectedFile] = useState<File | null>(null);
   const [uploadValidationError, setUploadValidationError] = useState<string | null>(null);
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
 
   if (enrollments.length === 0) {
     return (
@@ -586,6 +583,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
     setCompletionAck(false);
     setUploadSelectedFile(null);
     setUploadValidationError(null);
+    setSignatureDataUrl(null);
     setError(null);
     setCompletionOpen(true);
   }
@@ -607,6 +605,10 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
 
     if (config.mode === "form") {
       payload.form_data = { ...completionForm };
+    }
+
+    if (config.mode === "acknowledge" && signatureDataUrl) {
+      payload.signature_data_url = signatureDataUrl;
     }
 
     if (config.mode === "upload" && uploadSelectedFile) {
@@ -642,6 +644,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
     setCompletionTarget(null);
     setUploadSelectedFile(null);
     setUploadValidationError(null);
+    setSignatureDataUrl(null);
   }
 
   async function handleSubmitPacket() {
@@ -662,26 +665,24 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
     setSubmittingPacket(false);
   }
 
-  // Group requirements by category
-  const groupedRequirements = (() => {
+  // Group requirements by category and precompute progress in one pass
+  const { groupedRequirements, categoryProgress } = useMemo(() => {
     const groups: Record<string, PacketRequirement[]> = {};
     for (const req of enrollment.requirements) {
       const cat = ITEM_TO_CATEGORY[req.item_type] ?? "records";
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(req);
     }
-    return groups;
-  })();
-
-  // Category completion counts
-  function getCategoryProgress(category: string) {
-    const reqs = groupedRequirements[category] ?? [];
-    const done = reqs.filter((r) => {
-      const item = itemsByType[r.item_type];
-      return item && (item.status === "submitted" || item.status === "verified");
-    }).length;
-    return { done, total: reqs.length };
-  }
+    const progress: Record<string, { done: number; total: number }> = {};
+    for (const [cat, reqs] of Object.entries(groups)) {
+      const done = reqs.filter((r) => {
+        const item = itemsByType[r.item_type];
+        return item && (item.status === "submitted" || item.status === "verified");
+      }).length;
+      progress[cat] = { done, total: reqs.length };
+    }
+    return { groupedRequirements: groups, categoryProgress: progress };
+  }, [enrollment.requirements, itemsByType]);
 
   return (
     <div className="space-y-6">
@@ -779,11 +780,11 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
             >
               {packetSubmitted
                 ? enrollment.packet?.status === "complete"
-                  ? "Complete"
-                  : "Under Review"
+                  ? t("reg.complete")
+                  : t("reg.underReviewBadge")
                 : allRequiredComplete
-                  ? "Ready to Submit"
-                  : `${completedCount}/${totalItems} Done`}
+                  ? t("reg.readyToSubmit")
+                  : `${completedCount}/${totalItems} ${t("common.done")}`}
             </Badge>
           </div>
           {/* Progress bar */}
@@ -813,14 +814,14 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
           {/* Category mini-progress */}
           {Object.keys(groupedRequirements).length > 1 && (
             <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-rooted-gray">
-              {Object.entries(ITEM_CATEGORIES).map(([catKey, catCfg]) => {
+              {Object.keys(ITEM_CATEGORY_ICONS).map((catKey) => {
                 if (!groupedRequirements[catKey]) return null;
-                const prog = getCategoryProgress(catKey);
+                const prog = categoryProgress[catKey] ?? { done: 0, total: 0 };
                 return (
                   <div key={catKey} className="flex items-center gap-1.5">
-                    <span className="text-xs">{catCfg.icon}</span>
+                    <span className="text-xs">{ITEM_CATEGORY_ICONS[catKey]}</span>
                     <span className="text-[10px] text-stone">
-                      {catCfg.label}
+                      {t(`reg.cat.${catKey}` as TranslationKey)}
                     </span>
                     <span className={`text-[10px] font-bold ${prog.done === prog.total ? "text-green-600" : "text-stone"}`}>
                       {prog.done}/{prog.total}
@@ -846,10 +847,10 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
           </CardContent>
         </Card>
       ) : (
-        Object.entries(ITEM_CATEGORIES).map(([catKey, catCfg]) => {
+        Object.keys(ITEM_CATEGORY_ICONS).map((catKey) => {
           const reqs = groupedRequirements[catKey];
           if (!reqs || reqs.length === 0) return null;
-          const prog = getCategoryProgress(catKey);
+          const prog = categoryProgress[catKey] ?? { done: 0, total: 0 };
           const allDone = prog.done === prog.total;
 
           return (
@@ -857,8 +858,8 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">{catCfg.icon}</span>
-                    <CardTitle className="text-sm">{catCfg.label}</CardTitle>
+                    <span className="text-lg">{ITEM_CATEGORY_ICONS[catKey]}</span>
+                    <CardTitle className="text-sm">{t(`reg.cat.${catKey}` as TranslationKey)}</CardTitle>
                   </div>
                   <span className={`text-xs font-semibold ${allDone ? "text-green-600" : "text-stone"}`}>
                     {prog.done}/{prog.total} complete
@@ -869,7 +870,6 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                 {reqs.map((req) => {
                   const item = itemsByType[req.item_type];
                   const status = item?.status ?? "pending";
-                  const statusCfg = STATUS_DISPLAY[status] ?? STATUS_DISPLAY.pending;
                   const isLoading = loadingItem === item?.id;
 
                   return (
@@ -894,7 +894,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                             </p>
                             {req.is_required && (
                               <span className="text-[10px] text-red-500 font-semibold uppercase">
-                                Required
+                                {t("reg.required")}
                               </span>
                             )}
                           </div>
@@ -924,12 +924,12 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                             }
                             className="bg-rooted-green hover:bg-rooted-green/90 text-white"
                           >
-                            {isLoading ? "Saving..." : getButtonLabel(req.item_type)}
+                            {isLoading ? t("reg.btn.saving") : getButtonLabel(req.item_type, t)}
                           </Button>
                         )}
                         {status === "pending" && !item && (
                           <Badge className="text-[10px] bg-rooted-gray text-stone">
-                            Awaiting Setup
+                            {t("reg.awaitingSetup")}
                           </Badge>
                         )}
                         {status === "submitted" && (
@@ -947,7 +947,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                                 d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                               />
                             </svg>
-                            <span className="text-xs text-blue-600 font-medium">Done</span>
+                            <span className="text-xs text-blue-600 font-medium">{t("common.done")}</span>
                           </div>
                         )}
                         {status === "verified" && (
@@ -965,7 +965,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                                 d="M5 13l4 4L19 7"
                               />
                             </svg>
-                            <span className="text-xs text-green-600 font-medium">Verified</span>
+                            <span className="text-xs text-green-600 font-medium">{t("common.verified")}</span>
                           </div>
                         )}
                       </div>
@@ -987,12 +987,12 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                 <span className="text-2xl" aria-hidden="true">🎉</span>
                 <div>
                   <p className="text-base font-bold text-ink">
-                    {allItemsComplete ? "All Items Complete!" : "Required Items Complete!"}
+                    {allItemsComplete ? t("reg.allComplete") : t("reg.requiredComplete")}
                   </p>
                   <p className="text-sm text-ink/60">
                     {allItemsComplete
-                      ? `Submit your registration packet to finalize ${enrollment.student_name}'s enrollment.`
-                      : `All required items are done. Submit now — you can complete any optional items later.`}
+                      ? t("reg.allRequired")
+                      : t("reg.submitNow")}
                   </p>
                 </div>
               </div>
@@ -1002,7 +1002,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                 className="bg-rooted-green hover:bg-rooted-green/90 text-white px-6"
                 size="lg"
               >
-                {submittingPacket ? "Submitting..." : "Submit Packet"}
+                {submittingPacket ? t("reg.submitting") : t("reg.submitPacket")}
               </Button>
             </div>
           </CardContent>
@@ -1018,17 +1018,17 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
             </span>
             <p className="text-lg font-bold text-green-800">
               {enrollment.packet?.status === "complete"
-                ? "Registration Complete!"
-                : "Packet Submitted!"}
+                ? t("reg.packComplete")
+                : t("reg.packSubmitted")}
             </p>
             <p className="text-sm text-green-600 mt-1 max-w-md mx-auto">
               {enrollment.packet?.status === "complete"
-                ? `All items have been verified by staff. ${enrollment.student_name} is officially enrolled. Welcome to the rootedschools family!`
-                : `Your registration packet is being reviewed by the enrollment team at ${enrollment.campus_name}. You'll be notified when everything is verified.`}
+                ? t("reg.allVerified")
+                : t("reg.underReview")}
             </p>
             <Link href="/family/dashboard">
               <Button variant="outline" size="sm" className="mt-4">
-                Back to Dashboard
+                {t("common.backToDashboard")}
               </Button>
             </Link>
           </CardContent>
@@ -1053,7 +1053,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                 !f.required || (completionForm[f.key] !== undefined && completionForm[f.key] !== "")
               )
             : config.mode === "acknowledge"
-              ? completionAck
+              ? completionAck && !!signatureDataUrl
               : !!uploadSelectedFile && !uploadValidationError; // upload mode: file selected and valid
 
         return (
@@ -1124,9 +1124,25 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                           className="mt-0.5 w-4 h-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
                         />
                         <span className="text-sm text-ink/70">
-                          I have read and agree to the above. I understand this is a binding acknowledgement.
+                          {t("reg.dialog.iAgree")}
                         </span>
                       </label>
+                      {completionAck && (
+                        <div className="space-y-1.5">
+                          <p className="text-sm font-medium text-ink/70">{t("reg.dialog.yourSignature")}</p>
+                          <SignaturePad
+                            onChange={setSignatureDataUrl}
+                            placeholder={t("reg.dialog.signHere")}
+                            drawInstruction={t("reg.dialog.signInstruct")}
+                            clearLabel={t("reg.dialog.clear")}
+                          />
+                          {!signatureDataUrl && (
+                            <p className="text-xs text-amber-600">
+                              {t("reg.dialog.signRequired")}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </>
                   );
                 })()}
@@ -1135,7 +1151,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                   <div className="space-y-3">
                     {config.examples.length > 0 && (
                       <div className="rounded-lg bg-blue-50 border border-blue-100 px-4 py-3">
-                        <p className="text-xs font-semibold text-blue-800 mb-1.5">What to upload:</p>
+                        <p className="text-xs font-semibold text-blue-800 mb-1.5">{t("reg.upload.whatToUpload")}</p>
                         <ul className="space-y-1">
                           {config.examples.map((ex) => (
                             <li key={ex} className="flex items-start gap-2 text-xs text-blue-700">
@@ -1181,14 +1197,14 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                             }}
                             className="text-xs text-rooted-green hover:underline mt-1"
                           >
-                            Choose a different file
+                            {t("reg.upload.chooseDifferent")}
                           </button>
                         </div>
                       ) : (
                         <label htmlFor="reg-upload-input" className="cursor-pointer block">
                           <p className="text-2xl mb-2">📎</p>
-                          <p className="text-sm font-medium text-ink">Click to choose a file</p>
-                          <p className="text-xs text-stone mt-1">PDF, JPEG, or PNG — max 10MB</p>
+                          <p className="text-sm font-medium text-ink">{t("reg.upload.clickToChoose")}</p>
+                          <p className="text-xs text-stone mt-1">{t("reg.upload.formats")}</p>
                         </label>
                       )}
                     </div>
@@ -1201,14 +1217,18 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setCompletionOpen(false)}>
-                  Cancel
+                  {t("reg.dialog.cancel")}
                 </Button>
                 <Button
                   onClick={doCompleteItem}
                   disabled={!canSubmit}
                   className="bg-rooted-green hover:bg-rooted-green/90 text-white"
                 >
-                  {config.mode === "form" ? "Submit" : config.mode === "upload" ? "Upload & Complete" : "Confirm"}
+                  {config.mode === "form"
+                    ? t("reg.dialog.submit")
+                    : config.mode === "upload"
+                      ? t("reg.dialog.uploadComplete")
+                      : t("reg.dialog.confirm")}
                 </Button>
               </DialogFooter>
             </DialogContent>

@@ -1,6 +1,9 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { FamilyHeader } from "@/components/layout/family-header";
 import { getFamilyPendingOffers } from "@/lib/queries";
+import { LocaleProvider } from "@/lib/i18n/locale-context";
+import { cookies } from "next/headers";
+import type { Locale } from "@/lib/i18n/translations";
 
 export const metadata = {
   title: "Family Portal | Rooted EMS",
@@ -30,16 +33,20 @@ export default async function FamilyLayout({
   ]);
 
   const unreadCount = (unreadResult as { count: number | null }).count ?? 0;
+  const cookieStore = await cookies();
+  const initialLocale = (cookieStore.get("NEXT_LOCALE")?.value as Locale | undefined) ?? "en";
 
   return (
-    <div className="min-h-screen bg-rooted-gray">
-      <FamilyHeader
-        userEmail={user?.email}
-        userPhone={user?.phone}
-        pendingOfferCount={pendingOffers.length}
-        unreadNotificationCount={unreadCount}
-      />
-      <main className="max-w-5xl mx-auto py-6 px-4">{children}</main>
-    </div>
+    <LocaleProvider initialLocale={initialLocale}>
+      <div className="min-h-screen bg-rooted-gray">
+        <FamilyHeader
+          userEmail={user?.email}
+          userPhone={user?.phone}
+          pendingOfferCount={pendingOffers.length}
+          unreadNotificationCount={unreadCount}
+        />
+        <main className="max-w-5xl mx-auto py-6 px-4">{children}</main>
+      </div>
+    </LocaleProvider>
   );
 }

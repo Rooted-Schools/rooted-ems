@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useState, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { createBrowserClient } from "@rooted-ems/database";
+import { useLocale } from "@/lib/i18n/locale-context";
+import { type TranslationKey } from "@/lib/i18n/translations";
+import { LanguageToggle } from "@/components/ui/language-toggle";
 
 interface FamilyHeaderProps {
   userEmail?: string | null;
@@ -18,26 +21,30 @@ interface NavLink {
   badge?: number;
 }
 
-function buildNavLinks(pendingOfferCount = 0): NavLink[] {
+function buildNavLinks(
+  pendingOfferCount = 0,
+  t: (key: TranslationKey) => string
+): NavLink[] {
   return [
-    { href: "/family/dashboard", label: "Dashboard" },
-    { href: "/family/applications", label: "Applications" },
+    { href: "/family/dashboard",    label: t("nav.dashboard") },
+    { href: "/family/applications", label: t("nav.applications") },
     {
       href: "/family/offers",
-      label: "Offers",
+      label: t("nav.offers"),
       badge: pendingOfferCount > 0 ? pendingOfferCount : undefined,
     },
-    { href: "/family/documents", label: "Documents" },
-    { href: "/family/messages", label: "Messages" },
-    { href: "/family/registration", label: "Registration" },
-    { href: "/family/reenrollment", label: "Re-enrollment" },
+    { href: "/family/documents",    label: t("nav.documents") },
+    { href: "/family/messages",     label: t("nav.messages") },
+    { href: "/family/registration", label: t("nav.registration") },
+    { href: "/family/reenrollment", label: t("nav.reenrollment") },
   ];
 }
 
 export function FamilyHeader({ userEmail, userPhone, pendingOfferCount = 0, unreadNotificationCount = 0 }: FamilyHeaderProps) {
   const pathname = usePathname();
   const supabase = useMemo(() => createBrowserClient(), []);
-  const NAV_LINKS = buildNavLinks(pendingOfferCount);
+  const { t } = useLocale();
+  const NAV_LINKS = useMemo(() => buildNavLinks(pendingOfferCount, t), [pendingOfferCount, t]);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   async function handleLogout() {
@@ -77,6 +84,7 @@ export function FamilyHeader({ userEmail, userPhone, pendingOfferCount = 0, unre
             );
           })}
           <div className="flex items-center gap-3 ml-4 pl-4 border-l border-stone/20">
+            <LanguageToggle />
             {/* Notification bell */}
             <Link href="/family/messages" className="relative text-ink/50 hover:text-rooted-green transition-colors" aria-label="Notifications">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -95,7 +103,7 @@ export function FamilyHeader({ userEmail, userPhone, pendingOfferCount = 0, unre
               onClick={handleLogout}
               className="text-sm text-stone hover:text-ink transition-colors"
             >
-              Sign out
+              {t("nav.signOut")}
             </button>
           </div>
         </nav>
@@ -142,15 +150,18 @@ export function FamilyHeader({ userEmail, userPhone, pendingOfferCount = 0, unre
             })}
           </nav>
           <div className="flex items-center justify-between px-4 pt-3 mt-1 border-t border-stone/10">
-            <span className="text-xs text-stone truncate max-w-[200px]">
+            <span className="text-xs text-stone truncate max-w-[140px]">
               {userEmail ?? userPhone ?? ""}
             </span>
-            <button
-              onClick={handleLogout}
-              className="text-sm text-stone hover:text-ink transition-colors"
-            >
-              Sign out
-            </button>
+            <div className="flex items-center gap-3">
+              <LanguageToggle />
+              <button
+                onClick={handleLogout}
+                className="text-sm text-stone hover:text-ink transition-colors"
+              >
+                {t("nav.signOut")}
+              </button>
+            </div>
           </div>
         </div>
       )}
