@@ -108,5 +108,16 @@ export {
   type ContactLogRow,
 } from "./inquiries";
 
+// Demographic / equity queries
+export {
+  getDemographicBreakdowns,
+  type DemographicBreakdowns,
+  type DemographicSummary,
+  type SubgroupFunnelRow,
+  type GradeDistributionRow,
+  type CampusBreakdownRow,
+  type RaceEthnicityRow,
+} from "./demographics";
+
 // Shared utilities
 export { formatRelativeTime } from "./utils";

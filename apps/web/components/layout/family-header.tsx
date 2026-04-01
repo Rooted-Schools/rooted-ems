@@ -30,6 +30,7 @@ function buildNavLinks(pendingOfferCount = 0): NavLink[] {
     { href: "/family/documents", label: "Documents" },
     { href: "/family/messages", label: "Messages" },
     { href: "/family/registration", label: "Registration" },
+    { href: "/family/reenrollment", label: "Re-enrollment" },
   ];
 }
 
