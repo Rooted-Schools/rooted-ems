@@ -347,6 +347,11 @@ export function FamilyLoginForm() {
             Staff login
           </a>
         </div>
+
+        <p className="mt-5 text-xs text-center text-stone/70 leading-relaxed">
+          This system contains education records protected under the Family
+          Educational Rights and Privacy Act (FERPA), 20 U.S.C. § 1232g.
+        </p>
       </div>
     </div>
   );
