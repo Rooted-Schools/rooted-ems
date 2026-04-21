@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useTransition, useEffect } from "react";
+import { useState, useRef, useTransition, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -157,6 +157,16 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
         </Button>
       </div>
 
+      {/* Item 8: set timing expectations so families don't think docs are needed right now */}
+      <div className="flex items-start gap-2.5 p-3 rounded-lg bg-blue-50 border border-blue-100 text-sm text-blue-800">
+        <span className="shrink-0 mt-0.5">ℹ️</span>
+        <span>
+          Most required documents are collected during <strong>registration</strong>, after you've
+          accepted an enrollment offer. You only need to upload something here if our enrollment
+          team has specifically requested it.
+        </span>
+      </div>
+
       {/* Document status summary */}
       {visibleDocuments.length > 0 && (() => {
         const pending = visibleDocuments.filter(d => d.status === "pending").length;
@@ -291,6 +301,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
           }
         }}
         applications={applications}
+        documents={visibleDocuments}
         userId={userId}
         isPending={isPending}
         initialDocType={prefilledDocType}
@@ -315,6 +326,7 @@ function UploadDialog({
   open,
   onOpenChange,
   applications,
+  documents,
   userId,
   isPending,
   initialDocType,
@@ -325,6 +337,8 @@ function UploadDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   applications: FamilyApp[];
+  /** All visible documents — used to filter already-uploaded types from the dropdown (item 10) */
+  documents: DocumentRow[];
   userId: string;
   isPending: boolean;
   initialDocType?: string;
@@ -339,6 +353,28 @@ function UploadDialog({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Item 10: filter out doc types already successfully uploaded for the selected app.
+  // "Other" is always available (multiple other docs can exist). Re-upload (initialDocType)
+  // is always included even if it's already on file (that's the whole point of re-uploading).
+  const availableDocTypes = useMemo(() => {
+    const uploadedForApp = new Set(
+      documents
+        .filter(
+          (d) =>
+            d.application_id === selectedApp &&
+            d.status !== "rejected" &&
+            d.status !== "expired"
+        )
+        .map((d) => d.document_type)
+    );
+    return documentTypes.filter(
+      (dt) =>
+        dt.value === "other" ||
+        dt.value === initialDocType ||
+        !uploadedForApp.has(dt.value)
+    );
+  }, [documents, selectedApp, initialDocType]);
 
   // Sync initial values when dialog opens (handles re-upload pre-fill)
   useEffect(() => {
@@ -457,7 +493,7 @@ function UploadDialog({
               onChange={(e) => setDocType(e.target.value)}
               className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
             >
-              {documentTypes.map((dt) => (
+              {availableDocTypes.map((dt) => (
                 <option key={dt.value} value={dt.value}>
                   {dt.label}
                 </option>

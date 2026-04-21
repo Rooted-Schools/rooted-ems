@@ -57,7 +57,7 @@ export default async function AuditTrailPage({
       id, table_name, record_id, action, old_data, new_data,
       ip_address, user_agent, created_at,
       actor:actor_id (first_name, last_name, email),
-      campus:campus_id (name)
+      campus:campus_id (name, timezone)
     `, { count: "exact" })
     .order("created_at", { ascending: false })
     .range(offset, offset + pageSize - 1);
@@ -200,13 +200,15 @@ export default async function AuditTrailPage({
                     return (
                       <tr key={event.id as string} className="hover:bg-rooted-gray-light">
                         <td className="py-2 px-4 text-xs text-stone whitespace-nowrap">
-                          {new Date(event.created_at as string).toLocaleDateString(
+                          {new Date(event.created_at as string).toLocaleString(
                             "en-US",
                             {
+                              timeZone: campus?.timezone ?? "UTC",
                               month: "short",
                               day: "numeric",
                               hour: "numeric",
                               minute: "2-digit",
+                              timeZoneName: "short",
                             }
                           )}
                         </td>

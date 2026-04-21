@@ -24,6 +24,8 @@ interface NewApplicationFormProps {
   windows: EnrollmentWindowInfo[];
   campuses: CampusRow[];
   gradeLevels: GradeLevel[];
+  /** Pre-selected campus id passed from the dashboard's school card link */
+  initialCampusId?: string;
 }
 
 /* ───────────── step definitions ───────────── */
@@ -202,11 +204,15 @@ function buildCreateInput(form: FormData, campusWindows: EnrollmentWindowInfo[])
 
 /* ───────────── page component ───────────── */
 
-export function NewApplicationForm({ windows, campuses, gradeLevels }: NewApplicationFormProps) {
+export function NewApplicationForm({ windows, campuses, gradeLevels, initialCampusId }: NewApplicationFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [stepIndex, setStepIndex] = useState(0);
-  const [form, setForm] = useState<FormData>(INITIAL);
+  // Item 9: pre-populate campus if the dashboard passed ?campus=X
+  const [form, setForm] = useState<FormData>(() => ({
+    ...INITIAL,
+    campusId: initialCampusId ?? "",
+  }));
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const currentStep = STEPS[stepIndex];

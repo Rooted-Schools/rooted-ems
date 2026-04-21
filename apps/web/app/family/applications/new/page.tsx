@@ -6,7 +6,11 @@ import { redirect } from "next/navigation";
 import { getActiveEnrollmentWindows, getCampuses } from "@/lib/queries";
 import { NewApplicationForm } from "./new-application-form";
 
-export default async function NewApplicationPage() {
+export default async function NewApplicationPage({
+  searchParams,
+}: {
+  searchParams: { campus?: string };
+}) {
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -37,11 +41,20 @@ export default async function NewApplicationPage() {
     campus_id: g.campus_id as string,
   }));
 
+  // Item 9: if dashboard passed ?campus=RSV, pre-select that campus so the
+  // family doesn't have to pick their school a second time.
+  const preselectedCampus = searchParams.campus
+    ? campuses.find(
+        (c) => c.short_code?.toLowerCase() === searchParams.campus!.toLowerCase()
+      )
+    : undefined;
+
   return (
     <NewApplicationForm
       windows={windows}
       campuses={campuses}
       gradeLevels={grades}
+      initialCampusId={preselectedCampus?.id}
     />
   );
 }
