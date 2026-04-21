@@ -74,7 +74,10 @@ export function SeatsClient({ rows }: SeatsClientProps) {
       <div>
         <h1 className="text-2xl font-bold text-ink">Seat Management</h1>
         <p className="text-sm text-stone mt-1">
-          Capacity planning and real-time seat availability across all campuses
+          {/* Item 13: scope description to what the user actually sees */}
+          {Object.keys(campusMap).length === 1
+            ? `Capacity planning and seat availability for ${Object.keys(campusMap)[0]}`
+            : "Capacity planning and real-time seat availability across your campuses"}
         </p>
       </div>
 

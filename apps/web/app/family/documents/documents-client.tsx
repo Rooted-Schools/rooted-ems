@@ -111,7 +111,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   // Hide rejected docs that have already been superseded by a newer re-upload of the same type
-  const visibleDocuments = documents.filter((doc) => {
+  const visibleDocuments = useMemo(() => documents.filter((doc) => {
     if (doc.status !== "rejected") return true;
     return !documents.some(
       (other) =>
@@ -120,7 +120,21 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
         other.application_id === doc.application_id &&
         new Date(other.created_at) > new Date(doc.created_at)
     );
-  });
+  }), [documents]);
+
+  // Item 18: group docs by student name for multi-student households
+  const studentNames = useMemo(
+    () => [...new Set(visibleDocuments.map((d) => d.student_name))].sort(),
+    [visibleDocuments]
+  );
+  const docsByStudent = useMemo(() => {
+    const groups: Record<string, DocumentRow[]> = {};
+    for (const doc of visibleDocuments) {
+      if (!groups[doc.student_name]) groups[doc.student_name] = [];
+      groups[doc.student_name].push(doc);
+    }
+    return groups;
+  }, [visibleDocuments]);
 
   function handleReupload(doc: DocumentRow) {
     setPrefilledDocType(doc.document_type);
@@ -223,6 +237,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
           </CardContent>
         </Card>
       ) : (
+        // Item 18: group docs by student (studentNames / docsByStudent computed above)
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{t("docs.yourDocs")}</CardTitle>
@@ -231,60 +246,65 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {visibleDocuments.map((doc) => {
-                const statusKey = (doc.status in docStatusVariant ? doc.status : "pending") as DocStatusKey;
-                const statusVariant = docStatusVariant[statusKey];
-                const statusLabel = doc.status === "verified" ? t("common.verified") : doc.status === "rejected" ? t("docs.status.rejected") : doc.status === "expired" ? t("docs.status.expired") : t("docs.status.pending");
-                const sizeStr = doc.file_size ? formatFileSize(doc.file_size) : "";
-                return (
-                  <div
-                    key={doc.id}
-                    className="flex items-center justify-between p-3 rounded-md border border-stone/20"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-xl shrink-0" aria-hidden="true">
-                        📄
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-ink truncate">
-                          {doc.file_name}
-                        </p>
-                        <p className="text-xs text-stone">
-                          {formatDocType(doc.document_type)}
-                          {sizeStr && <> &middot; {sizeStr}</>}
-                          {" "}&middot; Uploaded {formatDate(doc.created_at)}
-                          {" "}&middot; {doc.student_name}
-                        </p>
-                        {doc.status === "rejected" && doc.rejection_reason && (
-                          <p className="text-xs text-red-600 mt-1 font-medium">
-                            ⚠️ Reason: {doc.rejection_reason}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Badge variant={statusVariant}>{statusLabel}</Badge>
-                      {doc.status === "rejected" && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleReupload(doc)}
+            <div className="space-y-6">
+              {studentNames.map((studentName) => (
+                <div key={studentName}>
+                  {studentNames.length > 1 && (
+                    <p className="text-xs font-semibold text-stone uppercase tracking-wide mb-2">
+                      {studentName}
+                    </p>
+                  )}
+                  <div className="space-y-3">
+                    {docsByStudent[studentName].map((doc) => {
+                      const statusKey = (doc.status in docStatusVariant ? doc.status : "pending") as DocStatusKey;
+                      const statusVariant = docStatusVariant[statusKey];
+                      const statusLabel = doc.status === "verified" ? t("common.verified") : doc.status === "rejected" ? t("docs.status.rejected") : doc.status === "expired" ? t("docs.status.expired") : t("docs.status.pending");
+                      const sizeStr = doc.file_size ? formatFileSize(doc.file_size) : "";
+                      return (
+                        <div
+                          key={doc.id}
+                          className="flex items-center justify-between p-3 rounded-md border border-stone/20"
                         >
-                          {t("docs.reupload")}
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewDocument(doc.storage_path)}
-                        disabled={!doc.storage_path}
-                      >
-                        {t("docs.view")}
-                      </Button>
-                    </div>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-xl shrink-0" aria-hidden="true">📄</span>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-ink truncate">{doc.file_name}</p>
+                              <p className="text-xs text-stone">
+                                {formatDocType(doc.document_type)}
+                                {sizeStr && <> &middot; {sizeStr}</>}
+                                {" "}&middot; Uploaded {formatDate(doc.created_at)}
+                                {/* only repeat name inline when not shown as group header */}
+                                {studentNames.length === 1 && <> &middot; {doc.student_name}</>}
+                              </p>
+                              {doc.status === "rejected" && doc.rejection_reason && (
+                                <p className="text-xs text-red-600 mt-1 font-medium">
+                                  ⚠️ Reason: {doc.rejection_reason}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Badge variant={statusVariant}>{statusLabel}</Badge>
+                            {doc.status === "rejected" && (
+                              <Button size="sm" onClick={() => handleReupload(doc)}>
+                                {t("docs.reupload")}
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewDocument(doc.storage_path)}
+                              disabled={!doc.storage_path}
+                            >
+                              {t("docs.view")}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

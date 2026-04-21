@@ -52,6 +52,7 @@ interface FormData {
   guardianFirstName: string;
   guardianLastName: string;
   guardianRelationship: string;
+  guardianRelationshipOther: string;
   guardianEmail: string;
   guardianPhone: string;
   dataSharingConsent: boolean;
@@ -72,6 +73,7 @@ function draftToFormData(d: DraftApplicationData): FormData {
     guardianFirstName: d.guardian.first_name,
     guardianLastName: d.guardian.last_name,
     guardianRelationship: d.guardian.relationship,
+    guardianRelationshipOther: d.answers.guardian_relationship_other ?? "",
     guardianEmail: d.guardian.email ?? "",
     guardianPhone: d.guardian.phone ?? "",
     dataSharingConsent: d.answers.data_sharing_consent === "true",
@@ -174,6 +176,9 @@ function buildUpdateInput(applicationId: string, form: FormData) {
   if (form.dataSharingConsent) answers.data_sharing_consent = true;
   if (form.signatureName) answers.e_signature_name = form.signatureName;
   answers.e_signature_date = new Date().toISOString().split("T")[0];
+  if (form.guardianRelationship === "other" && form.guardianRelationshipOther) {
+    answers.guardian_relationship_other = form.guardianRelationshipOther;
+  }
 
   return {
     application_id: applicationId,
@@ -440,7 +445,7 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
             <Field label="Relationship to Student" required>
               <Select
                 value={form.guardianRelationship}
-                onChange={(e) => update({ guardianRelationship: e.target.value })}
+                onChange={(e) => update({ guardianRelationship: e.target.value, guardianRelationshipOther: "" })}
               >
                 <option value="">Select...</option>
                 <option value="mother">Mother</option>
@@ -453,6 +458,15 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
                 <option value="legal_guardian">Legal Guardian</option>
                 <option value="other">Other</option>
               </Select>
+              {form.guardianRelationship === "other" && (
+                <Input
+                  className="mt-2"
+                  value={form.guardianRelationshipOther}
+                  onChange={(e) => update({ guardianRelationshipOther: e.target.value })}
+                  placeholder="Please describe your relationship to the student"
+                  maxLength={100}
+                />
+              )}
             </Field>
             <Field label="Email Address" required>
               <Input

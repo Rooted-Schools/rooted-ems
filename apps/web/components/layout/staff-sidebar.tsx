@@ -49,7 +49,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Operations",
     items: [
-      { label: "Enrollment", href: "/staff/enrollment", icon: "✅", minRole: "enrollment_staff" },
+      { label: "Registration", href: "/staff/enrollment", icon: "✅", minRole: "enrollment_staff" },
       { label: "Seat Management", href: "/staff/seats", icon: "🪑", minRole: "enrollment_manager" },
       { label: "Communications", href: "/staff/communications", icon: "📬", minRole: "enrollment_staff" },
     ],

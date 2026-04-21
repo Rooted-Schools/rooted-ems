@@ -763,7 +763,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Enrollment Details</CardTitle>
+                <CardTitle className="text-base">Application Details</CardTitle>
               </CardHeader>
               <CardContent>
                 <DetailRow label="Campus" value={detail.campus_name} />
