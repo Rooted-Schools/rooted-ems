@@ -6,7 +6,7 @@ import { sendOffer } from "@/lib/mutations/offers";
 import { verifyRegistrationItem, skipRegistrationItem } from "@/lib/mutations/registration";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { requireStaffSession } from "@/lib/auth/get-session";
-import { notifyFamilyStudentEnrolled, notifyFamilyNeedsInfo } from "@/lib/notify";
+import { notifyFamilyStudentEnrolled, notifyFamilyNeedsInfo, notifyFamilyDocumentRejected } from "@/lib/notify";
 
 // ─── Status Transition ─────────────────────────────────
 
@@ -102,6 +102,30 @@ export async function staffReviewDocument(
 
   if (!result.error) {
     revalidatePath(`/staff/applications/${applicationId}`);
+
+    // On rejection, notify the family to re-upload — fire and forget
+    if (decision === "rejected" && rejectionReason) {
+      const supabase = createServiceRoleClient();
+      const { data: doc } = await supabase
+        .from("document")
+        .select("document_type, application:application_id (campus_id)")
+        .eq("id", documentId)
+        .single();
+      const docRow = doc as unknown as {
+        document_type: string;
+        application: { campus_id: string } | null;
+      } | null;
+      if (docRow?.document_type) {
+        notifyFamilyDocumentRejected({
+          applicationId,
+          documentType: docRow.document_type,
+          reason: rejectionReason,
+          campusId: docRow.application?.campus_id,
+        }).catch((err) =>
+          console.error("[staffReviewDocument] notification failed", err)
+        );
+      }
+    }
   }
 
   return result;

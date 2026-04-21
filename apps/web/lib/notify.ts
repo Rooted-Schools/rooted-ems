@@ -553,6 +553,38 @@ export async function notifyStaffOfFamilyResponse(applicationId: string): Promis
   }
 }
 
+/**
+ * Called immediately after a family submits an application.
+ * Looks up campus + student name once, then fires both:
+ *   1. Family confirmation (application received)
+ *   2. Staff alert (new application to review)
+ */
+export async function notifyOnApplicationSubmit(applicationId: string): Promise<void> {
+  const supabase = createServiceRoleClient();
+  const { data } = await supabase
+    .from("application")
+    .select("campus_id, student:student_id (first_name, last_name)")
+    .eq("id", applicationId)
+    .single();
+
+  const row = data as unknown as {
+    campus_id: string | null;
+    student: { first_name?: string; last_name?: string } | null;
+  } | null;
+
+  const campusId = row?.campus_id ?? undefined;
+  const studentName = row?.student
+    ? [row.student.first_name, row.student.last_name].filter(Boolean).join(" ") || undefined
+    : undefined;
+
+  await Promise.all([
+    notifyFamilyApplicationReceived({ applicationId, studentName, campusId }),
+    campusId
+      ? notifyStaffNewApplication({ campusId, studentName, applicationId })
+      : Promise.resolve(),
+  ]);
+}
+
 /** Student fully enrolled after academic audit — send family a celebratory message. */
 export async function notifyFamilyStudentEnrolled({
   applicationId,

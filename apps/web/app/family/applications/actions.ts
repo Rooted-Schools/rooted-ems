@@ -14,7 +14,7 @@ import {
 } from "@/lib/mutations";
 import { createFamilyResponse } from "@/lib/mutations/notes";
 import { updateApplicationStatus, createEnrollment, initializeRegistrationPacket } from "@/lib/mutations";
-import { notifyStaffOfFamilyResponse } from "@/lib/notify";
+import { notifyStaffOfFamilyResponse, notifyOnApplicationSubmit } from "@/lib/notify";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { requireSession } from "@/lib/auth/get-session";
 
@@ -56,6 +56,11 @@ export async function familySubmitApplication(applicationId: string) {
     revalidatePath("/family/applications");
     revalidatePath(`/family/applications/${applicationId}`);
     revalidatePath("/family/dashboard");
+
+    // Non-blocking: confirm receipt to the family + alert enrollment staff
+    notifyOnApplicationSubmit(applicationId).catch((err) =>
+      console.error("[familySubmitApplication] notification failed", err)
+    );
   }
 
   return result;

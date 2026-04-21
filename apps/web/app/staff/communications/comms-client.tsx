@@ -545,6 +545,9 @@ function NewMessageDialog({
   const [statusTarget, setStatusTarget] = useState("submitted");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [templateId, setTemplateId] = useState("");
+  const [selectedCampusId, setSelectedCampusId] = useState<string>(
+    campuses.length === 1 ? campuses[0].id : ""
+  );
 
   // Reset form when dialog closes
   useEffect(() => {
@@ -557,8 +560,9 @@ function NewMessageDialog({
       setStatusTarget("submitted");
       setSelectedIds(new Set());
       setTemplateId("");
+      setSelectedCampusId(campuses.length === 1 ? campuses[0].id : "");
     }
-  }, [open]);
+  }, [open, campuses]);
 
   function handleTemplateSelect(tplId: string) {
     setTemplateId(tplId);
@@ -582,6 +586,7 @@ function NewMessageDialog({
     if (ids.length === 0 || !subject.trim() || !body.trim()) return;
     onSend({
       recipientUserIds: ids,
+      campusId: selectedCampusId || undefined,
       channel,
       subject: subject.trim(),
       body: body.trim(),
@@ -619,6 +624,25 @@ function NewMessageDialog({
                   <option key={t.id} value={t.id}>
                     {t.name} ({channelLabels[t.channel] ?? t.channel})
                   </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Campus */}
+          {campuses.length > 1 && (
+            <div>
+              <label className="block text-sm font-medium text-ink/70 mb-1">
+                Campus
+              </label>
+              <select
+                value={selectedCampusId}
+                onChange={(e) => setSelectedCampusId(e.target.value)}
+                className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+              >
+                <option value="">All campuses</option>
+                {campuses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
             </div>

@@ -266,6 +266,45 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
         </div>
       </div>
 
+      {/* ── Post-submission confirmation ── */}
+      {detail.status === "submitted" && (
+        <Card className="border-green-300 bg-green-50">
+          <CardContent className="py-5">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl" aria-hidden="true">✅</span>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-semibold text-green-900">Application submitted — you&apos;re all set for now</p>
+                  <p className="text-sm text-green-800 mt-1">
+                    Our enrollment team will review your application and may reach out if they need anything. You&apos;ll receive an in-app notification here when there&apos;s an update.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-xs font-semibold text-green-900 uppercase tracking-wide">What happens next</p>
+                  <ol className="text-sm text-green-800 space-y-1 list-decimal list-inside">
+                    <li>Enrollment staff reviews your application</li>
+                    <li>If everything looks good, your student enters the lottery</li>
+                    <li>Lottery results are shared — you&apos;ll be notified of any seat offer</li>
+                    <li>Accept your offer and complete registration to finalize enrollment</li>
+                  </ol>
+                </div>
+                {detail.documents.length === 0 && (
+                  <div className="pt-1">
+                    <p className="text-xs text-green-700">
+                      📎 <span className="font-medium">Documents may be required.</span>{" "}
+                      <Link href="/family/documents" className="underline hover:no-underline">
+                        Go to Documents
+                      </Link>{" "}
+                      to upload proof of residency, birth certificate, and other required items.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* More Info Request — message + inline response form */}
       {detail.status === "needs_info" && (
         <Card className="border-amber-300 bg-amber-50">
