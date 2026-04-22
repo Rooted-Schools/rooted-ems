@@ -77,7 +77,7 @@ function draftToFormData(d: DraftApplicationData): FormData {
     guardianRelationshipOther: d.answers.guardian_relationship_other ?? "",
     guardianEmail: d.guardian.email ?? "",
     guardianPhone: d.guardian.phone ?? "",
-    hasSibling: d.answers.has_sibling_at_school === true || d.answers.has_sibling_at_school === "true",
+    hasSibling: d.answers.has_sibling_at_school === "true",
     dataSharingConsent: d.answers.data_sharing_consent === "true",
     agreeTerms: d.answers.agree_terms === "true",
     signatureName: d.answers.e_signature_name ?? "",
