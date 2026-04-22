@@ -160,7 +160,8 @@ export interface DocumentQueueStats {
 export async function getStaffPendingDocuments(
   campusIds?: string[]
 ): Promise<{ rows: PendingDocumentRow[]; stats: DocumentQueueStats }> {
-  const supabase = await createServerClient();
+  // Use service-role client so the application/campus join is not blocked by RLS
+  const supabase = createServiceRoleClient();
 
   let query = supabase
     .from("document")
@@ -886,7 +887,8 @@ export async function getStaffCommunications(campusIds?: string[]): Promise<{
     .limit(100);
 
   if (campusIds && campusIds.length > 0) {
-    q = q.in("campus_id", campusIds);
+    // Use .or() so rows where campus_id IS NULL (system-generated) are always visible
+    q = q.or(`campus_id.in.(${campusIds.join(",")}),campus_id.is.null`);
   }
 
   const { data, error } = await q;

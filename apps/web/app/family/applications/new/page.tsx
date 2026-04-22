@@ -41,13 +41,20 @@ export default async function NewApplicationPage({
     campus_id: g.campus_id as string,
   }));
 
-  // Item 9: if dashboard passed ?campus=RSV, pre-select that campus so the
-  // family doesn't have to pick their school a second time.
+  // Item 9: if dashboard passed ?campus=RSV, pre-select that campus.
+  // Try short_code first, then fall back to partial name match so the pre-selection
+  // is resilient to DB short_code mismatches.
   const preselectedCampus = searchParams.campus
     ? campuses.find(
         (c) => c.short_code?.toLowerCase() === searchParams.campus!.toLowerCase()
+      ) ??
+      campuses.find((c) =>
+        c.name.toLowerCase().includes(searchParams.campus!.toLowerCase())
       )
-    : undefined;
+    : // If only one campus has an open window, auto-select it regardless of param
+      campuses.length === 1
+      ? campuses[0]
+      : undefined;
 
   return (
     <NewApplicationForm

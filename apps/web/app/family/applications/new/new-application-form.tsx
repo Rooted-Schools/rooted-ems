@@ -59,6 +59,8 @@ interface FormData {
   guardianRelationshipOther: string;
   guardianEmail: string;
   guardianPhone: string;
+  // Sibling priority (affects lottery weighting)
+  hasSibling: boolean;
   // Step 3: Consent
   dataSharingConsent: boolean;
   agreeTerms: boolean;
@@ -80,6 +82,7 @@ const INITIAL: FormData = {
   guardianRelationshipOther: "",
   guardianEmail: "",
   guardianPhone: "",
+  hasSibling: false,
   dataSharingConsent: false,
   agreeTerms: false,
   signatureName: "",
@@ -189,6 +192,8 @@ function buildCreateInput(form: FormData, campusWindows: EnrollmentWindowInfo[])
   if (form.guardianRelationship === "other" && form.guardianRelationshipOther) {
     answers.guardian_relationship_other = form.guardianRelationshipOther;
   }
+  // Sibling priority — stored in answers so the lottery can weight accordingly
+  answers.has_sibling_at_school = form.hasSibling;
 
   return {
     enrollment_window_id: windowId,
@@ -390,6 +395,23 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
                   ))}
               </Select>
             </Field>
+
+            {/* Sibling priority question — affects lottery weighting */}
+            <div className="flex items-start gap-2.5 pt-1">
+              <input
+                type="checkbox"
+                id="has-sibling"
+                checked={form.hasSibling}
+                onChange={(e) => update({ hasSibling: e.target.checked })}
+                className="mt-1 h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
+              />
+              <label htmlFor="has-sibling" className="text-sm text-ink/70">
+                This student has a sibling currently attending or enrolled at this campus.
+                <span className="block text-xs text-stone mt-0.5">
+                  Sibling enrollment may affect lottery priority.
+                </span>
+              </label>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -536,6 +558,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
               <ReviewSection title="Campus & Grade">
                 <ReviewRow label="Campus" value={campuses.find((c) => c.id === form.campusId)?.name || "—"} />
                 <ReviewRow label="Grade" value={form.gradeLevel ? GRADE_LABELS[form.gradeLevel] || `Grade ${form.gradeLevel}` : "—"} />
+                <ReviewRow label="Sibling at campus" value={form.hasSibling ? "Yes" : "No"} />
               </ReviewSection>
               <ReviewSection title="Student">
                 <ReviewRow label="Name" value={[form.firstName, form.lastName].filter(Boolean).join(" ") || "—"} />
@@ -548,43 +571,6 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
                 <ReviewRow label="Email" value={form.guardianEmail || "—"} />
                 <ReviewRow label="Phone" value={form.guardianPhone || "—"} />
               </ReviewSection>
-            </div>
-
-            {/* Document checklist notice */}
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-              <p className="text-sm font-semibold text-amber-800 mb-2">
-                📋 Documents you&apos;ll need to upload after submitting
-              </p>
-              <p className="text-xs text-amber-700 mb-3">
-                Submit your application now — you&apos;ll upload these from the{" "}
-                <Link href="/family/documents" className="font-medium underline">
-                  Documents
-                </Link>{" "}
-                page after. Required documents must be on file before enrollment is finalized.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                {[
-                  { name: "Birth Certificate or Proof of Age", required: true },
-                  { name: "Proof of Residency", required: true },
-                  { name: "Immunization Records", required: true },
-                  { name: "Previous School Records", required: false },
-                  { name: "IEP / 504 Plan (if applicable)", required: false },
-                  { name: "Custody Documentation (if applicable)", required: false },
-                  { name: "McKinney-Vento Documentation (if applicable)", required: false },
-                  { name: "Income Verification (if applicable)", required: false },
-                  { name: "Parent / Guardian Photo ID", required: false },
-                ].map((doc) => (
-                  <div key={doc.name} className="flex items-center gap-1.5 text-xs py-0.5">
-                    <span className={doc.required ? "text-amber-700" : "text-amber-500"}>
-                      {doc.required ? "●" : "○"}
-                    </span>
-                    <span className={doc.required ? "text-amber-800 font-medium" : "text-amber-700"}>
-                      {doc.name}
-                      {doc.required && <span className="text-red-500 ml-0.5">*</span>}
-                    </span>
-                  </div>
-                ))}
-              </div>
             </div>
 
             <hr className="border-stone/20" />

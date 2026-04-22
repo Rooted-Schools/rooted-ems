@@ -377,12 +377,13 @@ function UploadDialog({
   // Item 10: filter out doc types already successfully uploaded for the selected app.
   // "Other" is always available (multiple other docs can exist). Re-upload (initialDocType)
   // is always included even if it's already on file (that's the whole point of re-uploading).
+  // Also include docs where application_id is null (unscoped / globally uploaded docs).
   const availableDocTypes = useMemo(() => {
     const uploadedForApp = new Set(
       documents
         .filter(
           (d) =>
-            d.application_id === selectedApp &&
+            (d.application_id === selectedApp || !d.application_id) &&
             d.status !== "rejected" &&
             d.status !== "expired"
         )
@@ -395,6 +396,13 @@ function UploadDialog({
         !uploadedForApp.has(dt.value)
     );
   }, [documents, selectedApp, initialDocType]);
+
+  // If the currently selected doc type was filtered out, reset to the first available option
+  useEffect(() => {
+    if (open && availableDocTypes.length > 0 && !availableDocTypes.find((dt) => dt.value === docType)) {
+      setDocType(availableDocTypes[0].value);
+    }
+  }, [availableDocTypes, open]);
 
   // Sync initial values when dialog opens (handles re-upload pre-fill)
   useEffect(() => {
