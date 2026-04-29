@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { StaffSidebar } from "@/components/layout/staff-sidebar";
 import { StaffHeader } from "@/components/layout/staff-header";
-import { getSession, getAccessibleCampusIds, getHighestRole } from "@/lib/auth/get-session";
+import { requireStaffSession, getAccessibleCampusIds, getHighestRole } from "@/lib/auth/get-session";
 import { getCampuses } from "@/lib/queries";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 
@@ -15,23 +15,21 @@ export default async function StaffLayout({
   children: React.ReactNode;
 }) {
   const [session, allCampuses] = await Promise.all([
-    getSession(),
+    requireStaffSession(),
     getCampuses(),
   ]);
 
   // Fetch unread notification count for the bell badge
   const db = createServiceRoleClient();
-  const unreadResult = session?.user_id
-    ? await db
-        .from("notification")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", session.user_id)
-        .eq("is_read", false)
-    : { count: 0 };
+  const unreadResult = await db
+      .from("notification")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", session.user_id)
+      .eq("is_read", false);
   const unreadNotificationCount = (unreadResult as { count: number | null }).count ?? 0;
 
   // Scope campus list to what the user can access
-  const accessibleIds = session ? getAccessibleCampusIds(session) : [];
+  const accessibleIds = getAccessibleCampusIds(session);
   const campuses = accessibleIds.length > 0
     ? allCampuses.filter((c) => accessibleIds.includes(c.id))
     : allCampuses;
@@ -39,7 +37,7 @@ export default async function StaffLayout({
   const headerCampuses = campuses.map((c) => ({ id: c.id, name: c.name }));
 
   // Compute the user's highest role across all campuses for nav filtering
-  const highestRole = session ? getHighestRole(session) : "compliance_auditor";
+  const highestRole = getHighestRole(session);
 
   return (
     <div className="flex min-h-screen bg-rooted-gray">
@@ -49,7 +47,7 @@ export default async function StaffLayout({
       <div className="flex-1 flex flex-col">
         <Suspense fallback={<div className="h-[5.5rem]" />}>
           <StaffHeader
-            userEmail={session?.email}
+            userEmail={session.email}
             campuses={headerCampuses}
             unreadNotificationCount={unreadNotificationCount}
           />
