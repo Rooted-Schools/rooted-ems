@@ -1,0 +1,71 @@
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { type NextRequest, NextResponse } from "next/server";
+
+// Routes that never require auth
+const PUBLIC_EXACT = ["/", "/login", "/staff-login", "/inquiry"];
+const PUBLIC_PREFIXES = ["/api/", "/auth/", "/_next/", "/favicon"];
+
+function isPublic(pathname: string): boolean {
+  return (
+    PUBLIC_EXACT.includes(pathname) ||
+    PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))
+  );
+}
+
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  let response = NextResponse.next({ request });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
+  // Cryptographically verifies the Supabase JWT — not just cookie presence
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Only apply redirect logic to protected routes
+  if (!isPublic(pathname)) {
+    // Family routes → /login
+    if (pathname.startsWith("/family") && !user) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    // Staff routes → /staff-login
+    if (pathname.startsWith("/staff") && !user) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/staff-login";
+      loginUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
+  return response;
+}
+
+export const config = {
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
+};
