@@ -541,8 +541,13 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
 
   if (enrollments.length === 0) {
     return (
-      <div className="text-center py-12">
-        <p className="text-stone">No registration packets available.</p>
+      <div className="text-center py-16 max-w-md mx-auto">
+        <div className="text-4xl mb-4">📋</div>
+        <h3 className="text-lg font-semibold text-ink mb-2">No registration packet yet</h3>
+        <p className="text-stone text-sm">
+          Your registration packet will appear here once you accept a seat offer.
+          Head to <a href="/family/offers" className="text-rooted-green underline font-medium">Your Offers</a> to respond to any pending offers.
+        </p>
       </div>
     );
   }

@@ -91,11 +91,13 @@ function getAvailableActions(status: string): { label: string; variant: "default
       ];
     case "verified":
       return [
-        { label: "Assign to Lottery", variant: "default", targetStatus: "lottery_assigned" },
+        { label: "Accept Application", variant: "default", targetStatus: "accepted" },
+        { label: "Assign to Lottery", variant: "outline", targetStatus: "lottery_assigned" },
       ];
     case "lottery_assigned":
       return [
-        { label: "Make Offer", variant: "default", targetStatus: "offered" },
+        { label: "Accept Application", variant: "default", targetStatus: "accepted" },
+        { label: "Make Offer", variant: "outline", targetStatus: "offered" },
         { label: "Add to Waitlist", variant: "outline", targetStatus: "waitlisted" },
       ];
     case "offered":

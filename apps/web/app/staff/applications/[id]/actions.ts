@@ -122,8 +122,10 @@ export async function staffReviewDocument(
           reason: rejectionReason,
           campusId: docRow.application?.campus_id,
         }).catch((err) =>
-          console.error("[staffReviewDocument] notification failed", err)
+          console.error("[staffReviewDocument] rejection notification failed", err)
         );
+      } else {
+        console.warn("[staffReviewDocument] skipped rejection notification — document_type not found for document", documentId);
       }
     }
   }
