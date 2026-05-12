@@ -201,18 +201,38 @@ rooted-ems  ← the project folder you downloaded
 1. Open **File Explorer**
 2. In the address bar, type `%USERPROFILE%\rooted-ems\apps\web` and press Enter
 
-**Step 9b — Move the `.env.local` file into that folder:**
+**Step 9b — Move and rename the file (Windows only — important!):**
 
-1. Find the `.env.local` file Steven sent you (likely in your **Downloads** folder)
-2. Drag and drop it into the `web` folder you opened above
+> ⚠️ **Windows issue:** Windows doesn't allow files that start with a dot to be saved normally. When Steven sends you the `.env.local` file, Windows will likely save it as `env.local`, `env.downloaded`, or similar — **without the dot at the front**. You must rename it using PowerShell. Here's how:
+
+1. Open **PowerShell** (press the Windows key, type `PowerShell`, press Enter)
+2. Run this command to navigate to your Downloads folder:
+   ```
+   cd ~\Downloads
+   ```
+3. Check what the file was saved as by running:
+   ```
+   dir env*
+   ```
+   You'll see the filename listed — it might be `env.local`, `env.downloaded`, or something similar.
+
+4. Rename it to `.env.local` using the exact command below (replace `env.downloaded` with whatever filename you saw in the previous step):
+   ```
+   Rename-Item env.downloaded .env.local
+   ```
+
+5. Now move it to the correct folder:
+   ```
+   Move-Item .env.local ~\rooted-ems\apps\web\.env.local
+   ```
 
 **Step 9c — Verify it worked:**
 
-Back in Terminal, run:
+In PowerShell, run:
 ```
-ls ~/rooted-ems/apps/web/.env.local
+dir ~\rooted-ems\apps\web\.env.local
 ```
-If it prints back the file path, you're good. If it says "No such file or directory," the file is in the wrong place — go back to Step 9b.
+If it shows the file in the list — you're good. If it says "Cannot find path," the file is in the wrong place — go back to Step 9b.
 
 ---
 
@@ -275,6 +295,7 @@ Here are some starter prompts to try in Claude Code once you're in:
 | `command not found: claude` | Go back to Step 7 and install Claude Code. Make sure to close and reopen Terminal after installing. |
 | GitHub clone fails with "access denied" | Make sure you accepted the GitHub invitation in Step 2 |
 | `.env.local` not working | Make sure the file is inside `apps/web/` — not the `rooted-ems` root folder |
+| Windows saved it as `env.downloaded` or `env.local` | See Step 9b — use PowerShell to rename it to `.env.local` before moving it |
 | `pnpm install` permission error on Mac | Add `sudo` before the command and enter your Mac password |
 | App doesn't load in browser | Make sure the Terminal command from Step 11 is still running |
 
