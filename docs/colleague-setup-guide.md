@@ -1,286 +1,418 @@
 # Getting Started with Rooted EMS
-### A Step-by-Step Setup Guide
+### A Complete Step-by-Step Setup Guide
 
-Welcome! This guide will walk you through everything you need to get set up — no technical experience required. Follow each step in order and don't skip ahead.
+Welcome! This guide walks you through everything you need — no technical experience required. Every single step is spelled out. Follow them in order and don't skip ahead.
 
 **Estimated time: 30–45 minutes**
 
-If anything goes wrong, text or email Steven and he'll help you through it.
+If anything goes wrong at any point, stop and reach out to Steven. He can jump on a quick call and walk you through it.
 
 ---
 
 ## Before You Begin
 
-You'll need:
+You will need:
 - A Mac or Windows computer
-- An internet connection
-- The `.env.local` file from Steven (he'll send this to you separately — wait until Step 9 to use it)
+- A stable internet connection
+- The `.env.local` file from Steven — he'll send this to you separately. **Don't use it until Step 9.**
 
 ---
 
 ## Step 1: Create a GitHub Account
 
-GitHub is the website where the project's code is stored. You need a free account to access it.
+GitHub is the website that stores the project code. You need a free account to access it.
 
-1. Go to **[github.com](https://github.com)** in your web browser
-2. Click the green **"Sign up"** button in the top right corner
-3. Enter your email address, create a password, and choose a username
-   > Your username can be anything — something simple like your first name is fine
-4. Follow the prompts to verify your email and finish creating your account
-5. Once you're signed in, **find your username** — it appears in the top right corner of the page under your profile picture
+1. Open your web browser (Chrome, Safari, Edge — any of them)
+2. In the address bar at the top, type **github.com** and press **Enter**
+3. You'll land on the GitHub homepage. Click the green **"Sign up"** button in the top right corner of the page
+4. GitHub will walk you through creating an account:
+   - Enter your **email address** and click Continue
+   - Create a **password** (at least 8 characters) and click Continue
+   - Choose a **username** — this can be anything, like your first name or first name + last initial (example: `juliesmith` or `jsmith`)
+   - Click Continue
+5. GitHub will send a **verification code** to your email. Go check your inbox, copy the code, and paste it back on the GitHub page
+6. Follow any remaining prompts until you see your GitHub dashboard (a page that says "Welcome to GitHub")
+7. **Find your username:** Look at the top right corner of the page — click your profile picture and your username will appear in the dropdown
 
-**Send Steven your GitHub username** so he can give you access to the project. He'll invite you by email.
-
----
-
-## Step 2: Accept the GitHub Invitation
-
-After Steven adds you, GitHub will send you an invitation email.
-
-1. Check your email inbox for a message from **noreply@github.com** with the subject line **"You've been invited to collaborate"**
-   > Check your spam folder if you don't see it within a few minutes
-2. Open the email and click the green **"Accept invitation"** button
-3. You'll be taken to GitHub and see a confirmation that you now have access
+**→ Send Steven your GitHub username now.** He needs it to invite you to the project. You can text it or email it to him.
 
 ---
 
-## Step 3: Open Terminal
+## Step 2: Accept Steven's GitHub Invitation
 
-Terminal is a built-in app on your computer that lets you type commands. You'll use it throughout this setup.
+After Steven adds you, you'll receive an invitation by email.
 
-**On a Mac:**
-1. Press **⌘ Space** (Command + Spacebar) to open Spotlight Search
-2. Type **Terminal** and press **Enter**
-3. A window will open with a blinking cursor — that's Terminal
-
-**On Windows:**
-1. Press the **Windows key**, type **PowerShell**, and press **Enter**
-2. A blue window will open with a blinking cursor — that's your Terminal
-
-> **What is a "command"?** When this guide says "run" something, it means: click inside the Terminal window, type exactly what's shown, and press **Enter**. The computer will do the rest.
+1. Open your email inbox and look for a message from **noreply@github.com**
+   - The subject line will say something like: **"carnster invited you to collaborate"**
+   - > If you don't see it after a few minutes, check your **Spam** or **Junk** folder
+2. Open the email
+3. Click the green **"View invitation"** or **"Accept invitation"** button inside the email
+4. Your browser will open GitHub and show a confirmation page — click **Accept invitation** one more time if prompted
+5. You'll see a message that you now have access to the `rooted-ems` repository
 
 ---
 
-## Step 4: Install Node.js
+## Step 3: Open Terminal (Your Command Window)
 
-Node.js is a tool that the project needs to run. Let's check if you already have it.
+Terminal is a built-in app that lets you type instructions directly to your computer. You'll use it for most of the remaining steps.
 
-1. In Terminal, type the following and press **Enter**:
+> **What does "run a command" mean?**
+> Throughout this guide, when it says "run" something, it means:
+> 1. Click inside the Terminal window so it's active
+> 2. Type exactly what's shown (copy-paste also works)
+> 3. Press **Enter**
+> The computer will execute the instruction and show you the result.
+
+---
+
+### If you're on a Mac:
+
+1. Press **⌘ Space** (hold the Command key and tap Spacebar) — a search bar called Spotlight will appear in the middle of your screen
+2. Type **Terminal** into the search bar
+3. Press **Enter** when you see "Terminal" appear in the results
+4. A white or black window will open with some text and a blinking cursor — that's Terminal. Leave it open.
+
+---
+
+### If you're on Windows:
+
+1. Press the **Windows key** on your keyboard (the key with the Windows logo, usually bottom-left)
+2. Type **PowerShell** into the search bar that appears
+3. Click **Windows PowerShell** in the results
+4. A blue window will open with some text and a blinking cursor — that's your Terminal. Leave it open.
+
+> ⚠️ **Windows users:** Everywhere this guide says "Terminal," use PowerShell. They work the same way for everything in this guide.
+
+---
+
+## Step 4: Check if Node.js is Installed
+
+Node.js is a tool the project needs to run. Let's see if you already have it.
+
+1. In Terminal, type this exactly and press **Enter**:
    ```
    node --version
    ```
 
-2. **If you see something like `v20.11.0`** — you already have it! Skip to Step 5.
+2. Look at what appears:
+   - **If you see something like `v20.11.0` or `v18.x.x`** — great, you have it! Move on to Step 5.
+   - **If you see `command not found` or `node is not recognized`** — you need to install it. Continue with the steps below.
 
-3. **If you see `command not found`** — you need to install it:
-   - Go to **[nodejs.org](https://nodejs.org)**
-   - Click the big button that says **"LTS"** (recommended for most users)
-   - Open the downloaded file and follow the installer — click Continue, Agree, and Install
-   - Once installed, **close Terminal completely** and reopen it (Step 3 again)
-   - Run `node --version` again — you should now see a version number
+### Installing Node.js (only if needed):
+
+1. Open your web browser and go to **[nodejs.org](https://nodejs.org)**
+2. You'll see two big download buttons. Click the one that says **"LTS"** — that stands for Long Term Support and is the recommended version
+3. A file will download to your computer (it will be in your Downloads folder)
+4. Open the downloaded file:
+   - **Mac:** Double-click the `.pkg` file. Click Continue → Continue → Agree → Continue → Install. Enter your Mac password if asked. Click Install Software. Click Close when done.
+   - **Windows:** Double-click the `.msi` file. Click Next → check "I accept" → Next → Next → Next → Install. Click Yes if a security popup appears. Click Finish when done.
+5. **Important:** After installation, completely close Terminal and reopen it (go back to Step 3)
+6. Once Terminal is open again, run `node --version` — you should now see a version number
 
 ---
 
 ## Step 5: Install pnpm
 
-pnpm is a tool that downloads and manages the project's dependencies (the extra code the project relies on).
+pnpm is a tool that downloads everything else the project needs to run.
 
-1. In Terminal, run:
+1. In Terminal, type this exactly and press **Enter**:
    ```
    npm install -g pnpm
    ```
-   > This will take about 30 seconds. You'll see some text scroll by — that's normal.
+2. You'll see several lines of text appear — that's normal. Wait until the blinking cursor comes back (about 30 seconds)
 
-2. When it finishes, verify it worked by running:
+3. Verify it worked by running:
    ```
    pnpm --version
    ```
-   You should see a version number like `9.0.0`. If you do, you're good to go.
-
-   > **If you get a "permission denied" error on Mac**, run this instead:
-   > ```
-   > sudo npm install -g pnpm
-   > ```
-   > It will ask for your Mac login password. Type it and press Enter (you won't see the letters as you type — that's normal).
+   You should see a number like `9.0.0` or similar. If you do, move on to Step 6.
 
 ---
 
-## Step 6: Install Git
+### If you get a "permission denied" error on Mac:
 
-Git is a tool that downloads code from GitHub to your computer.
+1. Run this version of the command instead:
+   ```
+   sudo npm install -g pnpm
+   ```
+2. Terminal will ask: `Password:`
+3. Type your **Mac login password** and press **Enter**
+   > You won't see any letters appear as you type — that's normal, it's hidden for security
+4. The installation will proceed. Run `pnpm --version` to confirm it worked.
+
+---
+
+### If you get an error on Windows:
+
+1. Close PowerShell
+2. Press the **Windows key**, type **PowerShell**, then right-click on **Windows PowerShell** and click **"Run as administrator"**
+3. Click **Yes** if a security popup appears
+4. Run the install command again:
+   ```
+   npm install -g pnpm
+   ```
+
+---
+
+## Step 6: Check if Git is Installed
+
+Git is the tool that downloads the project code from GitHub to your computer.
 
 1. In Terminal, run:
    ```
    git --version
    ```
 
-2. **If you see something like `git version 2.39.0`** — you already have it! Skip to Step 7.
+2. Look at what appears:
+   - **If you see something like `git version 2.39.0`** — you already have it! Skip to Step 7.
+   - **Mac — if a popup appears** saying "The Xcode Command Line Tools are required" → click **Install** and wait for it to finish (5–10 minutes). Then run `git --version` again.
+   - **Windows — if you see `command not found`** → follow the install steps below.
 
-3. **If you're on a Mac and see a pop-up** asking to install developer tools — click **Install** and wait for it to finish, then run `git --version` again.
+### Installing Git on Windows (only if needed):
 
-4. **If you're on Windows and see `command not found`** — go to **[git-scm.com/download/win](https://git-scm.com/download/win)**, download the installer, and follow the steps (click Next through all the defaults).
+1. Open your browser and go to **[git-scm.com/download/win](https://git-scm.com/download/win)**
+2. The download should start automatically. If not, click the download link on the page.
+3. Open the downloaded file
+4. Click **Next** through every screen — the default settings are all correct. Don't change anything.
+5. Click **Install**, then **Finish** when done
+6. Close PowerShell and reopen it (Step 3), then run `git --version` to confirm
 
 ---
 
 ## Step 7: Install Claude Code
 
-Claude Code is the AI assistant you'll use to explore and work in the project.
+Claude Code is the AI assistant you'll use to explore and contribute to the project.
 
-1. Go to **[claude.ai/download](https://claude.ai/download)**
-2. Click the download button for your operating system (Mac or Windows)
-3. Open the downloaded file and follow the installer instructions
-4. When the installation finishes, **close Terminal and reopen it** (Step 3 again)
-5. Verify Claude Code installed by running:
+1. Open your browser and go to **[claude.ai/download](https://claude.ai/download)**
+2. Click the download button for your operating system (**Mac** or **Windows**)
+3. A file will download to your computer. Open it:
+   - **Mac:** Double-click the downloaded `.dmg` file. Drag the Claude icon into the Applications folder. Open your Applications folder and double-click Claude to launch it.
+   - **Windows:** Double-click the downloaded installer file. Click Yes if a security popup appears. Follow the prompts and click Install, then Finish.
+4. When Claude Code opens, it will ask you to log in. Go to **[claude.ai](https://claude.ai)** and create a free account if you don't have one. Then sign in with those credentials inside Claude Code.
+5. **After Claude Code is installed, close Terminal and reopen it** (go back to Step 3)
+6. Verify it worked by running:
    ```
    claude --version
    ```
-   You should see a version number. If so, Claude Code is ready.
-
-6. Claude Code will ask you to log in — go to **[claude.ai](https://claude.ai)**, create a free account if you don't have one, and sign in.
+   You should see a version number like `1.x.x`. If you do, Claude Code is ready.
 
 ---
 
-## Step 8: Download the Project (Clone the Repository)
+## Step 8: Download the Project
 
-Now you'll download the actual project code to your computer.
+Now you'll download the actual project code to your computer. This is called "cloning."
 
-1. In Terminal, run this command to navigate to your home folder:
+### On Mac:
+
+1. In Terminal, run this to make sure you're starting from your home folder:
+   ```
+   cd ~
+   ```
+   > You won't see anything happen — that's normal. It just navigates to the right place.
+
+2. Run this to download the project:
+   ```
+   git clone https://github.com/carnster/rooted-ems.git
+   ```
+   > Lines of text will scroll by as it downloads. This takes about 30–60 seconds. Wait until the cursor is blinking again.
+
+3. Navigate into the project folder:
+   ```
+   cd rooted-ems
+   ```
+   > **How to know it worked:** The text at the beginning of your Terminal line should now end with `rooted-ems`
+
+4. Install the project's dependencies:
+   ```
+   pnpm install
+   ```
+   > This takes 1–3 minutes. A lot of text will scroll by — that's normal. Wait until the blinking cursor comes back before moving on.
+
+---
+
+### On Windows:
+
+1. In PowerShell, run this to start from your home folder:
    ```
    cd ~
    ```
 
-2. Now run this command to download the project:
+2. Run this to download the project:
    ```
    git clone https://github.com/carnster/rooted-ems.git
    ```
-   > You'll see text scrolling by as it downloads — this takes about 30–60 seconds depending on your internet speed.
+   > Lines of text will scroll by. Wait for the blinking cursor to return.
 
-3. When it finishes, navigate into the project folder:
+3. Navigate into the project folder:
    ```
    cd rooted-ems
    ```
-   > **How to know it worked:** Your Terminal prompt will now show `rooted-ems` at the end of the line.
 
-4. Now install the project's dependencies:
+4. Install the project's dependencies:
    ```
    pnpm install
    ```
-   > This downloads additional code the project needs. It will take 1–3 minutes. You'll see a lot of text — that's normal. Wait until you see your cursor blinking again before moving on.
+   > This takes 1–3 minutes. Wait until the blinking cursor returns before moving on.
 
 ---
 
 ## Step 9: Add the Database Credentials File
 
-Steven will send you a file called `.env.local`. This file contains the passwords and keys needed to connect to the database. **Keep this file private — do not share it or post it anywhere.**
+Steven will send you a file called `.env.local`. This file contains the private keys that connect the app to its database. **Keep this file private. Do not forward it, post it, or share it anywhere.**
 
-### Where it needs to go
-
-The file must be placed inside a specific folder on your computer:
+The file needs to be placed in a very specific location inside the project you just downloaded:
 
 ```
-rooted-ems  ← the project folder you downloaded
+rooted-ems
 └── apps
     └── web
-        └── .env.local   ← the file goes HERE
+        └── .env.local   ← the file must go exactly here
 ```
 
-### How to place it there
+---
 
-**Step 9a — Find the destination folder in Finder (Mac) or File Explorer (Windows):**
+### On Mac:
 
-*On Mac:*
-1. Open **Finder**
-2. In the menu bar at the top of your screen, click **Go → Home**
-3. You'll see a folder called `rooted-ems` — double-click to open it
-4. Open the `apps` folder inside it
-5. Open the `web` folder inside that
-6. Press **⌘ Shift .** (Command + Shift + Period) to show hidden files
-   > The `.env.local` file starts with a dot, which makes it invisible by default. This shortcut reveals it.
+**Step 9a — Locate the Downloads folder where the file landed:**
+1. Open **Finder** (click the smiley face icon in your Dock at the bottom of the screen)
+2. In the left sidebar, click **Downloads**
+3. You should see the `.env.local` file there
+   > If you don't see it, press **⌘ Shift .** (Command + Shift + Period) to reveal hidden files. Files starting with a dot are hidden by default on Mac.
 
-*On Windows:*
-1. Open **File Explorer**
-2. In the address bar, type `%USERPROFILE%\rooted-ems\apps\web` and press Enter
+**Step 9b — Navigate to the destination folder:**
+1. In the Finder left sidebar, click **Home** (the house icon with your name)
+2. Double-click the `rooted-ems` folder
+3. Double-click the `apps` folder
+4. Double-click the `web` folder
+5. Press **⌘ Shift .** to show hidden files here too
 
-**Step 9b — Move and rename the file (Windows only — important!):**
+**Step 9c — Move the file:**
+1. Go back to your Downloads folder (left sidebar → Downloads)
+2. Click on `.env.local` once to select it
+3. Hold **⌘** (Command) and press **C** to copy it
+4. Go back to the `web` folder
+5. Hold **⌘** and press **V** to paste it
 
-> ⚠️ **Windows issue:** Windows doesn't allow files that start with a dot to be saved normally. When Steven sends you the `.env.local` file, Windows will likely save it as `env.local`, `env.downloaded`, or similar — **without the dot at the front**. You must rename it using PowerShell. Here's how:
+**Step 9d — Verify it worked:**
+1. In Terminal, run:
+   ```
+   ls ~/rooted-ems/apps/web/.env.local
+   ```
+2. If it prints the file path back at you — you're done with this step. ✅
+3. If it says "No such file or directory" — the file is in the wrong location. Go back to Step 9c.
 
-1. Open **PowerShell** (press the Windows key, type `PowerShell`, press Enter)
-2. Run this command to navigate to your Downloads folder:
+---
+
+### On Windows:
+
+> ⚠️ **Important Windows note:** Windows does not allow files that start with a dot to be saved normally. When you receive the `.env.local` file, Windows will automatically rename it — stripping the dot — and save it as something like `env.local`, `env.downloaded`, or `env`. You **cannot** fix this in File Explorer. You must use PowerShell to rename and move it. Follow the steps below exactly.
+
+**Step 9a — Find out what Windows named the file:**
+1. Open **PowerShell** (Windows key → type PowerShell → press Enter)
+2. Navigate to your Downloads folder:
    ```
    cd ~\Downloads
    ```
-3. Check what the file was saved as by running:
+3. Look for the file by running:
    ```
    dir env*
    ```
-   You'll see the filename listed — it might be `env.local`, `env.downloaded`, or something similar.
+4. PowerShell will show you a list. Look for a file whose name starts with `env` — it might be called `env.local`, `env.downloaded`, `env`, or something similar. **Make a note of the exact name.**
 
-4. Rename it to `.env.local` using the exact command below (replace `env.downloaded` with whatever filename you saw in the previous step):
-   ```
-   Rename-Item env.downloaded .env.local
-   ```
+**Step 9b — Rename the file:**
 
-5. Now move it to the correct folder:
-   ```
-   Move-Item .env.local ~\rooted-ems\apps\web\.env.local
-   ```
-
-**Step 9c — Verify it worked:**
-
-In PowerShell, run:
+Replace `env.downloaded` in the command below with whatever exact filename you saw in Step 9a:
 ```
-dir ~\rooted-ems\apps\web\.env.local
+Rename-Item env.downloaded .env.local
 ```
-If it shows the file in the list — you're good. If it says "Cannot find path," the file is in the wrong place — go back to Step 9b.
+> For example, if the file was named `env.local`, you would type: `Rename-Item env.local .env.local`
+> If it was named just `env`, you would type: `Rename-Item env .env.local`
+
+**Step 9c — Move the file to the correct location:**
+```
+Move-Item .env.local ~\rooted-ems\apps\web\.env.local
+```
+> This moves the file from your Downloads folder into the correct spot inside the project.
+
+**Step 9d — Verify it worked:**
+```
+dir ~\rooted-ems\apps\web
+```
+Look through the list of files that appear. You should see `.env.local` listed. If you see it — you're done with this step. ✅
+
+If you don't see it, text Steven — this is the trickiest part of the setup on Windows and he can walk you through it.
 
 ---
 
 ## Step 10: Open Claude Code in the Project
 
-Now you'll open Claude Code inside the project folder.
+Now you'll launch Claude Code inside the project folder.
 
-1. In Terminal, make sure you're in the `rooted-ems` folder. Run:
+### On Mac:
+
+1. In Terminal, run:
    ```
    cd ~/rooted-ems
    ```
-
-2. Open Claude Code:
+2. Then run:
    ```
    claude
    ```
-
-3. Claude Code will start up and read the project automatically. **You're in!**
-
-You'll see a chat interface. Claude Code already knows the full codebase — just start asking it questions.
+3. Claude Code will start up. It will automatically read the project and know everything about the codebase.
+4. You'll see a chat-style interface. **You're in!** Just start typing questions.
 
 ---
 
-## Step 11 (Optional): See the App in Your Browser
+### On Windows:
 
-If you want to see the actual enrollment app running on your computer:
+1. In PowerShell, run:
+   ```
+   cd ~\rooted-ems
+   ```
+2. Then run:
+   ```
+   claude
+   ```
+3. Claude Code will start up and read the project automatically.
+4. You'll see a chat-style interface. **You're in!**
 
+---
+
+## Step 11 (Optional): See the App Running in Your Browser
+
+If you want to open the actual enrollment app in your web browser:
+
+### On Mac:
 1. In Terminal, run:
    ```
    pnpm turbo run dev --filter=web
    ```
-   > Wait until you see a message saying something like `ready on http://localhost:3000`
-
-2. Open your web browser and go to:
+2. Wait until you see a line that says something like `ready on http://localhost:3000` — this means the app is running
+3. Open your web browser and go to:
    - **Family portal:** `http://localhost:3000/login`
    - **Staff portal:** `http://localhost:3000/staff-login`
+4. When you're done, go back to Terminal and press **⌘ C** (Command + C) to stop the app
 
-3. To stop the app when you're done, go back to Terminal and press **⌃ C** (Control + C).
+### On Windows:
+1. In PowerShell, run:
+   ```
+   pnpm turbo run dev --filter=web
+   ```
+2. Wait until you see `ready on http://localhost:3000`
+3. Open your browser and go to:
+   - **Family portal:** `http://localhost:3000/login`
+   - **Staff portal:** `http://localhost:3000/staff-login`
+4. When you're done, press **Ctrl + C** in PowerShell to stop the app
 
 ---
 
 ## You're All Set!
 
-Here are some starter prompts to try in Claude Code once you're in:
+Once Claude Code is open, here are some questions to start with:
 
 - *"Give me a tour of this project — what does it do and how is it organized?"*
 - *"Walk me through what a family experiences when they apply to a school."*
-- *"Show me how the staff reviews applications."*
+- *"Show me how staff review and approve applications."*
 - *"What has been built so far and what's still in progress?"*
 
 ---
@@ -292,11 +424,10 @@ Here are some starter prompts to try in Claude Code once you're in:
 | `command not found: node` | Go back to Step 4 and install Node.js |
 | `command not found: pnpm` | Go back to Step 5 and install pnpm |
 | `command not found: git` | Go back to Step 6 and install Git |
-| `command not found: claude` | Go back to Step 7 and install Claude Code. Make sure to close and reopen Terminal after installing. |
-| GitHub clone fails with "access denied" | Make sure you accepted the GitHub invitation in Step 2 |
-| `.env.local` not working | Make sure the file is inside `apps/web/` — not the `rooted-ems` root folder |
-| Windows saved it as `env.downloaded` or `env.local` | See Step 9b — use PowerShell to rename it to `.env.local` before moving it |
-| `pnpm install` permission error on Mac | Add `sudo` before the command and enter your Mac password |
-| App doesn't load in browser | Make sure the Terminal command from Step 11 is still running |
-
-Still stuck? Reach out to Steven — he can jump on a quick call to help.
+| `command not found: claude` | Go back to Step 7 and reinstall Claude Code. Close and reopen Terminal after installing. |
+| GitHub clone says "access denied" | Make sure you accepted the GitHub invite in Step 2 and that Steven has added you |
+| `.env.local` not working | Make sure the file is inside the `apps/web` folder — not the main `rooted-ems` folder |
+| Windows saved file as `env.downloaded` or `env.local` | Follow Step 9 (Windows) exactly — use PowerShell to rename it before moving it |
+| `pnpm install` says "permission denied" on Mac | Re-run with `sudo` in front and enter your Mac password |
+| App doesn't open in browser | Make sure the Terminal command from Step 11 is still running — don't close that window |
+| Any other error | Text or email Steven — he can jump on a quick call |
