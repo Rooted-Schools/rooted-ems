@@ -183,18 +183,63 @@ Git is the tool that downloads the project code from GitHub to your computer.
 
 Claude Code is the AI assistant you'll use to explore and contribute to the project.
 
+---
+
+### On Mac:
+
 1. Open your browser and go to **[claude.ai/download](https://claude.ai/download)**
-2. Click the download button for your operating system (**Mac** or **Windows**)
-3. A file will download to your computer. Open it:
-   - **Mac:** Double-click the downloaded `.dmg` file. Drag the Claude icon into the Applications folder. Open your Applications folder and double-click Claude to launch it.
-   - **Windows:** Double-click the downloaded installer file. Click Yes if a security popup appears. Follow the prompts and click Install, then Finish.
-4. When Claude Code opens, it will ask you to log in. Go to **[claude.ai](https://claude.ai)** and create a free account if you don't have one. Then sign in with those credentials inside Claude Code.
-5. **After Claude Code is installed, close Terminal and reopen it** (go back to Step 3)
-6. Verify it worked by running:
+2. Click the download button for Mac
+3. Open the downloaded `.dmg` file
+4. Drag the Claude icon into your Applications folder when the window appears
+5. Open your Applications folder and double-click **Claude** to launch it
+6. Sign in with your Claude account when prompted. If you don't have one, go to **[claude.ai](https://claude.ai)** and create a free account first.
+7. Close Terminal completely and reopen it (go back to Step 3)
+8. Verify it worked:
+   ```
+   claude --version
+   ```
+   You should see a version number like `1.x.x`. If so, you're ready to move on.
+
+---
+
+### On Windows:
+
+> ⚠️ **Important:** The Claude desktop app for Windows does **not** automatically make the `claude` command available in PowerShell. You must install the Claude Code command-line tool separately using the steps below. This is the correct method for Windows.
+
+1. Open **PowerShell** (Windows key → type PowerShell → press Enter)
+
+2. Run this command exactly as written:
+   ```
+   npm install -g @anthropic-ai/claude-code
+   ```
+   > Text will scroll by for about 30–60 seconds. Wait until the blinking cursor comes back before doing anything else.
+
+3. **Close PowerShell completely** — click the **X** in the top right corner of the PowerShell window
+
+4. **Reopen PowerShell** — press the Windows key, type **PowerShell**, press Enter
+
+5. Verify Claude Code is installed:
    ```
    claude --version
    ```
    You should see a version number like `1.x.x`. If you do, Claude Code is ready.
+
+6. Claude Code will ask you to log in. Go to **[claude.ai](https://claude.ai)**, create a free account if you don't have one, then sign in with those credentials when prompted in PowerShell.
+
+---
+
+> **Still seeing "claude is not recognized" after closing and reopening PowerShell?**
+>
+> 1. Close PowerShell
+> 2. Press the Windows key, type **PowerShell**, then **right-click** on Windows PowerShell
+> 3. Click **"Run as administrator"**
+> 4. Click **Yes** on the security popup
+> 5. Run the install command again:
+>    ```
+>    npm install -g @anthropic-ai/claude-code
+>    ```
+> 6. Close PowerShell and reopen it normally (not as administrator)
+> 7. Run `claude --version` — you should now see a version number
 
 ---
 
