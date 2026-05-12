@@ -52,36 +52,40 @@ After Steven adds you, you'll receive an invitation by email.
 
 ---
 
-## Step 3: Open Terminal (Your Command Window)
+## Step 3: Open Your Command Window
 
-Terminal is a built-in app that lets you type instructions directly to your computer. You'll use it for most of the remaining steps.
+Throughout this guide, you'll need to type instructions directly into your computer using a special text window. This is normal — you're just giving your computer instructions by typing instead of clicking.
+
+**On a Mac, this window is called Terminal.**
+**On Windows, this window is called PowerShell.**
+
+They do the same thing. PowerShell is not something you download — it comes built into every Windows computer. It looks like a plain blue or black window with white text. You type a command, press Enter, and the computer does what you asked.
 
 > **What does "run a command" mean?**
-> Throughout this guide, when it says "run" something, it means:
-> 1. Click inside the Terminal window so it's active
-> 2. Type exactly what's shown (copy-paste also works)
+> When this guide says to "run" something, it means:
+> 1. Click inside the window so it's active (the cursor should be blinking)
+> 2. Type exactly what's shown — or copy and paste it
 > 3. Press **Enter**
-> The computer will execute the instruction and show you the result.
+> The computer runs the instruction and shows you the result. Then it waits for the next one.
 
 ---
 
-### If you're on a Mac:
+### On a Mac — How to open Terminal:
 
-1. Press **⌘ Space** (hold the Command key and tap Spacebar) — a search bar called Spotlight will appear in the middle of your screen
-2. Type **Terminal** into the search bar
-3. Press **Enter** when you see "Terminal" appear in the results
-4. A white or black window will open with some text and a blinking cursor — that's Terminal. Leave it open.
+1. Press **⌘ Space** (hold the Command key and tap Spacebar) — a search bar appears in the middle of your screen
+2. Type **Terminal** and press **Enter**
+3. A window opens with some text and a blinking cursor — that's Terminal. Leave it open.
 
 ---
 
-### If you're on Windows:
+### On Windows — How to open PowerShell:
 
-1. Press the **Windows key** on your keyboard (the key with the Windows logo, usually bottom-left)
-2. Type **PowerShell** into the search bar that appears
-3. Click **Windows PowerShell** in the results
-4. A blue window will open with some text and a blinking cursor — that's your Terminal. Leave it open.
+1. Press the **Windows key** on your keyboard — it has the Windows logo on it, usually in the bottom-left corner of your keyboard
+2. A search bar appears. Type **PowerShell**
+3. Click **Windows PowerShell** in the results (not PowerShell 7 or ISE — just plain Windows PowerShell)
+4. A blue window opens with white text and a blinking cursor — that's PowerShell. Leave it open.
 
-> ⚠️ **Windows users:** Everywhere this guide says "Terminal," use PowerShell. They work the same way for everything in this guide.
+> ⚠️ **Windows users:** Every time this guide says "Terminal," it means PowerShell. They work exactly the same way for everything in this guide.
 
 ---
 
