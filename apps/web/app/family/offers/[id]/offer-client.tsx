@@ -195,7 +195,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 flex items-start gap-2">
           <span className="shrink-0 mt-0.5">⚠️</span>
           <span>
-            This offer expires soon. Please respond today to avoid losing your spot.
+            Your spot is waiting — accept your offer today to lock it in.
           </span>
         </div>
       )}
@@ -289,8 +289,6 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
               Are you sure you want to decline the offer for{" "}
               <strong>{offer.student_name}</strong> at{" "}
               <strong>{offer.campus_name}</strong>? This action cannot be undone.
-              Your student may be placed back on the waitlist depending on
-              availability.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
