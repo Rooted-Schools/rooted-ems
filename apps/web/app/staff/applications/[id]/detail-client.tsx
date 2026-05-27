@@ -581,7 +581,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
                   </div>
                 )}
                 <p className="text-xs text-ink/60 mt-2">
-                  An in-app notification was sent. The family can view it under <strong>Messages</strong> in their portal. Once they respond or upload documents, mark this application as Verified.
+                  An in-app notification was sent. The family can view it under <strong>Notifications</strong> in their portal. Once they respond or upload documents, mark this application as Verified.
                 </p>
               </div>
             </div>
