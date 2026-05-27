@@ -310,7 +310,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
         </Link>
         <h1 className="text-2xl font-bold text-ink mt-2">New Application</h1>
         <p className="text-sm text-stone mt-1">
-          Takes about 5 minutes. You can save a draft and return later.
+          This takes about 5 minutes — save a draft and return anytime.
         </p>
       </div>
 
@@ -575,6 +575,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
 
             <hr className="border-stone/20" />
 
+            <p className="text-sm text-stone mb-3">Before you submit, please read and sign below.</p>
             <div className="space-y-3">
               <div className="flex items-start gap-2">
                 <input
@@ -586,7 +587,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
                 />
                 <label htmlFor="data-sharing-consent" className="text-sm text-ink/60">
                   I consent to the sharing of my child&apos;s educational records with{" "}
-                  <span className="font-bold">rooted</span>schools for the purpose of enrollment
+                  <span className="font-bold">Rooted Schools</span> for the purpose of enrollment
                   processing.
                 </label>
               </div>
