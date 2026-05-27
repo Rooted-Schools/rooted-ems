@@ -839,6 +839,15 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
         </CardContent>
       </Card>
 
+      {/* Help section */}
+      {!packetSubmitted && (
+        <div className="text-center py-2">
+          <p className="text-xs text-stone">
+            Need help? Contact your school&apos;s enrollment office for assistance with any registration items.
+          </p>
+        </div>
+      )}
+
       {/* Registration Items — Grouped by Category */}
       {enrollment.requirements.length === 0 ? (
         <Card>
@@ -1038,15 +1047,6 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
             </Link>
           </CardContent>
         </Card>
-      )}
-
-      {/* Help section */}
-      {!packetSubmitted && (
-        <div className="text-center py-2">
-          <p className="text-xs text-stone">
-            Need help? Contact your school&apos;s enrollment office for assistance with any registration items.
-          </p>
-        </div>
       )}
 
       {/* Completion Dialog */}
