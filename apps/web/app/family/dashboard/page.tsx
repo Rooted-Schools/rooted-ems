@@ -354,7 +354,7 @@ export default async function FamilyDashboardPage() {
                 {
                   step: 3,
                   title: "Enrollment Lottery",
-                  desc: "If more applications are received than seats available, a fair lottery determines placement.",
+                  desc: "If more students apply than seats are available, placement is determined by a randomized lottery. All eligible applicants are entered automatically.",
                 },
                 {
                   step: 4,

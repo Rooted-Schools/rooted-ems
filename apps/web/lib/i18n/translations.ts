@@ -37,7 +37,7 @@ const dict = {
   // ─── Dashboard ────────────────────────────────────────────────────────────
   "dashboard.welcomeBack":          { en: "Welcome back",                es: "Bienvenido/a de vuelta" },
   "dashboard.startNewApplication":  { en: "Start New Application",       es: "Nueva Solicitud" },
-  "dashboard.welcomeFamily":        { en: "Welcome to the rootedschools family!", es: "¡Bienvenido a la familia rootedschools!" },
+  "dashboard.welcomeFamily":        { en: "Welcome to the Rooted Schools family!", es: "¡Bienvenido a la familia Rooted Schools!" },
   "dashboard.enrolledStudents":     { en: "student(s) enrolled and registered.", es: "estudiante(s) matriculado(s) y registrado(s)." },
   "dashboard.checkOrientation":     { en: "Check your school for orientation details.", es: "Comuníquese con su escuela para los detalles de orientación." },
   "dashboard.activeApplications":   { en: "Active Applications",         es: "Solicitudes Activas" },
@@ -89,7 +89,7 @@ const dict = {
   "reg.packSubmitted":        { en: "Packet Submitted!",             es: "¡Paquete Enviado!" },
   "reg.packComplete":         { en: "Registration Complete!",        es: "¡Registro Completo!" },
   "reg.underReview":          { en: "Your registration packet is being reviewed by the enrollment team.", es: "Su paquete de registro está siendo revisado por el equipo de inscripción." },
-  "reg.allVerified":          { en: "All items have been verified by staff. Welcome to the rootedschools family!", es: "Todos los elementos han sido verificados. ¡Bienvenido a la familia rootedschools!" },
+  "reg.allVerified":          { en: "All items have been verified by staff. Welcome to the Rooted Schools family!", es: "Todos los elementos han sido verificados. ¡Bienvenido a la familia Rooted Schools!" },
   "reg.backToDashboard":      { en: "Back to Dashboard",             es: "Volver al Panel" },
   "reg.needHelp":             { en: "Need help? Contact your school's enrollment office for assistance.", es: "¿Necesita ayuda? Comuníquese con la oficina de inscripciones de su escuela." },
   "reg.itemsRemaining":       { en: "remaining",                     es: "restante(s)" },
