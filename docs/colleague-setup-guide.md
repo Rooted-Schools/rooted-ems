@@ -255,27 +255,40 @@ Now you'll download the actual project code to your computer. This is called "cl
 
 ### On Windows:
 
-1. In PowerShell, run this to start from your home folder:
+1. First, create a **Cowork** folder — this is your home base for all Claude Code projects:
    ```
-   cd ~
+   mkdir ~\Cowork
    ```
 
-2. Run this to download the project:
+2. Navigate into it:
    ```
-   git clone https://github.com/Rooted-schools/rooted-ems.git
+   cd ~\Cowork
+   ```
+
+3. Download the project into your Cowork folder:
+   ```
+   git clone https://github.com/Rooted-Schools/rooted-ems.git
    ```
    > Lines of text will scroll by. Wait for the blinking cursor to return.
 
-3. Navigate into the project folder:
+4. Navigate into the project folder:
    ```
    cd rooted-ems
    ```
 
-4. Install the project's dependencies:
+5. Install the project's dependencies:
    ```
    pnpm install
    ```
    > This takes 1–3 minutes. Wait until the blinking cursor returns before moving on.
+
+Your folder structure will now look like this:
+```
+Cowork\
+└── rooted-ems\    ← the project lives here
+```
+
+> **Why a Cowork folder?** This keeps all your Claude Code projects organized in one place. If you're ever added to other projects, they'll all live neatly inside `Cowork\`.
 
 ---
 
@@ -353,7 +366,7 @@ Rename-Item env.downloaded .env.local
 
 **Step 9c — Move the file to the correct location:**
 ```
-Move-Item .env.local ~\rooted-ems\apps\web\.env.local
+Move-Item .env.local ~\Cowork\rooted-ems\apps\web\.env.local
 ```
 > This moves the file from your Downloads folder into the correct spot inside the project.
 
@@ -375,7 +388,7 @@ Now you'll launch Claude Code inside the project folder.
 
 1. In Terminal, run:
    ```
-   cd ~/rooted-ems
+   cd ~\Cowork\rooted-ems
    ```
 2. Then run:
    ```

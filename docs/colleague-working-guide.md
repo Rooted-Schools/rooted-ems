@@ -32,7 +32,7 @@ Before opening Claude Code, you need to grab any changes Steven made since you l
 1. Press the **Windows key**, type **PowerShell**, press **Enter**
 2. Navigate to the project:
    ```
-   cd ~\rooted-ems
+   cd ~\Cowork\rooted-ems
    ```
 3. Pull the latest changes:
    ```
@@ -95,7 +95,7 @@ Open a **second PowerShell window** (don't close the one with Claude Code open):
 1. Press Windows key → type PowerShell → press Enter
 2. Navigate to the project:
    ```
-   cd ~\rooted-ems
+   cd ~\Cowork\rooted-ems
    ```
 3. Start the app:
    ```
@@ -217,7 +217,8 @@ If you're both making small, unrelated changes (different pages, different featu
 
 | What you want to do | Command |
 |---------------------|---------|
-| Navigate to project | `cd ~\rooted-ems` |
+| Navigate to project | `cd ~\Cowork\rooted-ems` |
+| Find your Cowork folder | `cd ~\Cowork` |
 | Get latest changes | `git pull` |
 | Open Claude Code | Click the Claude icon in taskbar |
 | Start the app | `pnpm turbo run dev --filter=web` |
