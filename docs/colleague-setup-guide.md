@@ -206,44 +206,18 @@ Claude Code is the AI assistant you'll use to explore and contribute to the proj
 
 ---
 
-### On Windows:
+### On Windows (Claude Code Desktop App):
 
-> ⚠️ **Important:** The Claude desktop app for Windows does **not** automatically make the `claude` command available in PowerShell. You must install the Claude Code command-line tool separately using the steps below. This is the correct method for Windows.
+1. Open your browser and go to **[claude.ai/download](https://claude.ai/download)**
+2. Click the **Windows** download button
+3. Open the downloaded installer file
+4. Click **Yes** if a security popup appears
+5. Follow the prompts — click **Next**, then **Install**, then **Finish**
+6. Claude Code will appear in your Start menu and on your taskbar
+7. Open it by clicking the **Claude** icon
+8. Sign in with your Claude account when prompted. If you don't have one, go to **[claude.ai](https://claude.ai)** and create a free account first.
 
-1. Open **PowerShell** (Windows key → type PowerShell → press Enter)
-
-2. Run this command exactly as written:
-   ```
-   npm install -g @anthropic-ai/claude-code
-   ```
-   > Text will scroll by for about 30–60 seconds. Wait until the blinking cursor comes back before doing anything else.
-
-3. **Close PowerShell completely** — click the **X** in the top right corner of the PowerShell window
-
-4. **Reopen PowerShell** — press the Windows key, type **PowerShell**, press Enter
-
-5. Verify Claude Code is installed:
-   ```
-   claude --version
-   ```
-   You should see a version number like `1.x.x`. If you do, Claude Code is ready.
-
-6. Claude Code will ask you to log in. Go to **[claude.ai](https://claude.ai)**, create a free account if you don't have one, then sign in with those credentials when prompted in PowerShell.
-
----
-
-> **Still seeing "claude is not recognized" after closing and reopening PowerShell?**
->
-> 1. Close PowerShell
-> 2. Press the Windows key, type **PowerShell**, then **right-click** on Windows PowerShell
-> 3. Click **"Run as administrator"**
-> 4. Click **Yes** on the security popup
-> 5. Run the install command again:
->    ```
->    npm install -g @anthropic-ai/claude-code
->    ```
-> 6. Close PowerShell and reopen it normally (not as administrator)
-> 7. Run `claude --version` — you should now see a version number
+That's it — no extra commands needed. Claude Code Desktop is ready to use.
 
 ---
 

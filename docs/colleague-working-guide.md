@@ -25,36 +25,36 @@ Pull latest → Open Claude Code → Make changes → Test → Save & Push
 
 ## Every Time You Sit Down to Work
 
-### Step 1 — Open PowerShell
+### Step 1 — Pull the latest changes first
 
-1. Press the **Windows key**
-2. Type **PowerShell** and press **Enter**
+Before opening Claude Code, you need to grab any changes Steven made since you last worked. This takes 30 seconds and prevents conflicts.
 
-### Step 2 — Navigate to the project
-
-```
-cd ~\rooted-ems
-```
-
-### Step 3 — Pull the latest changes
-
-**Always do this before starting.** It grabs anything Steven changed since you last worked.
-
-```
-git pull
-```
+1. Press the **Windows key**, type **PowerShell**, press **Enter**
+2. Navigate to the project:
+   ```
+   cd ~\rooted-ems
+   ```
+3. Pull the latest changes:
+   ```
+   git pull
+   ```
 
 You'll see one of two things:
 - `Already up to date.` — nothing new, you're good to go
-- A list of files — Steven made changes and they've been downloaded to your machine
+- A list of files — Steven made changes and they've been downloaded
 
-### Step 4 — Open Claude Code
+**Keep PowerShell open** — you'll need it later to save and share your work.
 
-```
-claude
-```
+### Step 2 — Open Claude Code Desktop
 
-A chat interface will open. Claude already knows the full codebase — just start describing what you want to change.
+1. Click the **Claude** icon in your taskbar or Start menu
+2. If it asks you to open a project or folder, click **Open Folder**
+3. Navigate to your home folder → open **rooted-ems**
+4. Click **Select Folder**
+
+Claude will read the project automatically and know the full codebase. You'll see the chat interface — just start typing what you want to change.
+
+> **Already have a session open?** If Claude Code is already open from a previous session, make sure you're in the right project. You should see `rooted-ems` somewhere at the top of the window. If not, go to **File → Open Folder** and navigate to the `rooted-ems` folder.
 
 ---
 
@@ -219,7 +219,7 @@ If you're both making small, unrelated changes (different pages, different featu
 |---------------------|---------|
 | Navigate to project | `cd ~\rooted-ems` |
 | Get latest changes | `git pull` |
-| Open Claude Code | `claude` |
+| Open Claude Code | Click the Claude icon in taskbar |
 | Start the app | `pnpm turbo run dev --filter=web` |
 | See what's changed | `git status` |
 | Stage changes | `git add -A` |
