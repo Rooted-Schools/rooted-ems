@@ -150,7 +150,7 @@ export async function notifyFamilyNeedsInfo({
   await notify({
     userId,
     subject: "Your application needs attention",
-    body: message ?? "Our enrollment team needs additional information to process your application. Please check your application for details.",
+    body: message ?? "Our enrollment team needs additional information to process your application. Open your application to see what we need.",
     link: `/family/applications/${applicationIdForLink}`,
     campusId,
     logTag: "notifyFamilyNeedsInfo",
@@ -173,7 +173,7 @@ export async function notifyFamilyApplicationWaitlisted({
   await notify({
     userId,
     subject: `You're on the waitlist at ${campusName}`,
-    body: `${studentName ? `${studentName}'s application` : "Your application"} has been placed on the waitlist at ${campusName}. We'll notify you right away if a seat opens up.`,
+    body: `${studentName ? `${studentName}'s application` : "Your application"} has been placed on the waitlist at ${campusName}. We'll contact you as soon as a seat becomes available.`,
     link: `/family/applications`,
     campusId,
     logTag: "notifyFamilyApplicationWaitlisted",
@@ -233,8 +233,8 @@ export async function notifyFamilyDocumentRejected({
   const readableType = documentType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   await notify({
     userId,
-    subject: `Action needed: ${readableType} needs to be re-uploaded`,
-    body: `Your ${readableType} could not be verified. Reason: ${reason}. Please upload a new copy to continue your enrollment.`,
+    subject: `Please re-upload your ${readableType}`,
+    body: `We reviewed your ${readableType} and need a new copy. Reason: ${reason}. Log in to your documents page and upload a replacement to keep your enrollment moving.`,
     link: `/family/documents`,
     campusId,
     logTag: "notifyFamilyDocumentRejected",
@@ -257,7 +257,7 @@ export async function notifyFamilyDocumentVerified({
   await notify({
     userId,
     subject: `✅ ${readableType} verified`,
-    body: `Your ${readableType} has been reviewed and verified by the enrollment team. No further action needed for this document.`,
+    body: `Your ${readableType} has been reviewed and verified by the enrollment team. You're all set on this one.`,
     link: `/family/documents`,
     campusId,
     logTag: "notifyFamilyDocumentVerified",
@@ -305,7 +305,7 @@ export async function notifyFamilyRegistrationSubmitted({
   await notify({
     userId,
     subject: `Registration packet submitted${studentName ? ` for ${studentName}` : ""}`,
-    body: `We've received ${studentName ? `${studentName}'s` : "your"} registration packet at ${campusName}. Our team will review it and notify you when it's verified.`,
+    body: `We've received ${studentName ? `${studentName}'s` : "your"} registration packet at ${campusName}. Our team will review it and reach out when it's verified.`,
     link: `/family/registration`,
     campusId,
     logTag: "notifyFamilyRegistrationSubmitted",
@@ -328,7 +328,7 @@ export async function notifyFamilyRegistrationComplete({
   await notify({
     userId,
     subject: `🎓 Enrollment complete${studentName ? ` for ${studentName}` : ""}!`,
-    body: `All registration items have been verified. ${studentName ? `${studentName} is` : "Your student is"} officially enrolled at ${campusName}. Welcome to the Rooted Schools family!`,
+    body: `All registration items have been verified. ${studentName ? `${studentName} is` : "Your student is"} officially enrolled at ${campusName}. Welcome to the Rooted Schools family — we're proud to have you with us.`,
     link: `/family/registration`,
     campusId,
     logTag: "notifyFamilyRegistrationComplete",
@@ -382,7 +382,7 @@ export async function notifyStaffNewApplication({
   await notifyStaff({
     campusId,
     subject: `New application${studentName ? ` from ${studentName}` : ""} submitted`,
-    body: `A new enrollment application has been submitted${studentName ? ` for ${studentName}` : ""}. Review it to begin the verification process.`,
+    body: `A new application has been submitted${studentName ? ` for ${studentName}` : ""}. Review it to get started.`,
     link: `/staff/applications/${applicationId}`,
     logTag: "notifyStaffNewApplication",
   });
@@ -420,7 +420,7 @@ export async function notifyStaffOfferDeclined({
   await notifyStaff({
     campusId,
     subject: `Offer declined${studentName ? ` by ${studentName}` : ""}`,
-    body: `${studentName ?? "A family"} has declined their seat offer. The next waitlist candidate has been automatically promoted if available.`,
+    body: `${studentName ?? "A family"} has declined their seat offer. Check the waitlist to promote the next eligible student.`,
     link: `/staff/applications/${applicationId}`,
     logTag: "notifyStaffOfferDeclined",
   });
@@ -604,7 +604,7 @@ export async function notifyFamilyStudentEnrolled({
   await notify({
     userId,
     subject: `🎉 ${studentName ?? "Your student"} is officially enrolled at ${campusName}!`,
-    body: `Congratulations! ${studentName ?? "Your student"} is now fully enrolled${grade} at ${campusName}. Welcome to the Rooted Schools family — we can't wait to see them thrive. Check your enrollment portal for next steps and important information.`,
+    body: `Congratulations! ${studentName ?? "Your student"} is now fully enrolled${grade} at ${campusName}. At Rooted Schools, every student graduates with a career credential and a clear plan. We're excited to get started. Log in to your portal to view orientation details and next steps.`,
     link: `/family/applications/${applicationId}`,
     campusId,
     logTag: "notifyFamilyStudentEnrolled",
