@@ -43,7 +43,7 @@ GitHub is the website that stores the project code. You need a free account to a
 After Steven adds you, you'll receive an invitation by email.
 
 1. Open your email inbox and look for a message from **noreply@github.com**
-   - The subject line will say something like: **"carnster invited you to collaborate"**
+   - The subject line will say something like: **"Rooted-schools invited you to collaborate"**
    - > If you don't see it after a few minutes, check your **Spam** or **Junk** folder
 2. Open the email
 3. Click the green **"View invitation"** or **"Accept invitation"** button inside the email
@@ -261,7 +261,7 @@ Now you'll download the actual project code to your computer. This is called "cl
 
 2. Run this to download the project:
    ```
-   git clone https://github.com/carnster/rooted-ems.git
+   git clone https://github.com/Rooted-schools/rooted-ems.git
    ```
    > Lines of text will scroll by as it downloads. This takes about 30–60 seconds. Wait until the cursor is blinking again.
 
@@ -288,7 +288,7 @@ Now you'll download the actual project code to your computer. This is called "cl
 
 2. Run this to download the project:
    ```
-   git clone https://github.com/carnster/rooted-ems.git
+   git clone https://github.com/Rooted-schools/rooted-ems.git
    ```
    > Lines of text will scroll by. Wait for the blinking cursor to return.
 
