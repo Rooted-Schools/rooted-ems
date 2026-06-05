@@ -1,6 +1,7 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
+import { requireStaffSession } from "@/lib/auth/get-session";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -22,6 +23,7 @@ export interface CreateEnrollmentInput {
 export async function createEnrollment(
   input: CreateEnrollmentInput
 ): Promise<MutationResult<{ id: string }>> {
+  await requireStaffSession();
   const supabase = createServiceRoleClient();
 
   const { data, error } = await supabase
@@ -82,6 +84,7 @@ export async function withdrawEnrollment(
   reason: string,
   withdrawnBy?: string
 ): Promise<MutationResult> {
+  await requireStaffSession();
   const supabase = createServiceRoleClient();
 
   // Fetch the enrollment to get the linked application_id and campus
@@ -140,6 +143,7 @@ export async function syncEnrollmentSIS(
   enrollmentId: string,
   sisStudentId: string
 ): Promise<MutationResult> {
+  await requireStaffSession();
   const supabase = createServiceRoleClient();
 
   const { error } = await supabase
@@ -166,6 +170,7 @@ export async function transferEnrollment(
   newGradeLevelId: string,
   transferredBy?: string
 ): Promise<MutationResult> {
+  await requireStaffSession();
   const supabase = createServiceRoleClient();
 
   // Mark current enrollment as transferred
