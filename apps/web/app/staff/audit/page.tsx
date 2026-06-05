@@ -23,7 +23,6 @@ const TABLE_LABELS: Record<string, string> = {
   capacity_plan: "Capacity",
   user_profile: "User Profile",
   verification_item: "Verification",
-  inquiry: "Inquiry",
   registration_item: "Registration",
   task: "Task",
   transfer: "Transfer",

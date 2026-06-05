@@ -182,7 +182,7 @@ export default async function HomePage() {
             mobility.{" "}
             {anyOpen
               ? "Apply to any of our campuses with open enrollment below."
-              : "Express your interest and we'll notify you when enrollment opens."}
+              : "Check back soon for upcoming enrollment windows."}
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             {anyOpen ? (
@@ -193,16 +193,6 @@ export default async function HomePage() {
                 Apply Now
               </Link>
             ) : null}
-            <Link
-              href="/inquiry"
-              className={`inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-lg transition-colors w-full sm:w-auto ${
-                anyOpen
-                  ? "text-ink/70 bg-white border border-stone/40 hover:bg-rooted-gray-light"
-                  : "text-white bg-rooted-green hover:bg-deep-green shadow-sm font-semibold"
-              }`}
-            >
-              Express Interest
-            </Link>
           </div>
         </div>
       </section>
@@ -218,7 +208,7 @@ export default async function HomePage() {
             the country.{" "}
             {anyOpen
               ? "Click a campus to start your application."
-              : "Express your interest to get notified when enrollment opens."}
+              : "Check back soon for upcoming enrollment windows."}
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -272,62 +262,20 @@ export default async function HomePage() {
                   )}
 
                   {/* CTAs */}
-                  <div className="mt-4 flex gap-2">
-                    {school.isOpen ? (
-                      <>
-                        <Link
-                          href={school.campusId ? `/login?campus=${school.campusId}` : "/login"}
-                          className="inline-flex items-center text-sm font-medium text-white bg-rooted-green hover:bg-deep-green px-4 py-2 rounded-lg transition-colors"
-                        >
-                          Apply Now
-                        </Link>
-                        <Link
-                          href="/inquiry"
-                          className="inline-flex items-center text-sm font-medium text-rooted-green border border-rooted-green/30 hover:bg-rooted-green/5 px-4 py-2 rounded-lg transition-colors"
-                        >
-                          Learn More
-                        </Link>
-                      </>
-                    ) : (
+                  {school.isOpen && (
+                    <div className="mt-4 flex gap-2">
                       <Link
-                        href="/inquiry"
+                        href={school.campusId ? `/login?campus=${school.campusId}` : "/login"}
                         className="inline-flex items-center text-sm font-medium text-white bg-rooted-green hover:bg-deep-green px-4 py-2 rounded-lg transition-colors"
                       >
-                        Express Interest
+                        Apply Now
                       </Link>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
-        </div>
-      </section>
-
-      {/* ─── Express Interest CTA ─── */}
-      <section className="py-16 bg-rooted-green/5 border-y border-rooted-green/10">
-        <div className="max-w-3xl mx-auto px-6 text-center">
-          <p className="text-sm font-semibold text-rooted-green uppercase tracking-wider mb-2">
-            {anyOpen ? "Not ready to apply?" : "Stay Connected"}
-          </p>
-          <h2 className="text-2xl md:text-3xl font-bold text-ink mb-3">
-            Express Your Interest
-          </h2>
-          <p className="text-ink/60 max-w-xl mx-auto mb-8">
-            {anyOpen
-              ? <>Complete a short form and our team will share more information about our schools, upcoming enrollment windows, and how{" "}<span className="font-bold">rooted</span>schools prepares students for economic mobility.</>
-              : <>Enrollment is currently closed. Fill out a quick form and we&apos;ll notify you when enrollment opens for the next school year at any of our <span className="font-bold">rooted</span>schools campuses.</>
-            }
-          </p>
-          <Link
-            href="/inquiry"
-            className="inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold text-white bg-rooted-green hover:bg-deep-green rounded-lg transition-colors shadow-sm"
-          >
-            Express Interest &rarr;
-          </Link>
-          <p className="text-xs text-stone mt-4">
-            No commitment required. We&apos;ll follow up to answer your questions.
-          </p>
         </div>
       </section>
 
@@ -386,9 +334,6 @@ export default async function HomePage() {
             <span className="text-white font-bold">rooted</span><span className="text-white/70 font-medium">schools</span>
           </span>
           <div className="flex items-center gap-6 text-xs text-white/60">
-            <Link href="/inquiry" className="hover:text-white transition-colors">
-              Express Interest
-            </Link>
             <Link href="/login" className="hover:text-white transition-colors">
               Family Portal
             </Link>

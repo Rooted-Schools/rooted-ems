@@ -107,13 +107,6 @@ export function ReportsClient({ data }: { data: ReportData }) {
       icon: "🔍",
       recordCount: data.auditEvents.length,
     },
-    {
-      id: "inquiry-sources",
-      title: "Inquiry Sources",
-      description: "Where families learn about the school and conversion rates.",
-      icon: "📣",
-      recordCount: data.inquirySources.reduce((s, r) => s + r.count, 0),
-    },
   ];
 
   // Compute summary stats for the header
@@ -177,17 +170,6 @@ export function ReportsClient({ data }: { data: ReportData }) {
             r.actor_name,
             r.created_at,
             r.details,
-          ])
-        );
-        break;
-      case "inquiry-sources":
-        csv = toCsv(
-          ["Source", "Total Inquiries", "Converted to Application", "Conversion Rate"],
-          data.inquirySources.map((r) => [
-            r.source,
-            String(r.count),
-            String(r.converted),
-            r.count > 0 ? `${((r.converted / r.count) * 100).toFixed(1)}%` : "0%",
           ])
         );
         break;
@@ -529,67 +511,6 @@ export function ReportsClient({ data }: { data: ReportData }) {
         </Card>
       )}
 
-      {previewId === "inquiry-sources" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Inquiry Sources & Conversion</CardTitle>
-            <CardDescription>
-              Where families learn about your school and how many convert to applications
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {data.inquirySources.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-sm text-stone">No inquiry data yet.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {data.inquirySources.map((row) => {
-                  const rate = row.count > 0 ? ((row.converted / row.count) * 100) : 0;
-                  const maxCount = Math.max(...data.inquirySources.map(r => r.count));
-                  return (
-                    <div key={row.source}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-ink/70 capitalize">
-                          {row.source.replace(/_/g, " ")}
-                        </span>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-stone">{row.count} inquiries</span>
-                          <span className={`text-xs font-bold ${rate >= 20 ? "text-rooted-green" : "text-stone"}`}>
-                            {rate.toFixed(0)}% converted
-                          </span>
-                        </div>
-                      </div>
-                      <div className="w-full bg-rooted-gray rounded-full h-2.5 relative overflow-hidden">
-                        {/* Total inquiries bar */}
-                        <div
-                          className="absolute left-0 top-0 h-2.5 bg-blue-200 rounded-full"
-                          style={{ width: `${maxCount > 0 ? (row.count / maxCount) * 100 : 0}%` }}
-                        />
-                        {/* Converted overlay */}
-                        <div
-                          className="absolute left-0 top-0 h-2.5 bg-rooted-green rounded-full"
-                          style={{ width: `${maxCount > 0 ? (row.converted / maxCount) * 100 : 0}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-                <div className="flex gap-4 mt-2 pt-2 border-t border-rooted-gray">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-sm bg-blue-200" />
-                    <span className="text-[10px] text-stone">Total Inquiries</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-sm bg-rooted-green" />
-                    <span className="text-[10px] text-stone">Converted to Application</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

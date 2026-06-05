@@ -38,7 +38,6 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Admissions",
     items: [
-      { label: "Inquiries", href: "/staff/inquiries", icon: "💬", minRole: "enrollment_staff" },
       { label: "Applications", href: "/staff/applications", icon: "📋" },
       { label: "Documents", href: "/staff/documents", icon: "📄", minRole: "enrollment_staff" },
       { label: "Students", href: "/staff/students", icon: "👤" },

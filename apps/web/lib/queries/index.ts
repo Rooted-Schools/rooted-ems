@@ -96,18 +96,6 @@ export {
   type RegistrationItemRow,
 } from "./staff";
 
-// Inquiry queries
-export {
-  getStaffInquiries,
-  getInquiryStats,
-  getInquiryDetail,
-  getRecentInquiries,
-  type InquiryRow,
-  type InquiryStats,
-  type InquiryDetail,
-  type ContactLogRow,
-} from "./inquiries";
-
 // Demographic / equity queries
 export {
   getDemographicBreakdowns,

@@ -98,14 +98,6 @@ export {
   type AssignStaffRoleInput,
 } from "./settings";
 
-// Inquiry mutations
-export {
-  updateInquiryStatus,
-  assignInquiryStaff,
-  addContactLog,
-  convertInquiryToApplication,
-} from "./inquiries";
-
 // Communication mutations
 export {
   sendNotification,

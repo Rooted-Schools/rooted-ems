@@ -17,7 +17,6 @@ import {
   buildPipeline,
   getUpcomingDeadlines,
   getRecentActivity,
-  getInquiryStats,
 } from "@/lib/queries";
 import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 
@@ -88,12 +87,6 @@ const FLOW_STAGES = [
 
 const QUEUE_ITEMS = [
   {
-    key: "new_inquiries",
-    label: "New Inquiries",
-    dotColor: "bg-purple-500",
-    href: "/staff/inquiries",
-  },
-  {
     key: "submitted",
     label: "New Submissions",
     dotColor: "bg-blue-500",
@@ -137,25 +130,20 @@ export default async function StaffDashboardPage({
 
   const supabase = createServiceRoleClient();
 
-  const [stats, appStats, deadlines, recentActivity, queueCounts, inquiryStats, { data: currentSY }] =
+  const [stats, appStats, deadlines, recentActivity, queueCounts, { data: currentSY }] =
     await Promise.all([
       getStaffDashboardStats(activeCampus),
       getApplicationStats(activeCampus),
       getUpcomingDeadlines(activeCampus),
       getRecentActivity({ campusId: activeCampus }),
       getWorkQueueCounts(scopedCampusIds),
-      getInquiryStats(scopedCampusIds),
       supabase.from("school_year").select("name").eq("is_current", true).single(),
     ]);
 
   const pipeline = buildPipeline(appStats);
   const pipelineTotal = pipeline.reduce((acc, s) => acc + s.count, 0);
 
-  // Merge inquiry counts into queue counts
-  const mergedQueueCounts: Record<string, number> = {
-    ...queueCounts,
-    new_inquiries: inquiryStats.new,
-  };
+  const mergedQueueCounts: Record<string, number> = { ...queueCounts };
   const totalQueueItems = Object.values(mergedQueueCounts).reduce(
     (a, b) => a + b,
     0
@@ -181,20 +169,7 @@ export default async function StaffDashboardPage({
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Link href="/staff/inquiries" className="no-underline">
-          <Card className="border-t-4 border-t-purple-500 hover:shadow-md transition-shadow h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
-                New Inquiries
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-purple-600">{inquiryStats.new}</p>
-              <p className="text-xs text-stone mt-1">awaiting follow-up</p>
-            </CardContent>
-          </Card>
-        </Link>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Link href="/staff/applications" className="no-underline">
           <Card className="border-t-4 border-t-rooted-green hover:shadow-md transition-shadow h-full cursor-pointer">
             <CardHeader className="pb-2">

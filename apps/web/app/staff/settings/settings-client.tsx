@@ -1222,13 +1222,6 @@ function PreferencesTab({ settings }: { settings: Record<string, string> }) {
           type: "toggle" as const,
           default: "true",
         },
-        {
-          key: "notify_staff_on_new_inquiry",
-          label: "Notify staff on new inquiry",
-          description: "Alert staff when a new interest inquiry is received.",
-          type: "toggle" as const,
-          default: "true",
-        },
       ],
     },
     {

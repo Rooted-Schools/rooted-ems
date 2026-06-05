@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
 // Routes that never require auth
-const PUBLIC_EXACT = ["/", "/login", "/staff-login", "/inquiry"];
+const PUBLIC_EXACT = ["/", "/login", "/staff-login"];
 const PUBLIC_PREFIXES = ["/api/auth/", "/auth/", "/_next/", "/favicon"];
 
 function isPublic(pathname: string): boolean {
