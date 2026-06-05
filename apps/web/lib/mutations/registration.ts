@@ -168,7 +168,23 @@ export async function seedMissingRegistrationItems(input: {
 export async function completeRegistrationItem(
   input: CompleteRegistrationItemInput
 ): Promise<MutationResult> {
+  const authClient = await createServerClient();
+  const { data: { user } } = await authClient.auth.getUser();
+  if (!user) return { data: null, error: "Not authenticated" };
+
   const supabase = createServiceRoleClient();
+
+  // Verify the calling user owns this registration item via:
+  // registration_item → enrollment → application → guardian → user_id
+  const { data: itemCheck } = await supabase
+    .from("registration_item")
+    .select("id, enrollment:enrollment_id (application:application_id (guardian:guardian_id (user_id)))")
+    .eq("id", input.item_id)
+    .single();
+  const itemGuardian = (itemCheck?.enrollment as unknown as { application: { guardian: { user_id: string } } } | null)?.application?.guardian ?? null;
+  if (!itemGuardian || itemGuardian.user_id !== user.id) {
+    return { data: null, error: "Not authorized" };
+  }
 
   const { error } = await supabase
     .from("registration_item")
@@ -232,7 +248,23 @@ export async function completeRegistrationItem(
 export async function submitRegistrationPacket(
   enrollmentId: string
 ): Promise<MutationResult> {
+  const authClient = await createServerClient();
+  const { data: { user } } = await authClient.auth.getUser();
+  if (!user) return { data: null, error: "Not authenticated" };
+
   const supabase = createServiceRoleClient();
+
+  // Verify the calling user owns this enrollment via:
+  // enrollment → application → guardian → user_id
+  const { data: enrollCheck } = await supabase
+    .from("enrollment")
+    .select("id, application:application_id (guardian:guardian_id (user_id))")
+    .eq("id", enrollmentId)
+    .single();
+  const enrollGuardian = (enrollCheck?.application as unknown as { guardian: { user_id: string } } | null)?.guardian ?? null;
+  if (!enrollGuardian || enrollGuardian.user_id !== user.id) {
+    return { data: null, error: "Not authorized" };
+  }
 
   // Get enrollment campus + school year so we can look up which items are required
   const { data: enrollment } = await supabase
