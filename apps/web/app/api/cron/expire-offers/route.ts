@@ -1,5 +1,3 @@
-export const runtime = "edge";
-
 import { createServerClient } from "@rooted-ems/database/server";
 import { NextResponse, type NextRequest } from "next/server";
 import { expireOffer, promoteFromWaitlist } from "@/lib/mutations";
@@ -11,12 +9,12 @@ import { expireOffer, promoteFromWaitlist } from "@/lib/mutations";
  * Runs on a schedule configured in vercel.json (daily at 02:00 UTC).
  * Can also be triggered manually by staff via GET /api/cron/expire-offers.
  *
- * Authentication: set CRON_SECRET env var and pass ?secret=<value>,
- * or Vercel's built-in cron auth headers (x-vercel-signature) if preferred.
+ * Authentication: set CRON_SECRET env var and pass via Authorization header as "Bearer <secret>".
  */
 export async function GET(request: NextRequest) {
   // Basic secret check (configure CRON_SECRET env var in Vercel)
-  const secret = request.nextUrl.searchParams.get("secret");
+  const authHeader = request.headers.get("authorization");
+  const secret = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret || secret !== cronSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
