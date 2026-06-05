@@ -1,8 +1,8 @@
 import Link from "next/link";
+import Image from "next/image";
 import { createServiceClient } from "@rooted-ems/database/service";
 
-export const dynamic = "force-dynamic";
-export const runtime = "edge";
+export const revalidate = 300; // revalidate every 5 minutes
 
 export const metadata = {
   title: "rootedschools | Enroll Today",
@@ -122,7 +122,6 @@ export default async function HomePage() {
       grades: "Grades 6-12",
       logo: "/logos/rooted-cleveland.png",
       matchKey: "cleveland",
-      logoClass: "max-h-48",
     },
   ];
 
@@ -222,12 +221,15 @@ export default async function HomePage() {
                   } ${accent?.border ?? "border-rooted-gray"} ${accent?.hoverBorder ?? "hover:border-stone/40"}`}
                 >
                   <div className="h-48 flex items-center justify-center mb-4 overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={school.logo}
-                      alt={school.name}
-                      className={`${school.logoClass ?? "max-h-36"} max-w-full object-contain group-hover:scale-105 transition-transform`}
-                    />
+                    <div className="relative w-48 h-48">
+                      <Image
+                        src={school.logo}
+                        alt={school.name}
+                        fill
+                        className="object-contain group-hover:scale-105 transition-transform"
+                        sizes="192px"
+                      />
+                    </div>
                   </div>
                   <p className="text-sm text-stone">{school.location}</p>
                   <p className="text-xs text-stone/70 mt-1">{school.grades}</p>

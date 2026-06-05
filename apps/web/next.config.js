@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  images: {
+    remotePatterns: [
+      { hostname: "szockdlohlmkyloubgtd.supabase.co" },
+    ],
+  },
   transpilePackages: [
     "@rooted-ems/database",
     "@rooted-ems/types",
