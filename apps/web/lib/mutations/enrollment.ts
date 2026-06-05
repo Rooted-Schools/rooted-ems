@@ -23,7 +23,6 @@ export interface CreateEnrollmentInput {
 export async function createEnrollment(
   input: CreateEnrollmentInput
 ): Promise<MutationResult<{ id: string }>> {
-  await requireStaffSession();
   const supabase = createServiceRoleClient();
 
   const { data, error } = await supabase
