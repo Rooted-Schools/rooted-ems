@@ -1,6 +1,7 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { isValidTransition, type ApplicationStatusValue } from "@rooted-ems/utils";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
+import { requireStaffSession } from "@/lib/auth/get-session";
 import {
   notifyFamilyApplicationReceived,
   notifyFamilyApplicationVerified,
@@ -311,6 +312,17 @@ export async function updateApplication(
 
   const supabase = createServiceRoleClient();
 
+  // Verify the calling user owns this application
+  const { data: appCheck } = await supabase
+    .from("application")
+    .select("id, guardian:guardian_id (user_id)")
+    .eq("id", input.application_id)
+    .single();
+  const appGuardian = appCheck?.guardian as unknown as { user_id: string } | null;
+  if (!appGuardian || appGuardian.user_id !== user.id) {
+    return { data: null, error: "Not authorized" };
+  }
+
   // Fetch current application to get student_id, guardian_id
   const { data: app, error: appErr } = await supabase
     .from("application")
@@ -487,7 +499,19 @@ export async function submitApplication(
   const { data: { user } } = await authClient.auth.getUser();
   if (!user) return { data: null, error: "Not authenticated" };
 
-  const supabase = createServiceRoleClient();
+  // Verify the calling user owns this application
+  const serviceClient = createServiceRoleClient();
+  const { data: appCheck } = await serviceClient
+    .from("application")
+    .select("id, guardian:guardian_id (user_id)")
+    .eq("id", applicationId)
+    .single();
+  const appGuardian = appCheck?.guardian as unknown as { user_id: string } | null;
+  if (!appGuardian || appGuardian.user_id !== user.id) {
+    return { data: null, error: "Not authorized" };
+  }
+
+  const supabase = serviceClient;
 
   // Verify application is draft and belongs to user
   const { data: app } = await supabase
@@ -532,7 +556,19 @@ export async function withdrawApplication(
   const { data: { user } } = await authClient.auth.getUser();
   if (!user) return { data: null, error: "Not authenticated" };
 
-  const supabase = createServiceRoleClient();
+  // Verify the calling user owns this application
+  const serviceClient = createServiceRoleClient();
+  const { data: appCheck } = await serviceClient
+    .from("application")
+    .select("id, guardian:guardian_id (user_id)")
+    .eq("id", applicationId)
+    .single();
+  const appGuardian = appCheck?.guardian as unknown as { user_id: string } | null;
+  if (!appGuardian || appGuardian.user_id !== user.id) {
+    return { data: null, error: "Not authorized" };
+  }
+
+  const supabase = serviceClient;
 
   const { data: app } = await supabase
     .from("application")
@@ -581,6 +617,7 @@ export async function staffCreateApplication(
   input: CreateApplicationInput & { created_by_staff: string },
   options?: { autoSubmit?: boolean }
 ): Promise<MutationResult<{ id: string; student_id: string; guardian_id: string }>> {
+  await requireStaffSession();
   const supabase = createServiceRoleClient();
 
   // 1. Create household (no family user link)
@@ -729,6 +766,7 @@ export async function staffCreateApplication(
 export async function staffFastTrackEnroll(
   input: CreateApplicationInput & { created_by_staff: string }
 ): Promise<MutationResult<{ application_id: string; enrollment_id: string }>> {
+  await requireStaffSession();
   const supabase = createServiceRoleClient();
 
   // 1. Create the application (auto-submitted)
