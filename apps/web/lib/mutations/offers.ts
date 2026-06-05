@@ -5,6 +5,7 @@ import { initializeRegistrationPacket } from "./registration";
 import { promoteFromWaitlist } from "./waitlist";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
 import { notifyFamilyOfOffer, notifyStaffOfferAccepted, notifyStaffOfferDeclined } from "@/lib/notify";
+import { requireStaffSession } from "@/lib/auth/get-session";
 
 // ─── Shared helper ─────────────────────────────────────────────────────────
 
@@ -75,6 +76,7 @@ export interface SendOfferInput {
 export async function sendOffer(
   input: SendOfferInput
 ): Promise<MutationResult<{ id: string }>> {
+  await requireStaffSession();
   const supabase = createServiceRoleClient();
 
   // Verify application is in an offerable state
@@ -157,7 +159,24 @@ export async function acceptOffer(
   offerId: string,
   guardianId: string
 ): Promise<MutationResult> {
-  const supabase = createServiceRoleClient();
+  // Auth check
+  const authClient = await createServerClient();
+  const { data: { user } } = await authClient.auth.getUser();
+  if (!user) return { data: null, error: "Not authenticated" };
+
+  // Ownership check — verify the offer belongs to this user's guardian
+  const ownerCheck = createServiceRoleClient();
+  const { data: offerCheck } = await ownerCheck
+    .from("offer")
+    .select("id, application:application_id (guardian:guardian_id (user_id))")
+    .eq("id", offerId)
+    .single();
+  const offerGuardian = (offerCheck?.application as unknown as { guardian: { user_id: string } } | null)?.guardian ?? null;
+  if (!offerGuardian || offerGuardian.user_id !== user.id) {
+    return { data: null, error: "Not authorized" };
+  }
+
+  const supabase = ownerCheck;
 
   // Get the offer with full application details for enrollment creation
   const { data: offer, error: fetchError } = await supabase
@@ -280,7 +299,24 @@ export async function acceptOffer(
  * Decline an offer (called by family).
  */
 export async function declineOffer(offerId: string, declinedBy?: string): Promise<MutationResult> {
-  const supabase = createServiceRoleClient();
+  // Auth check
+  const authClient = await createServerClient();
+  const { data: { user } } = await authClient.auth.getUser();
+  if (!user) return { data: null, error: "Not authenticated" };
+
+  // Ownership check — verify the offer belongs to this user's guardian
+  const ownerCheck = createServiceRoleClient();
+  const { data: offerCheck } = await ownerCheck
+    .from("offer")
+    .select("id, application:application_id (guardian:guardian_id (user_id))")
+    .eq("id", offerId)
+    .single();
+  const offerGuardian = (offerCheck?.application as unknown as { guardian: { user_id: string } } | null)?.guardian ?? null;
+  if (!offerGuardian || offerGuardian.user_id !== user.id) {
+    return { data: null, error: "Not authorized" };
+  }
+
+  const supabase = ownerCheck;
 
   const { data: offer, error: fetchError } = await supabase
     .from("offer")
@@ -349,6 +385,7 @@ export async function revokeOffer(
   revokedBy: string,
   reason?: string
 ): Promise<MutationResult> {
+  await requireStaffSession();
   const supabase = createServiceRoleClient();
 
   const { data: offer, error: fetchError } = await supabase
