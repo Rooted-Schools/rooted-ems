@@ -10,6 +10,19 @@ import {
   notifyStaffNewApplication,
 } from "@/lib/notify";
 
+// ─── EAV Answer Key Allowlist ───────────────────────────
+// Only these keys may be written to application_answer. Any key not present
+// here is silently dropped before the insert/upsert to prevent EAV flooding.
+const ALLOWED_ANSWER_KEYS = new Set([
+  "has_sibling_at_school",
+  "sibling_name",
+  "data_sharing_consent",
+  "agree_terms",
+  "e_signature_name",
+  "e_signature_date",
+  "guardian_relationship_other",
+]);
+
 // ─── Types ─────────────────────────────────────────────
 
 export interface MutationResult<T = null> {
@@ -282,13 +295,18 @@ export async function createApplication(
   const answers = input.answers ?? {};
   if (input.sibling_name) answers.sibling_name = input.sibling_name;
 
-  const answerRows = Object.entries(answers)
-    .filter(([, v]) => v !== "" && v !== undefined)
-    .map(([key, value]) => ({
-      application_id: app.id,
-      field_key: key,
-      value: JSON.stringify(value),
-    }));
+  const safeAnswers = Object.entries(answers)
+    .filter(([key, v]) => ALLOWED_ANSWER_KEYS.has(key) && v !== "" && v !== undefined);
+
+  if (safeAnswers.length > 50) {
+    return { data: null, error: "Too many answer fields." };
+  }
+
+  const answerRows = safeAnswers.map(([key, value]) => ({
+    application_id: app.id,
+    field_key: key,
+    value: JSON.stringify(value),
+  }));
 
   if (answerRows.length > 0) {
     await supabase.from("application_answer").insert(answerRows);
@@ -469,13 +487,18 @@ export async function updateApplication(
   const answers = input.answers ?? {};
   if (input.sibling_name !== undefined) answers.sibling_name = input.sibling_name;
 
-  const answerRows = Object.entries(answers)
-    .filter(([, v]) => v !== undefined)
-    .map(([key, value]) => ({
-      application_id: input.application_id,
-      field_key: key,
-      value: JSON.stringify(value),
-    }));
+  const safeAnswers = Object.entries(answers)
+    .filter(([key, v]) => ALLOWED_ANSWER_KEYS.has(key) && v !== undefined);
+
+  if (safeAnswers.length > 50) {
+    return { data: null, error: "Too many answer fields." };
+  }
+
+  const answerRows = safeAnswers.map(([key, value]) => ({
+    application_id: input.application_id,
+    field_key: key,
+    value: JSON.stringify(value),
+  }));
 
   if (answerRows.length > 0) {
     await supabase
@@ -737,13 +760,18 @@ export async function staffCreateApplication(
   const answers = input.answers ?? {};
   if (input.sibling_name) answers.sibling_name = input.sibling_name;
 
-  const answerRows = Object.entries(answers)
-    .filter(([, v]) => v !== "" && v !== undefined)
-    .map(([key, value]) => ({
-      application_id: app.id,
-      field_key: key,
-      value: JSON.stringify(value),
-    }));
+  const safeAnswers = Object.entries(answers)
+    .filter(([key, v]) => ALLOWED_ANSWER_KEYS.has(key) && v !== "" && v !== undefined);
+
+  if (safeAnswers.length > 50) {
+    return { data: null, error: "Too many answer fields." };
+  }
+
+  const answerRows = safeAnswers.map(([key, value]) => ({
+    application_id: app.id,
+    field_key: key,
+    value: JSON.stringify(value),
+  }));
 
   if (answerRows.length > 0) {
     await supabase.from("application_answer").insert(answerRows);
