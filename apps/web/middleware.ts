@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 // Routes that never require auth
 const PUBLIC_EXACT = ["/", "/login", "/staff-login", "/inquiry"];
-const PUBLIC_PREFIXES = ["/api/", "/auth/", "/_next/", "/favicon"];
+const PUBLIC_PREFIXES = ["/api/auth/", "/auth/", "/_next/", "/favicon"];
 
 function isPublic(pathname: string): boolean {
   return (

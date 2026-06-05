@@ -84,6 +84,9 @@ export async function assignStaffRole(
     const supabase = createServiceRoleClient();
 
     // Check if auth user already exists
+    // NOTE: @supabase/auth-js@2.98.0 does not expose getUserByEmail on the admin API;
+    // listUsers is the only available lookup. Upgrade to a newer SDK version to use
+    // supabase.auth.admin.getUserByEmail() and eliminate this scan.
     const { data: existingList } = await supabase.auth.admin.listUsers({ perPage: 1000 });
     const existingAuthUser = existingList?.users?.find(
       (u) => u.email?.toLowerCase() === input.user_email.toLowerCase()
@@ -96,10 +99,12 @@ export async function assignStaffRole(
       authUserId = existingAuthUser.id;
     } else {
       // Invite via Supabase Auth — creates user + sends invite email
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+      if (!appUrl) throw new Error("NEXT_PUBLIC_APP_URL is not configured");
       const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
         input.user_email,
         {
-          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/staff/dashboard`,
+          redirectTo: `${appUrl}/staff/dashboard`,
         }
       );
       if (inviteError) return { data: null, error: inviteError.message };

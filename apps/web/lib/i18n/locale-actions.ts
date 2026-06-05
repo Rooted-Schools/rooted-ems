@@ -9,5 +9,7 @@ export async function setLocaleCookie(locale: Locale) {
     path: "/",
     maxAge: 60 * 60 * 24 * 365, // 1 year
     sameSite: "lax",
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
   });
 }
