@@ -262,7 +262,7 @@ export default async function FamilyDashboardPage() {
                 You have no applications yet.
               </p>
               <Link href="/family/applications/new">
-                <Button>Start New Application</Button>
+                <Button>{t("dashboard.startNewApplication")}</Button>
               </Link>
             </CardContent>
           </Card>

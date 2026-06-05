@@ -268,16 +268,19 @@ export function FamilyLoginForm() {
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 value={otp}
-                maxLength={8}
+                maxLength={6}
                 onChange={(e) => {
                   // Strip everything except digits, allow pasting codes with spaces/dashes
-                  const cleaned = e.target.value.replace(/[^0-9]/g, "").slice(0, 8);
+                  const cleaned = e.target.value.replace(/[^0-9]/g, "").slice(0, 6);
                   setOtp(cleaned);
                 }}
-                placeholder="12345678"
+                placeholder="123456"
                 required
                 className="w-full px-4 py-2 border border-stone/30 rounded-md text-center text-lg tracking-[0.25em] font-mono focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
               />
+              <p className="text-xs text-stone mt-1">
+                Enter the 6-digit code sent to your email.
+              </p>
             </div>
 
             {error && (
@@ -288,7 +291,7 @@ export function FamilyLoginForm() {
 
             <button
               type="submit"
-              disabled={loading || otp.length < 6 || otp.length > 8}
+              disabled={loading || otp.length !== 6}
               className="w-full py-2 px-4 bg-rooted-green text-white rounded-md font-medium hover:bg-deep-green disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? "Verifying..." : "Verify Code"}

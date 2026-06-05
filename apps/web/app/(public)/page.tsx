@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { createServiceClient } from "@rooted-ems/database/service";
+import { PublicLanguageToggle } from "@/components/ui/public-language-toggle";
 
 export const revalidate = 300; // revalidate every 5 minutes
 
@@ -150,6 +151,7 @@ export default async function HomePage() {
             <span className="text-rooted-green font-bold">rooted</span><span className="text-ink font-medium">schools</span>
           </span>
           <div className="flex items-center gap-3">
+            <PublicLanguageToggle />
             <Link
               href="/login"
               className="text-sm font-medium text-ink/60 hover:text-ink transition-colors px-3 py-2"
