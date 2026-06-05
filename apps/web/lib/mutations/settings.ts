@@ -1,4 +1,5 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
+import { requireStaffSession } from "@/lib/auth/get-session";
 import type { MutationResult } from "./applications";
 
 // ─── Enrollment Window Mutations ────────────────────────
@@ -16,6 +17,7 @@ export interface CreateEnrollmentWindowInput {
 export async function createEnrollmentWindow(
   input: CreateEnrollmentWindowInput
 ): Promise<MutationResult<{ id: string }>> {
+  await requireStaffSession();
   try {
     const supabase = createServiceRoleClient();
 
@@ -44,6 +46,7 @@ export async function updateEnrollmentWindowStatus(
   windowId: string,
   status: "draft" | "open" | "closed" | "archived"
 ): Promise<MutationResult> {
+  await requireStaffSession();
   try {
     const supabase = createServiceRoleClient();
 
@@ -76,6 +79,7 @@ export interface AssignStaffRoleInput {
 export async function assignStaffRole(
   input: AssignStaffRoleInput
 ): Promise<MutationResult<{ id: string; invited: boolean }>> {
+  await requireStaffSession();
   try {
     const supabase = createServiceRoleClient();
 
@@ -135,6 +139,7 @@ export async function editStaffRole(
   roleId: string,
   updates: { role?: string; campus_id?: string }
 ): Promise<MutationResult> {
+  await requireStaffSession();
   try {
     const supabase = createServiceRoleClient();
 
@@ -151,6 +156,7 @@ export async function editStaffRole(
 }
 
 export async function removeStaffRole(roleId: string): Promise<MutationResult> {
+  await requireStaffSession();
   try {
     const supabase = createServiceRoleClient();
 
@@ -195,6 +201,7 @@ export async function updatePacketRequirement(
   requirementId: string,
   updates: { is_active?: boolean; is_required?: boolean }
 ): Promise<MutationResult> {
+  await requireStaffSession();
   try {
     const supabase = createServiceRoleClient();
 
@@ -217,6 +224,7 @@ export async function bulkUpdatePacketRequirements(
   requirementIds: string[],
   updates: { is_active?: boolean; is_required?: boolean }
 ): Promise<MutationResult> {
+  await requireStaffSession();
   try {
     const supabase = createServiceRoleClient();
 
