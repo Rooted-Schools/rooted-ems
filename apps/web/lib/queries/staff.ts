@@ -536,9 +536,13 @@ export async function getStaffWaitlist(campusIds?: string[]): Promise<{
   entries: WaitlistEntry[];
   campusCounts: WaitlistCampusCount[];
 }> {
+  if (!campusIds || campusIds.length === 0) {
+    return { entries: [], campusCounts: [] };
+  }
+
   const supabase = await createServerClient();
 
-  // Waitlist is nested via waitlist → campus_id, so we filter post-fetch
+  // Push campus filter into the DB query via PostgREST joined-column filter
   const { data, error } = await supabase
     .from("waitlist_position")
     .select(`
@@ -553,6 +557,7 @@ export async function getStaffWaitlist(campusIds?: string[]): Promise<{
       )
     `)
     .is("removed_at", null)
+    .filter("waitlist.campus_id", "in", `(${campusIds.map(id => `"${id}"`).join(",")})`)
     .order("position_number", { ascending: true });
 
   if (error) {
@@ -560,18 +565,12 @@ export async function getStaffWaitlist(campusIds?: string[]): Promise<{
     return { entries: [], campusCounts: [] };
   }
 
-  const rows = data ?? [];
+  // PostgREST returns rows where the join didn't match with waitlist=null; exclude them
+  const rows = (data ?? []).filter(
+    (row: Record<string, unknown>) => row.waitlist !== null
+  );
 
-  // Filter by campus if campusIds provided
-  const filteredRows = campusIds && campusIds.length > 0
-    ? rows.filter((row: Record<string, unknown>) => {
-        const wl = row.waitlist as unknown as Record<string, unknown> | null;
-        const cid = wl?.campus_id as string | undefined;
-        return cid ? campusIds.includes(cid) : false;
-      })
-    : rows;
-
-  const entries: WaitlistEntry[] = filteredRows.map((row: Record<string, unknown>) => {
+  const entries: WaitlistEntry[] = rows.map((row: Record<string, unknown>) => {
     const wl = row.waitlist as unknown as Record<string, unknown> | null;
     const campus = wl?.campus as unknown as Record<string, string> | null;
     const grade = wl?.grade_level as unknown as Record<string, string> | null;
@@ -995,6 +994,8 @@ export async function getStaffWorkQueue(campusIds?: string[]): Promise<WorkQueue
   const items: WorkQueueItem[] = [];
   const hasCampusFilter = campusIds && campusIds.length > 0;
 
+  // Build all 5 query objects without awaiting — they are fully independent
+
   // 1. New submissions needing review
   let submittedQuery = supabase
     .from("application")
@@ -1008,23 +1009,6 @@ export async function getStaffWorkQueue(campusIds?: string[]): Promise<WorkQueue
     .order("created_at", { ascending: true })
     .limit(20);
   if (hasCampusFilter) submittedQuery = submittedQuery.in("campus_id", campusIds);
-  const { data: submitted } = await submittedQuery;
-
-  for (const row of (submitted ?? []) as Record<string, unknown>[]) {
-    const student = row.student as unknown as Record<string, string> | null;
-    const campus = row.campus as Record<string, string> | null;
-    const grade = row.grade_level as Record<string, string> | null;
-    items.push({
-      id: `sub-${row.id}`,
-      type: "new_submission",
-      title: `Review application: ${student?.first_name} ${student?.last_name}`,
-      description: `${grade?.grade ? `Grade ${grade.grade}` : ""} application needs initial review.`,
-      campus_name: campus?.name ?? "",
-      created_at: row.created_at as string,
-      link: `/staff/applications/${row.id}`,
-      priority: "high",
-    });
-  }
 
   // 2. Applications needing info follow-up
   let needsInfoQuery = supabase
@@ -1038,22 +1022,6 @@ export async function getStaffWorkQueue(campusIds?: string[]): Promise<WorkQueue
     .order("updated_at", { ascending: true })
     .limit(20);
   if (hasCampusFilter) needsInfoQuery = needsInfoQuery.in("campus_id", campusIds);
-  const { data: needsInfo } = await needsInfoQuery;
-
-  for (const row of (needsInfo ?? []) as Record<string, unknown>[]) {
-    const student = row.student as unknown as Record<string, string> | null;
-    const campus = row.campus as Record<string, string> | null;
-    items.push({
-      id: `info-${row.id}`,
-      type: "needs_info",
-      title: `Follow up: ${student?.first_name} ${student?.last_name}`,
-      description: "Waiting on additional information from family.",
-      campus_name: campus?.name ?? "",
-      created_at: row.updated_at as string,
-      link: `/staff/applications/${row.id}`,
-      priority: "medium",
-    });
-  }
 
   // 3. Verified apps ready for next step
   let verifiedQuery = supabase
@@ -1067,22 +1035,6 @@ export async function getStaffWorkQueue(campusIds?: string[]): Promise<WorkQueue
     .order("reviewed_at", { ascending: true })
     .limit(20);
   if (hasCampusFilter) verifiedQuery = verifiedQuery.in("campus_id", campusIds);
-  const { data: verified } = await verifiedQuery;
-
-  for (const row of (verified ?? []) as Record<string, unknown>[]) {
-    const student = row.student as unknown as Record<string, string> | null;
-    const campus = row.campus as Record<string, string> | null;
-    items.push({
-      id: `ver-${row.id}`,
-      type: "pending_verification",
-      title: `Assign to lottery: ${student?.first_name} ${student?.last_name}`,
-      description: "Verified and ready for lottery assignment or direct offer.",
-      campus_name: campus?.name ?? "",
-      created_at: (row.reviewed_at as string) ?? "",
-      link: `/staff/applications/${row.id}`,
-      priority: "medium",
-    });
-  }
 
   // 4. Offers expiring soon (within 7 days)
   const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -1101,7 +1053,80 @@ export async function getStaffWorkQueue(campusIds?: string[]): Promise<WorkQueue
     .order("expires_at", { ascending: true })
     .limit(20);
   if (hasCampusFilter) offersQuery = offersQuery.in("campus_id", campusIds);
-  const { data: expiringOffers } = await offersQuery;
+
+  // 5. Accepted apps pending enrollment
+  let pendingEnrollQuery = supabase
+    .from("application")
+    .select(`
+      id, updated_at,
+      student:student_id (first_name, last_name),
+      campus:campus_id (name)
+    `)
+    .eq("status", "accepted")
+    .order("updated_at", { ascending: true })
+    .limit(20);
+  if (hasCampusFilter) pendingEnrollQuery = pendingEnrollQuery.in("campus_id", campusIds);
+
+  // Fire all 5 queries in parallel
+  const [
+    { data: submitted },
+    { data: needsInfo },
+    { data: verified },
+    { data: expiringOffers },
+    { data: pendingEnroll },
+  ] = await Promise.all([
+    submittedQuery,
+    needsInfoQuery,
+    verifiedQuery,
+    offersQuery,
+    pendingEnrollQuery,
+  ]);
+
+  for (const row of (submitted ?? []) as Record<string, unknown>[]) {
+    const student = row.student as unknown as Record<string, string> | null;
+    const campus = row.campus as Record<string, string> | null;
+    const grade = row.grade_level as Record<string, string> | null;
+    items.push({
+      id: `sub-${row.id}`,
+      type: "new_submission",
+      title: `Review application: ${student?.first_name} ${student?.last_name}`,
+      description: `${grade?.grade ? `Grade ${grade.grade}` : ""} application needs initial review.`,
+      campus_name: campus?.name ?? "",
+      created_at: row.created_at as string,
+      link: `/staff/applications/${row.id}`,
+      priority: "high",
+    });
+  }
+
+  for (const row of (needsInfo ?? []) as Record<string, unknown>[]) {
+    const student = row.student as unknown as Record<string, string> | null;
+    const campus = row.campus as Record<string, string> | null;
+    items.push({
+      id: `info-${row.id}`,
+      type: "needs_info",
+      title: `Follow up: ${student?.first_name} ${student?.last_name}`,
+      description: "Waiting on additional information from family.",
+      campus_name: campus?.name ?? "",
+      created_at: row.updated_at as string,
+      link: `/staff/applications/${row.id}`,
+      priority: "medium",
+    });
+  }
+
+  for (const row of (verified ?? []) as Record<string, unknown>[]) {
+    const student = row.student as unknown as Record<string, string> | null;
+    const campus = row.campus as Record<string, string> | null;
+    items.push({
+      id: `ver-${row.id}`,
+      type: "pending_verification",
+      title: `Assign to lottery: ${student?.first_name} ${student?.last_name}`,
+      description: "Verified and ready for lottery assignment or direct offer.",
+      campus_name: campus?.name ?? "",
+      created_at: (row.reviewed_at as string) ?? "",
+      link: `/staff/applications/${row.id}`,
+      priority: "medium",
+    });
+  }
 
   for (const row of (expiringOffers ?? []) as Record<string, unknown>[]) {
     const app = row.application as unknown as Record<string, unknown> | null;
@@ -1120,20 +1145,6 @@ export async function getStaffWorkQueue(campusIds?: string[]): Promise<WorkQueue
       priority: daysLeft <= 2 ? "high" : "medium",
     });
   }
-
-  // 5. Accepted apps pending enrollment
-  let pendingEnrollQuery = supabase
-    .from("application")
-    .select(`
-      id, updated_at,
-      student:student_id (first_name, last_name),
-      campus:campus_id (name)
-    `)
-    .eq("status", "accepted")
-    .order("updated_at", { ascending: true })
-    .limit(20);
-  if (hasCampusFilter) pendingEnrollQuery = pendingEnrollQuery.in("campus_id", campusIds);
-  const { data: pendingEnroll } = await pendingEnrollQuery;
 
   for (const row of (pendingEnroll ?? []) as Record<string, unknown>[]) {
     const student = row.student as unknown as Record<string, string> | null;
