@@ -135,7 +135,8 @@ export async function sendOffer(
     .eq("id", input.application_id);
 
   if (statusError) {
-    console.error("[sendOffer] status update", statusError.message);
+    console.error("[sendOffer] application status update", statusError.message);
+    return { data: null, error: "Failed to update application status." };
   }
 
   await logAuditEvent({
@@ -265,6 +266,11 @@ export async function acceptOffer(
   const schoolYearId =
     (app?.enrollment_window as unknown as Record<string, string> | null)?.school_year_id ?? "";
 
+  if (!schoolYearId) {
+    console.error("[acceptOffer] missing schoolYearId for offer", offerId);
+    return { data: null, error: "Could not resolve school year. Please contact support." };
+  }
+
   if (app?.student_id) {
     const enrollResult = await createEnrollment({
       student_id: app.student_id,
@@ -275,16 +281,17 @@ export async function acceptOffer(
       application_id: offer.application_id,
     });
 
-    if (!enrollResult.error && enrollResult.data) {
-      // Initialize registration packet for the new enrollment
-      await initializeRegistrationPacket({
-        enrollment_id: enrollResult.data.id,
-        campus_id: offer.campus_id,
-        school_year_id: schoolYearId,
-      });
-    } else if (enrollResult.error) {
-      console.error("[acceptOffer] auto-enrollment", enrollResult.error);
+    if (enrollResult.error || !enrollResult.data) {
+      console.error("[acceptOffer] enrollment creation", enrollResult.error);
+      return { data: null, error: "Enrollment creation failed. Please contact support." };
     }
+
+    // Initialize registration packet for the new enrollment
+    await initializeRegistrationPacket({
+      enrollment_id: enrollResult.data.id,
+      campus_id: offer.campus_id,
+      school_year_id: schoolYearId,
+    });
   }
 
   await logAuditEvent({
