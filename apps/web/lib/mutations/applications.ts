@@ -830,7 +830,7 @@ export async function staffFastTrackEnroll(
 
   // 4. Create offer (auto-accepted)
   const offerNow = new Date().toISOString();
-  const { data: offer } = await supabase
+  const { data: offer, error: offerError } = await supabase
     .from("offer")
     .insert({
       application_id: applicationId,
@@ -844,6 +844,11 @@ export async function staffFastTrackEnroll(
     })
     .select("id")
     .single();
+
+  if (offerError || !offer) {
+    console.error("[staffFastTrackEnroll] offer insert", offerError?.message);
+    return { data: null, error: "Failed to create offer record." };
+  }
 
   // 5. Create acceptance record
   if (offer) {
@@ -868,7 +873,7 @@ export async function staffFastTrackEnroll(
     campus_id: input.campus_id,
     grade_level_id: input.grade_level_id,
     school_year_id: schoolYearId,
-    acceptance_id: offer?.id ?? undefined,
+    acceptance_id: offer.id,
     application_id: applicationId,
   });
 

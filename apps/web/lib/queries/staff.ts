@@ -390,7 +390,7 @@ export async function getStaffLotteryDetail(
     .select(`
       id, priority_tier, random_number, final_rank, is_selected,
       application:application_id (
-        id,
+        id, has_sibling_enrolled,
         student:student_id (first_name, last_name),
         guardian:guardian_id (first_name, last_name)
       )
@@ -430,7 +430,7 @@ export async function getStaffLotteryDetail(
         randomNumber: (e.random_number as number) ?? null,
         finalRank: rank,
         result,
-        siblingInSchool: false, // Would require additional query to determine
+        siblingInSchool: (app as any)?.has_sibling_enrolled ?? false,
       };
     }
   );
