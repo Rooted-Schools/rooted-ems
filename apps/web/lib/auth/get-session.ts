@@ -1,13 +1,16 @@
+import { cache } from "react";
 import { createServerClient } from "@rooted-ems/database/server";
 import type { AuthSession, CampusRoleMap } from "@rooted-ems/types";
 import { StaffRole } from "@rooted-ems/types";
 import { redirect } from "next/navigation";
 
 /**
- * Get the current auth session with campus role map.
- * Returns null if not authenticated.
+ * Internal per-request cached session resolver.
+ * React.cache deduplicates calls within a single RSC render tree,
+ * so the Supabase getUser() round-trip fires at most once per request
+ * even if getSession() is called from multiple server components.
  */
-export async function getSession(): Promise<AuthSession | null> {
+const getCachedSession = cache(async (): Promise<AuthSession | null> => {
   const supabase = await createServerClient();
 
   const {
@@ -53,6 +56,15 @@ export async function getSession(): Promise<AuthSession | null> {
     is_staff: isStaff,
     campus_roles: campusRoles,
   };
+});
+
+/**
+ * Get the current auth session with campus role map.
+ * Returns null if not authenticated.
+ * Deduplicated per-request via React.cache.
+ */
+export async function getSession(): Promise<AuthSession | null> {
+  return getCachedSession();
 }
 
 /**
