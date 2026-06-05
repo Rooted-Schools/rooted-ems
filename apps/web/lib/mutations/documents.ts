@@ -110,6 +110,17 @@ export async function createDocumentRecord(input: {
 
   const supabase = createServiceRoleClient();
 
+  // Verify calling user owns this application
+  const { data: appOwner } = await supabase
+    .from("application")
+    .select("id, guardian:guardian_id (user_id)")
+    .eq("id", input.application_id)
+    .single();
+  const appGuardian = appOwner?.guardian as unknown as { user_id: string } | null;
+  if (!appGuardian || appGuardian.user_id !== user.id) {
+    return { data: null, error: "Not authorized" };
+  }
+
   const { data: doc, error } = await supabase
     .from("document")
     .insert({
