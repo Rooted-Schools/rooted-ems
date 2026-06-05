@@ -160,10 +160,16 @@ export interface DocumentQueueStats {
 export async function getStaffPendingDocuments(
   campusIds?: string[]
 ): Promise<{ rows: PendingDocumentRow[]; stats: DocumentQueueStats }> {
+  // Guard: if no campus scope is provided, refuse to return cross-campus data
+  if (!campusIds || campusIds.length === 0) {
+    return { rows: [], stats: { total_pending: 0, total_today: 0, oldest_pending_days: null } };
+  }
+
   // Use service-role client so the application/campus join is not blocked by RLS
   const supabase = createServiceRoleClient();
 
-  let query = supabase
+  // Apply campus filter at the DB level via PostgREST's joined-column filter syntax
+  const { data, error } = await supabase
     .from("document")
     .select(`
       id, document_type, file_name, file_size, status, created_at,
@@ -175,9 +181,8 @@ export async function getStaffPendingDocuments(
       )
     `)
     .eq("status", "pending")
+    .filter("application.campus_id", "in", `(${campusIds.map(id => `"${id}"`).join(",")})`)
     .order("created_at", { ascending: true }); // oldest first — FIFO queue
-
-  const { data, error } = await query;
 
   if (error) {
     console.error("[getStaffPendingDocuments]", error.message);
@@ -187,33 +192,30 @@ export async function getStaffPendingDocuments(
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
-  // Filter by campus access after the join (RLS handles security; this is for UI scoping)
-  const allRows = (data ?? []).map((row: Record<string, unknown>) => {
-    const app = row.application as unknown as Record<string, unknown> | null;
-    const campus = app?.campus as unknown as Record<string, string> | null;
-    const student = app?.student as Record<string, string> | null;
-    const guardian = app?.guardian as Record<string, string> | null;
+  const rows = (data ?? [])
+    // PostgREST returns rows where the join didn't match with application=null; exclude them
+    .filter((row: Record<string, unknown>) => row.application !== null)
+    .map((row: Record<string, unknown>) => {
+      const app = row.application as unknown as Record<string, unknown> | null;
+      const campus = app?.campus as unknown as Record<string, string> | null;
+      const student = app?.student as Record<string, string> | null;
+      const guardian = app?.guardian as Record<string, string> | null;
 
-    return {
-      id: row.id as string,
-      document_type: row.document_type as string,
-      file_name: row.file_name as string,
-      file_size: row.file_size as number | null,
-      status: row.status as string,
-      created_at: row.created_at as string,
-      student_name: student ? `${student.first_name} ${student.last_name}` : "Unknown",
-      guardian_name: guardian ? `${guardian.first_name} ${guardian.last_name}` : "",
-      guardian_email: guardian?.email ?? "",
-      campus_name: campus?.name ?? "",
-      campus_id: (app?.campus_id as string) ?? "",
-      application_id: (app?.id as string) ?? "",
-    };
-  });
-
-  // Apply campus filter if provided
-  const rows = campusIds && campusIds.length > 0
-    ? allRows.filter((r) => campusIds.includes(r.campus_id))
-    : allRows;
+      return {
+        id: row.id as string,
+        document_type: row.document_type as string,
+        file_name: row.file_name as string,
+        file_size: row.file_size as number | null,
+        status: row.status as string,
+        created_at: row.created_at as string,
+        student_name: student ? `${student.first_name} ${student.last_name}` : "Unknown",
+        guardian_name: guardian ? `${guardian.first_name} ${guardian.last_name}` : "",
+        guardian_email: guardian?.email ?? "",
+        campus_name: campus?.name ?? "",
+        campus_id: (app?.campus_id as string) ?? "",
+        application_id: (app?.id as string) ?? "",
+      };
+    });
 
   // Compute stats
   const totalToday = rows.filter(
