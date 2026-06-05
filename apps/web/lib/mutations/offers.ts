@@ -47,6 +47,22 @@ async function promoteNextWaitlistCandidate(
   const nextPositionId = posRows?.[0]?.id as string | undefined;
   if (!nextPositionId) return;
 
+  // Atomically claim this position before promoting — prevents two concurrent
+  // callers (e.g. inline decline + nightly cron) from both promoting the same
+  // candidate.  Only the process that wins the UPDATE proceeds.
+  const { data: claimed, error: claimError } = await supabase
+    .from("waitlist_position")
+    .update({ promoted_at: new Date().toISOString() })
+    .eq("id", nextPositionId)
+    .is("promoted_at", null) // only claim if not already promoted
+    .select("id")
+    .single();
+
+  if (claimError || !claimed) {
+    // Another process already claimed this position — skip silently
+    return;
+  }
+
   // Give the promoted candidate 7 days to respond
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -462,49 +478,40 @@ export async function revokeOffer(
 export async function expireOffer(offerId: string): Promise<MutationResult> {
   const supabase = createServiceRoleClient();
 
-  // First check the offer is actually pending before expiring
-  const { data: offer, error: fetchError } = await supabase
-    .from("offer")
-    .select("id, application_id, campus_id, status")
-    .eq("id", offerId)
-    .single();
-
-  if (fetchError || !offer) {
-    return { data: null, error: "Offer not found." };
-  }
-
-  if (offer.status !== "pending") {
-    return { data: null, error: `Offer is ${offer.status}, cannot expire.` };
-  }
-
-  const { error } = await supabase
+  // Atomically transition from pending → expired in a single statement.
+  // If two cron runs overlap, only one will find status='pending' and win
+  // the UPDATE; the other gets no row back and exits cleanly.
+  const { data: updatedOffer, error: updateError } = await supabase
     .from("offer")
     .update({
       status: "expired",
       responded_at: new Date().toISOString(),
     })
     .eq("id", offerId)
-    .eq("status", "pending");
+    .eq("status", "pending") // atomic guard — only succeeds if still pending
+    .select("id, application_id, campus_id, grade_level_id")
+    .single();
 
-  if (error) {
-    return { data: null, error: "Failed to expire offer." };
+  if (updateError || !updatedOffer) {
+    // Either already processed by another runner or doesn't exist — not an error worth propagating
+    return { data: null, error: null };
   }
 
   // Update application status to expired
   await supabase
     .from("application")
     .update({ status: "expired", updated_at: new Date().toISOString() })
-    .eq("id", offer.application_id);
+    .eq("id", updatedOffer.application_id);
 
   await logAuditEvent({
     table_name: "offer",
     record_id: offerId,
     action: AuditAction.StatusChange,
     actor_id: null, // cron-driven — no human actor
-    campus_id: offer.campus_id ?? null,
+    campus_id: updatedOffer.campus_id ?? null,
     old_data: { status: "pending" },
     new_data: { status: "expired" },
-    metadata: { application_id: offer.application_id, triggered_by: "cron" },
+    metadata: { application_id: updatedOffer.application_id, triggered_by: "cron" },
   });
 
   return { data: null, error: null };
