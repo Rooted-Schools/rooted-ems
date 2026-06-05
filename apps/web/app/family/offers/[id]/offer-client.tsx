@@ -148,7 +148,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
           <h2 className="text-base font-semibold text-ink">{t("offers.offerDetails")}</h2>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div>
               <p className="text-stone text-xs uppercase tracking-wide mb-0.5">{t("offers.student")}</p>
               <p className="font-medium text-ink">{offer.student_name}</p>
@@ -165,13 +165,13 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
               <p className="text-stone text-xs uppercase tracking-wide mb-0.5">{t("offers.deadline")}</p>
               <div>
                 {offer.is_urgent ? (
-                  <Badge variant="destructive" className="text-xs">
+                  <Badge variant="destructive" className="text-xs whitespace-nowrap">
                     {offer.hours_remaining != null && offer.hours_remaining < 24
                       ? `${offer.hours_remaining}h left`
                       : `${offer.days_remaining} days left`}
                   </Badge>
                 ) : (
-                  <Badge variant="warning" className="text-xs">
+                  <Badge variant="warning" className="text-xs whitespace-nowrap">
                     {offer.days_remaining} days left
                   </Badge>
                 )}
@@ -217,15 +217,20 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
         >
           {t("offers.accept")}
         </Button>
-        <Button
-          size="lg"
-          variant="outline"
-          className="w-full text-base h-12"
-          onClick={() => setShowDeclineDialog(true)}
-          disabled={isPending}
-        >
-          {t("offers.decline")}
-        </Button>
+        <div>
+          <Button
+            size="lg"
+            variant="outline"
+            className="w-full text-base h-12"
+            onClick={() => setShowDeclineDialog(true)}
+            disabled={isPending}
+          >
+            {t("offers.decline")}
+          </Button>
+          <p className="text-xs text-stone-500 mt-1">
+            Declining permanently forfeits your spot.
+          </p>
+        </div>
       </div>
 
       {/* ── What happens next ── */}

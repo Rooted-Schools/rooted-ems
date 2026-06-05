@@ -793,7 +793,14 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
             </Badge>
           </div>
           {/* Progress bar */}
-          <div className="w-full bg-rooted-gray-dark/30 rounded-full h-3">
+          <div
+            className="w-full bg-rooted-gray-dark/30 rounded-full h-3"
+            role="progressbar"
+            aria-valuenow={completedCount}
+            aria-valuemin={0}
+            aria-valuemax={totalItems}
+            aria-label="Registration completion progress"
+          >
             <div
               className={`h-3 rounded-full transition-all ${
                 packetSubmitted ? "bg-blue-500" : allItemsComplete ? "bg-rooted-green" : "bg-rooted-green"
