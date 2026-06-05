@@ -93,15 +93,17 @@ const INITIAL: FormData = {
 function Field({
   label,
   required,
+  id,
   children,
 }: {
   label: string;
   required?: boolean;
+  id?: string;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-ink/70 mb-1">
+      <label htmlFor={id} className="block text-sm font-medium text-ink/70 mb-1">
         {label}
         {required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
@@ -225,6 +227,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
     campusId: initialCampusId ?? "",
   }));
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [showValidation, setShowValidation] = useState(false);
 
   const currentStep = STEPS[stepIndex];
 
@@ -236,6 +239,11 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
   }
 
   function next() {
+    if (!canProceedStep[currentStep.id]) {
+      setShowValidation(true);
+      return;
+    }
+    setShowValidation(false);
     if (stepIndex < STEPS.length - 1) setStepIndex((i) => i + 1);
   }
 
@@ -338,6 +346,11 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {showValidation && !canProceedStep.campus && (
+              <div role="alert" className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3 mb-4">
+                Please fill in all required fields before continuing.
+              </div>
+            )}
             <Field label="Campus" required>
               <Select
                 value={form.campusId}
@@ -373,8 +386,9 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
                 </Select>
               </Field>
             )}
-            <Field label="Grade Level" required>
+            <Field label="Grade Level" required id="grade-level">
               <Select
+                id="grade-level"
                 value={form.gradeLevelId}
                 onChange={(e) => {
                   const gl = campusGrades.find((g) => g.id === e.target.value);
@@ -426,16 +440,23 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {showValidation && !canProceedStep.student && (
+              <div role="alert" className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3 mb-4">
+                Please fill in all required fields before continuing.
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="First Name" required>
+              <Field label="First Name" required id="student-first-name">
                 <Input
+                  id="student-first-name"
                   value={form.firstName}
                   onChange={(e) => update({ firstName: e.target.value })}
                   placeholder="First"
                 />
               </Field>
-              <Field label="Last Name" required>
+              <Field label="Last Name" required id="student-last-name">
                 <Input
+                  id="student-last-name"
                   value={form.lastName}
                   onChange={(e) => update({ lastName: e.target.value })}
                   placeholder="Last"
@@ -477,23 +498,26 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="First Name" required>
+              <Field label="First Name" required id="guardian-first-name">
                 <Input
+                  id="guardian-first-name"
                   value={form.guardianFirstName}
                   onChange={(e) => update({ guardianFirstName: e.target.value })}
                   placeholder="First"
                 />
               </Field>
-              <Field label="Last Name" required>
+              <Field label="Last Name" required id="guardian-last-name">
                 <Input
+                  id="guardian-last-name"
                   value={form.guardianLastName}
                   onChange={(e) => update({ guardianLastName: e.target.value })}
                   placeholder="Last"
                 />
               </Field>
             </div>
-            <Field label="Relationship to Student" required>
+            <Field label="Relationship to Student" required id="guardian-relationship">
               <Select
+                id="guardian-relationship"
                 value={form.guardianRelationship}
                 onChange={(e) => update({ guardianRelationship: e.target.value, guardianRelationshipOther: "" })}
               >
@@ -519,16 +543,18 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
                 />
               )}
             </Field>
-            <Field label="Email Address" required>
+            <Field label="Email Address" required id="guardian-email">
               <Input
+                id="guardian-email"
                 type="email"
                 value={form.guardianEmail}
                 onChange={(e) => update({ guardianEmail: e.target.value })}
                 placeholder="you@example.com"
               />
             </Field>
-            <Field label="Phone Number" required>
+            <Field label="Phone Number" required id="guardian-phone">
               <Input
+                id="guardian-phone"
                 type="tel"
                 value={form.guardianPhone}
                 onChange={(e) => update({ guardianPhone: e.target.value })}
@@ -643,7 +669,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
               >
                 {isPending ? "Saving..." : "Save Draft"}
               </Button>
-              <Button onClick={next} disabled={!canProceedStep[currentStep.id]}>
+              <Button onClick={next}>
                 Continue
               </Button>
             </>
