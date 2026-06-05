@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rooted EMS — Pre-Launch Demo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green: #2d6a4f;
+      --green-light: #e8f5ee;
+      --amber: #b45309;
+      --amber-light: #fef3c7;
+      --ink: #1a1a1a;
+      --stone: #6b7280;
+      --gray: #f3f4f6;
+      --white: #ffffff;
+      --border: #e5e7eb;
+      --radius: 12px;
+      --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f9fafb;
+      color: var(--ink);
+      line-height: 1.6;
+    }
+
+    /* ── Header ── */
+    .site-header {
+      background: var(--green);
+      color: white;
+      padding: 40px 48px;
+    }
+    .site-header .eyebrow {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      opacity: 0.75;
+      margin-bottom: 8px;
+    }
+    .site-header h1 {
+      font-size: 32px;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 12px;
+    }
+    .site-header p {
+      font-size: 16px;
+      opacity: 0.85;
+      max-width: 640px;
+    }
+    .site-header .meta-row {
+      display: flex;
+      gap: 24px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    .meta-pill {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    /* ── Nav ── */
+    .demo-nav {
+      background: white;
+      border-bottom: 1px solid var(--border);
+      padding: 0 48px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+    }
+    .demo-nav a {
+      display: block;
+      padding: 16px 20px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--stone);
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .demo-nav a:hover {
+      color: var(--green);
+      border-bottom-color: var(--green);
+    }
+
+    /* ── Main content ── */
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 48px 48px 80px;
+    }
+
+    /* ── Section ── */
+    .demo-section {
+      margin-bottom: 72px;
+      scroll-margin-top: 64px;
+    }
+    .section-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--stone);
+      margin-bottom: 8px;
+    }
+    .section-label .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+    .demo-section h2 {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+    .demo-section .section-desc {
+      font-size: 15px;
+      color: var(--stone);
+      max-width: 640px;
+      margin-bottom: 28px;
+    }
+
+    /* ── Screenshot card ── */
+    .screen-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+    .screen-card .screen-bar {
+      background: #f0f0f0;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .screen-bar .dot-row {
+      display: flex;
+      gap: 5px;
+    }
+    .screen-bar .dot-row span {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: block;
+    }
+    .screen-bar .dot-row span:nth-child(1) { background: #ff5f57; }
+    .screen-bar .dot-row span:nth-child(2) { background: #febc2e; }
+    .screen-bar .dot-row span:nth-child(3) { background: #28c840; }
+    .screen-bar .url-pill {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 12px;
+      font-size: 12px;
+      color: var(--stone);
+      flex: 1;
+      max-width: 400px;
+    }
+    .screen-card img {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: 680px;
+      object-fit: cover;
+      object-position: top;
+    }
+    .screen-card .screen-caption {
+      padding: 14px 20px;
+      background: var(--gray);
+      border-top: 1px solid var(--border);
+    }
+    .screen-caption .cap-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 2px;
+    }
+    .screen-caption .cap-desc {
+      font-size: 13px;
+      color: var(--stone);
+    }
+
+    /* ── Two-up grid ── */
+    .two-up {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 800px) {
+      .two-up { grid-template-columns: 1fr; }
+      main, .site-header, .demo-nav { padding-left: 20px; padding-right: 20px; }
+    }
+
+    /* ── Feature chips ── */
+    .feature-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .chip {
+      background: var(--green-light);
+      color: var(--green);
+      border: 1px solid #b7dfc8;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .chip.amber {
+      background: var(--amber-light);
+      color: var(--amber);
+      border-color: #fcd34d;
+    }
+
+    /* ── Status bar ── */
+    .status-bar {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 28px;
+      display: flex;
+      gap: 40px;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+    }
+    .status-item { text-align: center; }
+    .status-item .val {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--green);
+      display: block;
+    }
+    .status-item .lbl {
+      font-size: 12px;
+      color: var(--stone);
+      font-weight: 500;
+    }
+
+    /* ── Pre-launch checklist ── */
+    .checklist {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .checklist-header {
+      background: var(--green);
+      color: white;
+      padding: 16px 24px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .checklist-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .checklist-item:last-child { border-bottom: none; }
+    .check-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      margin-top: 1px;
+    }
+    .check-icon.done { background: var(--green); color: white; }
+    .check-icon.pending { background: var(--amber-light); color: var(--amber); border: 2px solid #fcd34d; font-size: 10px; }
+    .checklist-item .item-text strong {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 2px;
+    }
+    .checklist-item .item-text span {
+      font-size: 13px;
+      color: var(--stone);
+    }
+
+    /* ── Footer ── */
+    .site-footer {
+      background: white;
+      border-top: 1px solid var(--border);
+      padding: 28px 48px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--stone);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header class="site-header">
+  <div class="eyebrow">Pre-Launch Demo · March 2026</div>
+  <h1>Rooted Enrollment Management System</h1>
+  <p>A full-cycle enrollment platform built for Rooted School Foundation — managing applications, lotteries, offers, waitlists, and document verification across three campuses.</p>
+  <div class="meta-row">
+    <span class="meta-pill">🌱 3 Campuses</span>
+    <span class="meta-pill">📋 Full Application → Enrollment Pipeline</span>
+    <span class="meta-pill">🎰 Lottery with Sibling Priority</span>
+    <span class="meta-pill">🔔 Real-Time Family Notifications</span>
+    <span class="meta-pill">⚡ Supabase · Next.js 14 · Vercel</span>
+  </div>
+</header>
+
+<!-- ── Nav ── -->
+<nav class="demo-nav">
+  <a href="#public">Public Site</a>
+  <a href="#family-portal">Family Portal</a>
+  <a href="#staff-dashboard">Staff Dashboard</a>
+  <a href="#applications">Applications</a>
+  <a href="#documents">Document Queue</a>
+  <a href="#lottery">Lottery</a>
+  <a href="#offers">Offers</a>
+  <a href="#settings">Settings</a>
+  <a href="#launch">Pre-Launch Status</a>
+</nav>
+
+<!-- ── Main ── -->
+<main>
+
+  <!-- Stats bar -->
+  <div class="status-bar">
+    <div class="status-item">
+      <span class="val">3</span>
+      <span class="lbl">Campuses</span>
+    </div>
+    <div class="status-item">
+      <span class="val">9</span>
+      <span class="lbl">Pages Built</span>
+    </div>
+    <div class="status-item">
+      <span class="val">40+</span>
+      <span class="lbl">Server Actions</span>
+    </div>
+    <div class="status-item">
+      <span class="val">100%</span>
+      <span class="lbl">TypeScript</span>
+    </div>
+    <div class="status-item">
+      <span class="val">Live</span>
+      <span class="lbl">Supabase DB</span>
+    </div>
+  </div>
+
+  <!-- ── Public Site ── -->
+  <section class="demo-section" id="public">
+    <div class="section-label"><span class="dot"></span>Public-Facing</div>
+    <h2>Public Homepage</h2>
+    <p class="section-desc">Families land here to learn about each campus and start an application. The enrollment window status ("Open Enrollment" badge) is live-calculated from the database — no manual updates needed.</p>
+    <div class="feature-chips">
+      <span class="chip">Live enrollment window status</span>
+      <span class="chip">Campus cards with grade ranges</span>
+      <span class="chip">Single CTA → Family Portal</span>
+    </div>
+    <div class="screen-card">
+      <div class="screen-bar">
+        <div class="dot-row"><span></span><span></span><span></span></div>
+        <div class="url-pill">rootedschool.org</div>
+      </div>
+      <img src="demo-01-home.png" alt="Rooted EMS public homepage showing 3 campus cards with Open Enrollment badges" />
+      <div class="screen-caption">
+        <div class="cap-title">Homepage — rootedschool.org</div>
+        <div class="cap-desc">All three campuses displayed with live enrollment window data. "Open Enrollment" badges auto-appear when a window is active in the database.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Family Portal ── -->
+  <section class="demo-section" id="family-portal">
+    <div class="section-label"><span class="dot"></span>Family Experience</div>
+    <h2>Family Portal</h2>
+    <p class="section-desc">Families use Google SSO or a magic link to sign in. Once inside, they can track application status, respond to offers, and upload required documents — all from one dashboard.</p>
+    <div class="feature-chips">
+      <span class="chip">Google SSO + magic link</span>
+      <span class="chip">Real-time offer countdown</span>
+      <span class="chip">Document upload + re-upload</span>
+      <span class="chip amber">🔔 In-app notifications live</span>
+    </div>
+    <div class="screen-card">
+      <div class="screen-bar">
+        <div class="dot-row"><span></span><span></span><span></span></div>
+        <div class="url-pill">rootedschool.org/login</div>
+      </div>
+      <img src="demo-02-family-login.png" alt="Family portal login with Google SSO and email magic link" />
+      <div class="screen-caption">
+        <div class="cap-title">Family Login</div>
+        <div class="cap-desc">Google SSO (one click for returning families) or email magic link. No password to forget. Supabase Auth handles sessions securely via server-side cookies.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Staff Console ── -->
+  <section class="demo-section" id="staff-dashboard">
+    <div class="section-label"><span class="dot"></span>Staff Console</div>
+    <h2>Staff Dashboard</h2>
+    <p class="section-desc">Staff log in with email/password or Google. The dashboard shows live pipeline metrics, active enrollment windows, and a work queue (Staff Inbox) surfacing items that need attention right now.</p>
+    <div class="feature-chips">
+      <span class="chip">Role-based access (system_admin / enrollment_staff / viewer)</span>
+      <span class="chip">Multi-campus support</span>
+      <span class="chip">Live pipeline counters</span>
+      <span class="chip">Staff Inbox work queue</span>
+    </div>
+    <div class="two-up">
+      <div class="screen-card">
+        <div class="screen-bar">
+          <div class="dot-row"><span></span><span></span><span></span></div>
+          <div class="url-pill">rootedschool.org/staff-login</div>
+        </div>
+        <img src="demo-03-staff-login.png" alt="Staff console login page" />
+        <div class="screen-caption">
+          <div class="cap-title">Staff Login</div>
+          <div class="cap-desc">Email + password or Google. Middleware enforces campus role before rendering any staff page.</div>
+        </div>
+      </div>
+      <div class="screen-card">
+        <div class="screen-bar">
+          <div class="dot-row"><span></span><span></span><span></span></div>
+          <div class="url-pill">rootedschool.org/staff/dashboard</div>
+        </div>
+        <img src="demo-04-staff-dashboard.png" alt="Staff dashboard with pipeline metrics and enrollment windows" />
+        <div class="screen-caption">
+          <div class="cap-title">Staff Dashboard</div>
+          <div class="cap-desc">Live data: 9 new inquiries, 3 active enrollment windows (closing April 30), full pipeline view, Staff Inbox work queue, and upcoming deadlines.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Applications ── -->
+  <section class="demo-section" id="applications">
+    <div class="section-label"><span class="dot"></span>Admissions</div>
+    <h2>Application Queue</h2>
+    <p class="section-desc">Every submitted application surfaces here. Staff can review details, change status, request more information, and trigger document requests — all without leaving the page.</p>
+    <div class="feature-chips">
+      <span class="chip">Full status lifecycle</span>
+      <span class="chip">Campus filter</span>
+      <span class="chip">Inline status transitions</span>
+      <span class="chip">Audit log on every action</span>
+    </div>
+    <div class="screen-card">
+      <div class="screen-bar">
+        <div class="dot-row"><span></span><span></span><span></span></div>
+        <div class="url-pill">rootedschool.org/staff/applications</div>
+      </div>
+      <img src="demo-05-staff-applications.png" alt="Staff applications queue" />
+      <div class="screen-caption">
+        <div class="cap-title">Applications Queue</div>
+        <div class="cap-desc">FIFO queue with status badges, campus filter, and inline action buttons. Every status change writes an audit event with actor, timestamp, and before/after state.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Documents ── -->
+  <section class="demo-section" id="documents">
+    <div class="section-label"><span class="dot"></span>Document Verification</div>
+    <h2>Document Review Queue</h2>
+    <p class="section-desc">Uploaded documents queue here for staff verification. Approving marks a document as verified; rejecting sends an automatic in-app notification to the family explaining what to re-upload and why.</p>
+    <div class="feature-chips">
+      <span class="chip">FIFO review queue</span>
+      <span class="chip">Stats bar (pending / today / oldest)</span>
+      <span class="chip">Campus filter</span>
+      <span class="chip amber">🔔 Auto-notify family on reject</span>
+      <span class="chip">Optimistic UI (no page reload)</span>
+    </div>
+    <div class="screen-card">
+      <div class="screen-bar">
+        <div class="dot-row"><span></span><span></span><span></span></div>
+        <div class="url-pill">rootedschool.org/staff/documents</div>
+      </div>
+      <img src="demo-06-staff-documents.png" alt="Staff document review queue with stats bar" />
+      <div class="screen-caption">
+        <div class="cap-title">Document Review Queue</div>
+        <div class="cap-desc">Stats bar shows queue health at a glance. "Oldest pending" turns amber after 3 days — a built-in SLA indicator. Reject dialog requires a written reason that gets sent directly to the family.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Lottery ── -->
+  <section class="demo-section" id="lottery">
+    <div class="section-label"><span class="dot"></span>Lottery & Waitlist</div>
+    <h2>Lottery Runner</h2>
+    <p class="section-desc">One-click lottery runs for any campus + grade + enrollment window. Siblings of currently enrolled students are automatically placed in Priority Tier 0 before the general pool is randomized. Results finalize immediately and can be pushed to offers.</p>
+    <div class="feature-chips">
+      <span class="chip">Sibling priority tier (Tier 0 / Tier 1)</span>
+      <span class="chip">Verifiable random selection</span>
+      <span class="chip">Immediate waitlist auto-promotion</span>
+      <span class="chip">Full audit trail</span>
+    </div>
+    <div class="screen-card">
+      <div class="screen-bar">
+        <div class="dot-row"><span></span><span></span><span></span></div>
+        <div class="url-pill">rootedschool.org/staff/lottery</div>
+      </div>
+      <img src="demo-07-staff-lottery.png" alt="Staff lottery runner" />
+      <div class="screen-caption">
+        <div class="cap-title">Lottery Runner</div>
+        <div class="cap-desc">Run the lottery for any campus/grade combination. Siblings are pulled into priority slots first. Results are stored, audited, and ready to convert to offers in one more click.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Offers ── -->
+  <section class="demo-section" id="offers">
+    <div class="section-label"><span class="dot"></span>Seat Offers</div>
+    <h2>Offer Management</h2>
+    <p class="section-desc">Staff send seat offers with a configurable deadline. Families receive an immediate in-app notification with a countdown. When a family declines, the next waitlist candidate is promoted automatically — no waiting until the nightly cron at 2am.</p>
+    <div class="feature-chips">
+      <span class="chip">Configurable expiry deadline</span>
+      <span class="chip amber">🔔 Instant family notification</span>
+      <span class="chip">Auto-promote next waitlist candidate on decline</span>
+      <span class="chip">Revoke with reason</span>
+    </div>
+    <div class="screen-card">
+      <div class="screen-bar">
+        <div class="dot-row"><span></span><span></span><span></span></div>
+        <div class="url-pill">rootedschool.org/staff/offers</div>
+      </div>
+      <img src="demo-08-staff-offers.png" alt="Staff offer management" />
+      <div class="screen-caption">
+        <div class="cap-title">Offer Management</div>
+        <div class="cap-desc">Active, accepted, declined, and expired offers tracked in one view. When a seat opens (decline, revoke, or expiry), the next candidate is promoted immediately and notified.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Settings ── -->
+  <section class="demo-section" id="settings">
+    <div class="section-label"><span class="dot"></span>Administration</div>
+    <h2>Settings & Configuration</h2>
+    <p class="section-desc">Enrollment windows, school years, grade levels, and campus configuration are managed here. No code deployments needed to open or close an enrollment window.</p>
+    <div class="feature-chips">
+      <span class="chip">Enrollment window open/close</span>
+      <span class="chip">School year management</span>
+      <span class="chip">Campus seat capacity</span>
+      <span class="chip">Grade level configuration</span>
+    </div>
+    <div class="screen-card">
+      <div class="screen-bar">
+        <div class="dot-row"><span></span><span></span><span></span></div>
+        <div class="url-pill">rootedschool.org/staff/settings</div>
+      </div>
+      <img src="demo-09-staff-settings.png" alt="Staff settings and configuration" />
+      <div class="screen-caption">
+        <div class="cap-title">Settings</div>
+        <div class="cap-desc">Operational control without code. Opening enrollment for a new school year is a button click, not a deployment. Three active enrollment windows currently configured (all closing April 30, 2026).</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Pre-Launch Status ── -->
+  <section class="demo-section" id="launch">
+    <div class="section-label"><span class="dot"></span>Pre-Launch Checklist</div>
+    <h2>Before You Connect to Vercel</h2>
+    <p class="section-desc">Everything the system needs before going live with real families. The build is complete — these are configuration and operational steps, not development work.</p>
+
+    <div class="checklist">
+      <div class="checklist-header">Pre-Launch Checklist</div>
+
+      <div class="checklist-item">
+        <div class="check-icon done">✓</div>
+        <div class="item-text">
+          <strong>Supabase project live</strong>
+          <span>Project <code>szockdlohlmkyloubgtd</code> is running. Auth, database, storage, and RLS policies all configured.</span>
+        </div>
+      </div>
+
+      <div class="checklist-item">
+        <div class="check-icon done">✓</div>
+        <div class="item-text">
+          <strong>Staff account created</strong>
+          <span>scarney@rootedschool.org has system_admin role on all 3 campuses. Ready to use immediately.</span>
+        </div>
+      </div>
+
+      <div class="checklist-item">
+        <div class="check-icon done">✓</div>
+        <div class="item-text">
+          <strong>Enrollment windows configured</strong>
+          <span>3 active windows, all closing April 30 2026. Visible on the public homepage with live badges.</span>
+        </div>
+      </div>
+
+      <div class="checklist-item">
+        <div class="check-icon done">✓</div>
+        <div class="item-text">
+          <strong>In-app notifications wired</strong>
+          <span>Families are notified on: offer received, document rejected (with reason). Works without any external email provider.</span>
+        </div>
+      </div>
+
+      <div class="checklist-item">
+        <div class="check-icon done">✓</div>
+        <div class="item-text">
+          <strong>Cron job configured (vercel.json)</strong>
+          <span>Nightly offer expiry runs at 2am. Waitlist promotions also happen immediately on decline/revoke — no family waits until 2am to hear good news.</span>
+        </div>
+      </div>
+
+      <div class="checklist-item">
+        <div class="check-icon pending">!</div>
+        <div class="item-text">
+          <strong>Set CRON_SECRET in Vercel environment variables</strong>
+          <span>Generate a random string (e.g. <code>openssl rand -hex 32</code>), add to Vercel as <code>CRON_SECRET</code>. This protects the /api/cron/* endpoints from unauthorized calls.</span>
+        </div>
+      </div>
+
+      <div class="checklist-item">
+        <div class="check-icon pending">!</div>
+        <div class="item-text">
+          <strong>Add production domain to Supabase Auth</strong>
+          <span>In Supabase → Auth → URL Configuration, add your Vercel production URL to "Redirect URLs" so Google OAuth and magic links work after deployment.</span>
+        </div>
+      </div>
+
+      <div class="checklist-item">
+        <div class="check-icon pending">!</div>
+        <div class="item-text">
+          <strong>Add remaining staff accounts</strong>
+          <span>Create Supabase Auth users for each staff member and assign campus roles in the <code>user_campus_role</code> table. Role options: system_admin, enrollment_staff, viewer.</span>
+        </div>
+      </div>
+
+      <div class="checklist-item">
+        <div class="check-icon pending">!</div>
+        <div class="item-text">
+          <strong>Run one end-to-end test application</strong>
+          <span>Before opening to families: submit a test application as a family user, verify it appears in the staff queue, approve/reject a document, run a lottery, send an offer, accept it — confirm enrollment is created.</span>
+        </div>
+      </div>
+
+      <div class="checklist-item">
+        <div class="check-icon pending">!</div>
+        <div class="item-text">
+          <strong>Connect email provider (optional, post-launch)</strong>
+          <span>In-app notifications are live now. To also send email, add Resend API key as <code>RESEND_API_KEY</code> in Vercel. The notification system is already wired — no code changes needed.</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  Rooted Enrollment Management System · Built March 2026 · Supabase + Next.js 14 + Vercel
+</footer>
+
+</body>
+</html>

@@ -2,6 +2,7 @@ import { createServerClient, createServiceRoleClient } from "@rooted-ems/databas
 import type { MutationResult } from "./applications";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
 import { notifyFamilyDocumentVerified, notifyStaffDocumentUploaded } from "@/lib/notify";
+import { requireStaffSession } from "@/lib/auth/get-session";
 
 // ─── Review Document (Staff) ───────────────────────────
 
@@ -13,6 +14,9 @@ export async function reviewDocument(
   decision: "verified" | "rejected",
   rejectionReason?: string
 ): Promise<MutationResult> {
+  // Require staff session before proceeding
+  await requireStaffSession();
+
   // Auth check via user session
   const authClient = await createServerClient();
   const {
