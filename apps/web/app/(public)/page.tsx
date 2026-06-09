@@ -191,18 +191,18 @@ export default async function HomePage() {
                 href="/login"
                 className="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-white bg-rooted-green hover:bg-deep-green rounded-lg transition-colors shadow-sm w-full sm:w-auto"
               >
-                Apply Today
+                Apply Now
               </Link>
             ) : null}
           </div>
         </div>
       </section>
 
-      {/* ─── Our Schools ─── */}
+      {/* ─── Our Network Schools ─── */}
       <section className="py-16 bg-white">
         <div className="max-w-5xl mx-auto px-6">
           <h2 className="text-2xl font-bold text-ink text-center mb-3">
-            Our Schools
+            Our Network Schools
           </h2>
           <p className="text-stone text-center mb-10 max-w-xl mx-auto">
             <span className="font-bold">rooted</span>schools operates career-connected schools across
@@ -272,7 +272,7 @@ export default async function HomePage() {
                         href={school.campusId ? `/login?campus=${school.campusId}` : "/login"}
                         className="inline-flex items-center text-sm font-medium text-white bg-rooted-green hover:bg-deep-green px-4 py-2 rounded-lg transition-colors"
                       >
-                        Apply Today
+                        Apply Now
                       </Link>
                     </div>
                   )}
