@@ -198,11 +198,11 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ─── Our Schools ─── */}
+      {/* ─── Our Network Schools ─── */}
       <section className="py-16 bg-white">
         <div className="max-w-5xl mx-auto px-6">
           <h2 className="text-2xl font-bold text-ink text-center mb-3">
-            Our Schools
+            Our Network Schools
           </h2>
           <p className="text-stone text-center mb-10 max-w-xl mx-auto">
             <span className="font-bold">rooted</span>schools operates career-connected schools across
