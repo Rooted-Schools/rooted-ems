@@ -191,7 +191,7 @@ export default async function HomePage() {
                 href="/login"
                 className="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-white bg-rooted-green hover:bg-deep-green rounded-lg transition-colors shadow-sm w-full sm:w-auto"
               >
-                Apply Today
+                Apply Now
               </Link>
             ) : null}
           </div>
@@ -272,7 +272,7 @@ export default async function HomePage() {
                         href={school.campusId ? `/login?campus=${school.campusId}` : "/login"}
                         className="inline-flex items-center text-sm font-medium text-white bg-rooted-green hover:bg-deep-green px-4 py-2 rounded-lg transition-colors"
                       >
-                        Apply Today
+                        Apply Now
                       </Link>
                     </div>
                   )}
