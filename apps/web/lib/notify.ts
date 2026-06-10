@@ -84,24 +84,37 @@ function firstNameOf(studentName?: string): string | undefined {
  * Send a templated email to the guardian.  No-op when the guardian has no
  * email on file or when the provider is not configured.  Never throws.
  */
-async function emailGuardian(email: string | null, template: EmailTemplate, logTag: string): Promise<void> {
+async function emailGuardian(
+  email: string | null,
+  template: EmailTemplate,
+  logTag: string,
+  replyTo?: string | null
+): Promise<void> {
   if (!email) return;
   const result = await sendEmail({
     to: email,
     subject: template.subject,
     html: template.html,
     text: template.text,
+    replyTo: replyTo ?? undefined,
   });
   if (!result.ok && result.error !== "email not configured") {
     console.error(`[${logTag}] email failed`, result.error);
   }
 }
 
-async function resolveCampusName(campusId?: string): Promise<string> {
-  if (!campusId) return "your school";
+interface CampusInfo {
+  name: string;
+  /** Campus inbox — used as the email Reply-To so family replies reach the school, not RSF central. */
+  email: string | null;
+}
+
+async function resolveCampus(campusId?: string): Promise<CampusInfo> {
+  if (!campusId) return { name: "your school", email: null };
   const supabase = createServiceRoleClient();
-  const { data } = await supabase.from("campus").select("name").eq("id", campusId).single();
-  return (data as unknown as Record<string, string> | null)?.name ?? "your school";
+  const { data } = await supabase.from("campus").select("name, email").eq("id", campusId).single();
+  const row = data as unknown as Record<string, string | null> | null;
+  return { name: row?.name ?? "your school", email: row?.email ?? null };
 }
 
 async function notify(params: {
@@ -137,7 +150,7 @@ export async function notifyFamilyApplicationReceived({
 }): Promise<void> {
   const { userId, email } = await getGuardianContact(applicationId);
   if (!userId && !email) return;
-  const campusName = await resolveCampusName(campusId);
+  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
   await Promise.all([
     userId
       ? notify({
@@ -152,7 +165,8 @@ export async function notifyFamilyApplicationReceived({
     emailGuardian(
       email,
       emailTemplates.applicationReceived({ studentFirstName: firstNameOf(studentName), campusName }),
-      "notifyFamilyApplicationReceived"
+      "notifyFamilyApplicationReceived",
+      campusEmail
     ),
   ]);
 }
@@ -169,7 +183,7 @@ export async function notifyFamilyApplicationVerified({
 }): Promise<void> {
   const { userId } = await getGuardianContact(applicationId);
   if (!userId) return;
-  const campusName = await resolveCampusName(campusId);
+  const { name: campusName } = await resolveCampus(campusId);
   await notify({
     userId,
     subject: `Application verified${studentName ? ` for ${studentName}` : ""}`,
@@ -216,7 +230,7 @@ export async function notifyFamilyApplicationWaitlisted({
 }): Promise<void> {
   const { userId } = await getGuardianContact(applicationId);
   if (!userId) return;
-  const campusName = await resolveCampusName(campusId);
+  const { name: campusName } = await resolveCampus(campusId);
   await notify({
     userId,
     subject: `You're on the waitlist at ${campusName}`,
@@ -252,7 +266,8 @@ export async function notifyFamilyOfOffer({
 }): Promise<void> {
   const { userId, email } = await getGuardianContact(applicationId);
   if (!userId && !email) return;
-  const campusName = campusNameProp ?? await resolveCampusName(campusId);
+  const { name: resolvedCampusName, email: campusEmail } = await resolveCampus(campusId);
+  const campusName = campusNameProp ?? resolvedCampusName;
   const deadline = new Date(expiresAt).toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric",
   });
@@ -271,7 +286,7 @@ export async function notifyFamilyOfOffer({
           logTag: "notifyFamilyOfOffer",
         })
       : Promise.resolve(),
-    emailGuardian(email, template, "notifyFamilyOfOffer"),
+    emailGuardian(email, template, "notifyFamilyOfOffer", campusEmail),
   ]);
 }
 
@@ -294,7 +309,7 @@ export async function notifyFamilyOfferExpiringSoon({
 }): Promise<void> {
   const { userId, email } = await getGuardianContact(applicationId);
   if (!userId && !email) return;
-  const campusName = await resolveCampusName(campusId);
+  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
   const deadline = new Date(expiresAt).toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric",
   });
@@ -312,7 +327,8 @@ export async function notifyFamilyOfferExpiringSoon({
     emailGuardian(
       email,
       emailTemplates.offerExpiringSoon({ studentFirstName: firstNameOf(studentName), campusName, expiresAt }),
-      "notifyFamilyOfferExpiringSoon"
+      "notifyFamilyOfferExpiringSoon",
+      campusEmail
     ),
   ]);
 }
@@ -385,7 +401,7 @@ export async function notifyFamilyRegistrationReady({
 }): Promise<void> {
   const { userId, email } = await getGuardianContact(applicationId);
   if (!userId && !email) return;
-  const campusName = await resolveCampusName(campusId);
+  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
   await Promise.all([
     userId
       ? notify({
@@ -400,7 +416,8 @@ export async function notifyFamilyRegistrationReady({
     emailGuardian(
       email,
       emailTemplates.offerAccepted({ studentFirstName: firstNameOf(studentName), campusName }),
-      "notifyFamilyRegistrationReady"
+      "notifyFamilyRegistrationReady",
+      campusEmail
     ),
   ]);
 }
@@ -417,7 +434,7 @@ export async function notifyFamilyRegistrationSubmitted({
 }): Promise<void> {
   const { userId } = await getGuardianContactByEnrollment(enrollmentId);
   if (!userId) return;
-  const campusName = await resolveCampusName(campusId);
+  const { name: campusName } = await resolveCampus(campusId);
   await notify({
     userId,
     subject: `Registration packet submitted${studentName ? ` for ${studentName}` : ""}`,
@@ -440,7 +457,7 @@ export async function notifyFamilyRegistrationComplete({
 }): Promise<void> {
   const { userId, email } = await getGuardianContactByEnrollment(enrollmentId);
   if (!userId && !email) return;
-  const campusName = await resolveCampusName(campusId);
+  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
   await Promise.all([
     userId
       ? notify({
@@ -455,7 +472,8 @@ export async function notifyFamilyRegistrationComplete({
     emailGuardian(
       email,
       emailTemplates.registrationComplete({ studentFirstName: firstNameOf(studentName), campusName }),
-      "notifyFamilyRegistrationComplete"
+      "notifyFamilyRegistrationComplete",
+      campusEmail
     ),
   ]);
 }
@@ -726,7 +744,7 @@ export async function notifyFamilyStudentEnrolled({
   // when their packet was verified — a second identical email would be noise.
   const { userId } = await getGuardianContact(applicationId);
   if (!userId) return;
-  const campusName = await resolveCampusName(campusId);
+  const { name: campusName } = await resolveCampus(campusId);
   const grade = gradeLabel ? ` in ${gradeLabel}` : "";
   await notify({
     userId,

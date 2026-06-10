@@ -22,6 +22,8 @@ export interface SendEmailInput {
   subject: string;
   html: string;
   text: string;
+  /** Per-campus inbox replies should route to (e.g. vancouver@rootedschool.org). */
+  replyTo?: string;
 }
 
 export interface SendEmailResult {
@@ -33,7 +35,7 @@ export interface SendEmailResult {
  * Send a single email. Resolves `{ ok: false, error }` on any failure —
  * never throws, never rejects.
  */
-export async function sendEmail({ to, subject, html, text }: SendEmailInput): Promise<SendEmailResult> {
+export async function sendEmail({ to, subject, html, text, replyTo }: SendEmailInput): Promise<SendEmailResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     if (!warnedNotConfigured) {
@@ -56,6 +58,7 @@ export async function sendEmail({ to, subject, html, text }: SendEmailInput): Pr
         subject,
         html,
         text,
+        ...(replyTo ? { reply_to: [replyTo] } : {}),
       }),
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
     });
