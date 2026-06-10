@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { StaffSidebar } from "@/components/layout/staff-sidebar";
 import { StaffHeader } from "@/components/layout/staff-header";
 import { requireStaffSession, getAccessibleCampusIds, getHighestRole } from "@/lib/auth/get-session";
-import { getCampuses } from "@/lib/queries";
+import { getCampuses, getFamilyMessages } from "@/lib/queries";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { ToastProvider } from "@/components/ui/toast";
 
@@ -20,13 +20,17 @@ export default async function StaffLayout({
     getCampuses(),
   ]);
 
-  // Fetch unread notification count for the bell badge
+  // Fetch unread notification count (bell badge) and the most recent
+  // notifications (bell dropdown preview) — both scoped to this user
   const db = createServiceRoleClient();
-  const unreadResult = await db
+  const [unreadResult, recentNotifications] = await Promise.all([
+    db
       .from("notification")
       .select("id", { count: "exact", head: true })
       .eq("user_id", session.user_id)
-      .eq("is_read", false);
+      .eq("is_read", false),
+    getFamilyMessages(session.user_id, 10),
+  ]);
   const unreadNotificationCount = (unreadResult as { count: number | null }).count ?? 0;
 
   // Scope campus list to what the user can access
@@ -52,6 +56,7 @@ export default async function StaffLayout({
             userEmail={session.email}
             campuses={headerCampuses}
             unreadNotificationCount={unreadNotificationCount}
+            recentNotifications={recentNotifications}
             highestRole={highestRole}
           />
         </Suspense>

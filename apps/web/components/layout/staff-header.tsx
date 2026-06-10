@@ -6,11 +6,15 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@rooted-ems/database";
 import { Select } from "@/components/ui/select";
 import { NAV_SECTIONS, ROLE_LEVEL } from "@/components/layout/staff-sidebar";
+import { StaffNotificationBell } from "@/components/layout/staff-notification-bell";
+import type { FamilyMessageRow } from "@/lib/queries";
 
 interface StaffHeaderProps {
   userEmail?: string | null;
   campuses?: Array<{ id: string; name: string }>;
   unreadNotificationCount?: number;
+  /** Most recent notifications for the bell dropdown preview */
+  recentNotifications?: FamilyMessageRow[];
   /** The user's highest role across all campuses (drives mobile nav filtering) */
   highestRole?: string;
 }
@@ -19,6 +23,7 @@ export function StaffHeader({
   userEmail,
   campuses = [],
   unreadNotificationCount = 0,
+  recentNotifications = [],
   highestRole = "compliance_auditor",
 }: StaffHeaderProps) {
   const router = useRouter();
@@ -151,30 +156,10 @@ export function StaffHeader({
 
         <div className="flex items-center gap-2">
           {/* Notifications bell */}
-          <a
-            href="/staff/messages"
-            className="relative flex items-center justify-center w-8 h-8 rounded-lg hover:bg-rooted-gray-light transition-colors"
-            aria-label="Notifications"
-          >
-            <svg
-              className="w-4.5 h-4.5 text-stone"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-              />
-            </svg>
-            {unreadNotificationCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold leading-none px-0.5">
-                {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
-              </span>
-            )}
-          </a>
+          <StaffNotificationBell
+            unreadCount={unreadNotificationCount}
+            notifications={recentNotifications}
+          />
 
           {/* Search */}
           <form
