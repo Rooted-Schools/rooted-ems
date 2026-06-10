@@ -161,6 +161,7 @@ export async function promoteFromWaitlist(
     offerId: offer.id,
     expiresAt,
     campusId: wl.campus_id,
+    viaWaitlist: true,
   });
 
   return { data: { offer_id: offer.id }, error: null };

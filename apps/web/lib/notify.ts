@@ -1,62 +1,96 @@
 /**
  * Enrollment event notifications.
  *
- * All functions use the `in_app` channel which works without any external
- * provider.  Email/SMS uses the same `sendNotification` path once a provider
- * (e.g. Resend) is configured — no code changes needed.
+ * All functions create `in_app` notifications, which work without any external
+ * provider.  Family-facing milestone events (application received, offer
+ * extended, offer accepted, registration complete, waitlist promotion) also
+ * send a bilingual email to the guardian via Resend (lib/email.ts).  When
+ * RESEND_API_KEY is unset, email sending is a silent no-op.
  *
  * Rule: never throw.  A notification failure must never roll back the
- * primary operation that triggered it.
+ * primary operation that triggered it.  In-app and email delivery are fired
+ * independently — one failing never blocks the other.
  */
 
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { sendNotification } from "@/lib/mutations";
+import { sendEmail } from "@/lib/email";
+import * as emailTemplates from "@/lib/email-templates";
+import type { EmailTemplate } from "@/lib/email-templates";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+interface GuardianContact {
+  userId: string | null;
+  email: string | null;
+}
+
 /**
- * Resolve the Supabase auth user_id for the guardian on a given application.
- * Returns null if the lookup fails — callers degrade gracefully.
+ * Resolve the Supabase auth user_id and contact email for the guardian on a
+ * given application — one query for both needs.  Fields resolve to null on
+ * failure so callers degrade gracefully.
  */
-async function getGuardianUserId(applicationId: string): Promise<string | null> {
+async function getGuardianContact(applicationId: string): Promise<GuardianContact> {
   const supabase = createServiceRoleClient();
   const { data, error } = await supabase
     .from("application")
-    .select("guardian_id, guardian:guardian_id (user_id)")
+    .select("guardian_id, guardian:guardian_id (user_id, email)")
     .eq("id", applicationId)
     .single();
   if (error) {
-    console.error("[getGuardianUserId] query error", error.message, { applicationId });
-    return null;
+    console.error("[getGuardianContact] query error", error.message, { applicationId });
+    return { userId: null, email: null };
   }
   const row = data as unknown as Record<string, unknown> | null;
-  const guardian = row?.guardian as Record<string, string> | null;
+  const guardian = row?.guardian as Record<string, string | null> | null;
   const userId = guardian?.user_id ?? null;
   if (!userId) {
-    console.warn("[getGuardianUserId] no user_id found", {
+    console.warn("[getGuardianContact] no user_id found", {
       applicationId,
       guardian_id: row?.guardian_id ?? null,
       guardian,
     });
   }
-  return userId;
+  return { userId, email: guardian?.email ?? null };
 }
 
 /**
- * Resolve the Supabase auth user_id for the guardian on a given enrollment.
+ * Resolve the guardian's auth user_id and contact email for a given enrollment.
  */
-async function getGuardianUserIdByEnrollment(enrollmentId: string): Promise<{ userId: string | null; applicationId: string | null }> {
+async function getGuardianContactByEnrollment(enrollmentId: string): Promise<GuardianContact & { applicationId: string | null }> {
   const supabase = createServiceRoleClient();
   const { data } = await supabase
     .from("enrollment")
-    .select("application_id, application:application_id (guardian:guardian_id (user_id))")
+    .select("application_id, application:application_id (guardian:guardian_id (user_id, email))")
     .eq("id", enrollmentId)
     .single();
   const row = data as unknown as Record<string, unknown> | null;
   const applicationId = (row?.application_id as string) ?? null;
   const application = row?.application as Record<string, unknown> | null;
-  const guardian = application?.guardian as Record<string, string> | null;
-  return { userId: guardian?.user_id ?? null, applicationId };
+  const guardian = application?.guardian as Record<string, string | null> | null;
+  return { userId: guardian?.user_id ?? null, email: guardian?.email ?? null, applicationId };
+}
+
+/** First token of a full student name, for email greetings. */
+function firstNameOf(studentName?: string): string | undefined {
+  return studentName?.trim().split(/\s+/)[0] || undefined;
+}
+
+/**
+ * Send a templated email to the guardian.  No-op when the guardian has no
+ * email on file or when the provider is not configured.  Never throws.
+ */
+async function emailGuardian(email: string | null, template: EmailTemplate, logTag: string): Promise<void> {
+  if (!email) return;
+  const result = await sendEmail({
+    to: email,
+    subject: template.subject,
+    html: template.html,
+    text: template.text,
+  });
+  if (!result.ok && result.error !== "email not configured") {
+    console.error(`[${logTag}] email failed`, result.error);
+  }
 }
 
 async function resolveCampusName(campusId?: string): Promise<string> {
@@ -97,17 +131,26 @@ export async function notifyFamilyApplicationReceived({
   studentName?: string;
   campusId?: string;
 }): Promise<void> {
-  const userId = await getGuardianUserId(applicationId);
-  if (!userId) return;
+  const { userId, email } = await getGuardianContact(applicationId);
+  if (!userId && !email) return;
   const campusName = await resolveCampusName(campusId);
-  await notify({
-    userId,
-    subject: `Application received${studentName ? ` for ${studentName}` : ""}`,
-    body: `We've received your enrollment application${studentName ? ` for ${studentName}` : ""} at ${campusName}. We'll be in touch as we review it.`,
-    link: `/family/applications`,
-    campusId,
-    logTag: "notifyFamilyApplicationReceived",
-  });
+  await Promise.all([
+    userId
+      ? notify({
+          userId,
+          subject: `Application received${studentName ? ` for ${studentName}` : ""}`,
+          body: `We've received your enrollment application${studentName ? ` for ${studentName}` : ""} at ${campusName}. We'll be in touch as we review it.`,
+          link: `/family/applications`,
+          campusId,
+          logTag: "notifyFamilyApplicationReceived",
+        })
+      : Promise.resolve(),
+    emailGuardian(
+      email,
+      emailTemplates.applicationReceived({ studentFirstName: firstNameOf(studentName), campusName }),
+      "notifyFamilyApplicationReceived"
+    ),
+  ]);
 }
 
 /** Staff marks application as verified / moves it to lottery. */
@@ -120,7 +163,7 @@ export async function notifyFamilyApplicationVerified({
   studentName?: string;
   campusId?: string;
 }): Promise<void> {
-  const userId = await getGuardianUserId(applicationId);
+  const { userId } = await getGuardianContact(applicationId);
   if (!userId) return;
   const campusName = await resolveCampusName(campusId);
   await notify({
@@ -145,7 +188,7 @@ export async function notifyFamilyNeedsInfo({
   message?: string;
   campusId?: string;
 }): Promise<void> {
-  const userId = await getGuardianUserId(applicationId);
+  const { userId } = await getGuardianContact(applicationId);
   if (!userId) return;
   await notify({
     userId,
@@ -167,7 +210,7 @@ export async function notifyFamilyApplicationWaitlisted({
   studentName?: string;
   campusId?: string;
 }): Promise<void> {
-  const userId = await getGuardianUserId(applicationId);
+  const { userId } = await getGuardianContact(applicationId);
   if (!userId) return;
   const campusName = await resolveCampusName(campusId);
   await notify({
@@ -182,7 +225,10 @@ export async function notifyFamilyApplicationWaitlisted({
 
 // ─── Offer notifications ──────────────────────────────────────────────────────
 
-/** A seat offer has been made. */
+/**
+ * A seat offer has been made.  Pass `viaWaitlist: true` when the offer was
+ * created by a waitlist promotion so the email leads with "a seat opened".
+ */
 export async function notifyFamilyOfOffer({
   applicationId,
   offerId,
@@ -190,6 +236,7 @@ export async function notifyFamilyOfOffer({
   studentName,
   expiresAt,
   campusId,
+  viaWaitlist,
 }: {
   applicationId: string;
   offerId: string;
@@ -197,21 +244,73 @@ export async function notifyFamilyOfOffer({
   studentName?: string;
   expiresAt: string;
   campusId?: string;
+  viaWaitlist?: boolean;
 }): Promise<void> {
-  const userId = await getGuardianUserId(applicationId);
-  if (!userId) return;
+  const { userId, email } = await getGuardianContact(applicationId);
+  if (!userId && !email) return;
   const campusName = campusNameProp ?? await resolveCampusName(campusId);
   const deadline = new Date(expiresAt).toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric",
   });
-  await notify({
-    userId,
-    subject: studentName ? `🎉 Seat offer for ${studentName} at ${campusName}` : `🎉 You have a seat offer at ${campusName}`,
-    body: `Congratulations! A seat has been offered${studentName ? ` for ${studentName}` : ""} at ${campusName}. Please respond by ${deadline} to secure your spot.`,
-    link: `/family/offers/${offerId}`,
-    campusId,
-    logTag: "notifyFamilyOfOffer",
+  const studentFirstName = firstNameOf(studentName);
+  const template = viaWaitlist
+    ? emailTemplates.waitlistPromoted({ studentFirstName, campusName })
+    : emailTemplates.offerExtended({ studentFirstName, campusName, expiresAt });
+  await Promise.all([
+    userId
+      ? notify({
+          userId,
+          subject: studentName ? `🎉 Seat offer for ${studentName} at ${campusName}` : `🎉 You have a seat offer at ${campusName}`,
+          body: `Congratulations! A seat has been offered${studentName ? ` for ${studentName}` : ""} at ${campusName}. Please respond by ${deadline} to secure your spot.`,
+          link: `/family/offers/${offerId}`,
+          campusId,
+          logTag: "notifyFamilyOfOffer",
+        })
+      : Promise.resolve(),
+    emailGuardian(email, template, "notifyFamilyOfOffer"),
+  ]);
+}
+
+/**
+ * A pending offer is approaching its deadline — send the family an urgent
+ * (but warm) email reminder.  Intended to be called from a reminder cron.
+ */
+export async function notifyFamilyOfferExpiringSoon({
+  applicationId,
+  offerId,
+  studentName,
+  expiresAt,
+  campusId,
+}: {
+  applicationId: string;
+  offerId: string;
+  studentName?: string;
+  expiresAt: string;
+  campusId?: string;
+}): Promise<void> {
+  const { userId, email } = await getGuardianContact(applicationId);
+  if (!userId && !email) return;
+  const campusName = await resolveCampusName(campusId);
+  const deadline = new Date(expiresAt).toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric",
   });
+  await Promise.all([
+    userId
+      ? notify({
+          userId,
+          subject: `⏰ Your seat offer at ${campusName} expires soon`,
+          body: `Your seat offer${studentName ? ` for ${studentName}` : ""} at ${campusName} expires on ${deadline}. Please respond before the deadline to keep your spot.`,
+          link: `/family/offers/${offerId}`,
+          campusId,
+          logTag: "notifyFamilyOfferExpiringSoon",
+        })
+      : Promise.resolve(),
+    emailGuardian(
+      email,
+      emailTemplates.offerExpiringSoon({ studentFirstName: firstNameOf(studentName), campusName, expiresAt }),
+      "notifyFamilyOfferExpiringSoon"
+    ),
+  ]);
 }
 
 // ─── Document notifications ───────────────────────────────────────────────────
@@ -228,7 +327,7 @@ export async function notifyFamilyDocumentRejected({
   reason: string;
   campusId?: string;
 }): Promise<void> {
-  const userId = await getGuardianUserId(applicationId);
+  const { userId } = await getGuardianContact(applicationId);
   if (!userId) return;
   const readableType = documentType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   await notify({
@@ -251,7 +350,7 @@ export async function notifyFamilyDocumentVerified({
   documentType: string;
   campusId?: string;
 }): Promise<void> {
-  const userId = await getGuardianUserId(applicationId);
+  const { userId } = await getGuardianContact(applicationId);
   if (!userId) return;
   const readableType = documentType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   await notify({
@@ -266,7 +365,11 @@ export async function notifyFamilyDocumentVerified({
 
 // ─── Registration notifications ───────────────────────────────────────────────
 
-/** Registration packet is ready for the family to complete. */
+/**
+ * Registration packet is ready for the family to complete.  Fires right
+ * after an offer is accepted, so the email doubles as the offer-accepted
+ * congratulations with registration as the next step.
+ */
 export async function notifyFamilyRegistrationReady({
   applicationId,
   studentName,
@@ -276,17 +379,26 @@ export async function notifyFamilyRegistrationReady({
   studentName?: string;
   campusId?: string;
 }): Promise<void> {
-  const userId = await getGuardianUserId(applicationId);
-  if (!userId) return;
+  const { userId, email } = await getGuardianContact(applicationId);
+  if (!userId && !email) return;
   const campusName = await resolveCampusName(campusId);
-  await notify({
-    userId,
-    subject: `Registration is ready${studentName ? ` for ${studentName}` : ""}`,
-    body: `Your enrollment packet is ready to complete${studentName ? ` for ${studentName}` : ""} at ${campusName}. Please log in and complete all required items to finalize enrollment.`,
-    link: `/family/registration`,
-    campusId,
-    logTag: "notifyFamilyRegistrationReady",
-  });
+  await Promise.all([
+    userId
+      ? notify({
+          userId,
+          subject: `Registration is ready${studentName ? ` for ${studentName}` : ""}`,
+          body: `Your enrollment packet is ready to complete${studentName ? ` for ${studentName}` : ""} at ${campusName}. Please log in and complete all required items to finalize enrollment.`,
+          link: `/family/registration`,
+          campusId,
+          logTag: "notifyFamilyRegistrationReady",
+        })
+      : Promise.resolve(),
+    emailGuardian(
+      email,
+      emailTemplates.offerAccepted({ studentFirstName: firstNameOf(studentName), campusName }),
+      "notifyFamilyRegistrationReady"
+    ),
+  ]);
 }
 
 /** Family submits their registration packet — confirm receipt. */
@@ -299,7 +411,7 @@ export async function notifyFamilyRegistrationSubmitted({
   studentName?: string;
   campusId?: string;
 }): Promise<void> {
-  const { userId } = await getGuardianUserIdByEnrollment(enrollmentId);
+  const { userId } = await getGuardianContactByEnrollment(enrollmentId);
   if (!userId) return;
   const campusName = await resolveCampusName(campusId);
   await notify({
@@ -322,17 +434,26 @@ export async function notifyFamilyRegistrationComplete({
   studentName?: string;
   campusId?: string;
 }): Promise<void> {
-  const { userId } = await getGuardianUserIdByEnrollment(enrollmentId);
-  if (!userId) return;
+  const { userId, email } = await getGuardianContactByEnrollment(enrollmentId);
+  if (!userId && !email) return;
   const campusName = await resolveCampusName(campusId);
-  await notify({
-    userId,
-    subject: `🎓 Enrollment complete${studentName ? ` for ${studentName}` : ""}!`,
-    body: `All registration items have been verified. ${studentName ? `${studentName} is` : "Your student is"} officially enrolled at ${campusName}. Welcome to the Rooted Schools family — we're proud to have you with us.`,
-    link: `/family/registration`,
-    campusId,
-    logTag: "notifyFamilyRegistrationComplete",
-  });
+  await Promise.all([
+    userId
+      ? notify({
+          userId,
+          subject: `🎓 Enrollment complete${studentName ? ` for ${studentName}` : ""}!`,
+          body: `All registration items have been verified. ${studentName ? `${studentName} is` : "Your student is"} officially enrolled at ${campusName}. Welcome to the Rooted Schools family — we're proud to have you with us.`,
+          link: `/family/registration`,
+          campusId,
+          logTag: "notifyFamilyRegistrationComplete",
+        })
+      : Promise.resolve(),
+    emailGuardian(
+      email,
+      emailTemplates.registrationComplete({ studentFirstName: firstNameOf(studentName), campusName }),
+      "notifyFamilyRegistrationComplete"
+    ),
+  ]);
 }
 
 // ─── Staff notifications ──────────────────────────────────────────────────────
@@ -597,16 +718,25 @@ export async function notifyFamilyStudentEnrolled({
   campusId?: string;
   gradeLabel?: string;
 }): Promise<void> {
-  const userId = await getGuardianUserId(applicationId);
-  if (!userId) return;
+  const { userId, email } = await getGuardianContact(applicationId);
+  if (!userId && !email) return;
   const campusName = await resolveCampusName(campusId);
   const grade = gradeLabel ? ` in ${gradeLabel}` : "";
-  await notify({
-    userId,
-    subject: `🎉 ${studentName ?? "Your student"} is officially enrolled at ${campusName}!`,
-    body: `Congratulations! ${studentName ?? "Your student"} is now fully enrolled${grade} at ${campusName}. At Rooted Schools, every student graduates with a career credential and a clear plan. We're excited to get started. Log in to your portal to view orientation details and next steps.`,
-    link: `/family/applications/${applicationId}`,
-    campusId,
-    logTag: "notifyFamilyStudentEnrolled",
-  });
+  await Promise.all([
+    userId
+      ? notify({
+          userId,
+          subject: `🎉 ${studentName ?? "Your student"} is officially enrolled at ${campusName}!`,
+          body: `Congratulations! ${studentName ?? "Your student"} is now fully enrolled${grade} at ${campusName}. At Rooted Schools, every student graduates with a career credential and a clear plan. We're excited to get started. Log in to your portal to view orientation details and next steps.`,
+          link: `/family/applications/${applicationId}`,
+          campusId,
+          logTag: "notifyFamilyStudentEnrolled",
+        })
+      : Promise.resolve(),
+    emailGuardian(
+      email,
+      emailTemplates.registrationComplete({ studentFirstName: firstNameOf(studentName), campusName }),
+      "notifyFamilyStudentEnrolled"
+    ),
+  ]);
 }
