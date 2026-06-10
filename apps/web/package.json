@@ -16,6 +16,7 @@
     "@rooted-ems/database": "workspace:*",
     "@rooted-ems/types": "workspace:*",
     "@rooted-ems/utils": "workspace:*",
+    "@sentry/nextjs": "^8.55.2",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.107.0",
     "clsx": "^2.1.0",
