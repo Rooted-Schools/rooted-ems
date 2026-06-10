@@ -477,7 +477,7 @@ const dict = {
   "login.sentTo":           { en: "We sent a verification email to", es: "Enviamos un correo de verificación a" },
   "login.enterCodeHint":    { en: "Enter the code from the email, or click the link in the email to sign in directly.", es: "Ingrese el código del correo, o haga clic en el enlace del correo para iniciar sesión directamente." },
   "login.code":             { en: "Verification Code",    es: "Código de Verificación" },
-  "login.codeHint":         { en: "Enter the 6-digit code sent to your email.", es: "Ingrese el código de 6 dígitos enviado a su correo." },
+  "login.codeHint":         { en: "Enter the code sent to your email.", es: "Ingrese el código enviado a su correo." },
   "login.verifying":        { en: "Verifying...",         es: "Verificando..." },
   "login.verifyCode":       { en: "Verify Code",          es: "Verificar Código" },
   "login.resendIn":         { en: "Resend code in",       es: "Reenviar código en" },
