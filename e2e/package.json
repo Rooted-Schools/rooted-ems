@@ -1,0 +1,11 @@
+{
+  "name": "@rooted-ems/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "smoke": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
+  }
+}
