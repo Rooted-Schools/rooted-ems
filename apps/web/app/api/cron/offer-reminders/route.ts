@@ -1,4 +1,4 @@
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { NextResponse, type NextRequest } from "next/server";
 import { notifyFamilyOfferExpiringSoon } from "@/lib/notify";
 
@@ -21,7 +21,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = await createServerClient();
+  // Service role: cron requests carry no session cookies, so a user-scoped
+  // client would be filtered to zero rows by RLS. The CRON_SECRET check
+  // above is the auth boundary for this route.
+  const supabase = createServiceRoleClient();
   const now = new Date();
   const nowIso = now.toISOString();
   const cutoffIso = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
