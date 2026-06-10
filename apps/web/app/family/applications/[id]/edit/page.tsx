@@ -19,8 +19,8 @@ export default async function EditApplicationPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Fetch the draft application data
-  const draft = await getDraftApplicationForEdit(id);
+  // Fetch the draft application data (ownership-checked against the auth user)
+  const draft = await getDraftApplicationForEdit(id, user.id);
   if (!draft) {
     redirect(`/family/applications/${id}`);
   }

@@ -35,7 +35,8 @@ export default async function FamilyDashboardPage() {
   ]);
 
   const hasApps = apps.length > 0;
-  const draftCount = apps.filter((a) => a.status === "draft").length;
+  const draftApps = apps.filter((a) => a.status === "draft");
+  const draftCount = draftApps.length;
   const offeredCount = apps.filter((a) => a.status === "offered").length;
   const acceptedCount = apps.filter((a) => a.status === "accepted").length;
   const registeredCount = apps.filter((a) => a.status === "registered").length;
@@ -69,6 +70,54 @@ export default async function FamilyDashboardPage() {
           <Button>{t("dashboard.startNewApplication")}</Button>
         </Link>
       </div>
+
+      {/* ─── Resume: in-progress draft applications ─── */}
+      {draftCount > 0 && (
+        <Card className="border-2 border-rooted-green/40 bg-rooted-green/5">
+          <CardHeader className="pb-3">
+            <div className="flex items-start gap-3">
+              <span className="text-xl mt-0.5">✏️</span>
+              <div>
+                <CardTitle className="text-base">{t("dashboard.resume.title")}</CardTitle>
+                <CardDescription className="mt-0.5">
+                  {t("dashboard.resume.subtitle")}
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            {draftApps.map((app) => {
+              const studentName = app.student_name.trim();
+              const displayTitle =
+                studentName && studentName !== "Unknown Student"
+                  ? studentName
+                  : t("dashboard.resume.newApp");
+              return (
+                <div
+                  key={app.id}
+                  className="flex items-center justify-between gap-3 bg-white border border-rooted-green/20 rounded-lg px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-ink truncate">{displayTitle}</p>
+                    <p className="text-xs text-stone mt-0.5">
+                      {app.campus_name && <>{app.campus_name} &middot; </>}
+                      {t("common.updated")}{" "}
+                      {new Date(app.updated_at).toLocaleDateString(localeTag, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                  <Link href={`/family/applications/${app.id}/edit`} className="shrink-0">
+                    <Button size="sm">{t("dashboard.resume.continue")}</Button>
+                  </Link>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ─── Celebration: registered students ─── */}
       {registeredCount > 0 && (

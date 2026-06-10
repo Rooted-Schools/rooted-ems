@@ -290,6 +290,17 @@ const dict = {
   "appForm.saveDraft":          { en: "Save Draft",           es: "Guardar Borrador" },
   "appForm.submit":             { en: "Submit Application",   es: "Enviar Solicitud" },
 
+  // ─── Application form: auto-save indicator ────────────────────────────────
+  "appForm.autosave.saving":    { en: "Saving…",              es: "Guardando…" },
+  "appForm.autosave.saved":     { en: "Saved",                es: "Guardado" },
+  "appForm.autosave.error":     { en: "Couldn't save — check your connection", es: "No se pudo guardar. Revise su conexión." },
+
+  // ─── Dashboard: resume draft card ─────────────────────────────────────────
+  "dashboard.resume.title":     { en: "Pick up where you left off", es: "Continúe donde lo dejó" },
+  "dashboard.resume.subtitle":  { en: "Your answers are saved. Finish your application whenever you're ready.", es: "Sus respuestas están guardadas. Termine su solicitud cuando esté listo/a." },
+  "dashboard.resume.continue":  { en: "Continue application", es: "Continuar solicitud" },
+  "dashboard.resume.newApp":    { en: "New application",      es: "Nueva solicitud" },
+
   // ─── Offers (list + detail) ───────────────────────────────────────────────
   "offers.subtitle":          { en: "Respond to seat offers before the deadline to secure your spot.", es: "Responda a las ofertas de cupo antes de la fecha límite para asegurar su lugar." },
   "offers.noPending":         { en: "You have no pending offers at this time.", es: "No tiene ofertas pendientes en este momento." },

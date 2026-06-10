@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,7 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { GRADE_LABELS } from "@/lib/application-helpers";
 import type { EnrollmentWindowInfo, CampusRow } from "@/lib/queries";
-import { familyCreateApplication, familySubmitApplication } from "../actions";
+import {
+  familyCreateApplication,
+  familySubmitApplication,
+  familyUpdateApplication,
+} from "../actions";
+import { useDraftAutosave, SaveIndicator } from "@/components/draft-autosave";
 import { useLocale } from "@/lib/i18n/locale-context";
 import { type TranslationKey } from "@/lib/i18n/translations";
 
@@ -218,6 +223,54 @@ function buildCreateInput(form: FormData, campusWindows: EnrollmentWindowInfo[])
   };
 }
 
+/** Partial-update input for auto-saving an existing draft row. */
+function buildAutosaveInput(
+  applicationId: string,
+  form: FormData,
+  campusWindows: EnrollmentWindowInfo[]
+) {
+  const answers: Record<string, string | boolean> = {
+    // Persist booleans unconditionally so unchecking is saved too.
+    data_sharing_consent: form.dataSharingConsent,
+    agree_terms: form.agreeTerms,
+    has_sibling_at_school: form.hasSibling,
+    e_signature_name: form.signatureName,
+    guardian_relationship_other:
+      form.guardianRelationship === "other" ? form.guardianRelationshipOther : "",
+  };
+  if (form.signatureName) {
+    answers.e_signature_date = new Date().toISOString().split("T")[0];
+  }
+
+  // Persist placement changes (the family went back to step 1 and changed
+  // campus/grade) only as a complete trio, so the draft never ends up with a
+  // campus pointing at another campus's grade level or enrollment window.
+  const windowId = form.enrollmentWindowId || campusWindows[0]?.id;
+  const placement =
+    form.campusId && form.gradeLevelId && windowId
+      ? {
+          campus_id: form.campusId,
+          grade_level_id: form.gradeLevelId,
+          enrollment_window_id: windowId,
+        }
+      : {};
+
+  return {
+    application_id: applicationId,
+    ...placement,
+    student_first_name: form.firstName,
+    student_last_name: form.lastName,
+    student_date_of_birth: form.dateOfBirth || undefined,
+    student_gender: form.gender || undefined,
+    guardian_first_name: form.guardianFirstName,
+    guardian_last_name: form.guardianLastName,
+    guardian_relationship: form.guardianRelationship || undefined,
+    guardian_email: form.guardianEmail,
+    guardian_phone: form.guardianPhone,
+    answers,
+  };
+}
+
 /* ───────────── page component ───────────── */
 
 export function NewApplicationForm({ windows, campuses, gradeLevels, initialCampusId }: NewApplicationFormProps) {
@@ -232,11 +285,27 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
   }));
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [showValidation, setShowValidation] = useState(false);
+  // Server-side draft: created the first time the family completes step 1,
+  // then kept up to date by the debounced auto-save below.
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const creatingDraftRef = useRef(false);
 
   const currentStep = STEPS[stepIndex];
 
   const campusWindows = windows.filter((w) => w.campus_id === form.campusId && w.is_open);
   const campusGrades = gradeLevels.filter((g) => g.campus_id === form.campusId);
+
+  // Debounced auto-save (~2s after the last change) once the draft row exists.
+  // The server action re-verifies auth + guardian ownership on every save.
+  const { status: saveStatus, flush: flushAutosave } = useDraftAutosave({
+    enabled: !!draftId,
+    value: form,
+    onSave: async (current) => {
+      if (!draftId) return { error: null };
+      const currentWindows = windows.filter((w) => w.campus_id === current.campusId && w.is_open);
+      return familyUpdateApplication(buildAutosaveInput(draftId, current, currentWindows));
+    },
+  });
 
   function update(partial: Partial<FormData>) {
     setForm((prev) => ({ ...prev, ...partial }));
@@ -248,15 +317,57 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
       return;
     }
     setShowValidation(false);
+
+    // First time leaving step 1: create the draft row server-side so progress
+    // survives a closed browser (and is resumable from any device).
+    if (currentStep.id === "campus" && !draftId) {
+      if (creatingDraftRef.current) return;
+      creatingDraftRef.current = true;
+      startTransition(async () => {
+        try {
+          const input = buildCreateInput(form, campusWindows);
+          if (!input) {
+            setFeedback({ type: "error", message: t("appForm.noOpenWindow") });
+            return;
+          }
+          const result = await familyCreateApplication(input);
+          if (result.error || !result.data) {
+            setFeedback({ type: "error", message: result.error ?? t("appForm.createFailed") });
+            return;
+          }
+          setFeedback(null);
+          setDraftId(result.data.id);
+          setStepIndex(1);
+        } finally {
+          creatingDraftRef.current = false;
+        }
+      });
+      return;
+    }
+
     if (stepIndex < STEPS.length - 1) setStepIndex((i) => i + 1);
+    void flushAutosave(); // always persist on step navigation
   }
 
   function back() {
     if (stepIndex > 0) setStepIndex((i) => i - 1);
+    void flushAutosave(); // always persist on step navigation
   }
 
   function handleSaveDraft() {
     startTransition(async () => {
+      // Draft already exists (created on step 1) — just save the latest values.
+      if (draftId) {
+        const result = await familyUpdateApplication(buildAutosaveInput(draftId, form, campusWindows));
+        if (result.error) {
+          setFeedback({ type: "error", message: result.error });
+        } else {
+          setFeedback({ type: "success", message: t("appForm.draftSaved") });
+          router.push("/family/applications");
+        }
+        return;
+      }
+
       const input = buildCreateInput(form, campusWindows);
       if (!input) {
         setFeedback({ type: "error", message: t("appForm.noOpenWindow") });
@@ -277,23 +388,37 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
 
   function handleSubmit() {
     startTransition(async () => {
-      const input = buildCreateInput(form, campusWindows);
-      if (!input) {
-        setFeedback({ type: "error", message: t("appForm.noOpenWindow") });
-        return;
+      let applicationId = draftId;
+
+      if (applicationId) {
+        // Draft exists — persist the final values, then submit it.
+        const updateResult = await familyUpdateApplication(
+          buildAutosaveInput(applicationId, form, campusWindows)
+        );
+        if (updateResult.error) {
+          setFeedback({ type: "error", message: updateResult.error });
+          return;
+        }
+      } else {
+        // Fallback (draft creation failed earlier): create + submit in one go.
+        const input = buildCreateInput(form, campusWindows);
+        if (!input) {
+          setFeedback({ type: "error", message: t("appForm.noOpenWindow") });
+          return;
+        }
+        const createResult = await familyCreateApplication(input);
+        if (createResult.error || !createResult.data) {
+          setFeedback({ type: "error", message: createResult.error ?? t("appForm.createFailed") });
+          return;
+        }
+        applicationId = createResult.data.id;
       }
 
-      const createResult = await familyCreateApplication(input);
-      if (createResult.error || !createResult.data) {
-        setFeedback({ type: "error", message: createResult.error ?? t("appForm.createFailed") });
-        return;
-      }
-
-      const submitResult = await familySubmitApplication(createResult.data.id);
+      const submitResult = await familySubmitApplication(applicationId);
       if (submitResult.error) {
         setFeedback({ type: "error", message: submitResult.error });
       } else {
-        router.push(`/family/applications/${createResult.data.id}`);
+        router.push(`/family/applications/${applicationId}`);
       }
     });
   }
@@ -338,7 +463,10 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
         </div>
       )}
 
-      <StepIndicator steps={STEPS} currentIndex={stepIndex} />
+      <div className="flex items-start justify-between gap-4">
+        <StepIndicator steps={STEPS} currentIndex={stepIndex} />
+        <SaveIndicator status={saveStatus} />
+      </div>
 
       {/* ───── Step 1: Campus & Grade ───── */}
       {currentStep.id === "campus" && (

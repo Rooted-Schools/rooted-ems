@@ -81,6 +81,10 @@ export interface CreateApplicationInput {
 
 export interface UpdateApplicationInput {
   application_id: string;
+  // Placement fields (draft-only; values come from server-provided pick lists)
+  campus_id?: string;
+  grade_level_id?: string;
+  enrollment_window_id?: string;
   // Student fields (all optional for partial update)
   student_first_name?: string;
   student_middle_name?: string;
@@ -475,6 +479,13 @@ export async function updateApplication(
     appUpdates.has_sibling_enrolled = input.has_sibling_enrolled;
   if (input.source !== undefined)
     appUpdates.source = input.source;
+  // Placement changes are safe here: this path is draft-only (guarded above)
+  // and ownership has already been verified.
+  if (input.campus_id !== undefined) appUpdates.campus_id = input.campus_id;
+  if (input.grade_level_id !== undefined)
+    appUpdates.grade_level_id = input.grade_level_id;
+  if (input.enrollment_window_id !== undefined)
+    appUpdates.enrollment_window_id = input.enrollment_window_id;
 
   if (Object.keys(appUpdates).length > 0) {
     await supabase

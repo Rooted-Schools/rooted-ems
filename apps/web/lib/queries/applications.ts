@@ -449,10 +449,16 @@ export interface DraftApplicationData {
 
 /**
  * Fetch draft application data for the edit form.
+ *
+ * `userId` is required: the row is only returned when the application's
+ * guardian record belongs to that auth user, so a family can never load
+ * another family's draft by guessing an application id.
  */
 export async function getDraftApplicationForEdit(
-  applicationId: string
+  applicationId: string,
+  userId: string
 ): Promise<DraftApplicationData | null> {
+  if (!userId) return null;
   const supabase = createServiceRoleClient();
 
   const { data: app, error } = await supabase
@@ -469,7 +475,7 @@ export async function getDraftApplicationForEdit(
         emergency_contact_1_name, emergency_contact_1_phone, emergency_contact_1_relationship
       ),
       guardian:guardian_id (
-        first_name, last_name, relationship, email, phone,
+        user_id, first_name, last_name, relationship, email, phone,
         phone_secondary, employer, sms_consent, household_id
       ),
       grade_level:grade_level_id (grade)
@@ -487,6 +493,12 @@ export async function getDraftApplicationForEdit(
 
   const student = app.student as unknown as Record<string, unknown> | null;
   const guardian = app.guardian as unknown as Record<string, unknown> | null;
+
+  // Ownership check: the service-role client bypasses RLS, so enforce
+  // guardian.user_id === auth user here before returning any data.
+  if (!guardian || (guardian.user_id as string | null) !== userId) {
+    return null;
+  }
   const grade = app.grade_level as unknown as Record<string, string> | null;
 
   // Fetch household

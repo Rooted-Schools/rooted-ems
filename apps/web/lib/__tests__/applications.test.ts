@@ -248,4 +248,64 @@ describe("updateApplication", () => {
     expect(result.error).toBe("Only draft applications can be edited");
     expect(supabaseMock.writes()).toHaveLength(0);
   });
+
+  // Placement fields (campus/grade/window) are updatable on drafts only —
+  // used by the auto-save flow when a family changes campus on a saved draft.
+  const placementInput = {
+    application_id: APP_ID,
+    campus_id: "c-2",
+    grade_level_id: "gl-2",
+    enrollment_window_id: "ew-2",
+  };
+
+  it("rejects placement changes from unauthenticated users (no write)", async () => {
+    supabaseMock.setUser(null);
+
+    const result = await updateApplication(placementInput);
+
+    expect(result.error).toBe("Not authenticated");
+    expect(supabaseMock.writes()).toHaveLength(0);
+  });
+
+  it("rejects placement changes from a non-owner (no write)", async () => {
+    supabaseMock.setUser(ATTACKER);
+    supabaseMock.queueResult("application", guardRow(OWNER.id));
+
+    const result = await updateApplication(placementInput);
+
+    expect(result.error).toBe("Not authorized");
+    expect(supabaseMock.writes()).toHaveLength(0);
+  });
+
+  it("persists placement changes for the owning guardian's draft", async () => {
+    supabaseMock.setUser(OWNER);
+    supabaseMock.queueResult(
+      "application",
+      guardRow(OWNER.id),
+      {
+        data: {
+          id: APP_ID,
+          status: "draft",
+          student_id: "stu-1",
+          guardian_id: "g-1",
+          campus_id: "c-1",
+        },
+        error: null,
+      },
+      { data: null, error: null } // application update result
+    );
+
+    const result = await updateApplication(placementInput);
+
+    expect(result.error).toBeNull();
+    const appWrites = supabaseMock.writes("application");
+    expect(appWrites).toHaveLength(1);
+    expect(appWrites[0].op).toBe("update");
+    expect(appWrites[0].payload).toMatchObject({
+      campus_id: "c-2",
+      grade_level_id: "gl-2",
+      enrollment_window_id: "ew-2",
+    });
+    expect(hasEqFilter(appWrites[0], "id", APP_ID)).toBe(true);
+  });
 });

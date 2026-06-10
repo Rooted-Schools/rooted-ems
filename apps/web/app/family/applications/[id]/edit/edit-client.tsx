@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { GRADE_LABELS } from "@/lib/application-helpers";
 import type { EnrollmentWindowInfo, CampusRow, DraftApplicationData } from "@/lib/queries";
 import { familyUpdateApplication, familySubmitApplication } from "../../actions";
+import { useDraftAutosave, SaveIndicator } from "@/components/draft-autosave";
 
 /* ───────────── Props ───────────── */
 
@@ -173,18 +174,39 @@ function StepIndicator({
 
 /* ───────────── build mutation input ───────────── */
 
-function buildUpdateInput(applicationId: string, form: FormData) {
-  const answers: Record<string, string | boolean> = {};
-  if (form.dataSharingConsent) answers.data_sharing_consent = true;
-  if (form.signatureName) answers.e_signature_name = form.signatureName;
-  answers.e_signature_date = new Date().toISOString().split("T")[0];
-  if (form.guardianRelationship === "other" && form.guardianRelationshipOther) {
-    answers.guardian_relationship_other = form.guardianRelationshipOther;
+function buildUpdateInput(
+  applicationId: string,
+  form: FormData,
+  campusWindows: EnrollmentWindowInfo[]
+) {
+  const answers: Record<string, string | boolean> = {
+    // Persist booleans unconditionally so unchecking is saved too.
+    data_sharing_consent: form.dataSharingConsent,
+    agree_terms: form.agreeTerms,
+    has_sibling_at_school: form.hasSibling,
+    e_signature_name: form.signatureName,
+    guardian_relationship_other:
+      form.guardianRelationship === "other" ? form.guardianRelationshipOther : "",
+  };
+  if (form.signatureName) {
+    answers.e_signature_date = new Date().toISOString().split("T")[0];
   }
-  answers.has_sibling_at_school = form.hasSibling;
+
+  // Persist placement changes only as a complete trio, so the draft never
+  // ends up with a campus pointing at another campus's grade level or window.
+  const windowId = form.enrollmentWindowId || campusWindows[0]?.id;
+  const placement =
+    form.campusId && form.gradeLevelId && windowId
+      ? {
+          campus_id: form.campusId,
+          grade_level_id: form.gradeLevelId,
+          enrollment_window_id: windowId,
+        }
+      : {};
 
   return {
     application_id: applicationId,
+    ...placement,
     student_first_name: form.firstName,
     student_last_name: form.lastName,
     student_date_of_birth: form.dateOfBirth || undefined,
@@ -213,21 +235,34 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
   const campusGrades = gradeLevels.filter((g) => g.campus_id === form.campusId);
   const studentName = [form.firstName, form.lastName].filter(Boolean).join(" ") || "Untitled";
 
+  // Debounced auto-save (~2s after the last change). The server action
+  // re-verifies auth + guardian ownership on every save.
+  const { status: saveStatus, flush: flushAutosave } = useDraftAutosave({
+    enabled: true,
+    value: form,
+    onSave: (current) => {
+      const currentWindows = windows.filter((w) => w.campus_id === current.campusId && w.is_open);
+      return familyUpdateApplication(buildUpdateInput(draft.id, current, currentWindows));
+    },
+  });
+
   function update(partial: Partial<FormData>) {
     setForm((prev) => ({ ...prev, ...partial }));
   }
 
   function next() {
     if (stepIndex < STEPS.length - 1) setStepIndex((i) => i + 1);
+    void flushAutosave(); // always persist on step navigation
   }
 
   function back() {
     if (stepIndex > 0) setStepIndex((i) => i - 1);
+    void flushAutosave(); // always persist on step navigation
   }
 
   function handleSaveDraft() {
     startTransition(async () => {
-      const input = buildUpdateInput(draft.id, form);
+      const input = buildUpdateInput(draft.id, form, campusWindows);
       const result = await familyUpdateApplication(input);
       if (result.error) {
         setFeedback({ type: "error", message: result.error });
@@ -240,7 +275,7 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
 
   function handleSubmit() {
     startTransition(async () => {
-      const input = buildUpdateInput(draft.id, form);
+      const input = buildUpdateInput(draft.id, form, campusWindows);
       const updateResult = await familyUpdateApplication(input);
       if (updateResult.error) {
         setFeedback({ type: "error", message: updateResult.error });
@@ -300,7 +335,10 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
         </div>
       )}
 
-      <StepIndicator steps={STEPS} currentIndex={stepIndex} />
+      <div className="flex items-start justify-between gap-4">
+        <StepIndicator steps={STEPS} currentIndex={stepIndex} />
+        <SaveIndicator status={saveStatus} />
+      </div>
 
       {/* ───── Step 1: Campus & Grade ───── */}
       {currentStep.id === "campus" && (
