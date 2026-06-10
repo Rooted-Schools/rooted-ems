@@ -14,6 +14,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/toast";
 import type { FamilyOfferDetail } from "@/lib/queries";
 import { familyAcceptOffer, familyDeclineOffer } from "../../applications/actions";
 import { useLocale } from "@/lib/i18n/locale-context";
@@ -38,10 +39,10 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
   const { t, locale } = useLocale();
   const localeTag = locale === "es" ? "es-US" : "en-US";
   const router = useRouter();
+  const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [showAcceptDialog, setShowAcceptDialog] = useState(false);
   const [showDeclineDialog, setShowDeclineDialog] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // ── Already-handled states ─────────────────────────────────────────────────
 
@@ -102,11 +103,14 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
   // ── Pending offer ──────────────────────────────────────────────────────────
 
   const handleAccept = () => {
-    setError(null);
     startTransition(async () => {
       const result = await familyAcceptOffer(offer.id, guardianId, offer.application_id);
       if (result.error) {
-        setError(result.error);
+        toast({
+          variant: "error",
+          title: t("toast.errorTitle"),
+          description: result.error,
+        });
         setShowAcceptDialog(false);
       } else {
         router.push("/family/registration");
@@ -115,11 +119,14 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
   };
 
   const handleDecline = () => {
-    setError(null);
     startTransition(async () => {
       const result = await familyDeclineOffer(offer.id, offer.application_id);
       if (result.error) {
-        setError(result.error);
+        toast({
+          variant: "error",
+          title: t("toast.errorTitle"),
+          description: result.error,
+        });
         setShowDeclineDialog(false);
       } else {
         router.push("/family/dashboard");
@@ -200,13 +207,6 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
           <span>
             {t("offers.urgentBanner")}
           </span>
-        </div>
-      )}
-
-      {/* ── Error ── */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-          {error}
         </div>
       )}
 

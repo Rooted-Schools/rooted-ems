@@ -14,6 +14,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useToast } from "@/components/ui/toast";
 import { uploadFile, getSignedUrl, formatFileSize, validateFile } from "@/lib/storage/upload";
 import { familyCreateDocumentRecord } from "@/app/family/applications/actions";
 import { useLocale } from "@/lib/i18n/locale-context";
@@ -106,11 +107,11 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
   const { t, locale } = useLocale();
   const localeTag = locale === "es" ? "es-US" : "en-US";
   const router = useRouter();
+  const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [showUpload, setShowUpload] = useState(false);
   const [prefilledDocType, setPrefilledDocType] = useState<string | undefined>();
   const [prefilledAppId, setPrefilledAppId] = useState<string | undefined>();
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   // Hide rejected docs that have already been superseded by a newer re-upload of the same type
   const visibleDocuments = useMemo(() => documents.filter((doc) => {
@@ -148,7 +149,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
     if (!storagePath) return;
     const { url, error } = await getSignedUrl(storagePath);
     if (error) {
-      setFeedback({ type: "error", message: `${t("docs.couldNotOpen")} ${error}` });
+      toast({ variant: "error", title: t("docs.couldNotOpen"), description: error });
       return;
     }
     if (url) {
@@ -209,18 +210,6 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
           </div>
         );
       })()}
-
-      {feedback && (
-        <div
-          className={`p-3 rounded-lg text-sm ${
-            feedback.type === "success"
-              ? "bg-green-50 border border-green-200 text-green-800"
-              : "bg-red-50 border border-red-200 text-red-800"
-          }`}
-        >
-          {feedback.message}
-        </div>
-      )}
 
       {visibleDocuments.length === 0 ? (
         <Card>
@@ -327,13 +316,13 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
         initialDocType={prefilledDocType}
         initialAppId={prefilledAppId}
         onUploadComplete={(message) => {
-          setFeedback({ type: "success", message });
+          toast({ variant: "success", title: t("toast.docUploaded"), description: message });
           startTransition(() => {
             router.refresh();
           });
         }}
         onError={(message) => {
-          setFeedback({ type: "error", message });
+          toast({ variant: "error", title: t("toast.docUploadFailed"), description: message });
         }}
       />
     </div>

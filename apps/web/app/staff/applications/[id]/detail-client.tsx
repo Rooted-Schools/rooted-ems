@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useToast } from "@/components/ui/toast";
 import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationDetail } from "@/lib/queries";
 import {
@@ -186,6 +187,7 @@ function labelFromKey(key: string) {
 
 /* ─── View File Button ─── */
 function ViewFileButton({ storagePath, fileName }: { storagePath: string; fileName?: string }) {
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
   async function handleClick() {
@@ -193,7 +195,11 @@ function ViewFileButton({ storagePath, fileName }: { storagePath: string; fileNa
     const { url, error } = await staffGetSignedUrl(storagePath);
     setLoading(false);
     if (error || !url) {
-      alert("Could not generate file link. The file may have been moved or deleted.");
+      toast({
+        variant: "error",
+        title: "Could not open file",
+        description: "The file may have been moved or deleted.",
+      });
       return;
     }
     window.open(url, "_blank", "noopener,noreferrer");
@@ -339,10 +345,10 @@ function defaultExpiryDate() {
 export function StaffApplicationDetailClient({ detail, userId, registrationPacket }: StaffApplicationDetailClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
   const defaultTab = searchParams.get("tab") ?? "overview";
   const [isPending, startTransition] = useTransition();
   const [noteText, setNoteText] = useState("");
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
   const [showMoreInfoDialog, setShowMoreInfoDialog] = useState(false);
   const [moreInfoMessage, setMoreInfoMessage] = useState("");
@@ -364,8 +370,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
   const canWithdraw = WITHDRAWABLE.includes(detail.status);
 
   function showFeedback(type: "success" | "error", message: string) {
-    setFeedback({ type, message });
-    setTimeout(() => setFeedback(null), 4000);
+    toast({ variant: type, title: message });
   }
 
   function handleStatusChange(targetStatus: string, reason?: string) {
@@ -492,19 +497,6 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
       <Link href="/staff/applications" className="text-sm text-rooted-green hover:underline">
         ← Back to Applications
       </Link>
-
-      {/* Feedback banner */}
-      {feedback && (
-        <div
-          className={`px-4 py-2 rounded-md text-sm font-medium ${
-            feedback.type === "success"
-              ? "bg-green-50 text-green-800 border border-green-200"
-              : "bg-red-50 text-red-800 border border-red-200"
-          }`}
-        >
-          {feedback.message}
-        </div>
-      )}
 
       {/* Header */}
       <div className="flex items-start justify-between">
@@ -863,7 +855,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
                                   if (!doc.storage_path) return;
                                   const { url, error } = await staffGetSignedUrl(doc.storage_path);
                                   if (url) window.open(url, "_blank");
-                                  else if (error) setFeedback({ type: "error", message: error });
+                                  else if (error) showFeedback("error", error);
                                 }}
                               >
                                 View

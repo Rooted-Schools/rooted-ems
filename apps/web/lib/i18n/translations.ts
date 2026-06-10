@@ -388,7 +388,7 @@ const dict = {
   "docs.infoPre":             { en: "Most required documents are collected during", es: "La mayoría de los documentos requeridos se recopilan durante" },
   "docs.infoStrong":          { en: "registration",         es: "el registro" },
   "docs.infoPost":            { en: ", after you've accepted an enrollment offer. You only need to upload something here if our enrollment team has specifically requested it.", es: ", después de que haya aceptado una oferta de inscripción. Solo necesita cargar algo aquí si nuestro equipo de inscripción se lo ha solicitado específicamente." },
-  "docs.couldNotOpen":        { en: "Could not open document:", es: "No se pudo abrir el documento:" },
+  "docs.couldNotOpen":        { en: "Could not open document", es: "No se pudo abrir el documento" },
   "docs.emptyNoApps":         { en: "Start an enrollment application to upload documents.", es: "Inicie una solicitud de inscripción para cargar documentos." },
   "docs.emptyWithApps":       { en: "Use the Upload Document button to add files to your application.", es: "Use el botón Cargar Documento para agregar archivos a su solicitud." },
   "docs.acrossApps":          { en: "document(s) across your applications.", es: "documento(s) en sus solicitudes." },
@@ -402,6 +402,12 @@ const dict = {
   "docs.file":                { en: "File",                 es: "Archivo" },
   "docs.uploadSuccess":       { en: "uploaded successfully.", es: "se cargó correctamente." },
   "docs.uploadUnexpected":    { en: "An unexpected error occurred during upload.", es: "Ocurrió un error inesperado durante la carga." },
+
+  // ─── Toasts ───────────────────────────────────────────────────────────────
+  "toast.docUploaded":        { en: "Document uploaded",    es: "Documento cargado" },
+  "toast.docUploadFailed":    { en: "Upload failed",        es: "Error al cargar el documento" },
+  "toast.errorTitle":         { en: "Something went wrong", es: "Algo salió mal" },
+  "toast.offerError":         { en: "We could not process your response. Please try again.", es: "No pudimos procesar su respuesta. Por favor intente de nuevo." },
 
   // ─── Document type labels ─────────────────────────────────────────────────
   "docs.type.birth_certificate":    { en: "Birth Certificate / Proof of Age", es: "Acta de Nacimiento / Comprobante de Edad" },

@@ -2,6 +2,7 @@ import { createServerClient, createServiceRoleClient } from "@rooted-ems/databas
 import { FamilyHeader } from "@/components/layout/family-header";
 import { getFamilyPendingOffers } from "@/lib/queries";
 import { LocaleProvider } from "@/lib/i18n/locale-context";
+import { ToastProvider } from "@/components/ui/toast";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Locale } from "@/lib/i18n/translations";
@@ -41,6 +42,7 @@ export default async function FamilyLayout({
 
   return (
     <LocaleProvider initialLocale={initialLocale}>
+      <ToastProvider>
       <div className="min-h-screen bg-rooted-gray">
         <FamilyHeader
           userEmail={user.email}
@@ -50,6 +52,7 @@ export default async function FamilyLayout({
         />
         <main className="max-w-5xl mx-auto py-6 px-4">{children}</main>
       </div>
+      </ToastProvider>
     </LocaleProvider>
   );
 }

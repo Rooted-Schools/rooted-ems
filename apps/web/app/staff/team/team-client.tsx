@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { useToast } from "@/components/ui/toast";
 import type { TeamMember } from "./page";
 import {
   addTeamMember,
@@ -52,6 +53,7 @@ function AddMemberForm({
   ]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
 
   function addRow() {
     setAssignments((prev) => [
@@ -78,6 +80,11 @@ function AddMemberForm({
       if (result.error) {
         setError(result.error);
       } else {
+        toast({
+          variant: "success",
+          title: "Staff member added",
+          description: `${email.trim()} now has access to the assigned campuses.`,
+        });
         onDone();
       }
     });
@@ -187,6 +194,7 @@ function MemberRow({
   const [editRole, setEditRole] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
 
   function startEdit(rowId: string, currentRole: string) {
     setEditingRowId(rowId);
@@ -205,6 +213,7 @@ function MemberRow({
       if (result.error) {
         setError(result.error);
       } else {
+        toast({ variant: "success", title: "Role updated" });
         setEditingRowId(null);
       }
     });
@@ -215,6 +224,7 @@ function MemberRow({
     startTransition(async () => {
       const result = await removeCampusFromMember(rowId, member.user_id);
       if (result.error) setError(result.error);
+      else toast({ variant: "success", title: "Campus assignment removed" });
     });
   }
 

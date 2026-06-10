@@ -4,6 +4,7 @@ import { StaffHeader } from "@/components/layout/staff-header";
 import { requireStaffSession, getAccessibleCampusIds, getHighestRole } from "@/lib/auth/get-session";
 import { getCampuses } from "@/lib/queries";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
+import { ToastProvider } from "@/components/ui/toast";
 
 export const metadata = {
   title: "Staff Console | Rooted EMS",
@@ -40,6 +41,7 @@ export default async function StaffLayout({
   const highestRole = getHighestRole(session);
 
   return (
+    <ToastProvider>
     <div className="flex min-h-screen bg-rooted-gray">
       <Suspense fallback={<aside className="hidden md:block w-64 bg-white border-r border-stone/20 min-h-screen" />}>
         <StaffSidebar highestRole={highestRole} />
@@ -56,5 +58,6 @@ export default async function StaffLayout({
         <main className="flex-1 p-6">{children}</main>
       </div>
     </div>
+    </ToastProvider>
   );
 }

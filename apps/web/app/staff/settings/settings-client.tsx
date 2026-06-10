@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/components/ui/toast";
 import {
   Dialog,
   DialogContent,
@@ -193,6 +194,7 @@ function EnrollmentWindowsTab({
   schoolYears: SchoolYear[];
 }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -248,6 +250,7 @@ function EnrollmentWindowsTab({
       if (result.error) {
         setFeedback({ type: "error", message: result.error });
       } else {
+        toast({ variant: "success", title: `Window status changed to ${newStatus}` });
         router.refresh();
       }
     });
@@ -711,6 +714,7 @@ function StaffUsersTab({
   staffUserId: string;
 }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -764,6 +768,7 @@ function StaffUsersTab({
       if (result.error) {
         setFeedback({ type: "error", message: result.error });
       } else {
+        toast({ variant: "success", title: `Removed ${userName}'s role` });
         router.refresh();
       }
     });
