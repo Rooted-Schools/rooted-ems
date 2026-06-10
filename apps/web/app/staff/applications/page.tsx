@@ -6,23 +6,28 @@ import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from
 
 export const dynamic = "force-dynamic";
 
+const PAGE_SIZE = 50;
+
 export default async function StaffApplicationsPage({
   searchParams,
 }: {
-  searchParams: { campus?: string; status?: string; search?: string };
+  searchParams: { campus?: string; status?: string; search?: string; page?: string };
 }) {
   const session = await requireStaffSession();
   const accessibleIds = getAccessibleCampusIds(session);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const statusParam = searchParams?.status && searchParams.status !== "all" ? searchParams.status : undefined;
   const searchParam = searchParams?.search || undefined;
+  const parsedPage = Number.parseInt(searchParams?.page ?? "1", 10);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
 
-  const [{ data: applications, count }, stats, allCampuses] = await Promise.all([
+  const [{ rows: applications, totalCount }, stats, allCampuses] = await Promise.all([
     getStaffApplications({
       campusId: activeCampus,
       status: statusParam,
       search: searchParam,
-      limit: 500,
+      page,
+      pageSize: PAGE_SIZE,
     }),
     getApplicationStats(activeCampus),
     getCampuses(),
@@ -36,7 +41,9 @@ export default async function StaffApplicationsPage({
   return (
     <StaffApplicationsClient
       applications={applications}
-      totalCount={count}
+      totalCount={totalCount}
+      page={page}
+      pageSize={PAGE_SIZE}
       stats={stats}
       campuses={campuses}
       initialStatus={searchParams?.status ?? "all"}

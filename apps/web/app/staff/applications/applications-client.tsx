@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pagination } from "@/components/ui/pagination";
 import {
   Dialog,
   DialogContent,
@@ -139,6 +140,8 @@ function ApplicationTableRow({
 interface StaffApplicationsClientProps {
   applications: ApplicationRow[];
   totalCount: number;
+  page: number;
+  pageSize: number;
   stats: ApplicationStats;
   campuses: CampusRow[];
   initialStatus?: string;
@@ -149,6 +152,8 @@ interface StaffApplicationsClientProps {
 export function StaffApplicationsClient({
   applications,
   totalCount,
+  page,
+  pageSize,
   stats,
   campuses,
   initialStatus = "all",
@@ -186,9 +191,27 @@ export function StaffApplicationsClient({
       if (campus && campus !== "all") params.set("campus", campus);
       else params.delete("campus");
 
+      // Any filter change resets pagination — page numbers from the old
+      // result set are meaningless against the new one.
+      params.delete("page");
+
       router.push(`${pathname}?${params.toString()}`);
     },
     [router, pathname, currentParams, statusFilter, search, campusFilter]
+  );
+
+  // Page navigation: URL is the source of truth (?page=2) so pagination
+  // survives refresh and back/forward. Selection is cleared on page change —
+  // cross-page selection is intentionally out of scope.
+  const goToPage = useCallback(
+    (nextPage: number) => {
+      setSelectedIds(new Set());
+      const params = new URLSearchParams(currentParams.toString());
+      if (nextPage > 1) params.set("page", String(nextPage));
+      else params.delete("page");
+      router.push(`${pathname}?${params.toString()}`);
+    },
+    [router, pathname, currentParams]
   );
 
   // Server already filtered — just display what we got
@@ -319,7 +342,7 @@ export function StaffApplicationsClient({
         <h1 className="text-2xl font-bold text-ink">Applications</h1>
         <div className="flex items-center gap-3">
           <span className="text-sm text-stone">
-            <span className="font-medium">{filtered.length}</span>{filtered.length !== totalCount ? ` of ${totalCount}` : ""} application{totalCount !== 1 ? "s" : ""}
+            <span className="font-medium">{totalCount.toLocaleString("en-US")}</span> application{totalCount !== 1 ? "s" : ""}
           </span>
           <Link href="/staff/applications/new">
             <Button className="bg-rooted-green hover:bg-rooted-green/90 text-white">
@@ -497,6 +520,14 @@ export function StaffApplicationsClient({
               </TableBody>
             </Table>
           )}
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            totalCount={totalCount}
+            onPageChange={goToPage}
+            itemLabel="applications"
+            className="border-t border-rooted-gray px-6 pt-4 mt-4"
+          />
         </CardContent>
       </Card>
 

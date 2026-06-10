@@ -85,19 +85,22 @@ export interface PipelineStage {
 // ─── Queries ─────────────────────────────────────────────
 
 /**
- * Fetch paginated application list with student/guardian names.
- * Staff view: campus-scoped via RLS.
+ * Fetch one page of the application list with student/guardian names.
+ * All filters (campus, status, name search) are applied server-side so
+ * `totalCount` is always correct for the active filter set.
  */
 export async function getStaffApplications(opts?: {
   campusId?: string;
   status?: string;
   search?: string;
-  limit?: number;
-  offset?: number;
-}): Promise<{ data: ApplicationRow[]; count: number }> {
+  /** 1-based page number */
+  page?: number;
+  pageSize?: number;
+}): Promise<{ rows: ApplicationRow[]; totalCount: number }> {
   const supabase = createServiceRoleClient();
-  const limit = opts?.limit ?? 50;
-  const offset = opts?.offset ?? 0;
+  const pageSize = Math.max(1, opts?.pageSize ?? 50);
+  const page = Math.max(1, opts?.page ?? 1);
+  const offset = (page - 1) * pageSize;
 
   // Build query — joins application with student, guardian, campus, grade_level
   let query = supabase
@@ -117,7 +120,7 @@ export async function getStaffApplications(opts?: {
       { count: "exact" }
     )
     .order("updated_at", { ascending: false })
-    .range(offset, offset + limit - 1);
+    .range(offset, offset + pageSize - 1);
 
   if (opts?.campusId) {
     query = query.eq("campus_id", opts.campusId);
@@ -127,11 +130,36 @@ export async function getStaffApplications(opts?: {
     query = query.eq("status", opts.status);
   }
 
+  // Name search: resolve matching student/guardian ids first, then filter the
+  // application query by those ids. PostgREST cannot OR an ilike across two
+  // different embedded tables in a single query, so this two-step lookup keeps
+  // the search (and therefore the pagination count) fully server-side.
+  const term = opts?.search?.trim();
+  if (term) {
+    // Strip characters that would break PostgREST's quoted-pattern syntax
+    const pattern = `%${term.replace(/[",%\\]/g, "")}%`;
+    const nameFilter = `first_name.ilike."${pattern}",last_name.ilike."${pattern}"`;
+    const [studentRes, guardianRes] = await Promise.all([
+      supabase.from("student").select("id").or(nameFilter).limit(1000),
+      supabase.from("guardian").select("id").or(nameFilter).limit(1000),
+    ]);
+    const studentIds = (studentRes.data ?? []).map((r) => r.id as string);
+    const guardianIds = (guardianRes.data ?? []).map((r) => r.id as string);
+
+    if (studentIds.length === 0 && guardianIds.length === 0) {
+      return { rows: [], totalCount: 0 };
+    }
+    const orParts: string[] = [];
+    if (studentIds.length > 0) orParts.push(`student_id.in.(${studentIds.join(",")})`);
+    if (guardianIds.length > 0) orParts.push(`guardian_id.in.(${guardianIds.join(",")})`);
+    query = query.or(orParts.join(","));
+  }
+
   const { data, count, error } = await query;
 
   if (error) {
     console.error("[getStaffApplications]", error.message);
-    return { data: [], count: 0 };
+    return { rows: [], totalCount: 0 };
   }
 
   const rows: ApplicationRow[] = (data ?? []).map((row: Record<string, unknown>) => {
@@ -157,7 +185,7 @@ export async function getStaffApplications(opts?: {
     };
   });
 
-  return { data: rows, count: count ?? 0 };
+  return { rows, totalCount: count ?? 0 };
 }
 
 /**
