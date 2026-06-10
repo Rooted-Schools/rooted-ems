@@ -103,11 +103,11 @@ function LandingContent({ schools }: LandingClientProps) {
     <div className="min-h-screen bg-warm-white">
       {/* ─── Header ─── */}
       <header className="bg-white border-b border-rooted-gray">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-y-2">
           <span className="text-2xl tracking-wide">
             <span className="text-rooted-green font-bold">rooted</span><span className="text-ink font-medium">schools</span>
           </span>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <LanguageToggle />
             <Link
               href="/login"
