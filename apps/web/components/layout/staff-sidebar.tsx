@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 /* ------------------------------------------------------------------ */
 /*  Role hierarchy — higher number = more access                      */
 /* ------------------------------------------------------------------ */
-const ROLE_LEVEL: Record<string, number> = {
+export const ROLE_LEVEL: Record<string, number> = {
   compliance_auditor: 1,
   enrollment_staff: 2,
   enrollment_manager: 3,
@@ -16,7 +16,7 @@ const ROLE_LEVEL: Record<string, number> = {
 
 type MinRole = "compliance_auditor" | "enrollment_staff" | "enrollment_manager" | "system_admin";
 
-interface NavItem {
+export interface NavItem {
   label: string;
   href: string;
   icon: string;
@@ -24,12 +24,12 @@ interface NavItem {
   minRole?: MinRole;
 }
 
-interface NavSection {
+export interface NavSection {
   title?: string;
   items: NavItem[];
 }
 
-const NAV_SECTIONS: NavSection[] = [
+export const NAV_SECTIONS: NavSection[] = [
   {
     items: [
       { label: "Dashboard", href: "/staff/dashboard", icon: "📊" },
@@ -87,7 +87,7 @@ export function StaffSidebar({ highestRole = "compliance_auditor" }: StaffSideba
   const userLevel = ROLE_LEVEL[highestRole] ?? 1;
 
   return (
-    <aside className="w-64 bg-white border-r border-stone/20 min-h-screen flex flex-col">
+    <aside className="hidden md:flex w-64 bg-white border-r border-stone/20 min-h-screen flex-col">
       {/* Brand */}
       <div className="p-4 border-b border-stone/20">
         <Link
@@ -154,6 +154,7 @@ export function StaffSidebar({ highestRole = "compliance_auditor" }: StaffSideba
                     <Link
                       key={item.href}
                       href={buildHref(item.href)}
+                      aria-current={isActive ? "page" : undefined}
                       className={cn(
                         "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors",
                         isActive

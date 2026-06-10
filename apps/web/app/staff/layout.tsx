@@ -41,7 +41,7 @@ export default async function StaffLayout({
 
   return (
     <div className="flex min-h-screen bg-rooted-gray">
-      <Suspense fallback={<aside className="w-64 bg-white border-r border-stone/20 min-h-screen" />}>
+      <Suspense fallback={<aside className="hidden md:block w-64 bg-white border-r border-stone/20 min-h-screen" />}>
         <StaffSidebar highestRole={highestRole} />
       </Suspense>
       <div className="flex-1 flex flex-col">
@@ -50,6 +50,7 @@ export default async function StaffLayout({
             userEmail={session.email}
             campuses={headerCampuses}
             unreadNotificationCount={unreadNotificationCount}
+            highestRole={highestRole}
           />
         </Suspense>
         <main className="flex-1 p-6">{children}</main>

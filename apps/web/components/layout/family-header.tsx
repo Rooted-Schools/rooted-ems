@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { createBrowserClient } from "@rooted-ems/database";
 import { useLocale } from "@/lib/i18n/locale-context";
@@ -46,6 +46,26 @@ export function FamilyHeader({ userEmail, userPhone, pendingOfferCount = 0, unre
   const { t } = useLocale();
   const NAV_LINKS = useMemo(() => buildNavLinks(pendingOfferCount, t), [pendingOfferCount, t]);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
+
+  // Close mobile menu on Escape or tap outside the header
+  useEffect(() => {
+    if (!mobileOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMobileOpen(false);
+    }
+    function onPointerDown(e: PointerEvent) {
+      if (headerRef.current && !headerRef.current.contains(e.target as Node)) {
+        setMobileOpen(false);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [mobileOpen]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -53,7 +73,7 @@ export function FamilyHeader({ userEmail, userPhone, pendingOfferCount = 0, unre
   }
 
   return (
-    <header className="border-b border-stone/20 bg-white">
+    <header ref={headerRef} className="border-b border-stone/20 bg-white">
       <div className="max-w-5xl mx-auto flex items-center justify-between px-4 h-14">
         <Link
           href="/family/dashboard"
@@ -72,6 +92,7 @@ export function FamilyHeader({ userEmail, userPhone, pendingOfferCount = 0, unre
               <Link
                 key={link.href}
                 href={link.href}
+                aria-current={isActive ? "page" : undefined}
                 className={`relative text-sm transition-colors ${isActive ? "text-rooted-green font-semibold" : "text-ink/70 hover:text-rooted-green"}`}
               >
                 {link.label}
@@ -110,9 +131,11 @@ export function FamilyHeader({ userEmail, userPhone, pendingOfferCount = 0, unre
 
         {/* Mobile hamburger */}
         <button
-          className="md:hidden p-2 -mr-2 text-ink/70 hover:text-ink"
+          className="md:hidden flex items-center justify-center w-11 h-11 -mr-2 text-ink/70 hover:text-ink"
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label={mobileOpen ? t("nav.closeMenu") : t("nav.openMenu")}
+          aria-expanded={mobileOpen}
+          aria-controls="family-mobile-menu"
         >
           {mobileOpen ? (
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -128,7 +151,7 @@ export function FamilyHeader({ userEmail, userPhone, pendingOfferCount = 0, unre
 
       {/* Mobile dropdown */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-stone/10 bg-white pb-3">
+        <div id="family-mobile-menu" className="md:hidden border-t border-stone/10 bg-white pb-3">
           <nav className="flex flex-col px-4 pt-2">
             {NAV_LINKS.map((link) => {
               const isActive = pathname === link.href || pathname.startsWith(link.href + "/");
@@ -137,7 +160,8 @@ export function FamilyHeader({ userEmail, userPhone, pendingOfferCount = 0, unre
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileOpen(false)}
-                  className={`py-2.5 text-sm border-b border-stone/10 last:border-0 transition-colors flex items-center justify-between ${isActive ? "text-rooted-green font-semibold" : "text-ink/70 hover:text-rooted-green"}`}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`min-h-[44px] py-2.5 text-sm border-b border-stone/10 last:border-0 transition-colors flex items-center justify-between ${isActive ? "text-rooted-green font-semibold" : "text-ink/70 hover:text-rooted-green"}`}
                 >
                   {link.label}
                   {link.badge != null && (
