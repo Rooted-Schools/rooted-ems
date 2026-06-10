@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +18,19 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/toast";
 import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
+import { buildCsv, downloadCsv } from "@/lib/csv";
+import { getAllowedTransitions, type ApplicationStatusValue } from "@rooted-ems/utils";
+import { staffBulkChangeStatus, staffBulkSendOffers, type BulkItemResult } from "./bulk-actions";
 import type { ApplicationRow, ApplicationStats, CampusRow } from "@/lib/queries";
 
 const STATUS_TABS = [
@@ -43,15 +55,70 @@ function formatDate(dateStr: string | null) {
   });
 }
 
-function ApplicationTableRow({ app }: { app: ApplicationRow }) {
+// Default offer expiry: 14 days from today — same as the single-item offer dialog
+function defaultExpiryDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + 14);
+  return d.toISOString().split("T")[0];
+}
+
+/**
+ * Build a summary toast from per-item bulk results, e.g.
+ * "12 offers sent · 2 skipped (already have pending offers)".
+ */
+function summarizeResults(results: BulkItemResult[], successNoun: string) {
+  const okCount = results.filter((r) => r.ok).length;
+  const skipped = results.filter((r) => !r.ok);
+
+  const parts = [`${okCount} ${successNoun}`];
+  if (skipped.length > 0) parts.push(`${skipped.length} skipped`);
+  const title = parts.join(" · ");
+
+  // Group skip reasons so the description stays readable
+  const reasonCounts = new Map<string, number>();
+  for (const r of skipped) {
+    const reason = r.error ?? "unknown error";
+    reasonCounts.set(reason, (reasonCounts.get(reason) ?? 0) + 1);
+  }
+  const description =
+    skipped.length > 0
+      ? [...reasonCounts.entries()]
+          .map(([reason, count]) => (count > 1 ? `${count}× ${reason}` : reason))
+          .join(" · ")
+      : undefined;
+
+  const variant: "success" | "error" | "info" =
+    okCount === 0 ? "error" : skipped.length > 0 ? "info" : "success";
+
+  return { title, description, variant };
+}
+
+function ApplicationTableRow({
+  app,
+  selected,
+  onToggle,
+}: {
+  app: ApplicationRow;
+  selected: boolean;
+  onToggle: (id: string) => void;
+}) {
   const router = useRouter();
   const statusConfig = getStatusConfig(app.status);
 
   return (
     <TableRow
-      className="cursor-pointer hover:bg-rooted-gray-light"
+      className={`cursor-pointer hover:bg-rooted-gray-light ${selected ? "bg-rooted-green/5" : ""}`}
       onClick={() => router.push(`/staff/applications/${app.id}`)}
     >
+      <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggle(app.id)}
+          aria-label={`Select application for ${app.student_name}`}
+          className="h-4 w-4 rounded border-rooted-gray-dark text-rooted-green focus:ring-rooted-green cursor-pointer"
+        />
+      </TableCell>
       <TableCell className="font-medium">{app.student_name}</TableCell>
       <TableCell className="text-stone">{app.guardian_name}</TableCell>
       <TableCell>{getGradeLabel(app.grade)}</TableCell>
@@ -91,9 +158,19 @@ export function StaffApplicationsClient({
   const router = useRouter();
   const pathname = usePathname();
   const currentParams = useSearchParams();
+  const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [campusFilter, setCampusFilter] = useState(initialCampus);
+
+  // ── Bulk selection state ──────────────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkTargetStatus, setBulkTargetStatus] = useState("");
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const [showOfferDialog, setShowOfferDialog] = useState(false);
+  const [offerExpiry, setOfferExpiry] = useState(defaultExpiryDate);
+  const headerCheckboxRef = useRef<HTMLInputElement>(null);
 
   const pushFilters = useCallback(
     (overrides: { status?: string; search?: string; campus?: string }) => {
@@ -116,6 +193,125 @@ export function StaffApplicationsClient({
 
   // Server already filtered — just display what we got
   const filtered = applications;
+
+  // Selection derived against the currently visible rows only, so rows that
+  // scroll out of a changed filter never get acted on invisibly.
+  const selectedRows = useMemo(
+    () => filtered.filter((app) => selectedIds.has(app.id)),
+    [filtered, selectedIds]
+  );
+  const selectedCount = selectedRows.length;
+  const allSelected = filtered.length > 0 && selectedCount === filtered.length;
+  const someSelected = selectedCount > 0 && !allSelected;
+
+  // Prune stale ids (rows no longer visible) whenever the result set changes
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const visible = new Set(applications.map((a) => a.id));
+      const next = new Set([...prev].filter((id) => visible.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [applications]);
+
+  // Header checkbox indeterminate state
+  useEffect(() => {
+    if (headerCheckboxRef.current) {
+      headerCheckboxRef.current.indeterminate = someSelected;
+    }
+  }, [someSelected]);
+
+  const toggleRow = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      const visibleIds = filtered.map((a) => a.id);
+      const allCurrentlySelected =
+        visibleIds.length > 0 && visibleIds.every((id) => prev.has(id));
+      return allCurrentlySelected ? new Set<string>() : new Set(visibleIds);
+    });
+  }, [filtered]);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  // Valid bulk status targets: union of legal transitions across the
+  // selected rows' current statuses (per-item validation still happens
+  // server-side — this just keeps the dropdown meaningful).
+  const statusTargets = useMemo(() => {
+    const targets = new Set<string>();
+    for (const row of selectedRows) {
+      for (const t of getAllowedTransitions(row.status as ApplicationStatusValue)) {
+        targets.add(t);
+      }
+    }
+    return [...targets];
+  }, [selectedRows]);
+
+  // ── Bulk action handlers ──────────────────────────────────────────────────
+
+  function confirmBulkStatusChange() {
+    const ids = selectedRows.map((r) => r.id);
+    const target = bulkTargetStatus;
+    setShowStatusDialog(false);
+    startTransition(async () => {
+      try {
+        const results = await staffBulkChangeStatus(ids, target);
+        const label = getStatusConfig(target).label;
+        toast(summarizeResults(results, `updated to ${label}`));
+        if (results.some((r) => r.ok)) {
+          clearSelection();
+          setBulkTargetStatus("");
+          router.refresh();
+        }
+      } catch {
+        toast({ variant: "error", title: "Bulk status change failed", description: "Please try again." });
+      }
+    });
+  }
+
+  function confirmBulkSendOffers() {
+    const ids = selectedRows.map((r) => r.id);
+    const expiresAt = new Date(offerExpiry + "T23:59:59").toISOString();
+    setShowOfferDialog(false);
+    startTransition(async () => {
+      try {
+        const results = await staffBulkSendOffers(ids, expiresAt);
+        toast(summarizeResults(results, results.filter((r) => r.ok).length === 1 ? "offer sent" : "offers sent"));
+        if (results.some((r) => r.ok)) {
+          clearSelection();
+          router.refresh();
+        }
+      } catch {
+        toast({ variant: "error", title: "Bulk send offers failed", description: "Please try again." });
+      }
+    });
+  }
+
+  function exportCsv() {
+    // Client-side export from already-loaded rows — no server roundtrip
+    const header = ["Student", "Guardian", "Grade", "Campus", "Status", "Submitted", "Updated"];
+    const rows = selectedRows.map((app) => [
+      app.student_name,
+      app.guardian_name,
+      getGradeLabel(app.grade),
+      app.campus_name,
+      getStatusConfig(app.status).label,
+      formatDate(app.submitted_at),
+      formatDate(app.updated_at),
+    ]);
+    const today = new Date().toISOString().split("T")[0];
+    downloadCsv(`applications-${today}.csv`, buildCsv(header, rows));
+    toast({
+      variant: "success",
+      title: `Exported ${rows.length} application${rows.length !== 1 ? "s" : ""} to CSV`,
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -270,6 +466,16 @@ export function StaffApplicationsClient({
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <input
+                      ref={headerCheckboxRef}
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                      aria-label="Select all visible applications"
+                      className="h-4 w-4 rounded border-rooted-gray-dark text-rooted-green focus:ring-rooted-green cursor-pointer"
+                    />
+                  </TableHead>
                   <TableHead>Student</TableHead>
                   <TableHead>Guardian</TableHead>
                   <TableHead>Grade</TableHead>
@@ -281,13 +487,141 @@ export function StaffApplicationsClient({
               </TableHeader>
               <TableBody>
                 {filtered.map((app) => (
-                  <ApplicationTableRow key={app.id} app={app} />
+                  <ApplicationTableRow
+                    key={app.id}
+                    app={app}
+                    selected={selectedIds.has(app.id)}
+                    onToggle={toggleRow}
+                  />
                 ))}
               </TableBody>
             </Table>
           )}
         </CardContent>
       </Card>
+
+      {/* Sticky bulk action bar */}
+      {selectedCount > 0 && (
+        <div className="sticky bottom-4 z-40">
+          <div className="mx-auto flex w-fit max-w-full flex-wrap items-center gap-3 rounded-lg border border-rooted-gray bg-white px-4 py-3 shadow-lg">
+            <span className="text-sm font-medium text-ink whitespace-nowrap">
+              {selectedCount} selected
+            </span>
+            <span className="hidden h-5 w-px bg-rooted-gray sm:block" aria-hidden="true" />
+            <div className="flex items-center gap-2">
+              <Select
+                value={bulkTargetStatus}
+                onChange={(e) => setBulkTargetStatus(e.target.value)}
+                disabled={isPending || statusTargets.length === 0}
+                className="w-44 text-sm"
+                aria-label="Bulk target status"
+              >
+                <option value="">Change status to…</option>
+                {statusTargets.map((s) => (
+                  <option key={s} value={s}>
+                    {getStatusConfig(s).label}
+                  </option>
+                ))}
+              </Select>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isPending || !bulkTargetStatus}
+                onClick={() => setShowStatusDialog(true)}
+              >
+                Apply
+              </Button>
+            </div>
+            <Button
+              size="sm"
+              className="bg-rooted-green hover:bg-rooted-green/90 text-white"
+              disabled={isPending}
+              onClick={() => setShowOfferDialog(true)}
+            >
+              Send Offers
+            </Button>
+            <Button size="sm" variant="outline" disabled={isPending} onClick={exportCsv}>
+              Export CSV
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={isPending}
+              onClick={clearSelection}
+              aria-label="Clear selection"
+            >
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk status change confirmation */}
+      <Dialog open={showStatusDialog} onOpenChange={setShowStatusDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change status of {selectedCount} application{selectedCount !== 1 ? "s" : ""}?</DialogTitle>
+            <DialogDescription>
+              Selected applications will move to{" "}
+              <span className="font-medium text-ink">
+                {bulkTargetStatus ? getStatusConfig(bulkTargetStatus).label : ""}
+              </span>
+              . Applications that cannot legally make this transition will be
+              skipped and reported — nothing is forced.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowStatusDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-rooted-green hover:bg-rooted-green/90 text-white"
+              disabled={isPending || !bulkTargetStatus}
+              onClick={confirmBulkStatusChange}
+            >
+              {isPending ? "Updating…" : "Change Status"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk send offers confirmation */}
+      <Dialog open={showOfferDialog} onOpenChange={setShowOfferDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send offers to {selectedCount} application{selectedCount !== 1 ? "s" : ""}?</DialogTitle>
+            <DialogDescription>
+              A seat offer will be created for each selected application and the
+              family notified. Applications that are not in an offerable status
+              or already have a pending offer will be skipped and reported.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            <label htmlFor="bulk-offer-expiry" className="block text-sm font-medium text-ink mb-1">
+              Offer expires on
+            </label>
+            <Input
+              id="bulk-offer-expiry"
+              type="date"
+              value={offerExpiry}
+              min={new Date().toISOString().split("T")[0]}
+              onChange={(e) => setOfferExpiry(e.target.value)}
+            />
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowOfferDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-rooted-green hover:bg-rooted-green/90 text-white"
+              disabled={isPending || !offerExpiry}
+              onClick={confirmBulkSendOffers}
+            >
+              {isPending ? "Sending…" : "Send Offers"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

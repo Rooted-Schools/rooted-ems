@@ -48,6 +48,14 @@ export {
   type SendOfferInput,
 } from "./offers";
 
+// Bulk mutations
+export {
+  bulkChangeApplicationStatus,
+  bulkSendOffers,
+  MAX_BULK_ITEMS,
+  type BulkItemResult,
+} from "./bulk";
+
 // Waitlist mutations
 export {
   addToWaitlist,
