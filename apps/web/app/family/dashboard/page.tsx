@@ -25,6 +25,7 @@ export default async function FamilyDashboardPage() {
 
   const locale = await getLocale();
   const t = (key: Parameters<typeof tx>[0]) => tx(key, locale);
+  const localeTag = locale === "es" ? "es-US" : "en-US";
 
   const [apps, notifications, enrollmentWindows, pendingOffers] = await Promise.all([
     getFamilyDashboardApps(user.id),
@@ -51,7 +52,7 @@ export default async function FamilyDashboardPage() {
   const displayName =
     user.user_metadata?.full_name?.split(" ")[0] ??
     user.email?.split("@")[0] ??
-    "there";
+    t("dashboard.there");
 
   return (
     <div className="space-y-6">
@@ -78,7 +79,7 @@ export default async function FamilyDashboardPage() {
               {t("dashboard.welcomeFamily")}
             </p>
             <p className="text-sm text-ink/60 mt-0.5">
-              {registeredCount} student{registeredCount > 1 ? "s are" : " is"} enrolled and registered. Check your school for orientation details.
+              {registeredCount} {t("dashboard.enrolledStudents")} {t("dashboard.checkOrientation")}
             </p>
           </div>
         </div>
@@ -103,8 +104,8 @@ export default async function FamilyDashboardPage() {
                 </p>
                 <p className="text-sm text-ink/60 mt-0.5">
                   {offer.is_urgent
-                    ? `Expires in ${offer.days_remaining === 0 ? "less than 1 day" : `${offer.days_remaining} day${offer.days_remaining === 1 ? "" : "s"}`} — respond now.`
-                    : `Respond within ${offer.days_remaining} days to secure your spot.`}
+                    ? `${t("dashboard.expiresIn")} ${offer.days_remaining === 0 ? t("dashboard.lessThanDay") : `${offer.days_remaining} ${offer.days_remaining === 1 ? t("common.day") : t("common.days")}`} — ${t("dashboard.respondNow")}`
+                    : `${t("dashboard.respondWithin")} ${offer.days_remaining} ${t("dashboard.daysToSecure")}`}
                 </p>
               </div>
               <Link href={`/family/offers/${offer.id}`} className="shrink-0">
@@ -133,7 +134,7 @@ export default async function FamilyDashboardPage() {
               {t("dashboard.completeReg")}
             </p>
             <p className="text-sm text-ink/60 mt-0.5">
-              You have {acceptedCount} accepted enrollment{acceptedCount > 1 ? "s" : ""}. Complete the registration packet to finalize enrollment.
+              {t("dashboard.acceptedPre")} {acceptedCount} {t("dashboard.acceptedPost")}
             </p>
           </div>
           <Link href="/family/registration">
@@ -209,17 +210,17 @@ export default async function FamilyDashboardPage() {
                   </div>
                   <p className="text-xs text-stone mt-1">{school.location}</p>
                   <Badge variant="outline" className={`mt-2 ${isOpen ? school.badgeClass : ""}`}>
-                    {isOpen ? "Accepting Applications" : "Coming Soon"}
+                    {isOpen ? t("dashboard.acceptingApps") : t("dashboard.comingSoon")}
                   </Badge>
                 </CardContent>
                 {isOpen && campusWindow && (
                   <div className={`${school.footerClass} px-4 py-2.5 flex items-center justify-between`}>
                     <p className="text-xs text-ink/60">
-                      Apply by <span className="font-semibold text-ink">{campusWindow.close_date}</span>
+                      {t("dashboard.applyBy")} <span className="font-semibold text-ink">{campusWindow.close_date}</span>
                     </p>
                     {campusWindow.days_remaining != null && (
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${school.daysClass}`}>
-                        {campusWindow.days_remaining}d left
+                        {campusWindow.days_remaining}{t("dashboard.daysLeftShort")}
                       </span>
                     )}
                   </div>
@@ -245,13 +246,13 @@ export default async function FamilyDashboardPage() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-semibold text-ink">
-            Your Applications
+            {t("dashboard.yourApplications")}
           </h2>
           <Link
             href="/family/applications"
             className="text-sm text-rooted-green hover:underline"
           >
-            View all &rarr;
+            {t("dashboard.viewAll")} &rarr;
           </Link>
         </div>
 
@@ -259,7 +260,7 @@ export default async function FamilyDashboardPage() {
           <Card>
             <CardContent className="py-8 text-center">
               <p className="text-stone mb-4">
-                You have no applications yet.
+                {t("dashboard.noApplications")}
               </p>
               <Link href="/family/applications/new">
                 <Button>{t("dashboard.startNewApplication")}</Button>
@@ -270,6 +271,9 @@ export default async function FamilyDashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {apps.map((app) => {
               const cfg = getStatusConfig(app.status);
+              const statusKey = `status.${app.status}` as Parameters<typeof tx>[0];
+              const localizedStatus = tx(statusKey, locale);
+              const statusLabel = localizedStatus === statusKey ? cfg.label : localizedStatus;
               return (
                 <Card
                   key={app.id}
@@ -289,7 +293,7 @@ export default async function FamilyDashboardPage() {
                           {app.grade_label} &middot; {app.campus_name}
                         </CardDescription>
                       </div>
-                      <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                      <Badge variant={cfg.variant}>{statusLabel}</Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -298,20 +302,20 @@ export default async function FamilyDashboardPage() {
                     )}
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-stone">
-                        Updated{" "}
+                        {t("common.updated")}{" "}
                         {new Date(app.updated_at).toLocaleDateString(
-                          "en-US",
+                          localeTag,
                           { month: "short", day: "numeric", year: "numeric" }
                         )}
                       </span>
                       {app.status === "draft" ? (
                         <Link href={`/family/applications/${app.id}/edit`}>
-                          <Button size="sm">Continue</Button>
+                          <Button size="sm">{t("common.continue")}</Button>
                         </Link>
                       ) : (
                         <Link href={`/family/applications/${app.id}`}>
                           <Button variant="outline" size="sm">
-                            View Details
+                            {t("apps.viewDetails")}
                           </Button>
                         </Link>
                       )}
@@ -330,10 +334,10 @@ export default async function FamilyDashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">
-              How Enrollment Works
+              {t("dashboard.howItWorks")}
             </CardTitle>
             <CardDescription>
-              Your step-by-step guide through the enrollment process
+              {t("dashboard.howItWorksDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -341,28 +345,28 @@ export default async function FamilyDashboardPage() {
               {[
                 {
                   step: 1,
-                  title: "Submit Application",
-                  desc: "Fill out the application form with your child's information and required documents.",
+                  title: t("dashboard.step1Title"),
+                  desc: t("dashboard.step1Desc"),
                 },
                 {
                   step: 2,
-                  title: "Application Review",
-                  desc: "Our team reviews your application and verifies all submitted documents.",
+                  title: t("dashboard.step2Title"),
+                  desc: t("dashboard.step2Desc"),
                 },
                 {
                   step: 3,
-                  title: "Enrollment Lottery",
-                  desc: "If more students apply than seats are available, placement is determined by a randomized lottery. All eligible applicants are entered automatically.",
+                  title: t("dashboard.step3Title"),
+                  desc: t("dashboard.step3Desc"),
                 },
                 {
                   step: 4,
-                  title: "Offer & Acceptance",
-                  desc: "If selected, you'll receive an offer to accept within the specified deadline.",
+                  title: t("dashboard.step4Title"),
+                  desc: t("dashboard.step4Desc"),
                 },
                 {
                   step: 5,
-                  title: "Registration",
-                  desc: "Complete final registration to secure your child's enrollment.",
+                  title: t("dashboard.step5Title"),
+                  desc: t("dashboard.step5Desc"),
                 },
               ].map((s) => {
                 const isComplete = hasApps && s.step < currentStep;
@@ -383,7 +387,7 @@ export default async function FamilyDashboardPage() {
                     <div>
                       <p className={`text-sm font-medium ${isCurrent ? "text-rooted-green" : isComplete ? "text-ink/60" : "text-ink"}`}>
                         {s.title}
-                        {isCurrent && <span className="text-[10px] ml-2 text-rooted-green font-bold uppercase">Current</span>}
+                        {isCurrent && <span className="text-[10px] ml-2 text-rooted-green font-bold uppercase">{t("dashboard.current")}</span>}
                       </p>
                       <p className="text-xs text-stone mt-0.5">{s.desc}</p>
                     </div>
@@ -397,13 +401,13 @@ export default async function FamilyDashboardPage() {
         {/* Notifications */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Notifications</CardTitle>
-            <CardDescription>Recent updates about your applications</CardDescription>
+            <CardTitle className="text-base">{t("dashboard.notifications")}</CardTitle>
+            <CardDescription>{t("dashboard.notificationsDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             {notifications.length === 0 ? (
               <p className="text-sm text-stone text-center py-4">
-                No notifications yet.
+                {t("dashboard.noNotifications")}
               </p>
             ) : (
               <div className="space-y-3">
@@ -420,7 +424,7 @@ export default async function FamilyDashboardPage() {
                     <div className="min-w-0">
                       <p className="text-sm text-ink/70">{n.message}</p>
                       <p className="text-xs text-stone mt-0.5">
-                        {new Date(n.created_at).toLocaleDateString("en-US", {
+                        {new Date(n.created_at).toLocaleDateString(localeTag, {
                           month: "short",
                           day: "numeric",
                         })}

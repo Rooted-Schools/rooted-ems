@@ -11,6 +11,8 @@ import { Select } from "@/components/ui/select";
 import { GRADE_LABELS } from "@/lib/application-helpers";
 import type { EnrollmentWindowInfo, CampusRow } from "@/lib/queries";
 import { familyCreateApplication, familySubmitApplication } from "../actions";
+import { useLocale } from "@/lib/i18n/locale-context";
+import { type TranslationKey } from "@/lib/i18n/translations";
 
 /* ───────────── Props ───────────── */
 
@@ -31,9 +33,9 @@ interface NewApplicationFormProps {
 /* ───────────── step definitions ───────────── */
 
 const STEPS = [
-  { id: "campus", label: "Campus & Grade" },
-  { id: "student", label: "Student & Guardian" },
-  { id: "review", label: "Review & Submit" },
+  { id: "campus", labelKey: "appForm.step.campus" },
+  { id: "student", labelKey: "appForm.step.student" },
+  { id: "review", labelKey: "appForm.step.review" },
 ] as const;
 
 type StepId = (typeof STEPS)[number]["id"];
@@ -121,8 +123,9 @@ function StepIndicator({
   steps: readonly (typeof STEPS)[number][];
   currentIndex: number;
 }) {
+  const { t } = useLocale();
   return (
-    <nav aria-label="Progress" className="mb-8">
+    <nav aria-label={t("appForm.progress")} className="mb-8">
       <ol className="flex items-center gap-2">
         {steps.map((step, i) => {
           const isComplete = i < currentIndex;
@@ -164,7 +167,7 @@ function StepIndicator({
                   isCurrent ? "font-semibold text-ink" : "text-stone"
                 }`}
               >
-                {step.label}
+                {t(step.labelKey)}
               </span>
               {i < steps.length - 1 && (
                 <div
@@ -218,6 +221,7 @@ function buildCreateInput(form: FormData, campusWindows: EnrollmentWindowInfo[])
 /* ───────────── page component ───────────── */
 
 export function NewApplicationForm({ windows, campuses, gradeLevels, initialCampusId }: NewApplicationFormProps) {
+  const { t, locale } = useLocale();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [stepIndex, setStepIndex] = useState(0);
@@ -255,7 +259,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
     startTransition(async () => {
       const input = buildCreateInput(form, campusWindows);
       if (!input) {
-        setFeedback({ type: "error", message: "No open enrollment window found for this campus." });
+        setFeedback({ type: "error", message: t("appForm.noOpenWindow") });
         return;
       }
 
@@ -265,7 +269,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
       } else if (result.data?.id) {
         router.push(`/family/applications/${result.data.id}/edit`);
       } else {
-        setFeedback({ type: "success", message: "Draft saved!" });
+        setFeedback({ type: "success", message: t("appForm.draftSaved") });
         router.push("/family/applications");
       }
     });
@@ -275,13 +279,13 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
     startTransition(async () => {
       const input = buildCreateInput(form, campusWindows);
       if (!input) {
-        setFeedback({ type: "error", message: "No open enrollment window found for this campus." });
+        setFeedback({ type: "error", message: t("appForm.noOpenWindow") });
         return;
       }
 
       const createResult = await familyCreateApplication(input);
       if (createResult.error || !createResult.data) {
-        setFeedback({ type: "error", message: createResult.error ?? "Failed to create application" });
+        setFeedback({ type: "error", message: createResult.error ?? t("appForm.createFailed") });
         return;
       }
 
@@ -314,11 +318,11 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
           href="/family/applications"
           className="text-sm text-stone hover:text-ink/70 transition-colors"
         >
-          &larr; Back to Applications
+          &larr; {t("appForm.backToApplications")}
         </Link>
-        <h1 className="text-2xl font-bold text-ink mt-2">New Application</h1>
+        <h1 className="text-2xl font-bold text-ink mt-2">{t("appForm.title")}</h1>
         <p className="text-sm text-stone mt-1">
-          This takes about 5 minutes — save a draft and return anytime.
+          {t("appForm.subtitle")}
         </p>
       </div>
 
@@ -340,25 +344,25 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
       {currentStep.id === "campus" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Campus & Grade Level</CardTitle>
+            <CardTitle className="text-base">{t("appForm.campusGradeTitle")}</CardTitle>
             <CardDescription>
-              Select the campus and grade your child will attend.
+              {t("appForm.campusGradeDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {showValidation && !canProceedStep.campus && (
               <div role="alert" className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3 mb-4">
-                Please fill in all required fields before continuing.
+                {t("appForm.fillRequired")}
               </div>
             )}
-            <Field label="Campus" required>
+            <Field label={t("appForm.campus")} required>
               <Select
                 value={form.campusId}
                 onChange={(e) => {
                   update({ campusId: e.target.value, gradeLevelId: "", enrollmentWindowId: "" });
                 }}
               >
-                <option value="">Select a campus...</option>
+                <option value="">{t("appForm.selectCampus")}</option>
                 {campuses.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -368,25 +372,25 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
             </Field>
             {form.campusId && campusWindows.length === 0 && (
               <p className="text-sm text-amber-600">
-                No enrollment windows are currently open for this campus.
+                {t("appForm.noWindowsOpen")}
               </p>
             )}
             {campusWindows.length > 1 && (
-              <Field label="Enrollment Window" required>
+              <Field label={t("appForm.enrollmentWindow")} required>
                 <Select
                   value={form.enrollmentWindowId}
                   onChange={(e) => update({ enrollmentWindowId: e.target.value })}
                 >
-                  <option value="">Select window...</option>
+                  <option value="">{t("appForm.selectWindow")}</option>
                   {campusWindows.map((w) => (
                     <option key={w.id} value={w.id}>
-                      {w.name} (closes {w.close_date})
+                      {w.name} ({t("appForm.closes")} {w.close_date})
                     </option>
                   ))}
                 </Select>
               </Field>
             )}
-            <Field label="Grade Level" required id="grade-level">
+            <Field label={t("appForm.gradeLevel")} required id="grade-level">
               <Select
                 id="grade-level"
                 value={form.gradeLevelId}
@@ -395,10 +399,10 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
                   update({ gradeLevelId: e.target.value, gradeLevel: gl?.grade ?? "" });
                 }}
               >
-                <option value="">Select grade...</option>
+                <option value="">{t("appForm.selectGrade")}</option>
                 {campusGrades.map((g) => (
                   <option key={g.id} value={g.id}>
-                    {GRADE_LABELS[g.grade] ?? `Grade ${g.grade}`}
+                    {GRADE_LABELS[g.grade] ?? `${t("apps.grade")} ${g.grade}`}
                   </option>
                 ))}
                 {form.campusId && campusGrades.length === 0 &&
@@ -420,9 +424,9 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
                 className="mt-1 h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
               />
               <label htmlFor="has-sibling" className="text-sm text-ink/70">
-                This student has a sibling currently attending or enrolled at this campus.
+                {t("appForm.siblingLabel")}
                 <span className="block text-xs text-stone mt-0.5">
-                  Sibling enrollment may affect lottery priority.
+                  {t("appForm.siblingNote")}
                 </span>
               </label>
             </div>
@@ -434,53 +438,53 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
       {currentStep.id === "student" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Student Information</CardTitle>
+            <CardTitle className="text-base">{t("appForm.studentInfoTitle")}</CardTitle>
             <CardDescription>
-              Your student&apos;s legal name and date of birth.
+              {t("appForm.studentInfoDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {showValidation && !canProceedStep.student && (
               <div role="alert" className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3 mb-4">
-                Please fill in all required fields before continuing.
+                {t("appForm.fillRequired")}
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="First Name" required id="student-first-name">
+              <Field label={t("appForm.firstName")} required id="student-first-name">
                 <Input
                   id="student-first-name"
                   value={form.firstName}
                   onChange={(e) => update({ firstName: e.target.value })}
-                  placeholder="First"
+                  placeholder={t("appForm.firstPlaceholder")}
                 />
               </Field>
-              <Field label="Last Name" required id="student-last-name">
+              <Field label={t("appForm.lastName")} required id="student-last-name">
                 <Input
                   id="student-last-name"
                   value={form.lastName}
                   onChange={(e) => update({ lastName: e.target.value })}
-                  placeholder="Last"
+                  placeholder={t("appForm.lastPlaceholder")}
                 />
               </Field>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Date of Birth">
+              <Field label={t("appForm.dob")}>
                 <Input
                   type="date"
                   value={form.dateOfBirth}
                   onChange={(e) => update({ dateOfBirth: e.target.value })}
                 />
               </Field>
-              <Field label="Gender">
+              <Field label={t("appForm.gender")}>
                 <Select
                   value={form.gender}
                   onChange={(e) => update({ gender: e.target.value })}
                 >
-                  <option value="">Select...</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="non_binary">Non-binary</option>
-                  <option value="prefer_not">Prefer not to say</option>
+                  <option value="">{t("common.select")}</option>
+                  <option value="male">{t("appForm.gender.male")}</option>
+                  <option value="female">{t("appForm.gender.female")}</option>
+                  <option value="non_binary">{t("appForm.gender.non_binary")}</option>
+                  <option value="prefer_not">{t("appForm.gender.prefer_not")}</option>
                 </Select>
               </Field>
             </div>
@@ -491,46 +495,46 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
       {currentStep.id === "student" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Parent / Guardian</CardTitle>
+            <CardTitle className="text-base">{t("appForm.guardianTitle")}</CardTitle>
             <CardDescription>
-              Primary contact for this application.
+              {t("appForm.guardianDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="First Name" required id="guardian-first-name">
+              <Field label={t("appForm.firstName")} required id="guardian-first-name">
                 <Input
                   id="guardian-first-name"
                   value={form.guardianFirstName}
                   onChange={(e) => update({ guardianFirstName: e.target.value })}
-                  placeholder="First"
+                  placeholder={t("appForm.firstPlaceholder")}
                 />
               </Field>
-              <Field label="Last Name" required id="guardian-last-name">
+              <Field label={t("appForm.lastName")} required id="guardian-last-name">
                 <Input
                   id="guardian-last-name"
                   value={form.guardianLastName}
                   onChange={(e) => update({ guardianLastName: e.target.value })}
-                  placeholder="Last"
+                  placeholder={t("appForm.lastPlaceholder")}
                 />
               </Field>
             </div>
-            <Field label="Relationship to Student" required id="guardian-relationship">
+            <Field label={t("appForm.relationship")} required id="guardian-relationship">
               <Select
                 id="guardian-relationship"
                 value={form.guardianRelationship}
                 onChange={(e) => update({ guardianRelationship: e.target.value, guardianRelationshipOther: "" })}
               >
-                <option value="">Select...</option>
-                <option value="mother">Mother</option>
-                <option value="father">Father</option>
-                <option value="stepmother">Stepmother</option>
-                <option value="stepfather">Stepfather</option>
-                <option value="grandparent">Grandparent</option>
-                <option value="aunt_uncle">Aunt / Uncle</option>
-                <option value="foster_parent">Foster Parent</option>
-                <option value="legal_guardian">Legal Guardian</option>
-                <option value="other">Other</option>
+                <option value="">{t("common.select")}</option>
+                <option value="mother">{t("appForm.rel.mother")}</option>
+                <option value="father">{t("appForm.rel.father")}</option>
+                <option value="stepmother">{t("appForm.rel.stepmother")}</option>
+                <option value="stepfather">{t("appForm.rel.stepfather")}</option>
+                <option value="grandparent">{t("appForm.rel.grandparent")}</option>
+                <option value="aunt_uncle">{t("appForm.rel.aunt_uncle")}</option>
+                <option value="foster_parent">{t("appForm.rel.foster_parent")}</option>
+                <option value="legal_guardian">{t("appForm.rel.legal_guardian")}</option>
+                <option value="other">{t("appForm.rel.other")}</option>
               </Select>
               {/* Item 17: prompt for detail when "Other" is selected */}
               {form.guardianRelationship === "other" && (
@@ -538,21 +542,21 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
                   className="mt-2"
                   value={form.guardianRelationshipOther}
                   onChange={(e) => update({ guardianRelationshipOther: e.target.value })}
-                  placeholder="Please describe your relationship to the student"
+                  placeholder={t("appForm.relOtherPlaceholder")}
                   maxLength={100}
                 />
               )}
             </Field>
-            <Field label="Email Address" required id="guardian-email">
+            <Field label={t("appForm.email")} required id="guardian-email">
               <Input
                 id="guardian-email"
                 type="email"
                 value={form.guardianEmail}
                 onChange={(e) => update({ guardianEmail: e.target.value })}
-                placeholder="you@example.com"
+                placeholder={t("appForm.emailPlaceholder")}
               />
             </Field>
-            <Field label="Phone Number" required id="guardian-phone">
+            <Field label={t("appForm.phone")} required id="guardian-phone">
               <Input
                 id="guardian-phone"
                 type="tel"
@@ -562,9 +566,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
               />
             </Field>
             <p className="text-xs text-stone">
-              📋 Additional information (address, emergency contacts, demographics, and service
-              needs) will be collected during the registration process after an enrollment offer is
-              made.
+              📋 {t("appForm.regNote")}
             </p>
           </CardContent>
         </Card>
@@ -574,34 +576,34 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
       {currentStep.id === "review" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Review & Submit</CardTitle>
+            <CardTitle className="text-base">{t("appForm.step.review")}</CardTitle>
             <CardDescription>
-              Please review your application details before submitting.
+              {t("appForm.reviewDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="space-y-4">
-              <ReviewSection title="Campus & Grade">
-                <ReviewRow label="Campus" value={campuses.find((c) => c.id === form.campusId)?.name || "—"} />
-                <ReviewRow label="Grade" value={form.gradeLevel ? GRADE_LABELS[form.gradeLevel] || `Grade ${form.gradeLevel}` : "—"} />
-                <ReviewRow label="Sibling at campus" value={form.hasSibling ? "Yes" : "No"} />
+              <ReviewSection title={t("appForm.step.campus")}>
+                <ReviewRow label={t("appForm.campus")} value={campuses.find((c) => c.id === form.campusId)?.name || "—"} />
+                <ReviewRow label={t("apps.grade")} value={form.gradeLevel ? GRADE_LABELS[form.gradeLevel] || `${t("apps.grade")} ${form.gradeLevel}` : "—"} />
+                <ReviewRow label={t("appForm.review.siblingAtCampus")} value={form.hasSibling ? t("common.yes") : t("common.no")} />
               </ReviewSection>
-              <ReviewSection title="Student">
-                <ReviewRow label="Name" value={[form.firstName, form.lastName].filter(Boolean).join(" ") || "—"} />
-                <ReviewRow label="Date of Birth" value={form.dateOfBirth || "—"} />
-                {form.gender && <ReviewRow label="Gender" value={form.gender} />}
+              <ReviewSection title={t("offers.student")}>
+                <ReviewRow label={t("appForm.review.name")} value={[form.firstName, form.lastName].filter(Boolean).join(" ") || "—"} />
+                <ReviewRow label={t("appForm.dob")} value={form.dateOfBirth || "—"} />
+                {form.gender && <ReviewRow label={t("appForm.gender")} value={t(`appForm.gender.${form.gender}` as TranslationKey)} />}
               </ReviewSection>
-              <ReviewSection title="Parent / Guardian">
-                <ReviewRow label="Name" value={[form.guardianFirstName, form.guardianLastName].filter(Boolean).join(" ") || "—"} />
-                <ReviewRow label="Relationship" value={form.guardianRelationship || "—"} />
-                <ReviewRow label="Email" value={form.guardianEmail || "—"} />
-                <ReviewRow label="Phone" value={form.guardianPhone || "—"} />
+              <ReviewSection title={t("appForm.guardianTitle")}>
+                <ReviewRow label={t("appForm.review.name")} value={[form.guardianFirstName, form.guardianLastName].filter(Boolean).join(" ") || "—"} />
+                <ReviewRow label={t("appForm.review.relationship")} value={form.guardianRelationship ? t(`appForm.rel.${form.guardianRelationship}` as TranslationKey) : "—"} />
+                <ReviewRow label={t("appForm.review.email")} value={form.guardianEmail || "—"} />
+                <ReviewRow label={t("appForm.review.phone")} value={form.guardianPhone || "—"} />
               </ReviewSection>
             </div>
 
             <hr className="border-stone/20" />
 
-            <p className="text-sm text-stone mb-3">Before you submit, please read and sign below.</p>
+            <p className="text-sm text-stone mb-3">{t("appForm.readSign")}</p>
             <div className="space-y-3">
               <div className="flex items-start gap-2">
                 <input
@@ -612,9 +614,8 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
                   className="mt-1 h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
                 />
                 <label htmlFor="data-sharing-consent" className="text-sm text-ink/60">
-                  I consent to the sharing of my child&apos;s educational records with{" "}
-                  <span className="font-bold">Rooted Schools</span> for the purpose of enrollment
-                  processing.
+                  {t("appForm.consentPre")}{" "}
+                  <span className="font-bold">Rooted Schools</span> {t("appForm.consentPost")}
                 </label>
               </div>
               <div className="flex items-start gap-2">
@@ -626,25 +627,23 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
                   className="mt-1 h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
                 />
                 <label htmlFor="agree-terms" className="text-sm text-ink/60">
-                  I certify that the information provided in this application is accurate and
-                  complete to the best of my knowledge. I understand that providing false
-                  information may result in the disqualification of this application.
+                  {t("appForm.certify")}
                 </label>
               </div>
             </div>
 
             <hr className="border-stone/20" />
-            <p className="text-sm font-medium text-ink/70">Electronic Signature</p>
-            <Field label="Type your full legal name to sign" required>
+            <p className="text-sm font-medium text-ink/70">{t("appForm.eSignature")}</p>
+            <Field label={t("appForm.typeFullName")} required>
               <Input
                 value={form.signatureName}
                 onChange={(e) => update({ signatureName: e.target.value })}
-                placeholder="Full legal name"
+                placeholder={t("appForm.fullNamePlaceholder")}
               />
             </Field>
             <p className="text-xs text-stone">
-              By typing your name above, you are electronically signing this application. Date:{" "}
-              {new Date().toLocaleDateString("en-US")}
+              {t("appForm.eSignNote")}{" "}
+              {new Date().toLocaleDateString(locale === "es" ? "es-US" : "en-US")}
             </p>
           </CardContent>
         </Card>
@@ -655,7 +654,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
         <div>
           {stepIndex > 0 && (
             <Button variant="outline" onClick={back} disabled={isPending}>
-              Back
+              {t("common.back")}
             </Button>
           )}
         </div>
@@ -667,10 +666,10 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
                 onClick={handleSaveDraft}
                 disabled={isPending || !canProceedStep.campus}
               >
-                {isPending ? "Saving..." : "Save Draft"}
+                {isPending ? t("reg.btn.saving") : t("appForm.saveDraft")}
               </Button>
               <Button onClick={next}>
-                Continue
+                {t("common.continue")}
               </Button>
             </>
           )}
@@ -679,7 +678,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
               onClick={handleSubmit}
               disabled={!canProceedStep.review || isPending}
             >
-              {isPending ? "Submitting..." : "Submit Application"}
+              {isPending ? t("reg.submitting") : t("appForm.submit")}
             </Button>
           )}
         </div>

@@ -8,6 +8,8 @@ import { getFamilyPendingOffers } from "@/lib/queries";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { getLocale } from "@/lib/i18n/get-locale";
+import { tx } from "@/lib/i18n/translations";
 
 export default async function FamilyOffersPage() {
   const supabase = await createServerClient();
@@ -16,14 +18,17 @@ export default async function FamilyOffersPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const locale = await getLocale();
+  const t = (key: Parameters<typeof tx>[0]) => tx(key, locale);
+
   const offers = await getFamilyPendingOffers(user.id);
 
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-ink">Your Offers</h1>
+        <h1 className="text-2xl font-bold text-ink">{t("offers.heading")}</h1>
         <p className="text-sm text-stone mt-1">
-          Respond to seat offers before the deadline to secure your spot.
+          {t("offers.subtitle")}
         </p>
       </div>
 
@@ -32,10 +37,10 @@ export default async function FamilyOffersPage() {
           <CardContent className="py-10 text-center space-y-3">
             <div className="text-3xl">📬</div>
             <p className="text-sm text-stone">
-              You have no pending offers at this time.
+              {t("offers.noPending")}
             </p>
             <Link href="/family/dashboard">
-              <Button variant="outline">Back to Dashboard</Button>
+              <Button variant="outline">{t("common.backToDashboard")}</Button>
             </Link>
           </CardContent>
         </Card>
@@ -57,12 +62,14 @@ export default async function FamilyOffersPage() {
                       {offer.is_urgent ? (
                         <Badge variant="destructive" className="text-xs">
                           {offer.days_remaining === 0
-                            ? "Expires today"
-                            : `${offer.days_remaining} day${offer.days_remaining === 1 ? "" : "s"} left`}
+                            ? t("offers.expiresToday")
+                            : offer.days_remaining === 1
+                              ? t("offers.oneDayLeft")
+                              : `${offer.days_remaining} ${t("offers.daysLeftSuffix")}`}
                         </Badge>
                       ) : (
                         <Badge variant="warning" className="text-xs">
-                          {offer.days_remaining} days to respond
+                          {offer.days_remaining} {t("offers.daysToRespond")}
                         </Badge>
                       )}
                     </div>
@@ -75,7 +82,7 @@ export default async function FamilyOffersPage() {
                           : "bg-rooted-green hover:bg-rooted-green/90 text-white"
                       }
                     >
-                      Respond
+                      {t("dashboard.respond")}
                     </Button>
                   </Link>
                 </div>

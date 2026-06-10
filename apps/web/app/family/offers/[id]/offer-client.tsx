@@ -23,8 +23,8 @@ interface Props {
   guardianId: string;
 }
 
-function formatExpiry(isoString: string): string {
-  return new Date(isoString).toLocaleDateString("en-US", {
+function formatExpiry(isoString: string, localeTag: string): string {
+  return new Date(isoString).toLocaleDateString(localeTag, {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -35,7 +35,8 @@ function formatExpiry(isoString: string): string {
 }
 
 export function OfferResponseClient({ offer, guardianId }: Props) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const localeTag = locale === "es" ? "es-US" : "en-US";
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showAcceptDialog, setShowAcceptDialog] = useState(false);
@@ -51,8 +52,8 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
           <div className="text-4xl">✅</div>
           <h2 className="text-xl font-bold text-ink">{t("offers.offerAccepted")}</h2>
           <p className="text-sm text-stone max-w-xs mx-auto">
-            You have already accepted the offer for {offer.student_name} at{" "}
-            {offer.campus_name}. Complete registration to finalize enrollment.
+            {t("offers.alreadyAcceptedPre")} {offer.student_name} {t("common.at")}{" "}
+            {offer.campus_name}. {t("offers.alreadyAcceptedPost")}
           </p>
           <Link href="/family/registration">
             <Button className="bg-rooted-green hover:bg-rooted-green/90 text-white">
@@ -71,8 +72,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
           <div className="text-4xl">🚫</div>
           <h2 className="text-xl font-bold text-ink">{t("offers.offerDeclined")}</h2>
           <p className="text-sm text-stone max-w-xs mx-auto">
-            You previously declined this offer for {offer.student_name}. If
-            this was a mistake, please contact the school directly.
+            {t("offers.declinedPre")} {offer.student_name}. {t("offers.declinedPost")}
           </p>
           <Link href="/family/dashboard">
             <Button variant="outline">{t("common.backToDashboard")}</Button>
@@ -89,8 +89,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
           <div className="text-4xl">⏰</div>
           <h2 className="text-xl font-bold text-ink">{t("offers.offerExpired")}</h2>
           <p className="text-sm text-stone max-w-xs mx-auto">
-            The offer deadline for {offer.student_name} has passed. Please
-            contact the school to ask about your options.
+            {t("offers.expiredPre")} {offer.student_name} {t("offers.expiredPost")}
           </p>
           <Link href="/family/dashboard">
             <Button variant="outline">{t("common.backToDashboard")}</Button>
@@ -137,7 +136,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
           {t("offers.congratulations")}
         </h1>
         <p className="text-sm text-ink/70">
-          {offer.student_name} has been offered a seat at{" "}
+          {offer.student_name} {t("offers.offeredSeatAt")}{" "}
           <span className="font-semibold">{offer.campus_name}</span>.
         </p>
       </div>
@@ -167,12 +166,16 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
                 {offer.is_urgent ? (
                   <Badge variant="destructive" className="text-xs whitespace-nowrap">
                     {offer.hours_remaining != null && offer.hours_remaining < 24
-                      ? `${offer.hours_remaining}h left`
-                      : `${offer.days_remaining} days left`}
+                      ? `${offer.hours_remaining}${t("offers.hoursLeftSuffix")}`
+                      : offer.days_remaining === 1
+                        ? t("offers.oneDayLeft")
+                        : `${offer.days_remaining} ${t("offers.daysLeftSuffix")}`}
                   </Badge>
                 ) : (
                   <Badge variant="warning" className="text-xs whitespace-nowrap">
-                    {offer.days_remaining} days left
+                    {offer.days_remaining === 1
+                      ? t("offers.oneDayLeft")
+                      : `${offer.days_remaining} ${t("offers.daysLeftSuffix")}`}
                   </Badge>
                 )}
               </div>
@@ -181,9 +184,9 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
 
           <div className="border-t border-rooted-gray pt-3">
             <p className="text-xs text-stone">
-              Respond by{" "}
+              {t("offers.respondBy")}{" "}
               <span className={`font-semibold ${offer.is_urgent ? "text-red-600" : "text-ink"}`}>
-                {formatExpiry(offer.expires_at)}
+                {formatExpiry(offer.expires_at, localeTag)}
               </span>
             </p>
           </div>
@@ -195,7 +198,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 flex items-start gap-2">
           <span className="shrink-0 mt-0.5">⚠️</span>
           <span>
-            Your spot is waiting — accept your offer today to lock it in.
+            {t("offers.urgentBanner")}
           </span>
         </div>
       )}
@@ -228,7 +231,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
             {t("offers.decline")}
           </Button>
           <p className="text-xs text-stone-500 mt-1">
-            Declining permanently forfeits your spot.
+            {t("offers.declineForfeit")}
           </p>
         </div>
       </div>
@@ -236,19 +239,19 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
       {/* ── What happens next ── */}
       <Card>
         <CardContent className="py-4 space-y-3">
-          <p className="text-sm font-semibold text-ink">What happens when you accept?</p>
+          <p className="text-sm font-semibold text-ink">{t("offers.whatHappens")}</p>
           <div className="space-y-2 text-sm text-ink/70">
             <div className="flex items-start gap-2">
               <span className="text-rooted-green mt-0.5 shrink-0">✓</span>
-              <span>Your student's seat is secured at {offer.campus_name}.</span>
+              <span>{t("offers.seatSecuredAt")} {offer.campus_name}.</span>
             </div>
             <div className="flex items-start gap-2">
               <span className="text-rooted-green mt-0.5 shrink-0">✓</span>
-              <span>You will be taken to the registration portal to complete enrollment paperwork.</span>
+              <span>{t("offers.portalNext")}</span>
             </div>
             <div className="flex items-start gap-2">
               <span className="text-rooted-green mt-0.5 shrink-0">✓</span>
-              <span>Once registration is complete, enrollment is finalized.</span>
+              <span>{t("offers.regFinalized")}</span>
             </div>
           </div>
         </CardContent>
@@ -260,10 +263,10 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
           <DialogHeader>
             <DialogTitle>{t("offers.acceptTitle")}</DialogTitle>
             <DialogDescription>
-              You are accepting the enrollment offer for{" "}
-              <strong>{offer.student_name}</strong> at{" "}
-              <strong>{offer.campus_name}</strong> ({offer.grade}).
-              You will be directed to complete the registration packet.
+              {t("offers.acceptingFor")}{" "}
+              <strong>{offer.student_name}</strong> {t("common.at")}{" "}
+              <strong>{offer.campus_name}</strong> ({offer.grade}).{" "}
+              {t("offers.directedToPacket")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -291,9 +294,9 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
           <DialogHeader>
             <DialogTitle>{t("offers.declineTitle")}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to decline the offer for{" "}
-              <strong>{offer.student_name}</strong> at{" "}
-              <strong>{offer.campus_name}</strong>? This action cannot be undone.
+              {t("offers.declineConfirmPre")}{" "}
+              <strong>{offer.student_name}</strong> {t("common.at")}{" "}
+              <strong>{offer.campus_name}</strong>? {t("offers.cannotUndo")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

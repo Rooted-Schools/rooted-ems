@@ -525,7 +525,8 @@ function getButtonLabel(itemType: string, t: (key: TranslationKey) => string): s
 
 export function RegistrationClient({ enrollments, userId }: RegistrationClientProps) {
   const router = useRouter();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const localeTag = locale === "es" ? "es-US" : "en-US";
   const [activeEnrollment, setActiveEnrollment] = useState(0);
   const [loadingItem, setLoadingItem] = useState<string | null>(null);
   const [submittingPacket, setSubmittingPacket] = useState(false);
@@ -543,10 +544,9 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
     return (
       <div className="text-center py-16 max-w-md mx-auto">
         <div className="text-4xl mb-4">📋</div>
-        <h3 className="text-lg font-semibold text-ink mb-2">No registration packet yet</h3>
+        <h3 className="text-lg font-semibold text-ink mb-2">{t("reg.emptyTitle")}</h3>
         <p className="text-stone text-sm">
-          Your registration packet will appear here once you accept a seat offer.
-          Head to <a href="/family/offers" className="text-rooted-green underline font-medium">Your Offers</a> to respond to any pending offers.
+          {t("reg.emptyBody")} <a href="/family/offers" className="text-rooted-green underline font-medium">{t("offers.heading")}</a> {t("reg.emptyBodyEnd")}
         </p>
       </div>
     );
@@ -642,7 +642,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
     if (result.error) {
       setError(result.error);
     } else {
-      setSuccess(`"${itemName}" has been completed.`);
+      setSuccess(`"${itemName}" ${t("reg.itemCompleted")}`);
       router.refresh();
     }
     setLoadingItem(null);
@@ -664,7 +664,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
     if (result.error) {
       setError(result.error);
     } else {
-      setSuccess("Registration packet submitted successfully!");
+      setSuccess(t("reg.packetSubmitSuccess"));
       router.refresh();
     }
     setSubmittingPacket(false);
@@ -693,7 +693,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
     <div className="space-y-6">
       {/* Breadcrumb */}
       <Link href="/family/dashboard" className="text-sm text-rooted-green hover:underline">
-        ← Back to Dashboard
+        ← {t("common.backToDashboard")}
       </Link>
 
       {/* Feedback banners */}
@@ -716,12 +716,12 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
               <span className="text-3xl" aria-hidden="true">🎓</span>
               <div>
                 <p className="text-base font-bold text-ink">
-                  Welcome to Registration!
+                  {t("reg.welcome")}
                 </p>
                 <p className="text-sm text-ink/60 mt-0.5">
                   {allRequiredComplete
-                    ? "All required items are complete — submit your packet below to finalize enrollment. Optional items can still be completed after submission."
-                    : `Complete the ${totalRequired > 0 ? totalRequired + " required" : ""} items below to finalize ${enrollment.student_name}'s enrollment at ${enrollment.campus_name}. Optional items can be skipped. You can complete items in any order.`}
+                    ? t("reg.allRequiredOptional")
+                    : t("reg.completeItems")}
                 </p>
               </div>
             </div>
@@ -770,7 +770,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                 {enrollment.student_name}
               </p>
               <p className="text-xs text-stone">
-                {enrollment.campus_name} &middot; Grade {enrollment.grade}{" "}
+                {enrollment.campus_name} &middot; {t("apps.grade")} {enrollment.grade}{" "}
                 &middot; {enrollment.school_year}
               </p>
             </div>
@@ -799,7 +799,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
             aria-valuenow={completedCount}
             aria-valuemin={0}
             aria-valuemax={totalItems}
-            aria-label="Registration completion progress"
+            aria-label={t("reg.progressAria")}
           >
             <div
               className={`h-3 rounded-full transition-all ${
@@ -812,14 +812,14 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
           </div>
           <div className="flex items-center justify-between mt-2">
             <p className="text-xs text-stone">
-              {completedCount} of {totalItems} items completed
+              {completedCount} {t("reg.of")} {totalItems} {t("reg.itemsCompleted")}
               {totalRequired > 0 && totalRequired < totalItems && (
-                <span className="text-stone"> &middot; {totalRequired} required</span>
+                <span className="text-stone"> &middot; {totalRequired} {t("reg.requiredCount")}</span>
               )}
             </p>
             {!packetSubmitted && completedCount < totalItems && (
               <p className="text-xs text-amber-600 font-medium">
-                {totalItems - completedCount} remaining
+                {totalItems - completedCount} {t("reg.itemsRemaining")}
               </p>
             )}
           </div>
@@ -850,7 +850,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
       {!packetSubmitted && (
         <div className="text-center py-2">
           <p className="text-xs text-stone">
-            Need help? Contact your school&apos;s enrollment office for assistance with any registration items.
+            {t("reg.needHelp")}
           </p>
         </div>
       )}
@@ -860,10 +860,10 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
         <Card>
           <CardContent className="py-8 text-center">
             <p className="text-stone">
-              No registration requirements configured for this campus yet.
+              {t("reg.noRequirements")}
             </p>
             <p className="text-xs text-stone mt-1">
-              Check back soon — your school is setting up the registration packet.
+              {t("reg.checkBackSoon")}
             </p>
           </CardContent>
         </Card>
@@ -883,7 +883,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                     <CardTitle className="text-sm">{t(`reg.cat.${catKey}` as TranslationKey)}</CardTitle>
                   </div>
                   <span className={`text-xs font-semibold ${allDone ? "text-green-600" : "text-stone"}`}>
-                    {prog.done}/{prog.total} complete
+                    {prog.done}/{prog.total} {t("common.complete")}
                   </span>
                 </div>
               </CardHeader>
@@ -926,8 +926,8 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                           )}
                           {item?.signed_at && (
                             <p className="text-[10px] text-stone mt-0.5">
-                              Completed{" "}
-                              {new Date(item.signed_at).toLocaleDateString("en-US", {
+                              {t("reg.completedOn")}{" "}
+                              {new Date(item.signed_at).toLocaleDateString(localeTag, {
                                 month: "short",
                                 day: "numeric",
                               })}
@@ -1091,7 +1091,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                         }
                         className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                       >
-                        <option value="">Select...</option>
+                        <option value="">{t("common.select")}</option>
                         {field.options.map((opt) => (
                           <option key={opt} value={opt}>{opt}</option>
                         ))}

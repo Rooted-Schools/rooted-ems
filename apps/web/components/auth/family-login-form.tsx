@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { createBrowserClient } from "@rooted-ems/database";
+import { useLocale } from "@/lib/i18n/locale-context";
 
 type LoginMethod = "email" | "phone";
 
@@ -26,6 +27,7 @@ function createOtpClient() {
 }
 
 export function FamilyLoginForm() {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const [method] = useState<LoginMethod>("email");
   const [value, setValue] = useState("");
@@ -43,8 +45,9 @@ export function FamilyLoginForm() {
     const urlError = searchParams.get("error");
     const urlErrorDesc = searchParams.get("error_description");
     if (urlError) {
-      setError(urlErrorDesc || "Login failed. Please try again.");
+      setError(urlErrorDesc || t("login.errLoginFailed"));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   useEffect(() => {
@@ -68,7 +71,7 @@ export function FamilyLoginForm() {
           authError.message.toLowerCase().includes("rate limit") ||
           authError.message.toLowerCase().includes("too many")
         ) {
-          setError("Too many login attempts. Please wait a few minutes before trying again.");
+          setError(t("login.errRateLimit"));
           setCooldown(120);
         } else if (
           method === "phone" &&
@@ -76,7 +79,7 @@ export function FamilyLoginForm() {
             authError.message.toLowerCase().includes("not supported") ||
             authError.message.toLowerCase().includes("phone"))
         ) {
-          setError("Phone login is not available yet. Please use email instead.");
+          setError(t("login.errPhone"));
         } else {
           setError(authError.message);
         }
@@ -86,7 +89,7 @@ export function FamilyLoginForm() {
       setOtpSent(true);
       setCooldown(120);
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t("login.errGeneric"));
     } finally {
       setLoading(false);
     }
@@ -118,11 +121,11 @@ export function FamilyLoginForm() {
           refresh_token: data.session.refresh_token,
         });
         if (sessionError) {
-          setError("Failed to establish session. Please try again.");
+          setError(t("login.errSession"));
           return;
         }
       } else {
-        setError("No session returned. Please try again.");
+        setError(t("login.errNoSession"));
         return;
       }
 
@@ -132,7 +135,7 @@ export function FamilyLoginForm() {
         ? `/family/applications/new?campus=${safeCampus}`
         : "/family/dashboard";
     } catch {
-      setError("Verification failed. Please try again.");
+      setError(t("login.errVerify"));
     } finally {
       setLoading(false);
     }
@@ -157,7 +160,7 @@ export function FamilyLoginForm() {
         setLoading(false);
       }
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t("login.errGeneric"));
       setLoading(false);
     }
   }
@@ -173,9 +176,9 @@ export function FamilyLoginForm() {
             </div>
           </div>
         </div>
-        <h2 className="text-2xl font-bold text-center mb-2">Family Portal</h2>
+        <h2 className="text-2xl font-bold text-center mb-2">{t("login.title")}</h2>
         <p className="text-center text-ink/60 mb-6">
-          Sign in to manage your enrollment applications
+          {t("login.subtitle")}
         </p>
 
         {/* Google Login */}
@@ -192,7 +195,7 @@ export function FamilyLoginForm() {
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
             </svg>
-            <span className="text-sm font-medium text-ink">Continue with Google</span>
+            <span className="text-sm font-medium text-ink">{t("login.continueGoogle")}</span>
           </button>
         </div>
 
@@ -202,7 +205,7 @@ export function FamilyLoginForm() {
             <div className="w-full border-t border-stone/20"></div>
           </div>
           <div className="relative flex justify-center text-xs">
-            <span className="bg-white px-3 text-stone">or sign in with email</span>
+            <span className="bg-white px-3 text-stone">{t("login.orEmail")}</span>
           </div>
         </div>
 
@@ -213,14 +216,14 @@ export function FamilyLoginForm() {
                 htmlFor="login-value"
                 className="block text-sm font-medium text-ink/70 mb-1"
               >
-                Email Address
+                {t("login.email")}
               </label>
               <input
                 id="login-value"
                 type="email"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
-                placeholder="parent@example.com"
+                placeholder={t("login.emailPlaceholder")}
                 required
                 className="w-full px-4 py-2 border border-stone/30 rounded-md focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
               />
@@ -238,21 +241,20 @@ export function FamilyLoginForm() {
               className="w-full py-2 px-4 bg-rooted-green text-white rounded-md font-medium hover:bg-deep-green disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading
-                ? "Sending..."
+                ? t("login.sending")
                 : cooldown > 0
-                  ? `Wait ${cooldown}s`
-                  : "Send Verification Code"}
+                  ? `${t("login.wait")} ${cooldown}s`
+                  : t("login.sendCode")}
             </button>
           </form>
         ) : (
           <form onSubmit={handleVerifyOtp} className="space-y-4">
             <p className="text-sm text-ink/60 text-center">
-              We sent a verification email to{" "}
+              {t("login.sentTo")}{" "}
               <strong>{value}</strong>
             </p>
             <p className="text-xs text-stone text-center">
-              Enter the code from the email, or click the link in the
-              email to sign in directly.
+              {t("login.enterCodeHint")}
             </p>
 
             <div>
@@ -260,7 +262,7 @@ export function FamilyLoginForm() {
                 htmlFor="otp-code"
                 className="block text-sm font-medium text-ink/70 mb-1"
               >
-                Verification Code
+                {t("login.code")}
               </label>
               <input
                 id="otp-code"
@@ -279,7 +281,7 @@ export function FamilyLoginForm() {
                 className="w-full px-4 py-2 border border-stone/30 rounded-md text-center text-lg tracking-[0.25em] font-mono focus:outline-none focus:ring-2 focus:ring-rooted-green focus:border-transparent"
               />
               <p className="text-xs text-stone mt-1">
-                Enter the 6-digit code sent to your email.
+                {t("login.codeHint")}
               </p>
             </div>
 
@@ -294,7 +296,7 @@ export function FamilyLoginForm() {
               disabled={loading || otp.length !== 6}
               className="w-full py-2 px-4 bg-rooted-green text-white rounded-md font-medium hover:bg-deep-green disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? "Verifying..." : "Verify Code"}
+              {loading ? t("login.verifying") : t("login.verifyCode")}
             </button>
 
             <div className="flex flex-col gap-2">
@@ -309,7 +311,7 @@ export function FamilyLoginForm() {
                   const { error: resendErr } = await otpClient.auth.signInWithOtp(opts);
                   if (resendErr) {
                     if (resendErr.message.toLowerCase().includes("rate limit") || resendErr.message.toLowerCase().includes("too many")) {
-                      setError("Too many attempts. Please wait a few minutes.");
+                      setError(t("login.errTooMany"));
                       setCooldown(120);
                     } else {
                       setError(resendErr.message);
@@ -323,8 +325,8 @@ export function FamilyLoginForm() {
                 className="w-full text-sm text-rooted-green hover:text-rooted-green-dark disabled:text-stone disabled:cursor-not-allowed"
               >
                 {cooldown > 0
-                  ? `Resend code in ${cooldown}s`
-                  : "Resend verification code"}
+                  ? `${t("login.resendIn")} ${cooldown}s`
+                  : t("login.resend")}
               </button>
               <button
                 type="button"
@@ -336,7 +338,7 @@ export function FamilyLoginForm() {
                 }}
                 className="w-full text-sm text-stone hover:text-ink"
               >
-                Use a different email
+                {t("login.differentEmail")}
               </button>
             </div>
           </form>
@@ -347,13 +349,12 @@ export function FamilyLoginForm() {
             href="/staff-login"
             className="text-sm text-stone hover:text-ink/60 hover:underline"
           >
-            Staff login
+            {t("login.staffLogin")}
           </a>
         </div>
 
         <p className="mt-5 text-xs text-center text-stone/70 leading-relaxed">
-          This system contains education records protected under the Family
-          Educational Rights and Privacy Act (FERPA), 20 U.S.C. § 1232g.
+          {t("login.ferpa")}
         </p>
       </div>
     </div>

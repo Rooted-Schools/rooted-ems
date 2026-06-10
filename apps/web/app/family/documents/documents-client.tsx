@@ -17,6 +17,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { uploadFile, getSignedUrl, formatFileSize, validateFile } from "@/lib/storage/upload";
 import { familyCreateDocumentRecord } from "@/app/family/applications/actions";
 import { useLocale } from "@/lib/i18n/locale-context";
+import { type TranslationKey } from "@/lib/i18n/translations";
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -58,42 +59,42 @@ const docStatusVariant: Record<DocStatusKey, "success" | "warning" | "destructiv
 
 const documentTypes = [
   // Identity & Enrollment
-  { value: "birth_certificate", label: "Birth Certificate / Proof of Age" },
-  { value: "proof_of_residency", label: "Proof of Residency" },
-  { value: "parent_id", label: "Parent / Guardian ID" },
-  { value: "custody_docs", label: "Custody Documentation" },
+  { value: "birth_certificate", labelKey: "docs.type.birth_certificate" },
+  { value: "proof_of_residency", labelKey: "docs.type.proof_of_residency" },
+  { value: "parent_id", labelKey: "docs.type.parent_id" },
+  { value: "custody_docs", labelKey: "docs.type.custody_docs" },
   // Health & Medical
-  { value: "immunization_records", label: "Immunization Records" },
-  { value: "health_exam", label: "Health / Physical Examination" },
-  { value: "dental_screening", label: "Dental Screening" },
-  { value: "medication_auth", label: "Medication Authorization" },
-  { value: "food_allergy_plan", label: "Food Allergy / Health Plan" },
-  { value: "lthc_form", label: "Long-Term Health Condition Form" },
-  { value: "sports_physical", label: "Sports Physical" },
+  { value: "immunization_records", labelKey: "docs.type.immunization_records" },
+  { value: "health_exam", labelKey: "docs.type.health_exam" },
+  { value: "dental_screening", labelKey: "docs.type.dental_screening" },
+  { value: "medication_auth", labelKey: "docs.type.medication_auth" },
+  { value: "food_allergy_plan", labelKey: "docs.type.food_allergy_plan" },
+  { value: "lthc_form", labelKey: "docs.type.lthc_form" },
+  { value: "sports_physical", labelKey: "docs.type.sports_physical" },
   // Academic & Special Services
-  { value: "school_records", label: "Previous School Records / Transcripts" },
-  { value: "iep_records", label: "IEP / Special Education Records" },
-  { value: "504_plan", label: "504 Plan" },
-  { value: "mckinney_vento", label: "McKinney-Vento (Homeless / Transitional)" },
+  { value: "school_records", labelKey: "docs.type.school_records" },
+  { value: "iep_records", labelKey: "docs.type.iep_records" },
+  { value: "504_plan", labelKey: "docs.type.504_plan" },
+  { value: "mckinney_vento", labelKey: "docs.type.mckinney_vento" },
   // Family & Household
-  { value: "income_verification", label: "Income Verification (FRL)" },
-  { value: "military_family", label: "Military Family Documentation" },
-  { value: "student_photo", label: "Student Photo" },
+  { value: "income_verification", labelKey: "docs.type.income_verification" },
+  { value: "military_family", labelKey: "docs.type.military_family" },
+  { value: "student_photo", labelKey: "docs.type.student_photo" },
   // Other
-  { value: "other", label: "Other" },
-];
+  { value: "other", labelKey: "docs.type.other" },
+] as const;
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-US", {
+function formatDate(dateStr: string, localeTag: string) {
+  return new Date(dateStr).toLocaleDateString(localeTag, {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
 }
 
-function formatDocType(type: string): string {
+function formatDocType(type: string, t: (key: TranslationKey) => string): string {
   const found = documentTypes.find((d) => d.value === type);
-  if (found) return found.label;
+  if (found) return t(found.labelKey);
   return type
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
@@ -102,7 +103,8 @@ function formatDocType(type: string): string {
 // ─── Main Component ─────────────────────────────────────
 
 export function DocumentsClient({ documents, applications, userId }: DocumentsClientProps) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const localeTag = locale === "es" ? "es-US" : "en-US";
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showUpload, setShowUpload] = useState(false);
@@ -146,7 +148,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
     if (!storagePath) return;
     const { url, error } = await getSignedUrl(storagePath);
     if (error) {
-      setFeedback({ type: "error", message: `Could not open document: ${error}` });
+      setFeedback({ type: "error", message: `${t("docs.couldNotOpen")} ${error}` });
       return;
     }
     if (url) {
@@ -160,7 +162,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
         <div>
           <h1 className="text-2xl font-bold text-ink">{t("nav.documents")}</h1>
           <p className="text-sm text-stone mt-1">
-            Uploaded documents for your enrollment applications.
+            {t("docs.subtitle")}
           </p>
         </div>
         <Button
@@ -175,9 +177,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
       <div className="flex items-start gap-2.5 p-3 rounded-lg bg-blue-50 border border-blue-100 text-sm text-blue-800">
         <span className="shrink-0 mt-0.5">ℹ️</span>
         <span>
-          Most required documents are collected during <strong>registration</strong>, after you've
-          accepted an enrollment offer. You only need to upload something here if our enrollment
-          team has specifically requested it.
+          {t("docs.infoPre")} <strong>{t("docs.infoStrong")}</strong>{t("docs.infoPost")}
         </span>
       </div>
 
@@ -230,8 +230,8 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
               title={t("docs.noDocs")}
               description={
                 applications.length === 0
-                  ? "Start an enrollment application to upload documents."
-                  : "Use the Upload Document button to add files to your application."
+                  ? t("docs.emptyNoApps")
+                  : t("docs.emptyWithApps")
               }
             />
           </CardContent>
@@ -242,7 +242,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
           <CardHeader>
             <CardTitle className="text-base">{t("docs.yourDocs")}</CardTitle>
             <CardDescription>
-              {visibleDocuments.length} document{visibleDocuments.length !== 1 ? "s" : ""} across your applications.
+              {visibleDocuments.length} {t("docs.acrossApps")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -270,15 +270,15 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-ink truncate">{doc.file_name}</p>
                               <p className="text-xs text-stone">
-                                {formatDocType(doc.document_type)}
+                                {formatDocType(doc.document_type, t)}
                                 {sizeStr && <> &middot; {sizeStr}</>}
-                                {" "}&middot; Uploaded {formatDate(doc.created_at)}
+                                {" "}&middot; {t("docs.uploadedOn")} {formatDate(doc.created_at, localeTag)}
                                 {/* only repeat name inline when not shown as group header */}
                                 {studentNames.length === 1 && <> &middot; {doc.student_name}</>}
                               </p>
                               {doc.status === "rejected" && doc.rejection_reason && (
                                 <p className="text-xs text-red-600 mt-1 font-medium">
-                                  ⚠️ Reason: {doc.rejection_reason}
+                                  ⚠️ {t("docs.reason")} {doc.rejection_reason}
                                 </p>
                               )}
                             </div>
@@ -466,7 +466,7 @@ function UploadDialog({
       }
 
       // Success
-      onUploadComplete(`"${result.fileName}" uploaded successfully.`);
+      onUploadComplete(`"${result.fileName}" ${t("docs.uploadSuccess")}`);
       onOpenChange(false);
 
       // Reset form
@@ -474,7 +474,7 @@ function UploadDialog({
       setValidationError(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
-      onError("An unexpected error occurred during upload.");
+      onError(t("docs.uploadUnexpected"));
     } finally {
       setUploading(false);
     }
@@ -484,11 +484,11 @@ function UploadDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{initialDocType ? "Re-upload Document" : "Upload Document"}</DialogTitle>
+          <DialogTitle>{initialDocType ? t("docs.reuploadTitle") : t("docs.upload")}</DialogTitle>
           <DialogDescription>
             {initialDocType
-              ? "Upload a new version of this document. The document type has been pre-selected based on the rejected file."
-              : "Upload a document for one of your enrollment applications. Accepted formats: PDF, JPEG, PNG. Max 10MB."}
+              ? t("docs.reuploadDesc")
+              : t("docs.uploadDesc")}
           </DialogDescription>
         </DialogHeader>
 
@@ -496,7 +496,7 @@ function UploadDialog({
           {/* Application selector */}
           <div>
             <label className="block text-sm font-medium text-ink/70 mb-1">
-              Application
+              {t("docs.application")}
             </label>
             <select
               value={selectedApp}
@@ -514,7 +514,7 @@ function UploadDialog({
           {/* Document type */}
           <div>
             <label className="block text-sm font-medium text-ink/70 mb-1">
-              Document Type
+              {t("docs.docType")}
             </label>
             <select
               value={docType}
@@ -523,7 +523,7 @@ function UploadDialog({
             >
               {availableDocTypes.map((dt) => (
                 <option key={dt.value} value={dt.value}>
-                  {dt.label}
+                  {t(dt.labelKey)}
                 </option>
               ))}
             </select>
@@ -532,7 +532,7 @@ function UploadDialog({
           {/* File input */}
           <div>
             <label className="block text-sm font-medium text-ink/70 mb-1">
-              File
+              {t("docs.file")}
             </label>
             <input
               ref={fileInputRef}
