@@ -35,7 +35,7 @@ INSERT INTO campus (id, organization_id, region_id, name, short_code, address_li
     '5700 E 18th St',
     'Vancouver', 'WA', '98661',
     '(360) 555-0100',
-    'vancouver@rootedschool.org',
+    'info@rootedschoolvancouver.org',
     'America/Los_Angeles'
   ),
   (
@@ -47,7 +47,7 @@ INSERT INTO campus (id, organization_id, region_id, name, short_code, address_li
     '1225 Laurel St',
     'Columbia', 'SC', '29201',
     '(803) 555-0200',
-    'columbia@rootedschool.org',
+    'info@rootedschoolcola.org',
     'America/New_York'
   ),
   (
@@ -59,7 +59,7 @@ INSERT INTO campus (id, organization_id, region_id, name, short_code, address_li
     '3100 Chester Ave',
     'Cleveland', 'OH', '44114',
     '(216) 555-0300',
-    'cleveland@rootedschool.org',
+    'info@rootedschoolcle.org',
     'America/New_York'
   )
 ON CONFLICT (id) DO NOTHING;

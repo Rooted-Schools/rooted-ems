@@ -27,9 +27,9 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Campuses
 INSERT INTO campus (id, organization_id, region_id, name, short_code, address_line1, city, state, zip, phone, email, timezone) VALUES
-  ('33333333-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000001', 'Rooted School Vancouver', 'RSV', '5700 E 18th St', 'Vancouver', 'WA', '98661', '(360) 555-0100', 'vancouver@rootedschool.org', 'America/Los_Angeles'),
-  ('33333333-0000-0000-0000-000000000002', '11111111-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002', 'C.R. Neal Academy', 'CRN', '1225 Laurel St', 'Columbia', 'SC', '29201', '(803) 555-0200', 'columbia@rootedschool.org', 'America/New_York'),
-  ('33333333-0000-0000-0000-000000000003', '11111111-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000003', 'Rooted Schools Cleveland', 'RSC', '3100 Chester Ave', 'Cleveland', 'OH', '44114', '(216) 555-0300', 'cleveland@rootedschool.org', 'America/New_York')
+  ('33333333-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000001', 'Rooted School Vancouver', 'RSV', '5700 E 18th St', 'Vancouver', 'WA', '98661', '(360) 555-0100', 'info@rootedschoolvancouver.org', 'America/Los_Angeles'),
+  ('33333333-0000-0000-0000-000000000002', '11111111-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002', 'C.R. Neal Academy', 'CRN', '1225 Laurel St', 'Columbia', 'SC', '29201', '(803) 555-0200', 'info@rootedschoolcola.org', 'America/New_York'),
+  ('33333333-0000-0000-0000-000000000003', '11111111-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000003', 'Rooted Schools Cleveland', 'RSC', '3100 Chester Ave', 'Cleveland', 'OH', '44114', '(216) 555-0300', 'info@rootedschoolcle.org', 'America/New_York')
 ON CONFLICT (id) DO NOTHING;
 
 -- School Years
