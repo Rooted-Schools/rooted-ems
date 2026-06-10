@@ -13,6 +13,8 @@ import { GRADE_LABELS } from "@/lib/application-helpers";
 import type { EnrollmentWindowInfo, CampusRow, DraftApplicationData } from "@/lib/queries";
 import { familyUpdateApplication, familySubmitApplication } from "../../actions";
 import { useDraftAutosave, SaveIndicator } from "@/components/draft-autosave";
+import { useLocale } from "@/lib/i18n/locale-context";
+import type { TranslationKey } from "@/lib/i18n/translations";
 
 /* ───────────── Props ───────────── */
 
@@ -32,9 +34,9 @@ interface EditApplicationClientProps {
 /* ───────────── step definitions ───────────── */
 
 const STEPS = [
-  { id: "campus", label: "Campus & Grade" },
-  { id: "student", label: "Student & Guardian" },
-  { id: "review", label: "Review & Submit" },
+  { id: "campus", labelKey: "appForm.step.campus" },
+  { id: "student", labelKey: "appForm.step.student" },
+  { id: "review", labelKey: "appForm.step.review" },
 ] as const;
 
 type StepId = (typeof STEPS)[number]["id"];
@@ -116,8 +118,9 @@ function StepIndicator({
   steps: readonly (typeof STEPS)[number][];
   currentIndex: number;
 }) {
+  const { t } = useLocale();
   return (
-    <nav aria-label="Progress" className="mb-8">
+    <nav aria-label={t("appForm.progress")} className="mb-8">
       <ol className="flex items-center gap-2">
         {steps.map((step, i) => {
           const isComplete = i < currentIndex;
@@ -155,7 +158,7 @@ function StepIndicator({
                   isCurrent ? "font-semibold text-ink" : "text-stone"
                 }`}
               >
-                {step.label}
+                {t(step.labelKey)}
               </span>
               {i < steps.length - 1 && (
                 <div
@@ -224,6 +227,7 @@ function buildUpdateInput(
 
 export function EditApplicationClient({ draft, windows, campuses, gradeLevels }: EditApplicationClientProps) {
   const router = useRouter();
+  const { t, locale } = useLocale();
   const [isPending, startTransition] = useTransition();
   const [stepIndex, setStepIndex] = useState(0);
   const [form, setForm] = useState<FormData>(() => draftToFormData(draft));
@@ -233,7 +237,8 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
 
   const campusWindows = windows.filter((w) => w.campus_id === form.campusId && w.is_open);
   const campusGrades = gradeLevels.filter((g) => g.campus_id === form.campusId);
-  const studentName = [form.firstName, form.lastName].filter(Boolean).join(" ") || "Untitled";
+  const studentName =
+    [form.firstName, form.lastName].filter(Boolean).join(" ") || t("appForm.untitled");
 
   // Debounced auto-save (~2s after the last change). The server action
   // re-verifies auth + guardian ownership on every save.
@@ -267,7 +272,7 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
       if (result.error) {
         setFeedback({ type: "error", message: result.error });
       } else {
-        setFeedback({ type: "success", message: "Draft saved!" });
+        setFeedback({ type: "success", message: t("appForm.draftSaved") });
         router.refresh();
       }
     });
@@ -311,11 +316,11 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
           href="/family/applications"
           className="text-sm text-stone hover:text-ink/70 transition-colors"
         >
-          &larr; Back to Applications
+          &larr; {t("appForm.backToApplications")}
         </Link>
         <div className="flex items-center gap-3 mt-2">
           <h1 className="text-2xl font-bold text-ink">{studentName}</h1>
-          <Badge variant="secondary">Draft</Badge>
+          <Badge variant="secondary">{t("status.draft")}</Badge>
         </div>
         <p className="text-sm text-stone mt-1">
           {campuses.find((c) => c.id === form.campusId)?.name ?? ""}{" "}
@@ -344,20 +349,20 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
       {currentStep.id === "campus" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Campus & Grade Level</CardTitle>
+            <CardTitle className="text-base">{t("appForm.campusGradeTitle")}</CardTitle>
             <CardDescription>
-              Select the campus and grade your child will attend.
+              {t("appForm.campusGradeDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Field label="Campus" required>
+            <Field label={t("appForm.campus")} required>
               <Select
                 value={form.campusId}
                 onChange={(e) => {
                   update({ campusId: e.target.value, gradeLevelId: "", enrollmentWindowId: "" });
                 }}
               >
-                <option value="">Select a campus...</option>
+                <option value="">{t("appForm.selectCampus")}</option>
                 {campuses.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -367,25 +372,25 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
             </Field>
             {form.campusId && campusWindows.length === 0 && (
               <p className="text-sm text-amber-600">
-                No enrollment windows are currently open for this campus.
+                {t("appForm.noWindowsOpen")}
               </p>
             )}
             {campusWindows.length > 1 && (
-              <Field label="Enrollment Window" required>
+              <Field label={t("appForm.enrollmentWindow")} required>
                 <Select
                   value={form.enrollmentWindowId}
                   onChange={(e) => update({ enrollmentWindowId: e.target.value })}
                 >
-                  <option value="">Select window...</option>
+                  <option value="">{t("appForm.selectWindow")}</option>
                   {campusWindows.map((w) => (
                     <option key={w.id} value={w.id}>
-                      {w.name} (closes {w.close_date})
+                      {w.name} ({t("appForm.closes")} {w.close_date})
                     </option>
                   ))}
                 </Select>
               </Field>
             )}
-            <Field label="Grade Level" required>
+            <Field label={t("appForm.gradeLevel")} required>
               <Select
                 value={form.gradeLevelId}
                 onChange={(e) => {
@@ -393,10 +398,10 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
                   update({ gradeLevelId: e.target.value, gradeLevel: gl?.grade ?? "" });
                 }}
               >
-                <option value="">Select grade...</option>
+                <option value="">{t("appForm.selectGrade")}</option>
                 {campusGrades.map((g) => (
                   <option key={g.id} value={g.id}>
-                    {GRADE_LABELS[g.grade] ?? `Grade ${g.grade}`}
+                    {GRADE_LABELS[g.grade] ?? `${t("apps.grade")} ${g.grade}`}
                   </option>
                 ))}
                 {form.campusId && campusGrades.length === 0 &&
@@ -418,9 +423,9 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
                 className="mt-1 h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
               />
               <label htmlFor="has-sibling" className="text-sm text-ink/70">
-                This student has a sibling currently attending or enrolled at this campus.
+                {t("appForm.siblingLabel")}
                 <span className="block text-xs text-stone mt-0.5">
-                  Sibling enrollment may affect lottery priority.
+                  {t("appForm.siblingNote")}
                 </span>
               </label>
             </div>
@@ -432,44 +437,44 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
       {currentStep.id === "student" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Student Information</CardTitle>
-            <CardDescription>Your student&apos;s legal name and date of birth.</CardDescription>
+            <CardTitle className="text-base">{t("appForm.studentInfoTitle")}</CardTitle>
+            <CardDescription>{t("appForm.studentInfoDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="First Name" required>
+              <Field label={t("appForm.firstName")} required>
                 <Input
                   value={form.firstName}
                   onChange={(e) => update({ firstName: e.target.value })}
-                  placeholder="First"
+                  placeholder={t("appForm.firstPlaceholder")}
                 />
               </Field>
-              <Field label="Last Name" required>
+              <Field label={t("appForm.lastName")} required>
                 <Input
                   value={form.lastName}
                   onChange={(e) => update({ lastName: e.target.value })}
-                  placeholder="Last"
+                  placeholder={t("appForm.lastPlaceholder")}
                 />
               </Field>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Date of Birth">
+              <Field label={t("appForm.dob")}>
                 <Input
                   type="date"
                   value={form.dateOfBirth}
                   onChange={(e) => update({ dateOfBirth: e.target.value })}
                 />
               </Field>
-              <Field label="Gender">
+              <Field label={t("appForm.gender")}>
                 <Select
                   value={form.gender}
                   onChange={(e) => update({ gender: e.target.value })}
                 >
-                  <option value="">Select...</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="non_binary">Non-binary</option>
-                  <option value="prefer_not">Prefer not to say</option>
+                  <option value="">{t("common.select")}</option>
+                  <option value="male">{t("appForm.gender.male")}</option>
+                  <option value="female">{t("appForm.gender.female")}</option>
+                  <option value="non_binary">{t("appForm.gender.non_binary")}</option>
+                  <option value="prefer_not">{t("appForm.gender.prefer_not")}</option>
                 </Select>
               </Field>
             </div>
@@ -480,61 +485,61 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
       {currentStep.id === "student" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Parent / Guardian</CardTitle>
-            <CardDescription>Primary contact for this application.</CardDescription>
+            <CardTitle className="text-base">{t("appForm.guardianTitle")}</CardTitle>
+            <CardDescription>{t("appForm.guardianDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="First Name" required>
+              <Field label={t("appForm.firstName")} required>
                 <Input
                   value={form.guardianFirstName}
                   onChange={(e) => update({ guardianFirstName: e.target.value })}
-                  placeholder="First"
+                  placeholder={t("appForm.firstPlaceholder")}
                 />
               </Field>
-              <Field label="Last Name" required>
+              <Field label={t("appForm.lastName")} required>
                 <Input
                   value={form.guardianLastName}
                   onChange={(e) => update({ guardianLastName: e.target.value })}
-                  placeholder="Last"
+                  placeholder={t("appForm.lastPlaceholder")}
                 />
               </Field>
             </div>
-            <Field label="Relationship to Student" required>
+            <Field label={t("appForm.relationship")} required>
               <Select
                 value={form.guardianRelationship}
                 onChange={(e) => update({ guardianRelationship: e.target.value, guardianRelationshipOther: "" })}
               >
-                <option value="">Select...</option>
-                <option value="mother">Mother</option>
-                <option value="father">Father</option>
-                <option value="stepmother">Stepmother</option>
-                <option value="stepfather">Stepfather</option>
-                <option value="grandparent">Grandparent</option>
-                <option value="aunt_uncle">Aunt / Uncle</option>
-                <option value="foster_parent">Foster Parent</option>
-                <option value="legal_guardian">Legal Guardian</option>
-                <option value="other">Other</option>
+                <option value="">{t("common.select")}</option>
+                <option value="mother">{t("appForm.rel.mother")}</option>
+                <option value="father">{t("appForm.rel.father")}</option>
+                <option value="stepmother">{t("appForm.rel.stepmother")}</option>
+                <option value="stepfather">{t("appForm.rel.stepfather")}</option>
+                <option value="grandparent">{t("appForm.rel.grandparent")}</option>
+                <option value="aunt_uncle">{t("appForm.rel.aunt_uncle")}</option>
+                <option value="foster_parent">{t("appForm.rel.foster_parent")}</option>
+                <option value="legal_guardian">{t("appForm.rel.legal_guardian")}</option>
+                <option value="other">{t("appForm.rel.other")}</option>
               </Select>
               {form.guardianRelationship === "other" && (
                 <Input
                   className="mt-2"
                   value={form.guardianRelationshipOther}
                   onChange={(e) => update({ guardianRelationshipOther: e.target.value })}
-                  placeholder="Please describe your relationship to the student"
+                  placeholder={t("appForm.relOtherPlaceholder")}
                   maxLength={100}
                 />
               )}
             </Field>
-            <Field label="Email Address" required>
+            <Field label={t("appForm.email")} required>
               <Input
                 type="email"
                 value={form.guardianEmail}
                 onChange={(e) => update({ guardianEmail: e.target.value })}
-                placeholder="you@example.com"
+                placeholder={t("appForm.emailPlaceholder")}
               />
             </Field>
-            <Field label="Phone Number" required>
+            <Field label={t("appForm.phone")} required>
               <Input
                 type="tel"
                 value={form.guardianPhone}
@@ -543,9 +548,7 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
               />
             </Field>
             <p className="text-xs text-stone">
-              📋 Additional information (address, emergency contacts, demographics, and service
-              needs) will be collected during the registration process after an enrollment offer is
-              made.
+              📋 {t("appForm.regNote")}
             </p>
           </CardContent>
         </Card>
@@ -555,46 +558,61 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
       {currentStep.id === "review" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Review & Submit</CardTitle>
+            <CardTitle className="text-base">{t("appForm.step.review")}</CardTitle>
             <CardDescription>
-              Please review your application details before submitting.
+              {t("appForm.reviewDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="space-y-4">
-              <ReviewSection title="Campus & Grade">
+              <ReviewSection title={t("appForm.step.campus")}>
                 <ReviewRow
-                  label="Campus"
+                  label={t("appForm.campus")}
                   value={campuses.find((c) => c.id === form.campusId)?.name || "—"}
                 />
                 <ReviewRow
-                  label="Grade"
+                  label={t("apps.grade")}
                   value={
                     form.gradeLevel
-                      ? GRADE_LABELS[form.gradeLevel] || `Grade ${form.gradeLevel}`
+                      ? GRADE_LABELS[form.gradeLevel] || `${t("apps.grade")} ${form.gradeLevel}`
                       : "—"
                   }
                 />
-                <ReviewRow label="Sibling at campus" value={form.hasSibling ? "Yes" : "No"} />
-              </ReviewSection>
-              <ReviewSection title="Student">
                 <ReviewRow
-                  label="Name"
+                  label={t("appForm.review.siblingAtCampus")}
+                  value={form.hasSibling ? t("common.yes") : t("common.no")}
+                />
+              </ReviewSection>
+              <ReviewSection title={t("offers.student")}>
+                <ReviewRow
+                  label={t("appForm.review.name")}
                   value={[form.firstName, form.lastName].filter(Boolean).join(" ") || "—"}
                 />
-                <ReviewRow label="Date of Birth" value={form.dateOfBirth || "—"} />
-                {form.gender && <ReviewRow label="Gender" value={form.gender} />}
+                <ReviewRow label={t("appForm.dob")} value={form.dateOfBirth || "—"} />
+                {form.gender && (
+                  <ReviewRow
+                    label={t("appForm.gender")}
+                    value={t(`appForm.gender.${form.gender}` as TranslationKey)}
+                  />
+                )}
               </ReviewSection>
-              <ReviewSection title="Parent / Guardian">
+              <ReviewSection title={t("appForm.guardianTitle")}>
                 <ReviewRow
-                  label="Name"
+                  label={t("appForm.review.name")}
                   value={
                     [form.guardianFirstName, form.guardianLastName].filter(Boolean).join(" ") || "—"
                   }
                 />
-                <ReviewRow label="Relationship" value={form.guardianRelationship || "—"} />
-                <ReviewRow label="Email" value={form.guardianEmail || "—"} />
-                <ReviewRow label="Phone" value={form.guardianPhone || "—"} />
+                <ReviewRow
+                  label={t("appForm.review.relationship")}
+                  value={
+                    form.guardianRelationship
+                      ? t(`appForm.rel.${form.guardianRelationship}` as TranslationKey)
+                      : "—"
+                  }
+                />
+                <ReviewRow label={t("appForm.review.email")} value={form.guardianEmail || "—"} />
+                <ReviewRow label={t("appForm.review.phone")} value={form.guardianPhone || "—"} />
               </ReviewSection>
             </div>
 
@@ -610,9 +628,8 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
                   className="mt-1 h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
                 />
                 <label htmlFor="data-sharing-consent" className="text-sm text-ink/60">
-                  I consent to the sharing of my child&apos;s educational records with{" "}
-                  <span className="font-bold">rooted</span>schools for the purpose of enrollment
-                  processing.
+                  {t("appForm.consentPre")}{" "}
+                  <span className="font-bold">rooted</span>schools {t("appForm.consentPost")}
                 </label>
               </div>
               <div className="flex items-start gap-2">
@@ -624,25 +641,23 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
                   className="mt-1 h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
                 />
                 <label htmlFor="agree-terms" className="text-sm text-ink/60">
-                  I certify that the information provided in this application is accurate and
-                  complete to the best of my knowledge. I understand that providing false
-                  information may result in the disqualification of this application.
+                  {t("appForm.certify")}
                 </label>
               </div>
             </div>
 
             <hr className="border-stone/20" />
-            <p className="text-sm font-medium text-ink/70">Electronic Signature</p>
-            <Field label="Type your full legal name to sign" required>
+            <p className="text-sm font-medium text-ink/70">{t("appForm.eSignature")}</p>
+            <Field label={t("appForm.typeFullName")} required>
               <Input
                 value={form.signatureName}
                 onChange={(e) => update({ signatureName: e.target.value })}
-                placeholder="Full legal name"
+                placeholder={t("appForm.fullNamePlaceholder")}
               />
             </Field>
             <p className="text-xs text-stone">
-              By typing your name above, you are electronically signing this application. Date:{" "}
-              {new Date().toLocaleDateString("en-US")}
+              {t("appForm.eSignNote")}{" "}
+              {new Date().toLocaleDateString(locale === "es" ? "es-US" : "en-US")}
             </p>
           </CardContent>
         </Card>
@@ -653,7 +668,7 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
         <div>
           {stepIndex > 0 && (
             <Button variant="outline" onClick={back} disabled={isPending}>
-              Back
+              {t("common.back")}
             </Button>
           )}
         </div>
@@ -665,10 +680,10 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
                 onClick={handleSaveDraft}
                 disabled={isPending || !canProceedStep.campus}
               >
-                {isPending ? "Saving..." : "Save Draft"}
+                {isPending ? t("reg.btn.saving") : t("appForm.saveDraft")}
               </Button>
               <Button onClick={next} disabled={!canProceedStep[currentStep.id]}>
-                Continue
+                {t("common.continue")}
               </Button>
             </>
           )}
@@ -677,7 +692,7 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
               onClick={handleSubmit}
               disabled={!canProceedStep.review || isPending}
             >
-              {isPending ? "Submitting..." : "Submit Application"}
+              {isPending ? t("reg.submitting") : t("appForm.submit")}
             </Button>
           )}
         </div>
