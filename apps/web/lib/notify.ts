@@ -59,11 +59,15 @@ async function getGuardianContact(applicationId: string): Promise<GuardianContac
  */
 async function getGuardianContactByEnrollment(enrollmentId: string): Promise<GuardianContact & { applicationId: string | null }> {
   const supabase = createServiceRoleClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("enrollment")
     .select("application_id, application:application_id (guardian:guardian_id (user_id, email))")
     .eq("id", enrollmentId)
     .single();
+  if (error) {
+    console.error("[getGuardianContactByEnrollment] query error", error.message, { enrollmentId });
+    return { userId: null, email: null, applicationId: null };
+  }
   const row = data as unknown as Record<string, unknown> | null;
   const applicationId = (row?.application_id as string) ?? null;
   const application = row?.application as Record<string, unknown> | null;
@@ -718,25 +722,18 @@ export async function notifyFamilyStudentEnrolled({
   campusId?: string;
   gradeLabel?: string;
 }): Promise<void> {
-  const { userId, email } = await getGuardianContact(applicationId);
-  if (!userId && !email) return;
+  // In-app only: the family already received the registrationComplete email
+  // when their packet was verified — a second identical email would be noise.
+  const { userId } = await getGuardianContact(applicationId);
+  if (!userId) return;
   const campusName = await resolveCampusName(campusId);
   const grade = gradeLabel ? ` in ${gradeLabel}` : "";
-  await Promise.all([
-    userId
-      ? notify({
-          userId,
-          subject: `🎉 ${studentName ?? "Your student"} is officially enrolled at ${campusName}!`,
-          body: `Congratulations! ${studentName ?? "Your student"} is now fully enrolled${grade} at ${campusName}. At Rooted Schools, every student graduates with a career credential and a clear plan. We're excited to get started. Log in to your portal to view orientation details and next steps.`,
-          link: `/family/applications/${applicationId}`,
-          campusId,
-          logTag: "notifyFamilyStudentEnrolled",
-        })
-      : Promise.resolve(),
-    emailGuardian(
-      email,
-      emailTemplates.registrationComplete({ studentFirstName: firstNameOf(studentName), campusName }),
-      "notifyFamilyStudentEnrolled"
-    ),
-  ]);
+  await notify({
+    userId,
+    subject: `🎉 ${studentName ?? "Your student"} is officially enrolled at ${campusName}!`,
+    body: `Congratulations! ${studentName ?? "Your student"} is now fully enrolled${grade} at ${campusName}. At Rooted Schools, every student graduates with a career credential and a clear plan. We're excited to get started. Log in to your portal to view orientation details and next steps.`,
+    link: `/family/applications/${applicationId}`,
+    campusId,
+    logTag: "notifyFamilyStudentEnrolled",
+  });
 }

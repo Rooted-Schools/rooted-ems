@@ -155,14 +155,15 @@ export async function promoteFromWaitlist(
     },
   });
 
-  // Notify the family immediately — they may have been waiting weeks
+  // Notify the family immediately — they may have been waiting weeks.
+  // Guarded: a notification failure must never roll back the promotion.
   await notifyFamilyOfOffer({
     applicationId: pos.application_id as string,
     offerId: offer.id,
     expiresAt,
     campusId: wl.campus_id,
     viaWaitlist: true,
-  });
+  }).catch((err) => console.error("[promoteFromWaitlist] notify failed", err));
 
   return { data: { offer_id: offer.id }, error: null };
 }
