@@ -1,20 +1,41 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { JourneyTimeline } from "@/components/ui/journey-timeline";
 import Link from "next/link";
 import { createServerClient } from "@rooted-ems/database/server";
 import { redirect } from "next/navigation";
 import {
-  getFamilyDashboardApps,
+  getFamilyJourneyCards,
   getFamilyNotifications,
   getActiveEnrollmentWindows,
-  getFamilyPendingOffers,
+  type FamilyJourneyCard,
 } from "@/lib/queries";
 import { getStatusConfig } from "@/lib/application-helpers";
 import { getLocale } from "@/lib/i18n/get-locale";
 import { tx } from "@/lib/i18n/translations";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Maps application status → 0-based position on the 5-step journey
+ * (Applied → Verified → Offered → Accepted → Registered).
+ * Steps before the index render filled; 5 means the journey is complete.
+ * Statuses absent here (waitlisted / declined / expired / withdrawn) are
+ * off the happy path and render a status note instead of the stepper.
+ */
+const JOURNEY_INDEX: Record<string, number> = {
+  draft: 0,
+  submitted: 1,
+  needs_info: 1,
+  verified: 2,
+  lottery_assigned: 2,
+  offered: 2,
+  accepted: 4,
+  placement_review: 4,
+  registered: 5,
+  enrolled: 5,
+};
 
 export default async function FamilyDashboardPage() {
   const supabase = await createServerClient();
@@ -27,23 +48,75 @@ export default async function FamilyDashboardPage() {
   const t = (key: Parameters<typeof tx>[0]) => tx(key, locale);
   const localeTag = locale === "es" ? "es-US" : "en-US";
 
-  const [apps, notifications, enrollmentWindows, pendingOffers] = await Promise.all([
-    getFamilyDashboardApps(user.id),
+  const [cards, notifications, enrollmentWindows] = await Promise.all([
+    getFamilyJourneyCards(),
     getFamilyNotifications(user.id, 5),
     getActiveEnrollmentWindows(),
-    getFamilyPendingOffers(user.id),
   ]);
 
-  const hasApps = apps.length > 0;
-  const draftApps = apps.filter((a) => a.status === "draft");
-  const draftCount = draftApps.length;
-  const offeredCount = apps.filter((a) => a.status === "offered").length;
-  const acceptedCount = apps.filter((a) => a.status === "accepted").length;
-  const registeredCount = apps.filter((a) => a.status === "registered").length;
+  const hasApps = cards.length > 0;
 
-  // Determine farthest stage for dynamic stepper
+  const journeySteps = [
+    t("steps.applied"),
+    t("steps.verified"),
+    t("steps.offered"),
+    t("steps.accepted"),
+    t("steps.registered"),
+  ];
+
+  const daysLeftText = (d: number) =>
+    d === 0
+      ? t("offers.expiresToday")
+      : d === 1
+        ? t("offers.oneDayLeft")
+        : `${d} ${t("offers.daysLeftSuffix")}`;
+
+  // ONE next-action per card, derived from status
+  const actionFor = (
+    card: FamilyJourneyCard
+  ): { href: string; label: string; urgent?: boolean; outline?: boolean } | null => {
+    switch (card.status) {
+      case "draft":
+        return {
+          href: `/family/applications/${card.id}/edit`,
+          label: t("dashboard.resume.continue"),
+        };
+      case "offered":
+        if (card.pending_offer) {
+          return {
+            href: `/family/offers/${card.pending_offer.id}`,
+            label: `${t("card.respondOffer")} — ${daysLeftText(card.pending_offer.days_remaining)}`,
+            urgent: card.pending_offer.is_urgent,
+          };
+        }
+        return {
+          href: `/family/applications/${card.id}`,
+          label: t("apps.viewDetails"),
+          outline: true,
+        };
+      case "accepted":
+      case "placement_review":
+        return { href: "/family/registration", label: t("dashboard.completeReg") };
+      case "registered":
+      case "enrolled":
+      case "waitlisted": // no family-facing waitlist page exists → no button
+      case "declined":
+      case "expired":
+      case "withdrawn":
+        return null;
+      default:
+        // submitted / needs_info / verified / lottery_assigned
+        return {
+          href: `/family/applications/${card.id}`,
+          label: t("apps.viewDetails"),
+          outline: true,
+        };
+    }
+  };
+
+  // Determine farthest stage for the "How Enrollment Works" guide
   const statusOrder = ["draft", "submitted", "needs_info", "verified", "lottery_assigned", "offered", "accepted", "registered"];
-  const farthestStatus = apps.reduce((max, a) => {
+  const farthestStatus = cards.reduce((max, a) => {
     const idx = statusOrder.indexOf(a.status);
     return idx > max ? idx : max;
   }, -1);
@@ -71,129 +144,135 @@ export default async function FamilyDashboardPage() {
         </Link>
       </div>
 
-      {/* ─── Resume: in-progress draft applications ─── */}
-      {draftCount > 0 && (
-        <Card className="border-2 border-rooted-green/40 bg-rooted-green/5">
-          <CardHeader className="pb-3">
-            <div className="flex items-start gap-3">
-              <span className="text-xl mt-0.5">✏️</span>
-              <div>
-                <CardTitle className="text-base">{t("dashboard.resume.title")}</CardTitle>
-                <CardDescription className="mt-0.5">
-                  {t("dashboard.resume.subtitle")}
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-0">
-            {draftApps.map((app) => {
-              const studentName = app.student_name.trim();
-              const displayTitle =
-                studentName && studentName !== "Unknown Student"
-                  ? studentName
-                  : t("dashboard.resume.newApp");
-              return (
-                <div
-                  key={app.id}
-                  className="flex items-center justify-between gap-3 bg-white border border-rooted-green/20 rounded-lg px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-ink truncate">{displayTitle}</p>
-                    <p className="text-xs text-stone mt-0.5">
-                      {app.campus_name && <>{app.campus_name} &middot; </>}
-                      {t("common.updated")}{" "}
-                      {new Date(app.updated_at).toLocaleDateString(localeTag, {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </p>
-                  </div>
-                  <Link href={`/family/applications/${app.id}/edit`} className="shrink-0">
-                    <Button size="sm">{t("dashboard.resume.continue")}</Button>
-                  </Link>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ─── Celebration: registered students ─── */}
-      {registeredCount > 0 && (
-        <div className="bg-rooted-green/10 border border-rooted-green/30 rounded-lg p-4 flex items-start gap-3">
-          <span className="text-xl mt-0.5">🎓</span>
-          <div>
-            <p className="text-sm font-bold text-ink">
-              {t("dashboard.welcomeFamily")}
-            </p>
-            <p className="text-sm text-ink/60 mt-0.5">
-              {registeredCount} {t("dashboard.enrolledStudents")} {t("dashboard.checkOrientation")}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ─── Urgent: offer pending ─── */}
-      {pendingOffers.length > 0 && (
-        <div className="space-y-2">
-          {pendingOffers.map((offer) => (
-            <div
-              key={offer.id}
-              className={`rounded-lg p-4 flex items-start gap-3 border ${
-                offer.is_urgent
-                  ? "bg-red-50 border-red-300"
-                  : "bg-amber-50 border-amber-300"
-              }`}
-            >
-              <span className="text-xl mt-0.5">{offer.is_urgent ? "⏰" : "🎉"}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-ink">
-                  {offer.student_name} — {offer.campus_name}
-                </p>
-                <p className="text-sm text-ink/60 mt-0.5">
-                  {offer.is_urgent
-                    ? `${t("dashboard.expiresIn")} ${offer.days_remaining === 0 ? t("dashboard.lessThanDay") : `${offer.days_remaining} ${offer.days_remaining === 1 ? t("common.day") : t("common.days")}`} — ${t("dashboard.respondNow")}`
-                    : `${t("dashboard.respondWithin")} ${offer.days_remaining} ${t("dashboard.daysToSecure")}`}
-                </p>
-              </div>
-              <Link href={`/family/offers/${offer.id}`} className="shrink-0">
-                <Button
-                  size="sm"
-                  className={
-                    offer.is_urgent
-                      ? "bg-red-600 hover:bg-red-700 text-white"
-                      : "bg-rooted-green hover:bg-rooted-green/90 text-white"
-                  }
-                >
-                  {t("dashboard.respond")}
-                </Button>
-              </Link>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ─── Registration reminder ─── */}
-      {acceptedCount > 0 && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
-          <span className="text-xl mt-0.5">📝</span>
-          <div className="flex-1">
-            <p className="text-sm font-bold text-ink">
-              {t("dashboard.completeReg")}
-            </p>
-            <p className="text-sm text-ink/60 mt-0.5">
-              {t("dashboard.acceptedPre")} {acceptedCount} {t("dashboard.acceptedPost")}
-            </p>
-          </div>
-          <Link href="/family/registration">
-            <Button size="sm" variant="outline" className="shrink-0">
-              {t("dashboard.goToReg")}
-            </Button>
+      {/* ─── Per-child journey cards ─── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-semibold text-ink">
+            {t("dashboard.yourApplications")}
+          </h2>
+          <Link
+            href="/family/applications"
+            className="text-sm text-rooted-green hover:underline"
+          >
+            {t("dashboard.viewAll")} &rarr;
           </Link>
         </div>
-      )}
 
+        {!hasApps ? (
+          <Card>
+            <CardContent className="py-8 text-center">
+              <p className="text-stone mb-1">{t("dashboard.noApplications")}</p>
+              <p className="text-sm text-stone mb-4">{t("dashboard.startFirstApp")}</p>
+              <Link href="/family/applications/new">
+                <Button>{t("dashboard.startNewApplication")}</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {cards.map((card) => {
+              const cfg = getStatusConfig(card.status);
+              const statusKey = `status.${card.status}` as Parameters<typeof tx>[0];
+              const localizedStatus = tx(statusKey, locale);
+              const statusLabel = localizedStatus === statusKey ? cfg.label : localizedStatus;
+
+              const journeyIndex = JOURNEY_INDEX[card.status];
+              const onJourney = journeyIndex !== undefined;
+              const journeyAria =
+                journeyIndex !== undefined && journeyIndex >= journeySteps.length
+                  ? t("journey.aria.complete")
+                  : `${t("journey.aria.step")} ${(journeyIndex ?? 0) + 1} ${t("journey.aria.of")} ${journeySteps.length}: ${journeySteps[journeyIndex ?? 0]}`;
+
+              const isDraft = card.status === "draft";
+              const studentTitle = card.student_name || t("dashboard.resume.newApp");
+              const subtitle = [
+                card.campus_name,
+                card.grade ? `${t("offers.grade")} ${card.grade}` : "",
+              ]
+                .filter(Boolean)
+                .join(" · ");
+              const action = actionFor(card);
+
+              return (
+                <Card
+                  key={card.id}
+                  className={
+                    isDraft
+                      ? "border-rooted-green/40 bg-rooted-green/5"
+                      : card.registration_complete
+                        ? "border-rooted-green/30"
+                        : undefined
+                  }
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <CardTitle className="text-base truncate">
+                          {studentTitle}
+                        </CardTitle>
+                        {subtitle && <CardDescription>{subtitle}</CardDescription>}
+                      </div>
+                      <Badge variant={cfg.variant} className="shrink-0">
+                        {statusLabel}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {onJourney ? (
+                      <JourneyTimeline
+                        steps={journeySteps}
+                        currentIndex={journeyIndex}
+                        size="sm"
+                        ariaLabel={journeyAria}
+                      />
+                    ) : (
+                      <p className="text-sm text-ink/60">
+                        {card.status === "waitlisted"
+                          ? t("card.waitlistNote")
+                          : t("card.closedNote")}
+                      </p>
+                    )}
+
+                    {card.registration_complete && (
+                      <p className="text-sm font-medium text-rooted-green">
+                        🎓 {t("card.celebration")}
+                      </p>
+                    )}
+                    {isDraft && (
+                      <p className="text-sm text-ink/60">{t("card.draftHint")}</p>
+                    )}
+
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs text-stone">
+                        {t("common.updated")}{" "}
+                        {new Date(card.updated_at).toLocaleDateString(
+                          localeTag,
+                          { month: "short", day: "numeric", year: "numeric" }
+                        )}
+                      </span>
+                      {action && (
+                        <Link href={action.href} className="shrink-0">
+                          <Button
+                            size="sm"
+                            variant={action.outline ? "outline" : "default"}
+                            className={
+                              action.urgent
+                                ? "bg-red-600 hover:bg-red-700 text-white"
+                                : undefined
+                            }
+                          >
+                            {action.label}
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* ─── Our Schools — Clickable logos ─── */}
       <div>
@@ -289,92 +368,6 @@ export default async function FamilyDashboardPage() {
             );
           })}
         </div>
-      </div>
-
-      {/* ─── Application cards ─── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-ink">
-            {t("dashboard.yourApplications")}
-          </h2>
-          <Link
-            href="/family/applications"
-            className="text-sm text-rooted-green hover:underline"
-          >
-            {t("dashboard.viewAll")} &rarr;
-          </Link>
-        </div>
-
-        {!hasApps ? (
-          <Card>
-            <CardContent className="py-8 text-center">
-              <p className="text-stone mb-4">
-                {t("dashboard.noApplications")}
-              </p>
-              <Link href="/family/applications/new">
-                <Button>{t("dashboard.startNewApplication")}</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {apps.map((app) => {
-              const cfg = getStatusConfig(app.status);
-              const statusKey = `status.${app.status}` as Parameters<typeof tx>[0];
-              const localizedStatus = tx(statusKey, locale);
-              const statusLabel = localizedStatus === statusKey ? cfg.label : localizedStatus;
-              return (
-                <Card
-                  key={app.id}
-                  className={
-                    app.status === "draft"
-                      ? "border-amber-200 bg-amber-50/30"
-                      : undefined
-                  }
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-base">
-                          {app.student_name}
-                        </CardTitle>
-                        <CardDescription>
-                          {app.grade_label} &middot; {app.campus_name}
-                        </CardDescription>
-                      </div>
-                      <Badge variant={cfg.variant}>{statusLabel}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {app.next_step && (
-                      <p className="text-sm text-ink/60">{app.next_step}</p>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-stone">
-                        {t("common.updated")}{" "}
-                        {new Date(app.updated_at).toLocaleDateString(
-                          localeTag,
-                          { month: "short", day: "numeric", year: "numeric" }
-                        )}
-                      </span>
-                      {app.status === "draft" ? (
-                        <Link href={`/family/applications/${app.id}/edit`}>
-                          <Button size="sm">{t("common.continue")}</Button>
-                        </Link>
-                      ) : (
-                        <Link href={`/family/applications/${app.id}`}>
-                          <Button variant="outline" size="sm">
-                            {t("apps.viewDetails")}
-                          </Button>
-                        </Link>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       {/* ─── What to expect + Notifications ─── */}

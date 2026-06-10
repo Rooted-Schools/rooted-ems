@@ -301,6 +301,16 @@ const dict = {
   "dashboard.resume.continue":  { en: "Continue application", es: "Continuar solicitud" },
   "dashboard.resume.newApp":    { en: "New application",      es: "Nueva solicitud" },
 
+  // ─── Dashboard: per-child journey cards ───────────────────────────────────
+  "journey.aria.step":     { en: "Step",                 es: "Paso" },
+  "journey.aria.of":       { en: "of",                   es: "de" },
+  "journey.aria.complete": { en: "All steps complete",   es: "Todos los pasos completados" },
+  "card.respondOffer":     { en: "Respond to offer",     es: "Responder a la oferta" },
+  "card.waitlistNote":     { en: "Your student is on the waitlist. We will contact you if a seat opens.", es: "Su estudiante está en la lista de espera. Nos comunicaremos con usted si se abre un cupo." },
+  "card.closedNote":       { en: "This application is no longer active. Contact the school if you have questions.", es: "Esta solicitud ya no está activa. Comuníquese con la escuela si tiene preguntas." },
+  "card.celebration":      { en: "Enrollment complete — welcome to the Rooted Schools family!", es: "Inscripción completa — ¡bienvenido/a a la familia Rooted Schools!" },
+  "card.draftHint":        { en: "Your answers are saved — finish whenever you're ready.", es: "Sus respuestas están guardadas — termine cuando esté listo/a." },
+
   // ─── Offers (list + detail) ───────────────────────────────────────────────
   "offers.subtitle":          { en: "Respond to seat offers before the deadline to secure your spot.", es: "Responda a las ofertas de cupo antes de la fecha límite para asegurar su lugar." },
   "offers.noPending":         { en: "You have no pending offers at this time.", es: "No tiene ofertas pendientes en este momento." },

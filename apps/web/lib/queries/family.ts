@@ -63,7 +63,106 @@ export interface FamilyAppSummary {
   next_step: string | null;
 }
 
+export interface FamilyJourneyCard {
+  id: string;
+  /** Empty string when the application (e.g. an early draft) has no student yet. */
+  student_name: string;
+  grade: string;
+  campus_name: string;
+  status: string;
+  submitted_at: string | null;
+  updated_at: string;
+  /** Pending seat offer awaiting a family response, if any. */
+  pending_offer: {
+    id: string;
+    expires_at: string;
+    days_remaining: number;
+    is_urgent: boolean; // <= 3 days remaining
+  } | null;
+  /** True once the application has reached registered/enrolled. */
+  registration_complete: boolean;
+}
+
 // ─── Queries ─────────────────────────────────────────────
+
+/**
+ * Per-application journey data for the family dashboard cards.
+ *
+ * Uses the user-scoped server client: RLS (app_family / offer_family /
+ * student_own) restricts rows to the authenticated guardian's household, so
+ * no service-role access is needed for this family-facing read. Two queries
+ * total — applications with joins, then pending offers for those apps.
+ */
+export async function getFamilyJourneyCards(): Promise<FamilyJourneyCard[]> {
+  const supabase = await createServerClient();
+
+  const { data: apps, error } = await supabase
+    .from("application")
+    .select(
+      `
+      id, status, submitted_at, updated_at,
+      student:student_id (first_name, last_name),
+      campus:campus_id (name),
+      grade_level:grade_level_id (grade)
+    `
+    )
+    .order("updated_at", { ascending: false })
+    .limit(20);
+
+  if (error) {
+    console.error("[getFamilyJourneyCards]", error.message);
+    return [];
+  }
+  if (!apps || apps.length === 0) return [];
+
+  const appIds = apps.map((a: Record<string, unknown>) => a.id as string);
+
+  const { data: offers, error: offerError } = await supabase
+    .from("offer")
+    .select("id, application_id, expires_at")
+    .in("application_id", appIds)
+    .eq("status", "pending");
+
+  if (offerError) {
+    console.error("[getFamilyJourneyCards] offers", offerError.message);
+  }
+
+  const now = Date.now();
+  const offerByApp = new Map<string, FamilyJourneyCard["pending_offer"]>();
+  for (const o of offers ?? []) {
+    const row = o as Record<string, unknown>;
+    const expiry = row.expires_at ? new Date(row.expires_at as string).getTime() : null;
+    const daysRemaining =
+      expiry != null ? Math.max(0, Math.ceil((expiry - now) / (1000 * 60 * 60 * 24))) : 0;
+    offerByApp.set(row.application_id as string, {
+      id: row.id as string,
+      expires_at: row.expires_at as string,
+      days_remaining: daysRemaining,
+      is_urgent: daysRemaining <= 3,
+    });
+  }
+
+  return apps.map((row: Record<string, unknown>) => {
+    const student = row.student as Record<string, string> | null;
+    const campus = row.campus as Record<string, string> | null;
+    const grade = row.grade_level as Record<string, string> | null;
+    const status = row.status as string;
+
+    return {
+      id: row.id as string,
+      student_name: student
+        ? `${student.first_name ?? ""} ${student.last_name ?? ""}`.trim()
+        : "",
+      grade: (grade?.grade as string) ?? "",
+      campus_name: campus?.name ?? "",
+      status,
+      submitted_at: row.submitted_at as string | null,
+      updated_at: row.updated_at as string,
+      pending_offer: offerByApp.get(row.id as string) ?? null,
+      registration_complete: status === "registered" || status === "enrolled",
+    };
+  });
+}
 
 /**
  * Fetch notifications for a family user.
