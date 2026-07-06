@@ -645,6 +645,53 @@ export async function notifyFamilyRegistrationComplete({
   ]);
 }
 
+/**
+ * Registration packet has been stalled on missing items — nudge the family.
+ * Called by the nudge cron, which owns the throttle (registration_packet.
+ * last_nudged_at), so this function just delivers on all channels.
+ */
+export async function notifyFamilyRegistrationNudge({
+  applicationId,
+  studentName,
+  campusId,
+  missingNames,
+}: {
+  applicationId: string;
+  studentName?: string;
+  campusId?: string;
+  missingNames: string[];
+}): Promise<void> {
+  const contact = await getGuardianContact(applicationId);
+  const { userId, email } = contact;
+  if (!userId && !email) return;
+  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const studentFirstName = firstNameOf(studentName);
+  const count = missingNames.length;
+  await Promise.all([
+    userId
+      ? notify({
+          userId,
+          subject: `Almost done — ${count} registration item${count === 1 ? "" : "s"} left`,
+          body: `${studentName ? `${studentName}'s` : "Your student's"} registration at ${campusName} is waiting on: ${missingNames.slice(0, 4).join(", ")}${count > 4 ? "…" : ""}. Finish these to secure the seat.`,
+          link: `/family/registration`,
+          campusId,
+          logTag: "notifyFamilyRegistrationNudge",
+        })
+      : Promise.resolve(),
+    emailGuardian(
+      email,
+      emailTemplates.registrationNudge({ studentFirstName, campusName, missingNames }),
+      "notifyFamilyRegistrationNudge",
+      campusEmail
+    ),
+    smsGuardian(
+      contact,
+      `Rooted Schools: ${count} registration item${count === 1 ? "" : "s"} still needed for ${studentFirstName ?? "your student"} at ${campusName}. Finish here: ${APP_LINK}/family/registration\nAún faltan pasos de inscripción. Complételos en el enlace.`,
+      "notifyFamilyRegistrationNudge"
+    ),
+  ]);
+}
+
 // ─── Staff notifications ──────────────────────────────────────────────────────
 
 /**

@@ -327,6 +327,47 @@ export function waitlistPromoted({
   };
 }
 
+export function registrationNudge({
+  studentFirstName,
+  campusName,
+  missingNames,
+}: {
+  studentFirstName?: string;
+  campusName: string;
+  /** Names of required items still incomplete (shown as-is in both languages). */
+  missingNames: string[];
+}): EmailTemplate {
+  const shown = missingNames.slice(0, 4);
+  const more = missingNames.length - shown.length;
+  const listEn = shown.join(", ") + (more > 0 ? ` and ${more} more` : "");
+  const listEs = shown.join(", ") + (more > 0 ? ` y ${more} más` : "");
+  const { html, text } = renderEmail(
+    {
+      greeting: "Hello,",
+      paragraphs: [
+        `You're almost done! ${studentEn(studentFirstName)}'s registration at ${campusName} is still waiting on: ${listEn}.`,
+        "Completing these items secures your student's seat. Most can be finished right from your phone in a few minutes — and we're happy to help if anything is confusing.",
+      ],
+      cta: { label: "Finish registration", url: `${APP_URL}/family/registration` },
+      closing: "Warmly, the Rooted Schools Enrollment Team",
+    },
+    {
+      greeting: "Hola,",
+      paragraphs: [
+        `¡Ya casi termina! La inscripción de ${studentEs(studentFirstName)} en ${campusName} todavía está pendiente de: ${listEs}.`,
+        "Completar estos pasos asegura el cupo de su estudiante. La mayoría se pueden terminar desde su teléfono en pocos minutos — y con gusto le ayudamos si algo no está claro.",
+      ],
+      cta: { label: "Terminar la inscripción", url: `${APP_URL}/family/registration` },
+      closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
+    }
+  );
+  return {
+    subject: `Almost done — a few registration items remain / Faltan algunos pasos de inscripción`,
+    html,
+    text,
+  };
+}
+
 export function waitlistPositionImproved({
   studentFirstName,
   campusName,
