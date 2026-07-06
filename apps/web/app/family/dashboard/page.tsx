@@ -225,12 +225,19 @@ export default async function FamilyDashboardPage() {
                         size="sm"
                         ariaLabel={journeyAria}
                       />
+                    ) : card.status === "waitlisted" ? (
+                      <div className="space-y-1">
+                        {card.waitlist_standing && (
+                          <p className="text-sm font-semibold text-rooted-green">
+                            {t("card.waitlistStanding")
+                              .replace("{position}", String(card.waitlist_standing.position))
+                              .replace("{total}", String(card.waitlist_standing.total))}
+                          </p>
+                        )}
+                        <p className="text-sm text-ink/60">{t("card.waitlistNote")}</p>
+                      </div>
                     ) : (
-                      <p className="text-sm text-ink/60">
-                        {card.status === "waitlisted"
-                          ? t("card.waitlistNote")
-                          : t("card.closedNote")}
-                      </p>
+                      <p className="text-sm text-ink/60">{t("card.closedNote")}</p>
                     )}
 
                     {card.registration_complete && (

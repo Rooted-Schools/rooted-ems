@@ -326,3 +326,39 @@ export function waitlistPromoted({
     text,
   };
 }
+
+export function waitlistPositionImproved({
+  studentFirstName,
+  campusName,
+  position,
+}: {
+  studentFirstName?: string;
+  campusName: string;
+  position: number;
+}): EmailTemplate {
+  const { html, text } = renderEmail(
+    {
+      greeting: "Good news!",
+      paragraphs: [
+        `${studentEn(studentFirstName)} has moved up the waitlist at ${campusName} and is now #${position} in line.`,
+        "Seats can open at any time, and families near the front of the list are contacted first. You can check your position anytime in your family portal — no action is needed right now.",
+      ],
+      cta: { label: "View your dashboard", url: `${APP_URL}/family/dashboard` },
+      closing: "Warmly, the Rooted Schools Enrollment Team",
+    },
+    {
+      greeting: "¡Buenas noticias!",
+      paragraphs: [
+        `${studentEs(studentFirstName)} ha avanzado en la lista de espera en ${campusName} y ahora está en el puesto #${position}.`,
+        "Los cupos pueden abrirse en cualquier momento, y las familias al frente de la lista son contactadas primero. Puede consultar su posición en cualquier momento en su portal familiar — no se requiere ninguna acción por ahora.",
+      ],
+      cta: { label: "Ver su panel", url: `${APP_URL}/family/dashboard` },
+      closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
+    }
+  );
+  return {
+    subject: `Waitlist update: now #${position} in line / Actualización de la lista de espera`,
+    html,
+    text,
+  };
+}

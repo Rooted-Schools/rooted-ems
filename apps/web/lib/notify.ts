@@ -241,6 +241,105 @@ export async function notifyFamilyApplicationWaitlisted({
   });
 }
 
+/**
+ * Families near the front get an email as well as the in-app notification;
+ * further back, in-app only. Keeps a 30-family list from emailing 29 people
+ * every time one student leaves, while the families for whom movement is
+ * actionable hear about it on the channel they actually check.
+ */
+const WAITLIST_EMAIL_TOP_N = 3;
+
+/**
+ * An active entry left the waitlist (promoted or removed) — everyone behind
+ * it just moved up one place. Notify each affected family of their new
+ * effective position (rank among still-active entries, not the raw
+ * position_number, which is never renumbered).
+ */
+export async function notifyWaitlistMovement({
+  waitlistId,
+  removedPositionNumber,
+  campusId,
+}: {
+  waitlistId: string;
+  removedPositionNumber: number;
+  campusId?: string;
+}): Promise<void> {
+  try {
+    const supabase = createServiceRoleClient();
+
+    // All still-active entries, in line order — ranks derive from this list.
+    const { data: active, error } = await supabase
+      .from("waitlist_position")
+      .select("application_id, position_number")
+      .eq("waitlist_id", waitlistId)
+      .is("removed_at", null)
+      .order("position_number", { ascending: true });
+
+    if (error) {
+      console.error("[notifyWaitlistMovement]", error.message, { waitlistId });
+      return;
+    }
+
+    const rows = (active ?? []) as Array<{ application_id: string; position_number: number }>;
+    const improved = rows
+      .map((row, index) => ({ ...row, rank: index + 1 }))
+      .filter((row) => row.position_number > removedPositionNumber);
+    if (improved.length === 0) return;
+
+    // Batch-resolve guardian contact + student name for the affected apps
+    const { data: apps, error: appsError } = await supabase
+      .from("application")
+      .select("id, guardian:guardian_id (user_id, email), student:student_id (first_name)")
+      .in("id", improved.map((row) => row.application_id));
+
+    if (appsError) {
+      console.error("[notifyWaitlistMovement] apps", appsError.message, { waitlistId });
+      return;
+    }
+
+    const appById = new Map(
+      (apps ?? []).map((a: Record<string, unknown>) => [a.id as string, a])
+    );
+    const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+    const total = rows.length;
+
+    for (const row of improved) {
+      const app = appById.get(row.application_id);
+      if (!app) continue;
+      const guardian = app.guardian as Record<string, string | null> | null;
+      const student = app.student as Record<string, string | null> | null;
+      const studentFirst = student?.first_name ?? undefined;
+
+      if (guardian?.user_id) {
+        await notify({
+          userId: guardian.user_id,
+          subject: `You moved up the waitlist at ${campusName}`,
+          body: `${studentFirst ?? "Your student"} is now #${row.rank} of ${total} on the waitlist at ${campusName}.`,
+          link: `/family/dashboard`,
+          campusId,
+          logTag: "notifyWaitlistMovement",
+        });
+      }
+
+      if (row.rank <= WAITLIST_EMAIL_TOP_N) {
+        await emailGuardian(
+          guardian?.email ?? null,
+          emailTemplates.waitlistPositionImproved({
+            studentFirstName: studentFirst,
+            campusName,
+            position: row.rank,
+          }),
+          "notifyWaitlistMovement",
+          campusEmail
+        );
+      }
+    }
+  } catch (err) {
+    // Never let a movement notification failure surface to the caller.
+    console.error("[notifyWaitlistMovement] unexpected", err);
+  }
+}
+
 // ─── Offer notifications ──────────────────────────────────────────────────────
 
 /**

@@ -63,6 +63,13 @@ export interface FamilyAppSummary {
   next_step: string | null;
 }
 
+export interface WaitlistStanding {
+  /** Effective place in line: rank among still-active entries, 1-based. */
+  position: number;
+  /** Total active entries on the same waitlist. */
+  total: number;
+}
+
 export interface FamilyJourneyCard {
   id: string;
   /** Empty string when the application (e.g. an early draft) has no student yet. */
@@ -81,6 +88,75 @@ export interface FamilyJourneyCard {
   } | null;
   /** True once the application has reached registered/enrolled. */
   registration_complete: boolean;
+  /** Live waitlist standing when the application is waitlisted, else null. */
+  waitlist_standing: WaitlistStanding | null;
+}
+
+/**
+ * Compute the effective waitlist standing for a set of applications.
+ *
+ * `position_number` is never renumbered when entries leave the list (rows are
+ * soft-removed via `removed_at`), so the raw number overstates a family's
+ * place in line. The honest number is the rank among still-active entries.
+ *
+ * Uses the service-role client because ranking requires counting OTHER
+ * families' rows, which family RLS rightly forbids. Callers must pass only
+ * application IDs already proven to belong to the requesting user (i.e. IDs
+ * returned by an RLS-scoped query) — only rank and total are ever returned,
+ * never other families' data.
+ */
+export async function getWaitlistStandings(
+  applicationIds: string[]
+): Promise<Map<string, WaitlistStanding>> {
+  const standings = new Map<string, WaitlistStanding>();
+  if (applicationIds.length === 0) return standings;
+
+  const supabase = createServiceRoleClient();
+
+  const { data: mine, error } = await supabase
+    .from("waitlist_position")
+    .select("application_id, waitlist_id, position_number")
+    .in("application_id", applicationIds)
+    .is("removed_at", null);
+
+  if (error) {
+    console.error("[getWaitlistStandings]", error.message);
+    return standings;
+  }
+  if (!mine || mine.length === 0) return standings;
+
+  const waitlistIds = [...new Set(mine.map((m: Record<string, unknown>) => m.waitlist_id as string))];
+
+  const { data: active, error: activeError } = await supabase
+    .from("waitlist_position")
+    .select("waitlist_id, position_number")
+    .in("waitlist_id", waitlistIds)
+    .is("removed_at", null);
+
+  if (activeError) {
+    console.error("[getWaitlistStandings] active", activeError.message);
+    return standings;
+  }
+
+  // Group active position numbers by waitlist for rank computation
+  const byWaitlist = new Map<string, number[]>();
+  for (const row of active ?? []) {
+    const r = row as Record<string, unknown>;
+    const wid = r.waitlist_id as string;
+    const list = byWaitlist.get(wid) ?? [];
+    list.push(r.position_number as number);
+    byWaitlist.set(wid, list);
+  }
+
+  for (const row of mine) {
+    const r = row as Record<string, unknown>;
+    const numbers = byWaitlist.get(r.waitlist_id as string) ?? [];
+    const myNumber = r.position_number as number;
+    const rank = numbers.filter((n) => n < myNumber).length + 1;
+    standings.set(r.application_id as string, { position: rank, total: numbers.length });
+  }
+
+  return standings;
 }
 
 // ─── Queries ─────────────────────────────────────────────
@@ -127,6 +203,12 @@ export async function getFamilyJourneyCards(): Promise<FamilyJourneyCard[]> {
     console.error("[getFamilyJourneyCards] offers", offerError.message);
   }
 
+  // Live standings for any waitlisted applications (app IDs are RLS-proven above)
+  const waitlistedIds = apps
+    .filter((a: Record<string, unknown>) => a.status === "waitlisted")
+    .map((a: Record<string, unknown>) => a.id as string);
+  const standings = await getWaitlistStandings(waitlistedIds);
+
   const now = Date.now();
   const offerByApp = new Map<string, FamilyJourneyCard["pending_offer"]>();
   for (const o of offers ?? []) {
@@ -160,6 +242,7 @@ export async function getFamilyJourneyCards(): Promise<FamilyJourneyCard[]> {
       updated_at: row.updated_at as string,
       pending_offer: offerByApp.get(row.id as string) ?? null,
       registration_complete: status === "registered" || status === "enrolled",
+      waitlist_standing: standings.get(row.id as string) ?? null,
     };
   });
 }

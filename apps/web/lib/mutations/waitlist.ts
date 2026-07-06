@@ -1,7 +1,7 @@
 import { createServerClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
-import { notifyFamilyOfOffer } from "@/lib/notify";
+import { notifyFamilyOfOffer, notifyWaitlistMovement } from "@/lib/notify";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -82,7 +82,7 @@ export async function promoteFromWaitlist(
   const { data: position, error: fetchError } = await supabase
     .from("waitlist_position")
     .select(`
-      id, application_id, waitlist_id,
+      id, application_id, waitlist_id, position_number,
       waitlist:waitlist_id (campus_id, grade_level_id)
     `)
     .eq("id", waitlistPositionId)
@@ -165,6 +165,13 @@ export async function promoteFromWaitlist(
     viaWaitlist: true,
   }).catch((err) => console.error("[promoteFromWaitlist] notify failed", err));
 
+  // Everyone behind the promoted student just moved up one place.
+  await notifyWaitlistMovement({
+    waitlistId: pos.waitlist_id as string,
+    removedPositionNumber: pos.position_number as number,
+    campusId: wl.campus_id,
+  }).catch((err) => console.error("[promoteFromWaitlist] movement notify failed", err));
+
   return { data: { offer_id: offer.id }, error: null };
 }
 
@@ -181,7 +188,7 @@ export async function removeFromWaitlist(
   // Fetch position to get the application_id and campus before removing
   const { data: position } = await supabase
     .from("waitlist_position")
-    .select("application_id, waitlist:waitlist_id (campus_id)")
+    .select("application_id, waitlist_id, position_number, waitlist:waitlist_id (campus_id)")
     .eq("id", waitlistPositionId)
     .is("removed_at", null)
     .single();
@@ -220,6 +227,15 @@ export async function removeFromWaitlist(
     new_data: { removal_reason: reason },
     metadata: { application_id: position?.application_id ?? null },
   });
+
+  // Everyone behind the removed student just moved up one place.
+  if (position?.waitlist_id && position?.position_number != null) {
+    await notifyWaitlistMovement({
+      waitlistId: position.waitlist_id as string,
+      removedPositionNumber: position.position_number as number,
+      campusId: campusId ?? undefined,
+    }).catch((err) => console.error("[removeFromWaitlist] movement notify failed", err));
+  }
 
   return { data: null, error: null };
 }

@@ -307,6 +307,7 @@ const dict = {
   "journey.aria.complete": { en: "All steps complete",   es: "Todos los pasos completados" },
   "card.respondOffer":     { en: "Respond to offer",     es: "Responder a la oferta" },
   "card.waitlistNote":     { en: "Your student is on the waitlist. We will contact you if a seat opens.", es: "Su estudiante está en la lista de espera. Nos comunicaremos con usted si se abre un cupo." },
+  "card.waitlistStanding": { en: "Currently #{position} of {total} on the waitlist", es: "Actualmente #{position} de {total} en la lista de espera" },
   "card.closedNote":       { en: "This application is no longer active. Contact the school if you have questions.", es: "Esta solicitud ya no está activa. Comuníquese con la escuela si tiene preguntas." },
   "card.celebration":      { en: "Enrollment complete — welcome to the Rooted Schools family!", es: "Inscripción completa — ¡bienvenido/a a la familia Rooted Schools!" },
   "card.draftHint":        { en: "Your answers are saved — finish whenever you're ready.", es: "Sus respuestas están guardadas — termine cuando esté listo/a." },
