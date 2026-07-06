@@ -66,6 +66,8 @@ interface FormData {
   guardianRelationshipOther: string;
   guardianEmail: string;
   guardianPhone: string;
+  /** TCPA opt-in: OK to text enrollment updates to guardianPhone. */
+  smsConsent: boolean;
   // Sibling priority (affects lottery weighting)
   hasSibling: boolean;
   // Step 3: Consent
@@ -89,6 +91,7 @@ const INITIAL: FormData = {
   guardianRelationshipOther: "",
   guardianEmail: "",
   guardianPhone: "",
+  smsConsent: false,
   hasSibling: false,
   dataSharingConsent: false,
   agreeTerms: false,
@@ -218,6 +221,7 @@ function buildCreateInput(form: FormData, campusWindows: EnrollmentWindowInfo[])
     guardian_relationship: form.guardianRelationship || "other",
     guardian_email: form.guardianEmail,
     guardian_phone: form.guardianPhone,
+    guardian_sms_consent: form.smsConsent,
     source: "website" as const,
     answers,
   };
@@ -267,6 +271,7 @@ function buildAutosaveInput(
     guardian_relationship: form.guardianRelationship || undefined,
     guardian_email: form.guardianEmail,
     guardian_phone: form.guardianPhone,
+    guardian_sms_consent: form.smsConsent,
     answers,
   };
 }
@@ -693,6 +698,21 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
                 placeholder="(555) 555-0100"
               />
             </Field>
+            <div className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                id="sms-consent"
+                checked={form.smsConsent}
+                onChange={(e) => update({ smsConsent: e.target.checked })}
+                className="mt-1 h-4 w-4 rounded border-stone/40 text-rooted-green focus:ring-rooted-green"
+              />
+              <label htmlFor="sms-consent" className="text-sm text-ink/80">
+                {t("appForm.smsConsent")}
+                <span className="block text-xs text-stone mt-0.5">
+                  {t("appForm.smsConsentHint")}
+                </span>
+              </label>
+            </div>
             <p className="text-xs text-stone">
               📋 {t("appForm.regNote")}
             </p>

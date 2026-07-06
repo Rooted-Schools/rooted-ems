@@ -15,35 +15,42 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { sendNotification } from "@/lib/mutations";
 import { sendEmail } from "@/lib/email";
+import { sendSms } from "@/lib/sms";
 import * as emailTemplates from "@/lib/email-templates";
 import type { EmailTemplate } from "@/lib/email-templates";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/** Base URL used in SMS bodies (emails resolve their own via templates). */
+const APP_LINK = process.env.NEXT_PUBLIC_APP_URL ?? "https://enroll.rootedschool.org";
+
 interface GuardianContact {
   userId: string | null;
   email: string | null;
+  phone: string | null;
+  /** TCPA opt-in — automated texts go out only when this is true. */
+  smsConsent: boolean;
 }
 
 /**
- * Resolve the Supabase auth user_id and contact email for the guardian on a
- * given application — one query for both needs.  Fields resolve to null on
+ * Resolve the Supabase auth user_id and contact details for the guardian on a
+ * given application — one query for all needs.  Fields resolve to null on
  * failure so callers degrade gracefully.
  */
 async function getGuardianContact(applicationId: string): Promise<GuardianContact> {
   const supabase = createServiceRoleClient();
   const { data, error } = await supabase
     .from("application")
-    .select("guardian_id, guardian:guardian_id (user_id, email)")
+    .select("guardian_id, guardian:guardian_id (user_id, email, phone, sms_consent)")
     .eq("id", applicationId)
     .single();
   if (error) {
     console.error("[getGuardianContact] query error", error.message, { applicationId });
-    return { userId: null, email: null };
+    return { userId: null, email: null, phone: null, smsConsent: false };
   }
   const row = data as unknown as Record<string, unknown> | null;
-  const guardian = row?.guardian as Record<string, string | null> | null;
-  const userId = guardian?.user_id ?? null;
+  const guardian = row?.guardian as Record<string, string | boolean | null> | null;
+  const userId = (guardian?.user_id as string | null) ?? null;
   if (!userId) {
     console.warn("[getGuardianContact] no user_id found", {
       applicationId,
@@ -51,7 +58,29 @@ async function getGuardianContact(applicationId: string): Promise<GuardianContac
       guardian,
     });
   }
-  return { userId, email: guardian?.email ?? null };
+  return {
+    userId,
+    email: (guardian?.email as string | null) ?? null,
+    phone: (guardian?.phone as string | null) ?? null,
+    smsConsent: guardian?.sms_consent === true,
+  };
+}
+
+/**
+ * Text the guardian — only when they explicitly opted in AND have a phone on
+ * file. The consent gate lives here, not in lib/sms.ts, so every SMS in the
+ * system passes through it. Never throws.
+ */
+async function smsGuardian(
+  contact: Pick<GuardianContact, "phone" | "smsConsent">,
+  body: string,
+  logTag: string
+): Promise<void> {
+  if (!contact.smsConsent || !contact.phone) return;
+  const result = await sendSms({ to: contact.phone, body });
+  if (!result.ok && result.error !== "sms not configured") {
+    console.error(`[${logTag}] sms failed`, result.error);
+  }
 }
 
 /**
@@ -61,18 +90,24 @@ async function getGuardianContactByEnrollment(enrollmentId: string): Promise<Gua
   const supabase = createServiceRoleClient();
   const { data, error } = await supabase
     .from("enrollment")
-    .select("application_id, application:application_id (guardian:guardian_id (user_id, email))")
+    .select("application_id, application:application_id (guardian:guardian_id (user_id, email, phone, sms_consent))")
     .eq("id", enrollmentId)
     .single();
   if (error) {
     console.error("[getGuardianContactByEnrollment] query error", error.message, { enrollmentId });
-    return { userId: null, email: null, applicationId: null };
+    return { userId: null, email: null, phone: null, smsConsent: false, applicationId: null };
   }
   const row = data as unknown as Record<string, unknown> | null;
   const applicationId = (row?.application_id as string) ?? null;
   const application = row?.application as Record<string, unknown> | null;
-  const guardian = application?.guardian as Record<string, string | null> | null;
-  return { userId: guardian?.user_id ?? null, email: guardian?.email ?? null, applicationId };
+  const guardian = application?.guardian as Record<string, string | boolean | null> | null;
+  return {
+    userId: (guardian?.user_id as string | null) ?? null,
+    email: (guardian?.email as string | null) ?? null,
+    phone: (guardian?.phone as string | null) ?? null,
+    smsConsent: guardian?.sms_consent === true,
+    applicationId,
+  };
 }
 
 /** First token of a full student name, for email greetings. */
@@ -363,11 +398,15 @@ export async function notifyFamilyOfOffer({
   campusId?: string;
   viaWaitlist?: boolean;
 }): Promise<void> {
-  const { userId, email } = await getGuardianContact(applicationId);
+  const contact = await getGuardianContact(applicationId);
+  const { userId, email } = contact;
   if (!userId && !email) return;
   const { name: resolvedCampusName, email: campusEmail } = await resolveCampus(campusId);
   const campusName = campusNameProp ?? resolvedCampusName;
   const deadline = new Date(expiresAt).toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric",
+  });
+  const deadlineEs = new Date(expiresAt).toLocaleDateString("es-US", {
     weekday: "long", month: "long", day: "numeric",
   });
   const studentFirstName = firstNameOf(studentName);
@@ -386,6 +425,11 @@ export async function notifyFamilyOfOffer({
         })
       : Promise.resolve(),
     emailGuardian(email, template, "notifyFamilyOfOffer", campusEmail),
+    smsGuardian(
+      contact,
+      `Rooted Schools: A seat has been offered${studentFirstName ? ` for ${studentFirstName}` : ""} at ${campusName}! Respond by ${deadline}: ${APP_LINK}/family/offers\nSe ofreció un cupo. Responda antes del ${deadlineEs}.`,
+      "notifyFamilyOfOffer"
+    ),
   ]);
 }
 
@@ -406,10 +450,14 @@ export async function notifyFamilyOfferExpiringSoon({
   expiresAt: string;
   campusId?: string;
 }): Promise<void> {
-  const { userId, email } = await getGuardianContact(applicationId);
+  const contact = await getGuardianContact(applicationId);
+  const { userId, email } = contact;
   if (!userId && !email) return;
   const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
   const deadline = new Date(expiresAt).toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric",
+  });
+  const deadlineEs = new Date(expiresAt).toLocaleDateString("es-US", {
     weekday: "long", month: "long", day: "numeric",
   });
   await Promise.all([
@@ -429,6 +477,11 @@ export async function notifyFamilyOfferExpiringSoon({
       "notifyFamilyOfferExpiringSoon",
       campusEmail
     ),
+    smsGuardian(
+      contact,
+      `Rooted Schools: Your seat offer at ${campusName} expires ${deadline}. Respond now to keep your spot: ${APP_LINK}/family/offers\nSu oferta de cupo vence el ${deadlineEs}. Responda ahora.`,
+      "notifyFamilyOfferExpiringSoon"
+    ),
   ]);
 }
 
@@ -446,17 +499,25 @@ export async function notifyFamilyDocumentRejected({
   reason: string;
   campusId?: string;
 }): Promise<void> {
-  const { userId } = await getGuardianContact(applicationId);
+  const contact = await getGuardianContact(applicationId);
+  const { userId } = contact;
   if (!userId) return;
   const readableType = documentType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  await notify({
-    userId,
-    subject: `Please re-upload your ${readableType}`,
-    body: `We reviewed your ${readableType} and need a new copy. Reason: ${reason}. Log in to your documents page and upload a replacement to keep your enrollment moving.`,
-    link: `/family/documents`,
-    campusId,
-    logTag: "notifyFamilyDocumentRejected",
-  });
+  await Promise.all([
+    notify({
+      userId,
+      subject: `Please re-upload your ${readableType}`,
+      body: `We reviewed your ${readableType} and need a new copy. Reason: ${reason}. Log in to your documents page and upload a replacement to keep your enrollment moving.`,
+      link: `/family/documents`,
+      campusId,
+      logTag: "notifyFamilyDocumentRejected",
+    }),
+    smsGuardian(
+      contact,
+      `Rooted Schools: We need a new copy of your ${readableType}. Upload here: ${APP_LINK}/family/documents\nNecesitamos una nueva copia de su documento. Súbala en el enlace.`,
+      "notifyFamilyDocumentRejected"
+    ),
+  ]);
 }
 
 /** Staff verifies a document — let the family know. */
@@ -554,9 +615,11 @@ export async function notifyFamilyRegistrationComplete({
   studentName?: string;
   campusId?: string;
 }): Promise<void> {
-  const { userId, email } = await getGuardianContactByEnrollment(enrollmentId);
+  const contact = await getGuardianContactByEnrollment(enrollmentId);
+  const { userId, email } = contact;
   if (!userId && !email) return;
   const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const studentFirstName = firstNameOf(studentName);
   await Promise.all([
     userId
       ? notify({
@@ -570,9 +633,14 @@ export async function notifyFamilyRegistrationComplete({
       : Promise.resolve(),
     emailGuardian(
       email,
-      emailTemplates.registrationComplete({ studentFirstName: firstNameOf(studentName), campusName }),
+      emailTemplates.registrationComplete({ studentFirstName, campusName }),
       "notifyFamilyRegistrationComplete",
       campusEmail
+    ),
+    smsGuardian(
+      contact,
+      `Rooted Schools: 🎓 ${studentFirstName ?? "Your student"} is officially enrolled at ${campusName}! Welcome to the family.\n¡${studentFirstName ?? "Su estudiante"} está oficialmente inscrito/a en ${campusName}! Bienvenidos.`,
+      "notifyFamilyRegistrationComplete"
     ),
   ]);
 }

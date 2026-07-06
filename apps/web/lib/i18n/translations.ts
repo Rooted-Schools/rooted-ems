@@ -272,6 +272,8 @@ const dict = {
   "appForm.email":              { en: "Email Address",        es: "Correo Electrónico" },
   "appForm.emailPlaceholder":   { en: "you@example.com",      es: "usted@ejemplo.com" },
   "appForm.phone":              { en: "Phone Number",         es: "Número de Teléfono" },
+  "appForm.smsConsent":         { en: "It's OK to text me updates about this application at this number", es: "Está bien enviarme mensajes de texto con actualizaciones sobre esta solicitud a este número" },
+  "appForm.smsConsentHint":     { en: "Optional. Message and data rates may apply. You can opt out anytime by replying STOP.", es: "Opcional. Pueden aplicarse tarifas de mensajes y datos. Puede darse de baja en cualquier momento respondiendo STOP." },
   "appForm.regNote":            { en: "Additional information (address, emergency contacts, demographics, and service needs) will be collected during the registration process after an enrollment offer is made.", es: "La información adicional (dirección, contactos de emergencia, datos demográficos y necesidades de servicios) se recopilará durante el proceso de registro, después de que se haga una oferta de inscripción." },
   "appForm.reviewDesc":         { en: "Please review your application details before submitting.", es: "Por favor revise los detalles de su solicitud antes de enviarla." },
   "appForm.review.siblingAtCampus": { en: "Sibling at campus", es: "Hermano/a en la escuela" },
