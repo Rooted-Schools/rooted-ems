@@ -8,6 +8,7 @@ import {
   finalizeLotteryRun,
   archiveLotteryRun,
   sendOffersFromLottery,
+  simulateLotteryRun,
   type CreateLotteryRunInput,
 } from "@/lib/mutations";
 
@@ -23,6 +24,14 @@ export async function staffCreateLotteryRun(input: CreateLotteryRunInput) {
   }
 
   return result;
+}
+
+// ─── Simulate (read-only what-if) ─────────────────────
+
+export async function staffSimulateLottery(runId: string, seatsOverride?: number) {
+  await requireStaffSession();
+  // Read-only — no revalidation needed, nothing changes.
+  return simulateLotteryRun(runId, seatsOverride);
 }
 
 // ─── Run Preview ──────────────────────────────────────

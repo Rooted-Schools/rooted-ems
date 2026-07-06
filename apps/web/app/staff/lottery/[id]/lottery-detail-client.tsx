@@ -28,7 +28,9 @@ import {
   staffFinalizeLottery,
   staffArchiveLottery,
   staffSendLotteryOffers,
+  staffSimulateLottery,
 } from "../actions";
+import type { LotterySimulation } from "@/lib/mutations";
 
 /* ─── Status Config ─── */
 const statusVariants: Record<string, { label: string; variant: "default" | "secondary" | "success" | "warning" }> = {
@@ -93,6 +95,7 @@ export function StaffLotteryDetailClient({
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [sendOffersDialogOpen, setSendOffersDialogOpen] = useState(false);
   const [offerExpiresIn, setOfferExpiresIn] = useState("14");
+  const [simulation, setSimulation] = useState<LotterySimulation | null>(null);
 
   /* ─── Action Handlers ─── */
 
@@ -106,6 +109,20 @@ export function StaffLotteryDetailClient({
       } else {
         setFeedback({ type: "success", message: "Preview generated successfully. Rankings are ready for review." });
         router.refresh();
+      }
+    });
+  }
+
+  function handleSimulate() {
+    if (!run) return;
+    setFeedback(null);
+    startTransition(async () => {
+      const result = await staffSimulateLottery(run.id);
+      if (result.error) {
+        setFeedback({ type: "error", message: result.error });
+        setSimulation(null);
+      } else {
+        setSimulation(result.data);
       }
     });
   }
@@ -220,13 +237,21 @@ export function StaffLotteryDetailClient({
     switch (run!.status) {
       case "draft":
         return (
-          <Button onClick={() => handleActionClick("Run Preview")} disabled={isPending}>
-            {isPending ? "Running..." : "Run Preview"}
-          </Button>
+          <>
+            <Button variant="outline" onClick={handleSimulate} disabled={isPending}>
+              {isPending ? "Working..." : "Simulate"}
+            </Button>
+            <Button onClick={() => handleActionClick("Run Preview")} disabled={isPending}>
+              {isPending ? "Running..." : "Run Preview"}
+            </Button>
+          </>
         );
       case "preview":
         return (
           <>
+            <Button variant="outline" onClick={handleSimulate} disabled={isPending}>
+              {isPending ? "Working..." : "Simulate"}
+            </Button>
             <Button variant="outline" onClick={() => handleActionClick("Re-run Preview")} disabled={isPending}>
               {isPending ? "Running..." : "Re-run Preview"}
             </Button>
@@ -269,6 +294,53 @@ export function StaffLotteryDetailClient({
         >
           {feedback.message}
         </div>
+      )}
+
+      {/* Simulation Results — read-only what-if, nothing is written */}
+      {simulation && (
+        <Card className="border-amber-300 bg-amber-50/50">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">
+                Simulation — {simulation.total_seats} seats, {simulation.total_entries} applicants
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setSimulation(null)}>
+                Dismiss
+              </Button>
+            </div>
+            <CardDescription>
+              Seat math by priority tier. Read-only — no rankings were generated and no results were saved.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Priority Tier</TableHead>
+                  <TableHead className="text-right">Applicants</TableHead>
+                  <TableHead className="text-right">Would Be Offered</TableHead>
+                  <TableHead className="text-right">Would Be Waitlisted</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {simulation.tiers.map((tier) => (
+                  <TableRow key={tier.tier}>
+                    <TableCell className="font-medium">{tier.label}</TableCell>
+                    <TableCell className="text-right">{tier.entries}</TableCell>
+                    <TableCell className="text-right text-green-700 font-medium">{tier.selected}</TableCell>
+                    <TableCell className="text-right text-amber-700 font-medium">{tier.waitlisted}</TableCell>
+                  </TableRow>
+                ))}
+                <TableRow>
+                  <TableCell className="font-semibold">Total</TableCell>
+                  <TableCell className="text-right font-semibold">{simulation.total_entries}</TableCell>
+                  <TableCell className="text-right font-semibold text-green-700">{simulation.selected_total}</TableCell>
+                  <TableCell className="text-right font-semibold text-amber-700">{simulation.waitlisted_total}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
 
       {/* Header */}

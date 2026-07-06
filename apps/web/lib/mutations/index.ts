@@ -72,7 +72,11 @@ export {
   finalizeLotteryRun,
   archiveLotteryRun,
   sendOffersFromLottery,
+  simulateLotteryRun,
   type CreateLotteryRunInput,
+  type PriorityTierDef,
+  type LotterySimulation,
+  type TierSimulation,
 } from "./lottery";
 
 // Enrollment mutations

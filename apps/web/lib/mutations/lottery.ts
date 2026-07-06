@@ -14,6 +14,175 @@ export interface CreateLotteryRunInput {
   notes?: string;
 }
 
+// ─── Priority Tiers ────────────────────────────────────
+//
+// Tiers come from lottery_rule_set.priority_tiers (JSONB, per campus) so each
+// campus can encode what its authorizer permits — sibling preference, children
+// of staff, geographic zones — without a code change. Tier order = priority:
+// index 0 fills seats first. Applications matching no tier land in the general
+// pool (tier = tiers.length).
+
+interface TierMatcher {
+  /** "column" matches a boolean column on application; "answer" matches application_answer. */
+  source: "column" | "answer";
+  /** Column name (allowlisted) or application_answer.question_key. */
+  field: string;
+  /** For answers: value that grants the tier (case-insensitive). Defaults to yes/true. */
+  match_value?: string;
+}
+
+export interface PriorityTierDef {
+  key: string;
+  label: string;
+  /** A tier matches when ANY of its matchers hit. */
+  matchers: TierMatcher[];
+}
+
+// Boolean application columns a rule set may reference. Matcher fields are
+// data from the DB, but they end up in query filters — never widen this
+// beyond known boolean columns.
+const MATCHABLE_APP_COLUMNS = new Set(["has_sibling_enrolled"]);
+
+/**
+ * Default rule set: sibling preference only — the behavior every campus had
+ * before rule sets were wired up. Checks BOTH sibling signals: the
+ * application column (set by staff-submitted apps) and the family form's
+ * answer key. (The old code queried question_key "hasSiblingEnrolled", which
+ * no writer ever produced, so sibling priority silently never applied to
+ * family applications.)
+ */
+const DEFAULT_PRIORITY_TIERS: PriorityTierDef[] = [
+  {
+    key: "sibling",
+    label: "Sibling enrolled at campus",
+    matchers: [
+      { source: "column", field: "has_sibling_enrolled" },
+      { source: "answer", field: "has_sibling_at_school" },
+    ],
+  },
+];
+
+function coerceTierDefs(raw: unknown): PriorityTierDef[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const tiers: PriorityTierDef[] = [];
+  for (const item of raw) {
+    const t = item as Record<string, unknown>;
+    if (typeof t?.key !== "string" || typeof t?.label !== "string" || !Array.isArray(t?.matchers)) {
+      return null;
+    }
+    const matchers: TierMatcher[] = [];
+    for (const m of t.matchers as Array<Record<string, unknown>>) {
+      if (
+        (m?.source !== "column" && m?.source !== "answer") ||
+        typeof m?.field !== "string"
+      ) {
+        return null;
+      }
+      if (m.source === "column" && !MATCHABLE_APP_COLUMNS.has(m.field)) return null;
+      matchers.push({
+        source: m.source,
+        field: m.field,
+        match_value: typeof m.match_value === "string" ? m.match_value : undefined,
+      });
+    }
+    if (matchers.length === 0) return null;
+    tiers.push({ key: t.key, label: t.label, matchers });
+  }
+  return tiers;
+}
+
+interface ResolvedRuleSet {
+  ruleSetId: string | null;
+  tiers: PriorityTierDef[];
+}
+
+/**
+ * Load the tier definitions for a run: the requested rule set, else the
+ * campus's active rule set, else the sibling-only default. Malformed JSONB
+ * falls back to the default rather than failing a lottery.
+ */
+async function resolvePriorityTiers(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  campusId: string,
+  ruleSetId?: string
+): Promise<ResolvedRuleSet> {
+  let query = supabase
+    .from("lottery_rule_set")
+    .select("id, priority_tiers")
+    .eq("campus_id", campusId)
+    .eq("is_active", true)
+    .order("version", { ascending: false })
+    .limit(1);
+  if (ruleSetId) {
+    query = supabase
+      .from("lottery_rule_set")
+      .select("id, priority_tiers")
+      .eq("id", ruleSetId)
+      .limit(1);
+  }
+  const { data } = await query;
+  const row = data?.[0] as Record<string, unknown> | undefined;
+  if (!row) return { ruleSetId: null, tiers: DEFAULT_PRIORITY_TIERS };
+  const tiers = coerceTierDefs(row.priority_tiers);
+  if (!tiers) {
+    console.warn("[resolvePriorityTiers] malformed priority_tiers, using default", {
+      ruleSetId: row.id,
+    });
+    return { ruleSetId: row.id as string, tiers: DEFAULT_PRIORITY_TIERS };
+  }
+  return { ruleSetId: row.id as string, tiers };
+}
+
+/**
+ * Assign each application its priority tier: the index of the FIRST tier
+ * with any matching matcher, else tiers.length (general pool).
+ */
+async function assignPriorityTiers(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  appIds: string[],
+  tiers: PriorityTierDef[]
+): Promise<Map<string, number>> {
+  const assignment = new Map<string, number>();
+  if (appIds.length === 0) return assignment;
+
+  for (let index = 0; index < tiers.length; index++) {
+    const matched = new Set<string>();
+    for (const matcher of tiers[index].matchers) {
+      if (matcher.source === "column") {
+        const { data } = await supabase
+          .from("application")
+          .select("id")
+          .in("id", appIds)
+          .eq(matcher.field, true);
+        for (const row of data ?? []) matched.add((row as Record<string, string>).id);
+      } else {
+        const accepted = matcher.match_value
+          ? [matcher.match_value.toLowerCase()]
+          : ["yes", "true"];
+        const { data } = await supabase
+          .from("application_answer")
+          .select("application_id, answer_value")
+          .in("application_id", appIds)
+          .eq("question_key", matcher.field);
+        for (const row of data ?? []) {
+          const r = row as Record<string, string>;
+          if (accepted.includes((r.answer_value ?? "").toLowerCase())) {
+            matched.add(r.application_id);
+          }
+        }
+      }
+    }
+    for (const id of matched) {
+      if (!assignment.has(id)) assignment.set(id, index);
+    }
+  }
+
+  for (const id of appIds) {
+    if (!assignment.has(id)) assignment.set(id, tiers.length);
+  }
+  return assignment;
+}
+
 // ─── Create Draft Lottery Run ──────────────────────────
 
 export async function createLotteryRun(
@@ -40,13 +209,21 @@ export async function createLotteryRun(
     .eq("grade_level_id", input.grade_level_id)
     .in("status", ["verified", "lottery_assigned"]);
 
+  // Resolve the campus's priority tiers before creating the run so the run
+  // records which rule set actually governed entry tiers.
+  const { ruleSetId, tiers } = await resolvePriorityTiers(
+    supabase,
+    input.campus_id,
+    input.lottery_rule_set_id
+  );
+
   const { data: run, error } = await supabase
     .from("lottery_run")
     .insert({
       enrollment_window_id: input.enrollment_window_id,
       campus_id: input.campus_id,
       grade_level_id: input.grade_level_id,
-      lottery_rule_set_id: input.lottery_rule_set_id ?? null,
+      lottery_rule_set_id: ruleSetId,
       status: "draft",
       run_number: nextRunNumber,
       total_applicants: applicantCount ?? 0,
@@ -72,31 +249,12 @@ export async function createLotteryRun(
   if (eligibleApps && eligibleApps.length > 0) {
     const appIds = eligibleApps.map((a: Record<string, string>) => a.id);
 
-    // Fetch sibling preference answers for all eligible applications.
-    // Applications where hasSiblingEnrolled = "yes" receive priority_tier = 0
-    // (higher lottery priority). All others receive priority_tier = 1.
-    // This respects the sibling preference data collected on the application form.
-    const { data: siblingAnswers } = await supabase
-      .from("application_answer")
-      .select("application_id, answer_value")
-      .in("application_id", appIds)
-      .eq("question_key", "hasSiblingEnrolled");
-
-    const siblingSet = new Set(
-      (siblingAnswers ?? [])
-        .filter(
-          (a: Record<string, unknown>) =>
-            (a.answer_value as string)?.toLowerCase() === "yes"
-        )
-        .map((a: Record<string, unknown>) => a.application_id as string)
-    );
+    const tierByApp = await assignPriorityTiers(supabase, appIds, tiers);
 
     const entries = eligibleApps.map((app: Record<string, string>) => ({
       lottery_run_id: run.id,
       application_id: app.id,
-      // Tier 0 = sibling preference (higher priority in sort)
-      // Tier 1 = general pool
-      priority_tier: siblingSet.has(app.id) ? 0 : 1,
+      priority_tier: tierByApp.get(app.id) ?? tiers.length,
     }));
 
     const { error: entryError } = await supabase
@@ -285,6 +443,101 @@ export async function runLotteryPreview(
   });
 
   return { data: null, error: null };
+}
+
+// ─── Simulate (Read-Only What-If) ──────────────────────
+//
+// Seats fill strictly in tier order, so per-tier outcomes are a function of
+// tier counts and seat count alone — the random seed only decides WHICH
+// individuals sit at the boundary tier. That means a simulation can be exact
+// about tier-level results without running (or writing) anything: staff see
+// "tier 1: all 8 seated; tier 2: 12 of 30 seated, 18 waitlisted" before
+// committing to a preview or official run.
+
+export interface TierSimulation {
+  tier: number;
+  label: string;
+  entries: number;
+  selected: number;
+  waitlisted: number;
+}
+
+export interface LotterySimulation {
+  total_seats: number;
+  total_entries: number;
+  selected_total: number;
+  waitlisted_total: number;
+  tiers: TierSimulation[];
+}
+
+export async function simulateLotteryRun(
+  runId: string,
+  seatsOverride?: number
+): Promise<MutationResult<LotterySimulation>> {
+  const supabase = await createServerClient();
+
+  const { data: run, error: fetchError } = await supabase
+    .from("lottery_run")
+    .select("id, status, total_seats, campus_id, lottery_rule_set_id")
+    .eq("id", runId)
+    .single();
+
+  if (fetchError || !run) {
+    return { data: null, error: "Lottery run not found." };
+  }
+
+  const { data: entries, error: entriesError } = await supabase
+    .from("lottery_entry")
+    .select("priority_tier")
+    .eq("lottery_run_id", runId);
+
+  if (entriesError || !entries || entries.length === 0) {
+    return { data: null, error: "No entries found for this lottery run." };
+  }
+
+  const { tiers } = await resolvePriorityTiers(
+    supabase,
+    run.campus_id as string,
+    (run.lottery_rule_set_id as string | null) ?? undefined
+  );
+  const labelFor = (tier: number) => tiers[tier]?.label ?? "General pool";
+
+  const totalSeats = seatsOverride ?? (run.total_seats as number);
+
+  // Count entries per tier, then fill seats in tier order.
+  const countByTier = new Map<number, number>();
+  for (const e of entries) {
+    const tier = ((e as Record<string, unknown>).priority_tier as number) ?? 0;
+    countByTier.set(tier, (countByTier.get(tier) ?? 0) + 1);
+  }
+
+  let seatsLeft = Math.max(0, totalSeats);
+  const tierResults: TierSimulation[] = [...countByTier.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([tier, count]) => {
+      const selected = Math.min(seatsLeft, count);
+      seatsLeft -= selected;
+      return {
+        tier,
+        label: labelFor(tier),
+        entries: count,
+        selected,
+        waitlisted: count - selected,
+      };
+    });
+
+  const selectedTotal = tierResults.reduce((sum, t) => sum + t.selected, 0);
+
+  return {
+    data: {
+      total_seats: totalSeats,
+      total_entries: entries.length,
+      selected_total: selectedTotal,
+      waitlisted_total: entries.length - selectedTotal,
+      tiers: tierResults,
+    },
+    error: null,
+  };
 }
 
 // ─── Finalize as Official ──────────────────────────────
