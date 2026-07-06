@@ -692,6 +692,89 @@ export async function notifyFamilyRegistrationNudge({
   ]);
 }
 
+// ─── Lead (CRM) notifications ─────────────────────────────────────────────────
+
+interface LeadContact {
+  first_name: string;
+  email: string | null;
+  phone: string | null;
+  sms_consent: boolean;
+}
+
+/**
+ * Response-engine first touch: a new inquiry gets a warm bilingual welcome
+ * within minutes (email + SMS when consented), and campus staff get an
+ * in-app ping so a human call follows. Speed-to-lead is the point — Harmony
+ * saw 40% higher 7-day conversion from exactly this flow.
+ */
+export async function notifyLeadWelcome({
+  lead,
+  campusId,
+}: {
+  lead: LeadContact;
+  campusId: string;
+}): Promise<void> {
+  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  await Promise.all([
+    emailGuardian(
+      lead.email,
+      emailTemplates.inquiryWelcome({ guardianFirstName: lead.first_name, campusName }),
+      "notifyLeadWelcome",
+      campusEmail
+    ),
+    smsGuardian(
+      { phone: lead.phone, smsConsent: lead.sms_consent },
+      `Rooted Schools: Hi ${lead.first_name}! Thanks for your interest in ${campusName}. A member of our team will reach out within a day. Questions? Just reply.\n¡Gracias por su interés! Nuestro equipo le contactará pronto.`,
+      "notifyLeadWelcome"
+    ),
+  ]);
+}
+
+/** New inquiry — route to campus staff so a human follows up fast. */
+export async function notifyStaffNewLead({
+  campusId,
+  leadId,
+  leadName,
+  source,
+}: {
+  campusId: string;
+  leadId: string;
+  leadName: string;
+  source: string;
+}): Promise<void> {
+  await notifyStaff({
+    campusId,
+    subject: `New inquiry from ${leadName}`,
+    body: `${leadName} just asked about your school (source: ${source.replace(/_/g, " ")}). Fast follow-up wins — call or text within a day.`,
+    link: `/staff/recruitment/${leadId}`,
+    logTag: "notifyStaffNewLead",
+  });
+}
+
+/** Gone-quiet lead — one warm bilingual check-in (throttled by the cron). */
+export async function notifyLeadReengagement({
+  lead,
+  campusId,
+}: {
+  lead: LeadContact;
+  campusId: string;
+}): Promise<void> {
+  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  await Promise.all([
+    emailGuardian(
+      lead.email,
+      emailTemplates.leadReengagement({ guardianFirstName: lead.first_name, campusName }),
+      "notifyLeadReengagement",
+      campusEmail
+    ),
+    smsGuardian(
+      { phone: lead.phone, smsConsent: lead.sms_consent },
+      `Rooted Schools: Hi ${lead.first_name} — still thinking about ${campusName}? We'd love to help with any questions. Just reply, or apply here: ${APP_LINK}/login\n¿Aún considerando ${campusName}? Responda con sus preguntas.`,
+      "notifyLeadReengagement"
+    ),
+  ]);
+}
+
 // ─── Staff notifications ──────────────────────────────────────────────────────
 
 /**
@@ -920,12 +1003,13 @@ export async function notifyOnApplicationSubmit(applicationId: string): Promise<
   const supabase = createServiceRoleClient();
   const { data } = await supabase
     .from("application")
-    .select("campus_id, student:student_id (first_name, last_name)")
+    .select("campus_id, guardian:guardian_id (email), student:student_id (first_name, last_name)")
     .eq("id", applicationId)
     .single();
 
   const row = data as unknown as {
     campus_id: string | null;
+    guardian: { email?: string | null } | null;
     student: { first_name?: string; last_name?: string } | null;
   } | null;
 
@@ -934,11 +1018,16 @@ export async function notifyOnApplicationSubmit(applicationId: string): Promise<
     ? [row.student.first_name, row.student.last_name].filter(Boolean).join(" ") || undefined
     : undefined;
 
+  // CRM attribution stitch: if this family started as a lead, mark it
+  // converted. Lazy import avoids a module cycle (leads.ts imports notify).
+  const { stitchLeadToApplication } = await import("@/lib/mutations/leads");
+
   await Promise.all([
     notifyFamilyApplicationReceived({ applicationId, studentName, campusId }),
     campusId
       ? notifyStaffNewApplication({ campusId, studentName, applicationId })
       : Promise.resolve(),
+    stitchLeadToApplication(applicationId, row?.guardian?.email ?? null, row?.campus_id ?? null),
   ]);
 }
 

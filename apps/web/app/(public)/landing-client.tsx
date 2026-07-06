@@ -148,6 +148,12 @@ function LandingContent({ schools }: LandingClientProps) {
                 {t("public.applyNow")}
               </Link>
             ) : null}
+            <Link
+              href="/inquire"
+              className="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-rooted-green bg-white border-2 border-rooted-green hover:bg-rooted-green/5 rounded-lg transition-colors shadow-sm w-full sm:w-auto"
+            >
+              {t("public.getInfo")}
+            </Link>
           </div>
         </div>
       </section>

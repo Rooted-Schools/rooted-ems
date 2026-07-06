@@ -79,6 +79,20 @@ export {
   type TierSimulation,
 } from "./lottery";
 
+// Lead (CRM) mutations
+export {
+  createLeadFromInquiry,
+  createLeadByStaff,
+  logLeadActivity,
+  updateLead,
+  stitchLeadToApplication,
+  LEAD_STAGES,
+  LEAD_SOURCES,
+  type CreateLeadInput,
+  type UpdateLeadInput,
+  type LeadStage,
+} from "./leads";
+
 // Enrollment mutations
 export {
   createEnrollment,

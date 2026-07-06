@@ -109,5 +109,17 @@ export {
   type RaceEthnicityRow,
 } from "./demographics";
 
+// Lead (CRM) queries
+export {
+  getLeads,
+  getFollowUpQueue,
+  getLeadPipelineSummary,
+  getLeadDetail,
+  type LeadRow,
+  type LeadDetail,
+  type LeadActivityRow,
+  type LeadPipelineSummary,
+} from "./leads";
+
 // Shared utilities
 export { formatRelativeTime } from "./utils";

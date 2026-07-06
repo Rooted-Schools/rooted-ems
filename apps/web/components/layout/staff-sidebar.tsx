@@ -38,6 +38,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: "Admissions",
     items: [
+      { label: "Recruitment", href: "/staff/recruitment", icon: "🌱" },
       { label: "Applications", href: "/staff/applications", icon: "📋" },
       { label: "Documents", href: "/staff/documents", icon: "📄", minRole: "enrollment_staff" },
       { label: "Students", href: "/staff/students", icon: "👤" },

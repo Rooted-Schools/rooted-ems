@@ -327,6 +327,74 @@ export function waitlistPromoted({
   };
 }
 
+export function inquiryWelcome({
+  guardianFirstName,
+  campusName,
+}: {
+  guardianFirstName?: string;
+  campusName: string;
+}): EmailTemplate {
+  const { html, text } = renderEmail(
+    {
+      greeting: guardianFirstName ? `Hello ${guardianFirstName},` : "Hello,",
+      paragraphs: [
+        `Thank you for your interest in ${campusName}! We're excited to tell you more about what makes our school special — career-connected learning, real industry partnerships, and a personalized pathway for every student.`,
+        "Someone from our enrollment team will reach out personally within a day. In the meantime, you can start an application anytime — it takes just a few minutes on your phone.",
+      ],
+      cta: { label: "Start an application", url: `${APP_URL}/login` },
+      closing: "Warmly, the Rooted Schools Enrollment Team",
+    },
+    {
+      greeting: guardianFirstName ? `Hola ${guardianFirstName},` : "Hola,",
+      paragraphs: [
+        `¡Gracias por su interés en ${campusName}! Nos encantaría contarle más sobre lo que hace especial a nuestra escuela — aprendizaje conectado con carreras, alianzas reales con la industria y un camino personalizado para cada estudiante.`,
+        "Alguien de nuestro equipo de inscripción se comunicará con usted personalmente dentro de un día. Mientras tanto, puede iniciar una solicitud en cualquier momento — toma solo unos minutos desde su teléfono.",
+      ],
+      cta: { label: "Iniciar una solicitud", url: `${APP_URL}/login` },
+      closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
+    }
+  );
+  return {
+    subject: `Great to meet you! / ¡Un gusto conocerle! — ${campusName}`,
+    html,
+    text,
+  };
+}
+
+export function leadReengagement({
+  guardianFirstName,
+  campusName,
+}: {
+  guardianFirstName?: string;
+  campusName: string;
+}): EmailTemplate {
+  const { html, text } = renderEmail(
+    {
+      greeting: guardianFirstName ? `Hello ${guardianFirstName},` : "Hello,",
+      paragraphs: [
+        `We haven't heard from you in a little while, and we wanted to check in. Seats at ${campusName} are filled on a rolling basis, and we'd hate for your family to miss out.`,
+        "If you have questions — about our career pathways, transportation, the lottery, anything at all — just reply to this email and a real person from our team will answer.",
+      ],
+      cta: { label: "Start an application", url: `${APP_URL}/login` },
+      closing: "Warmly, the Rooted Schools Enrollment Team",
+    },
+    {
+      greeting: guardianFirstName ? `Hola ${guardianFirstName},` : "Hola,",
+      paragraphs: [
+        `No hemos sabido de usted en un tiempo y queríamos saludarle. Los cupos en ${campusName} se asignan de forma continua, y no quisiéramos que su familia se quede sin el suyo.`,
+        "Si tiene preguntas — sobre nuestros caminos de carrera, transporte, la lotería, lo que sea — simplemente responda a este correo y una persona real de nuestro equipo le contestará.",
+      ],
+      cta: { label: "Iniciar una solicitud", url: `${APP_URL}/login` },
+      closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
+    }
+  );
+  return {
+    subject: `Still thinking about ${campusName}? We're here / ¿Aún considerando ${campusName}?`,
+    html,
+    text,
+  };
+}
+
 export function registrationNudge({
   studentFirstName,
   campusName,

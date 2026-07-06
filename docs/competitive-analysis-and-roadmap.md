@@ -99,6 +99,12 @@ Ordered by leverage: what most changes family outcomes per unit of effort. Three
 
 ---
 
+## Part 4b — Blueprint reconciliation (July 2026)
+
+Steven's C.R. Neal Enrollment Ecosystem blueprint (Perla-derived, see `crm-concept-and-plan.md` for the benchmark detail) was compared against this roadmap. Findings: the blueprint's back half (application → first day) is already live in the EMS and exceeds the blueprint in three places (auditable in-house lottery with simulation vs. outsourcing to PowerSchool; waitlist transparency; registration pre-fill + nudges). The blueprint's front half (lead capture → application) maps to the CRM phases. Its stack question (Salesforce vs. SchoolMint vs. HubSpot) is retired: the EMS spine is Option D and satisfies the network-level requirement. Adopted from the blueprint into the CRM concept: stage-timed FAQ sequences, QR-code source generation for print materials, Harmony's benchmark metrics (7-day conversion, speed to first touch, referral share), and zip/home-language funnel disaggregation on the equity dashboard.
+
+**CRM Phase 0 + 1 shipped July 2026** on that basis: lead + activity schema (campus-scoped RLS), public bilingual inquiry form at `/inquire` with pathway-interest and source capture, response engine (instant bilingual welcome email/SMS, staff routing notification, next-day follow-up date), gone-quiet re-engagement cron (one automated touch, then it's a human's job), staff Recruitment surface (follow-up queue, stage pipeline, lead detail with journey timeline, call/note logging with one-tap follow-up scheduling), and the automatic lead→application attribution stitch keyed on guardian email + campus.
+
 ## Part 5 — The positioning sentence
 
 Every incumbent makes schools choose: SchoolMint's breadth with collapsing support and painful logins, Avela's elegant UX with no recruitment layer and no track record, or point tools that solve one step. The Rooted EMS's play is the combination none of them ships: **a phone-complete, bilingual, SMS-first family experience with a transparent, explainable lottery and an equity lens built in — at zero per-student cost, with the recruitment CRM (campus-owned) growing on the same spine.**
