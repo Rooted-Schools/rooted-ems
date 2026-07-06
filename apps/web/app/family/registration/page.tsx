@@ -6,6 +6,43 @@ import { redirect } from "next/navigation";
 import { RegistrationClient, type EnrollmentRegistration } from "./registration-client";
 import { initializeRegistrationPacket, seedMissingRegistrationItems } from "@/lib/mutations/registration";
 
+/** Application guardian_relationship → emergency-contact Relationship option. */
+function relationshipOption(relationship?: string | null): string {
+  switch (relationship) {
+    case "mother":
+    case "father":
+    case "stepmother":
+    case "stepfather":
+      return "Parent";
+    case "grandparent":
+      return "Grandparent";
+    case "aunt_uncle":
+      return "Aunt/Uncle";
+    default:
+      return "Other";
+  }
+}
+
+/**
+ * Seed registration form items from application data. Keyed by item_type →
+ * field key → value; the client uses these only when the item has no saved
+ * data yet, and families can edit everything before submitting.
+ */
+function buildPrefill(guardian: Record<string, string | null> | null): Record<string, Record<string, string | boolean>> {
+  const prefill: Record<string, Record<string, string | boolean>> = {};
+  if (!guardian) return prefill;
+
+  const fullName = [guardian.first_name, guardian.last_name].filter(Boolean).join(" ");
+  const emergency: Record<string, string | boolean> = {};
+  if (fullName) emergency.contact_name = fullName;
+  if (guardian.relationship) emergency.relationship = relationshipOption(guardian.relationship);
+  if (guardian.phone) emergency.phone = guardian.phone;
+  if (guardian.phone_secondary) emergency.alt_phone = guardian.phone_secondary;
+  if (Object.keys(emergency).length > 0) prefill.emergency_contact = emergency;
+
+  return prefill;
+}
+
 export default async function FamilyRegistrationPage() {
   const supabase = await createServerClient();
   const {
@@ -27,12 +64,16 @@ export default async function FamilyRegistrationPage() {
 
   const guardianIds = guardians.map((g: Record<string, string>) => g.id);
 
-  // Find accepted/registered applications for this family
+  // Find accepted/registered applications for this family.
+  // Guardian contact fields feed the registration pre-fill ("verify, don't
+  // re-enter") — families confirm what they told us at application time
+  // instead of retyping it.
   const { data: acceptedApps } = await db
     .from("application")
     .select(`
       id, status, campus_id, grade_level_id,
       student:student_id (id, first_name, last_name),
+      guardian:guardian_id (first_name, last_name, relationship, phone, phone_secondary),
       campus:campus_id (name),
       grade_level:grade_level_id (grade),
       enrollment_window:enrollment_window_id (school_year_id, school_year:school_year_id (name))
@@ -156,6 +197,7 @@ export default async function FamilyRegistrationPage() {
         packet,
         items,
         requirements,
+        prefill: buildPrefill(app.guardian as Record<string, string | null> | null),
       };
     })
   );

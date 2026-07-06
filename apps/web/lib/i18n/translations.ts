@@ -118,6 +118,7 @@ const dict = {
 
   // ─── Registration completion dialog ───────────────────────────────────────
   "reg.btn.fillOut":           { en: "Fill Out",             es: "Completar" },
+  "reg.prefilledHint":         { en: "We filled this in from your application — please review and update anything that changed.", es: "Completamos esto con la información de su solicitud — revise y actualice lo que haya cambiado." },
   "reg.btn.upload":            { en: "Upload",               es: "Cargar" },
   "reg.btn.reviewAgree":       { en: "Review & Agree",       es: "Revisar y Aceptar" },
   "reg.btn.saving":            { en: "Saving...",            es: "Guardando..." },

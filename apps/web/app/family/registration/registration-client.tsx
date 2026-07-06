@@ -62,6 +62,8 @@ export interface EnrollmentRegistration {
   } | null;
   items: RegistrationItem[];
   requirements: PacketRequirement[];
+  /** Application-sourced starting values per item_type ("verify, don't re-enter"). */
+  prefill: Record<string, Record<string, string | boolean>>;
 }
 
 interface RegistrationClientProps {
@@ -535,6 +537,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
   const [completionOpen, setCompletionOpen] = useState(false);
   const [completionTarget, setCompletionTarget] = useState<{ itemId: string; itemType: string; itemName: string } | null>(null);
   const [completionForm, setCompletionForm] = useState<Record<string, string | boolean>>({});
+  const [wasPrefilled, setWasPrefilled] = useState(false);
   const [completionAck, setCompletionAck] = useState(false);
   const [uploadSelectedFile, setUploadSelectedFile] = useState<File | null>(null);
   const [uploadValidationError, setUploadValidationError] = useState<string | null>(null);
@@ -583,8 +586,23 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
     enrollment.packet?.status === "complete";
 
   function openCompletionDialog(itemId: string, itemType: string, itemName: string) {
+    // Starting values: previously saved answers win, then application
+    // pre-fill, then a blank form. Families verify instead of re-entering.
+    const saved = itemsByType[itemType]?.data;
+    const savedValues =
+      saved && typeof saved === "object" && Object.keys(saved).length > 0
+        ? Object.fromEntries(
+            Object.entries(saved).filter(
+              (entry): entry is [string, string | boolean] =>
+                typeof entry[1] === "string" || typeof entry[1] === "boolean"
+            )
+          )
+        : null;
+    const prefillValues = enrollment.prefill?.[itemType] ?? null;
+
     setCompletionTarget({ itemId, itemType, itemName });
-    setCompletionForm({});
+    setCompletionForm(savedValues ?? prefillValues ?? {});
+    setWasPrefilled(!savedValues && !!prefillValues);
     setCompletionAck(false);
     setUploadSelectedFile(null);
     setUploadValidationError(null);
@@ -1077,6 +1095,11 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
               </DialogHeader>
 
               <div className="space-y-4 py-4">
+                {config.mode === "form" && wasPrefilled && (
+                  <p className="text-xs text-rooted-green bg-rooted-green/5 border border-rooted-green/20 rounded-md px-3 py-2">
+                    ✓ {t("reg.prefilledHint")}
+                  </p>
+                )}
                 {config.mode === "form" && config.fields.map((field) => (
                   <div key={field.key}>
                     <label className="block text-sm font-medium text-ink/70 mb-1">
