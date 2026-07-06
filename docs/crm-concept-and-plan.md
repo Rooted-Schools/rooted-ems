@@ -20,6 +20,22 @@ Build it as a module in the existing monorepo. It shares the Supabase project, t
 
 ---
 
+## The Perla benchmark (Harmony Public Schools)
+
+Steven's north star for this system is Perla — Harmony Public Schools' family-journey platform, built on Salesforce Education Cloud + Marketing Cloud + Mogli SMS + FormAssembly by Elevation Solutions, serving 76 campuses and ~100,000 applications a year. The philosophy to replicate: enrollment is not a series of transactions but one continuous, personalized family journey, where every interaction makes the next interaction smarter and families never feel like they're starting over. (Full analysis: `CR-Neal-Enrollment-Ecosystem-Component-Blueprint.md` and the "C.R. Neal Family Journey System" five-part concept from the July 2026 planning session.)
+
+The Harmony evidence that should drive our build order:
+
+- **Speed-to-lead is the single highest-leverage mechanic.** Auto-text within minutes of an inquiry, then a phone-call task for a named recruiter, then a re-text if the call misses. Harmony saw a ~40% lift in 7-day conversion, and leads that got a human call converted 59% higher. This is the "Response Engine."
+- **Referrals were Harmony's best channel** — referred families converted at ~55%. This upgrades our referral engine from "engagement feature" to "primary growth channel."
+- **Event machinery matters at volume** — RSVP tracking, QR check-in, and different follow-up branches for attended vs. no-show (6,000+ RSVPs tracked).
+- **Campaign seasons work** — Harmony's "Apply" festival season took first-month applications from 11,000 to 24,000.
+- **Dynamic family profiles power personalization** — pathway interest, transportation needs, language, channel preference, barriers — feeding interest-tagged content journeys (a healthcare-pathway family gets Prisma Health partnership stories; a tech-pathway family gets different content). The tagged content library is the content-management core of the system.
+
+**Build-vs-buy, resolved by events.** The earlier C.R. Neal blueprint weighed three stacks (Perla-faithful Salesforce, SchoolMint, or lean HubSpot + PowerSchool Enrollment + ParentSquare) because no in-house system existed. That premise has changed: the Rooted EMS is now live in production with an auditable lottery, bilingual family portal, SMS channel, and offer-to-registration pipeline — it already covers everything the blueprint assigned to PowerSchool Enrollment. The CRM therefore gets built on the EMS spine, and the "invisible handoff" the Perla vision calls for becomes trivial: it's the same database. The remaining external handoffs (each campus's SIS, ParentSquare) live at the enrolled end of the journey and stay on the roadmap as integrations, not replacements.
+
+---
+
 ## The two audiences and the two game engines
 
 The session description names two groups to energize: families and staff. They need different mechanics.
@@ -52,7 +68,7 @@ Each campus runs its own recruitment (confirmed by Steven, July 2026). The CRM t
 
 ## Data model (new tables, same Supabase project)
 
-- **lead** — a prospective family or student not yet in the pipeline: contact info, campus of interest, entry grade, source, stage, assigned recruiter, and a lead score.
+- **lead** — a prospective family or student not yet in the pipeline: contact info, campus of interest, entry grade, source, stage, assigned recruiter, and a lead score. Per the Perla model, this is a **dynamic family profile that opens at first inquiry and never closes**: it accrues pathway interest (healthcare, advanced manufacturing, tech), transportation needs, preferred language and channel, questions asked, and any enrollment barrier flagged — the "we know you" layer every other component personalizes from.
 - **lead_activity** — the timeline: calls, texts, emails, notes, event attendance, stage changes.
 - **event** — open houses, info sessions, tours: date, capacity, campus.
 - **rsvp** — a lead's registration for an event plus attendance status.
@@ -61,6 +77,7 @@ Each campus runs its own recruitment (confirmed by Steven, July 2026). The CRM t
 - **task** — a follow-up assigned to a recruiter, with due date and linked lead.
 - **points_ledger** — every point earned by any actor (family or staff) for a defined action; the single source of truth for all gamification.
 - **challenge** — a recruiter competition: rules, window, participants, scoring.
+- **content** — the pathway-tagged content library: stories, FAQs, and proof points tagged by pathway interest, grade band, campus, and common concern, so the same nurture journey sends a healthcare-pathway family different content than a tech-pathway family. This is the content-management / marketing core of the system.
 
 The bridge to the EMS: when a lead applies, the CRM creates or links the EMS `application` and writes `lead_id` onto it, then marks the lead converted. That is the whole handoff, and it is what makes end-to-end attribution possible.
 
@@ -78,12 +95,12 @@ The bridge to the EMS: when a lead applies, the CRM creates or links the EMS `ap
 
 The session pitch leads with gamification because that is the exciting part. The build should not. You cannot gamify a process you cannot yet measure, and the foundational value (a lead pipeline wired to enrollment outcomes) pays off even if gamification never ships. So:
 
-- **Phase 0 — Pipeline and handoff.** Lead and activity model, manual lead entry, a basic pipeline, and the convert-to-application stitch with attribution. This alone is worth the project.
-- **Phase 1 — Events and RSVP.** Event creation, public RSVP pages, attendance tracking, confirmations through the existing email system.
-- **Phase 2 — Campaigns and follow-up.** Campaign objects, the task engine, and bulk outreach.
-- **Phase 3 — Gamification v1.** Points ledger, referral tracking with consent, and family referral landing pages.
-- **Phase 4 — Gamification v2.** Recruiter challenges, leaderboards, ambassador tiers, and rewards.
-- **Phase 5 — Analytics.** Source-to-enrollment attribution, campaign ROI, and full funnel conversion dashboards.
+- **Phase 0 — Pipeline and handoff.** Lead and activity model, public inquiry form with source tagging and an interest question, manual lead entry, a basic pipeline, and the convert-to-application stitch with attribution. This alone is worth the project.
+- **Phase 1 — Response engine (speed-to-lead).** Harmony's highest-leverage piece, promoted ahead of events on their evidence: inquiry triggers a personalized text/email within minutes, routes a call task to the campus recruiter, re-texts if the call misses, and exits when a human conversation happens or an application lands. Includes the gone-quiet re-engagement trigger. Reuses the EMS's notify/SMS plumbing directly.
+- **Phase 2 — Events and RSVP.** Event creation, public RSVP pages, QR check-in, attendance tracking, and different follow-up branches for attended vs. registered-but-absent families.
+- **Phase 3 — Campaigns, nurture journeys, and the content library.** Campaign objects, the pathway-tagged content library, Push-to-Apply and Keep-the-Seat journeys, bulk outreach, and campaign seasons (Harmony's "Apply" festival model).
+- **Phase 4 — Gamification, referrals first.** The referral engine leads (Harmony's best channel at ~55% conversion): unique family codes, consent-gated referee contact, escalating funnel rewards, referral landing pages. Then points ledger, recruiter challenges, leaderboards, ambassador tiers.
+- **Phase 5 — Analytics and handoffs.** Source-to-enrollment attribution, campaign ROI, full funnel dashboards (leads by source, speed to first touch, 7-day conversion, referral share), and post-enrollment integrations per campus (SIS, ParentSquare) so the journey never visibly breaks.
 
 ---
 
