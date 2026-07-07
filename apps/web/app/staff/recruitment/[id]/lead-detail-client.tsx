@@ -214,6 +214,26 @@ export function LeadDetailClient({
                 {lead.pathway_interest ? (PATHWAY_LABELS[lead.pathway_interest] ?? lead.pathway_interest) : "Not sure yet"}
               </p>
             </div>
+            {lead.zip && (
+              <div>
+                <p className="text-xs text-stone">Zip code</p>
+                <p className="text-ink">{lead.zip}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-xs text-stone">Origin</p>
+              <p className="text-ink/80">
+                {lead.source_detail ?? (SOURCE_LABELS[lead.source] ?? lead.source)}
+              </p>
+              <p className="text-xs text-stone mt-0.5">
+                Signed up{" "}
+                {new Date(lead.created_at).toLocaleDateString("en-US", {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </p>
+            </div>
             {lead.notes && (
               <div>
                 <p className="text-xs text-stone">Notes</p>

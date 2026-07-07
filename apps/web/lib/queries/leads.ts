@@ -31,6 +31,7 @@ export interface LeadDetail extends LeadRow {
   sms_consent: boolean;
   preferred_language: string;
   source_detail: string | null;
+  zip: string | null;
   notes: string | null;
   application_id: string | null;
   converted_at: string | null;
@@ -254,7 +255,7 @@ export async function getLeadDetail(leadId: string): Promise<LeadDetail | null> 
     supabase
       .from("lead")
       .select(
-        `${LEAD_LIST_SELECT}, sms_consent, preferred_language, source_detail, notes, application_id, converted_at`
+        `${LEAD_LIST_SELECT}, sms_consent, preferred_language, source_detail, zip, notes, application_id, converted_at`
       )
       .eq("id", leadId)
       .single(),
@@ -277,6 +278,7 @@ export async function getLeadDetail(leadId: string): Promise<LeadDetail | null> 
     sms_consent: row.sms_consent === true,
     preferred_language: (row.preferred_language as string) ?? "en",
     source_detail: (row.source_detail as string | null) ?? null,
+    zip: (row.zip as string | null) ?? null,
     notes: (row.notes as string | null) ?? null,
     application_id: (row.application_id as string | null) ?? null,
     converted_at: (row.converted_at as string | null) ?? null,
