@@ -82,53 +82,68 @@ function toLeadRow(row: Record<string, unknown>): LeadRow {
 
 // ─── Queries ───────────────────────────────────────────
 
+// PostgREST caps each request at 1,000 rows, so large pipelines (C.R. Neal
+// imported 1,263 leads) must page. Client-side search/filtering stays instant
+// at this scale; revisit with server-driven pagination past ~5,000 leads.
+const LEAD_FETCH_MAX = 5000;
+const PAGE = 1000;
+
 export async function getLeads(options?: {
   stage?: string;
   search?: string;
-  limit?: number;
+  campusId?: string;
 }): Promise<LeadRow[]> {
   const supabase = await createServerClient();
+  const rows: Record<string, unknown>[] = [];
 
-  let query = supabase
-    .from("lead")
-    .select(LEAD_LIST_SELECT)
-    .order("created_at", { ascending: false })
-    .limit(options?.limit ?? 200);
+  for (let offset = 0; offset < LEAD_FETCH_MAX; offset += PAGE) {
+    let query = supabase
+      .from("lead")
+      .select(LEAD_LIST_SELECT)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + PAGE - 1);
 
-  if (options?.stage && options.stage !== "all") {
-    query = query.eq("stage", options.stage);
-  }
-  if (options?.search?.trim()) {
-    const term = options.search.trim();
-    query = query.or(
-      `first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`
-    );
+    if (options?.campusId) query = query.eq("campus_id", options.campusId);
+    if (options?.stage && options.stage !== "all") {
+      query = query.eq("stage", options.stage);
+    }
+    if (options?.search?.trim()) {
+      const term = options.search.trim();
+      query = query.or(
+        `first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`
+      );
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error("[getLeads]", error.message);
+      break;
+    }
+    rows.push(...(data ?? []));
+    if (!data || data.length < PAGE) break;
   }
 
-  const { data, error } = await query;
-  if (error) {
-    console.error("[getLeads]", error.message);
-    return [];
-  }
-  return (data ?? []).map((row: Record<string, unknown>) => toLeadRow(row));
+  return rows.map((row) => toLeadRow(row));
 }
 
 /**
  * The exception queue: open leads whose follow-up date has arrived, ordered
  * oldest-first so the most overdue family is always on top.
  */
-export async function getFollowUpQueue(): Promise<LeadRow[]> {
+export async function getFollowUpQueue(campusId?: string): Promise<LeadRow[]> {
   const supabase = await createServerClient();
   const nowIso = new Date().toISOString();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("lead")
     .select(LEAD_LIST_SELECT)
     .in("stage", ["new", "contacted", "engaged"])
     .lte("next_follow_up_at", nowIso)
     .order("next_follow_up_at", { ascending: true })
     .limit(50);
+  if (campusId) query = query.eq("campus_id", campusId);
 
+  const { data, error } = await query;
   if (error) {
     console.error("[getFollowUpQueue]", error.message);
     return [];
@@ -136,35 +151,53 @@ export async function getFollowUpQueue(): Promise<LeadRow[]> {
   return (data ?? []).map((row: Record<string, unknown>) => toLeadRow(row));
 }
 
-export async function getLeadPipelineSummary(): Promise<LeadPipelineSummary> {
+const ALL_STAGES = ["new", "contacted", "engaged", "applied", "closed"] as const;
+
+export async function getLeadPipelineSummary(campusId?: string): Promise<LeadPipelineSummary> {
   const supabase = await createServerClient();
   const nowIso = new Date().toISOString();
   const quietCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [{ data: stageRows }, { count: dueCount }, { count: quietCount }] = await Promise.all([
-    supabase.from("lead").select("stage"),
-    supabase
-      .from("lead")
-      .select("id", { count: "exact", head: true })
-      .in("stage", ["new", "contacted", "engaged"])
-      .lte("next_follow_up_at", nowIso),
-    supabase
-      .from("lead")
-      .select("id", { count: "exact", head: true })
-      .in("stage", ["new", "contacted", "engaged"])
-      .or(`last_contact_at.lt.${quietCutoff},and(last_contact_at.is.null,created_at.lt.${quietCutoff})`),
+  // Loosely typed on purpose: threading the exact PostgREST builder generics
+  // through a conditional helper blows TS's instantiation-depth limit.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scoped = (q: any): any => (campusId ? q.eq("campus_id", campusId) : q);
+
+  // Head counts per stage — counting via fetched rows silently caps at
+  // PostgREST's 1,000-row limit and undercounts large pipelines.
+  const stageCountQueries = ALL_STAGES.map((stage) =>
+    scoped(
+      supabase.from("lead").select("id", { count: "exact", head: true }).eq("stage", stage)
+    )
+  );
+
+  const [dueResult, quietResult, ...stageResults] = await Promise.all([
+    scoped(
+      supabase
+        .from("lead")
+        .select("id", { count: "exact", head: true })
+        .in("stage", ["new", "contacted", "engaged"])
+        .lte("next_follow_up_at", nowIso)
+    ),
+    scoped(
+      supabase
+        .from("lead")
+        .select("id", { count: "exact", head: true })
+        .in("stage", ["new", "contacted", "engaged"])
+        .or(`last_contact_at.lt.${quietCutoff},and(last_contact_at.is.null,created_at.lt.${quietCutoff})`)
+    ),
+    ...stageCountQueries,
   ]);
 
   const stageCounts: Record<string, number> = {};
-  for (const row of stageRows ?? []) {
-    const stage = (row as Record<string, string>).stage;
-    stageCounts[stage] = (stageCounts[stage] ?? 0) + 1;
-  }
+  ALL_STAGES.forEach((stage, i) => {
+    stageCounts[stage] = stageResults[i]?.count ?? 0;
+  });
 
   return {
     stage_counts: stageCounts,
-    follow_up_due: dueCount ?? 0,
-    gone_quiet: quietCount ?? 0,
+    follow_up_due: dueResult.count ?? 0,
+    gone_quiet: quietResult.count ?? 0,
   };
 }
 
@@ -182,15 +215,17 @@ export interface CampaignRow {
 }
 
 /** Recent campaigns for the recruitment page card (RLS scopes to campus). */
-export async function getCampaigns(limit = 10): Promise<CampaignRow[]> {
+export async function getCampaigns(campusId?: string, limit = 10): Promise<CampaignRow[]> {
   const supabase = await createServerClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("lead_campaign")
     .select(
       "id, name, template_key, audience_stage, status, daily_limit, total_recipients, sent_count, created_at, campus:campus_id (name)"
     )
     .order("created_at", { ascending: false })
     .limit(limit);
+  if (campusId) query = query.eq("campus_id", campusId);
+  const { data, error } = await query;
   if (error) {
     console.error("[getCampaigns]", error.message);
     return [];

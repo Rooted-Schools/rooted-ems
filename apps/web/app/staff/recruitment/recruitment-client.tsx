@@ -68,6 +68,8 @@ interface RecruitmentClientProps {
   leads: LeadRow[];
   campaigns: CampaignRow[];
   campuses: { id: string; name: string }[];
+  /** Campus filter from ?campus= — "all" when viewing every campus. */
+  activeCampusId: string;
   staffUserId: string;
 }
 
@@ -85,7 +87,7 @@ const EMPTY_LEAD = {
   notes: "",
 };
 
-export function RecruitmentClient({ queue, summary, leads, campaigns, campuses, staffUserId }: RecruitmentClientProps) {
+export function RecruitmentClient({ queue, summary, leads, campaigns, campuses, activeCampusId, staffUserId }: RecruitmentClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
@@ -291,6 +293,25 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, campuses, 
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row gap-3">
+            {campuses.length > 1 && (
+              <Select
+                value={activeCampusId}
+                onChange={(e) =>
+                  router.push(
+                    e.target.value === "all"
+                      ? "/staff/recruitment"
+                      : `/staff/recruitment?campus=${e.target.value}`
+                  )
+                }
+                className="sm:w-56"
+                aria-label="Filter by campus"
+              >
+                <option value="all">All campuses</option>
+                {campuses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </Select>
+            )}
             <Input
               placeholder="Search by family, student, or email…"
               value={search}
@@ -310,6 +331,9 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, campuses, 
               <option value="applied">Applied</option>
               <option value="closed">Closed</option>
             </Select>
+            <span className="text-xs text-stone self-center sm:ml-auto whitespace-nowrap">
+              {filtered.length.toLocaleString()} lead{filtered.length === 1 ? "" : "s"}
+            </span>
           </div>
         </CardHeader>
         <CardContent>

@@ -7,6 +7,7 @@ import {
   createLeadByStaff,
   logLeadActivity,
   updateLead,
+  deleteLead,
   createCampaign,
   cancelCampaign,
   sendCampaignTest,
@@ -45,6 +46,13 @@ export async function staffUpdateLead(leadId: string, input: UpdateLeadInput, ac
     revalidatePath("/staff/recruitment");
     revalidatePath(`/staff/recruitment/${leadId}`);
   }
+  return result;
+}
+
+export async function staffDeleteLead(leadId: string, actorId: string) {
+  await requireStaffSession();
+  const result = await deleteLead(leadId, actorId);
+  if (!result.error) revalidatePath("/staff/recruitment");
   return result;
 }
 

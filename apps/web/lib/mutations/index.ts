@@ -85,6 +85,7 @@ export {
   createLeadByStaff,
   logLeadActivity,
   updateLead,
+  deleteLead,
   stitchLeadToApplication,
   LEAD_STAGES,
   LEAD_SOURCES,

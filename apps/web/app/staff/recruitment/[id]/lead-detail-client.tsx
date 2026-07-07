@@ -17,7 +17,7 @@ import {
 import { Select } from "@/components/ui/select";
 import type { LeadDetail } from "@/lib/queries/leads";
 import { formatRelativeTime } from "@/lib/queries/utils";
-import { staffLogLeadActivity, staffUpdateLead } from "../actions";
+import { staffDeleteLead, staffLogLeadActivity, staffUpdateLead } from "../actions";
 import { PATHWAY_LABELS, SOURCE_LABELS, STAGE_CONFIG } from "../recruitment-client";
 
 const ACTIVITY_ICONS: Record<string, string> = {
@@ -52,6 +52,8 @@ export function LeadDetailClient({
   const [logBody, setLogBody] = useState("");
   const [logFollowUpDays, setLogFollowUpDays] = useState<number | null>(3);
   const [error, setError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   if (!lead) {
     return (
@@ -100,6 +102,19 @@ export function LeadDetailClient({
       }
       setLogOpen(false);
       router.refresh();
+    });
+  }
+
+  function doDelete() {
+    if (!lead) return;
+    setDeleteError(null);
+    startTransition(async () => {
+      const result = await staffDeleteLead(lead.id, staffUserId);
+      if (result.error) {
+        setDeleteError(result.error);
+      } else {
+        router.push("/staff/recruitment");
+      }
     });
   }
 
@@ -229,6 +244,17 @@ export function LeadDetailClient({
                 <p className="text-xs text-stone mt-1">Stage is locked once a family applies.</p>
               )}
             </div>
+            {!lead.application_id && (
+              <div className="pt-2 border-t border-stone/10">
+                <button
+                  type="button"
+                  onClick={() => { setDeleteError(null); setDeleteOpen(true); }}
+                  className="text-xs text-red-600 hover:text-red-700 hover:underline"
+                >
+                  Delete this lead
+                </button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -266,6 +292,35 @@ export function LeadDetailClient({
           </CardContent>
         </Card>
       </div>
+
+      {/* Delete confirmation */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {lead.first_name} {lead.last_name}?</DialogTitle>
+            <DialogDescription>
+              This permanently removes the lead and their entire activity timeline. It cannot be
+              undone. If this family just isn&apos;t interested, set the stage to Closed instead —
+              that keeps the history.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{deleteError}</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={isPending}>
+              Keep lead
+            </Button>
+            <Button
+              onClick={doDelete}
+              disabled={isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isPending ? "Deleting…" : "Delete permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Log dialog */}
       <Dialog open={logOpen} onOpenChange={setLogOpen}>

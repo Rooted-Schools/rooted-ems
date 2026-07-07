@@ -296,6 +296,52 @@ export async function updateLead(
   return { data: null, error: null };
 }
 
+/**
+ * Permanently delete a lead (activities and campaign enrollments cascade).
+ * Converted leads are protected — deleting them would erase the recruitment
+ * attribution their application carries; close them instead.
+ */
+export async function deleteLead(
+  leadId: string,
+  actorId: string
+): Promise<MutationResult> {
+  const supabase = await createServerClient();
+
+  const { data: lead } = await supabase
+    .from("lead")
+    .select("id, campus_id, first_name, last_name, email, application_id")
+    .eq("id", leadId)
+    .single();
+
+  if (!lead) return { data: null, error: "Lead not found." };
+  if (lead.application_id) {
+    return {
+      data: null,
+      error: "This family applied — their lead carries attribution data. Set the stage to Closed instead of deleting.",
+    };
+  }
+
+  const { error } = await supabase.from("lead").delete().eq("id", leadId);
+  if (error) {
+    console.error("[deleteLead]", error.message);
+    return { data: null, error: "Failed to delete the lead." };
+  }
+
+  await logAuditEvent({
+    table_name: "lead",
+    record_id: leadId,
+    action: AuditAction.Delete,
+    actor_id: actorId,
+    campus_id: (lead.campus_id as string) ?? null,
+    old_data: {
+      name: `${lead.first_name} ${lead.last_name}`,
+      email: lead.email,
+    },
+  });
+
+  return { data: null, error: null };
+}
+
 // ─── Conversion stitch ─────────────────────────────────
 
 /**
