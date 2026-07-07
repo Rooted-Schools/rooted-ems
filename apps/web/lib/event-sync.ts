@@ -79,21 +79,26 @@ function parseEventDate(raw: string): Date | null {
     .trim();
   if (!cleaned) return null;
 
-  const direct = new Date(cleaned);
-  if (!isNaN(direct.getTime()) && direct.getFullYear() > 2020) {
-    return new Date(Date.UTC(direct.getFullYear(), direct.getMonth(), direct.getDate(), 16, 0, 0));
-  }
+  // Guard against misparses: this is a 2026-forward calendar, so any result
+  // before 2025 is wrong (e.g. V8's loose parser turning a "June 1-August 24"
+  // range into Aug 1 2024). Noon-UTC to avoid timezone day-shift.
+  const accept = (d: Date): Date | null => {
+    if (isNaN(d.getTime()) || d.getUTCFullYear() < 2025) return null;
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 16, 0, 0));
+  };
 
+  // Strict "Month DD[,] YYYY" first — the reliable signal. For a date range
+  // it picks the segment that carries the year, not a stray misparse.
   const m = cleaned.match(
     /(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})/i
   );
   if (m) {
-    const d = new Date(`${m[1]} ${m[2]}, ${m[3]}`);
-    if (!isNaN(d.getTime())) {
-      return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 16, 0, 0));
-    }
+    const strict = accept(new Date(`${m[1]} ${m[2]}, ${m[3]} 12:00:00 UTC`));
+    if (strict) return strict;
   }
-  return null;
+
+  // Fall back to V8's lenient parse only when no explicit Month-DD-YYYY exists.
+  return accept(new Date(cleaned));
 }
 
 function col(header: string[], name: string): number {
