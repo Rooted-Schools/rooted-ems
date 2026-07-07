@@ -149,13 +149,20 @@ export function LeadDetailClient({
             {lead.campus_name} · {SOURCE_LABELS[lead.source] ?? lead.source} · inquired {formatRelativeTime(lead.created_at)}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button onClick={() => openLog("call")} disabled={isPending}>
             📞 Log a call
           </Button>
           <Button variant="outline" onClick={() => openLog("note")} disabled={isPending}>
             📝 Add note
           </Button>
+          {!lead.application_id && (
+            <Link href={`/staff/applications/new?lead=${lead.id}`}>
+              <Button variant="outline" disabled={isPending}>
+                📋 Start application
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 

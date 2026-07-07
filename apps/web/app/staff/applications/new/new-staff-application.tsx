@@ -33,6 +33,8 @@ interface StaffNewApplicationFormProps {
   gradeLevels: GradeLevel[];
   enrollmentWindows: EnrollmentWindow[];
   staffUserId: string;
+  /** Seed values (e.g. converting a recruitment lead via ?lead=). */
+  initial?: Partial<FormData>;
 }
 
 /* ─── Form State ─── */
@@ -115,9 +117,10 @@ export function StaffNewApplicationForm({
   gradeLevels,
   enrollmentWindows,
   staffUserId,
+  initial,
 }: StaffNewApplicationFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState<FormData>(initialFormData);
+  const [form, setForm] = useState<FormData>({ ...initialFormData, ...initial });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);

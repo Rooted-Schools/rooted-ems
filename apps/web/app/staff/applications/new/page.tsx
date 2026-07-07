@@ -1,12 +1,16 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-import { createServiceRoleClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient, createServerClient } from "@rooted-ems/database/server";
 import { getCampuses, getActiveEnrollmentWindows } from "@/lib/queries";
 import { requireStaffSession } from "@/lib/auth/get-session";
 import { StaffNewApplicationForm } from "./new-staff-application";
 
-export default async function StaffNewApplicationPage() {
+export default async function StaffNewApplicationPage({
+  searchParams,
+}: {
+  searchParams: { lead?: string };
+}) {
   const session = await requireStaffSession();
 
   const supabase = createServiceRoleClient();
@@ -44,12 +48,43 @@ export default async function StaffNewApplicationPage() {
     status: w.status as string,
   }));
 
+  // Converting a recruitment lead (?lead=): seed the form so staff verify
+  // instead of re-entering. The lead→application stitch happens automatically
+  // on submit (matched by guardian email + campus).
+  let initial: Record<string, unknown> | undefined;
+  if (searchParams?.lead) {
+    const rls = await createServerClient(); // user-scoped: campus RLS applies
+    const { data: lead } = await rls
+      .from("lead")
+      .select("campus_id, first_name, last_name, email, phone, sms_consent, student_first_name, entry_grade, zip, preferred_language")
+      .eq("id", searchParams.lead)
+      .single();
+    if (lead) {
+      const gradeMatch = grades.find(
+        (g) => g.campus_id === lead.campus_id && g.grade === lead.entry_grade
+      );
+      initial = {
+        campusId: lead.campus_id ?? "",
+        gradeLevelId: gradeMatch?.id ?? "",
+        firstName: lead.student_first_name ?? "",
+        guardianFirstName: lead.first_name ?? "",
+        guardianLastName: lead.last_name ?? "",
+        guardianEmail: lead.email ?? "",
+        guardianPhone: lead.phone ?? "",
+        guardianSmsConsent: lead.sms_consent === true,
+        guardianPreferredLanguage: lead.preferred_language === "es" ? "Spanish" : "English",
+        zip: lead.zip ?? "",
+      };
+    }
+  }
+
   return (
     <StaffNewApplicationForm
       campuses={campuses}
       gradeLevels={grades}
       enrollmentWindows={enrollmentWindows}
       staffUserId={session.user_id}
+      initial={initial}
     />
   );
 }
