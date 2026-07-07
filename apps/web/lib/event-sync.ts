@@ -73,6 +73,8 @@ function parseEventDate(raw: string): Date | null {
   const cleaned = raw
     .replace(/\([^)]*\)/g, " ")
     .replace(/\b(around|verify|weekly|recurring|to|through|–|-)\b/gi, " ")
+    // Strip ordinal suffixes ("June 14th" → "June 14") so both parse paths work.
+    .replace(/(\d{1,2})(st|nd|rd|th)\b/gi, "$1")
     .replace(/\s+/g, " ")
     .trim();
   if (!cleaned) return null;
