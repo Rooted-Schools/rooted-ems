@@ -115,10 +115,12 @@ export {
   getFollowUpQueue,
   getLeadPipelineSummary,
   getLeadDetail,
+  getCampaigns,
   type LeadRow,
   type LeadDetail,
   type LeadActivityRow,
   type LeadPipelineSummary,
+  type CampaignRow,
 } from "./leads";
 
 // Shared utilities

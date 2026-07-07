@@ -24,9 +24,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { LeadPipelineSummary, LeadRow } from "@/lib/queries/leads";
+import type { CampaignRow, LeadPipelineSummary, LeadRow } from "@/lib/queries/leads";
 import { formatRelativeTime } from "@/lib/queries/utils";
-import { staffCreateLead } from "./actions";
+import { staffCancelCampaign, staffCreateLead } from "./actions";
+import { CampaignDialog } from "./campaign-dialog";
+import { CAMPAIGN_TEMPLATES, type CampaignTemplateKey } from "@/lib/email-templates";
 
 /* ─── Display config ─── */
 
@@ -64,6 +66,7 @@ interface RecruitmentClientProps {
   queue: LeadRow[];
   summary: LeadPipelineSummary;
   leads: LeadRow[];
+  campaigns: CampaignRow[];
   campuses: { id: string; name: string }[];
   staffUserId: string;
 }
@@ -82,14 +85,22 @@ const EMPTY_LEAD = {
   notes: "",
 };
 
-export function RecruitmentClient({ queue, summary, leads, campuses, staffUserId }: RecruitmentClientProps) {
+export function RecruitmentClient({ queue, summary, leads, campaigns, campuses, staffUserId }: RecruitmentClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("open");
   const [addOpen, setAddOpen] = useState(false);
+  const [campaignOpen, setCampaignOpen] = useState(false);
   const [newLead, setNewLead] = useState({ ...EMPTY_LEAD });
   const [error, setError] = useState<string | null>(null);
+
+  function cancelCampaign(campaignId: string) {
+    startTransition(async () => {
+      await staffCancelCampaign(campaignId, staffUserId);
+      router.refresh();
+    });
+  }
 
   const updateNew = (patch: Partial<typeof EMPTY_LEAD>) =>
     setNewLead((l) => ({ ...l, ...patch }));
@@ -153,9 +164,14 @@ export function RecruitmentClient({ queue, summary, leads, campuses, staffUserId
             Every prospective family, from first hello to submitted application.
           </p>
         </div>
-        <Button onClick={() => { setNewLead({ ...EMPTY_LEAD, campus_id: campuses.length === 1 ? campuses[0].id : "" }); setError(null); setAddOpen(true); }}>
-          + Add Lead
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setCampaignOpen(true)}>
+            ✉️ Email Families
+          </Button>
+          <Button onClick={() => { setNewLead({ ...EMPTY_LEAD, campus_id: campuses.length === 1 ? campuses[0].id : "" }); setError(null); setAddOpen(true); }}>
+            + Add Lead
+          </Button>
+        </div>
       </div>
 
       {/* Follow-up queue — the morning triage */}
@@ -199,6 +215,54 @@ export function RecruitmentClient({ queue, summary, leads, campuses, staffUserId
                 + {queue.length - 8} more in the table below
               </p>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Active + recent campaigns */}
+      {campaigns.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">✉️ Campaigns</CardTitle>
+            <CardDescription>
+              Batch emails send automatically each morning at each campaign&apos;s daily pace.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {campaigns.map((c) => {
+              const pct = c.total_recipients > 0 ? Math.round((c.sent_count / c.total_recipients) * 100) : 0;
+              const templateLabel = CAMPAIGN_TEMPLATES[c.template_key as CampaignTemplateKey]?.label ?? c.template_key;
+              return (
+                <div key={c.id} className="flex items-center gap-3 rounded-lg border border-stone/15 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-ink truncate">
+                      {c.name}
+                      <span className="text-stone font-normal"> · {templateLabel} · {c.campus_name}</span>
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="h-1.5 flex-1 max-w-48 rounded-full bg-stone/15 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${c.status === "cancelled" ? "bg-stone/40" : "bg-rooted-green"}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-stone whitespace-nowrap">
+                        {c.sent_count.toLocaleString()}/{c.total_recipients.toLocaleString()} sent
+                      </span>
+                    </div>
+                  </div>
+                  {c.status === "sending" ? (
+                    <Button variant="outline" size="sm" onClick={() => cancelCampaign(c.id)} disabled={isPending}>
+                      Cancel
+                    </Button>
+                  ) : (
+                    <Badge variant={c.status === "complete" ? "success" : "secondary"}>
+                      {c.status === "complete" ? "Complete" : "Cancelled"}
+                    </Badge>
+                  )}
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       )}
@@ -313,6 +377,14 @@ export function RecruitmentClient({ queue, summary, leads, campuses, staffUserId
           )}
         </CardContent>
       </Card>
+
+      {/* Email Families wizard */}
+      <CampaignDialog
+        open={campaignOpen}
+        onOpenChange={setCampaignOpen}
+        campuses={campuses}
+        staffUserId={staffUserId}
+      />
 
       {/* Add Lead dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>

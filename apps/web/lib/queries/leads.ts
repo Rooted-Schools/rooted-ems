@@ -168,6 +168,50 @@ export async function getLeadPipelineSummary(): Promise<LeadPipelineSummary> {
   };
 }
 
+export interface CampaignRow {
+  id: string;
+  name: string;
+  template_key: string;
+  audience_stage: string;
+  status: string;
+  daily_limit: number;
+  total_recipients: number;
+  sent_count: number;
+  created_at: string;
+  campus_name: string;
+}
+
+/** Recent campaigns for the recruitment page card (RLS scopes to campus). */
+export async function getCampaigns(limit = 10): Promise<CampaignRow[]> {
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
+    .from("lead_campaign")
+    .select(
+      "id, name, template_key, audience_stage, status, daily_limit, total_recipients, sent_count, created_at, campus:campus_id (name)"
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.error("[getCampaigns]", error.message);
+    return [];
+  }
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const campus = row.campus as Record<string, string> | null;
+    return {
+      id: row.id as string,
+      name: row.name as string,
+      template_key: row.template_key as string,
+      audience_stage: row.audience_stage as string,
+      status: row.status as string,
+      daily_limit: row.daily_limit as number,
+      total_recipients: row.total_recipients as number,
+      sent_count: row.sent_count as number,
+      created_at: row.created_at as string,
+      campus_name: campus?.name ?? "",
+    };
+  });
+}
+
 export async function getLeadDetail(leadId: string): Promise<LeadDetail | null> {
   const supabase = await createServerClient();
 

@@ -93,6 +93,14 @@ export {
   type LeadStage,
 } from "./leads";
 
+// Lead campaign mutations
+export {
+  createCampaign,
+  cancelCampaign,
+  sendCampaignTest,
+  type CreateCampaignInput,
+} from "./campaigns";
+
 // Enrollment mutations
 export {
   createEnrollment,

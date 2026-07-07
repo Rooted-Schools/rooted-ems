@@ -327,6 +327,182 @@ export function waitlistPromoted({
   };
 }
 
+// ─── Campaign templates ───────────────────────────────────────────────────────
+// Staff-launched batch emails to leads (see /staff/recruitment → Email
+// Families). Every template is bilingual, carries the Rooted-branded wrapper,
+// and closes with a soft opt-out line. `renderCampaignEmail` is the single
+// entry point the send cron uses, so payloads are validated in one place.
+
+const OPT_OUT_EN = "If you'd rather not hear from us, just reply and let us know.";
+const OPT_OUT_ES = "Si prefiere no recibir estos mensajes, simplemente responda y háganoslo saber.";
+
+export type CampaignTemplateKey = "reintroduction" | "event_invite" | "deadline" | "custom";
+
+export interface CampaignPayload {
+  // event_invite
+  eventName?: string;
+  eventDate?: string;
+  eventLocation?: string;
+  // deadline
+  deadline?: string;
+  // custom
+  subject?: string;
+  bodyEn?: string;
+  bodyEs?: string;
+  ctaLabel?: string;
+  ctaUrl?: string;
+}
+
+export const CAMPAIGN_TEMPLATES: Record<CampaignTemplateKey, { label: string; description: string }> = {
+  reintroduction: {
+    label: "Reintroduction / Apply Now",
+    description: "Warm re-welcome for families who expressed interest before — applications are open, apply in five minutes.",
+  },
+  event_invite: {
+    label: "Event Invitation",
+    description: "Invite families to an info session, open house, or tour. You set the event name, date, and location.",
+  },
+  deadline: {
+    label: "Deadline Reminder",
+    description: "A friendly nudge that the application window is closing. You set the deadline.",
+  },
+  custom: {
+    label: "Custom Message",
+    description: "Write your own message — it's delivered inside the Rooted-branded bilingual wrapper.",
+  },
+};
+
+export function renderCampaignEmail(
+  templateKey: CampaignTemplateKey,
+  payload: CampaignPayload,
+  campusName: string
+): EmailTemplate {
+  switch (templateKey) {
+    case "reintroduction": {
+      const { html, text } = renderEmail(
+        {
+          greeting: "Hello,",
+          paragraphs: [
+            `You reached out about ${campusName}, and we have news worth sharing: applications are open, and seats are filling now.`,
+            `${campusName} is a tuition-free public school where students earn real credentials of value and build career experience with local employers while they work toward college. Our goal for every graduate: a job offer in one hand and a college acceptance in the other.`,
+            `Applying takes about five minutes on your phone. There is no fee, and applying does not commit you to anything. If you have questions first, just reply to this email and a real person from our team will answer. ${OPT_OUT_EN}`,
+          ],
+          cta: { label: "Start your application", url: `${APP_URL}/login` },
+          closing: `We would be honored to welcome your family. — The ${campusName} Enrollment Team`,
+        },
+        {
+          greeting: "Hola,",
+          paragraphs: [
+            `Usted nos contactó sobre ${campusName}, y tenemos noticias que vale la pena compartir: las solicitudes están abiertas, y los cupos se están llenando ahora.`,
+            `${campusName} es una escuela pública gratuita donde los estudiantes obtienen credenciales de valor y adquieren experiencia profesional con empleadores locales mientras se preparan para la universidad. Nuestra meta para cada graduado: una oferta de trabajo en una mano y una aceptación universitaria en la otra.`,
+            `La solicitud toma unos cinco minutos desde su teléfono. No tiene costo, y aplicar no le compromete a nada. Si primero tiene preguntas, simplemente responda a este correo y una persona real de nuestro equipo le contestará. ${OPT_OUT_ES}`,
+          ],
+          cta: { label: "Iniciar su solicitud", url: `${APP_URL}/login` },
+          closing: `Sería un honor darle la bienvenida a su familia. — El Equipo de Inscripción de ${campusName}`,
+        }
+      );
+      return {
+        subject: `Your seat at ${campusName} is waiting / Su cupo en ${campusName} le espera`,
+        html,
+        text,
+      };
+    }
+
+    case "event_invite": {
+      const eventName = payload.eventName ?? "an upcoming event";
+      const eventDate = payload.eventDate ?? "";
+      const eventLocation = payload.eventLocation ?? "";
+      const whenWhere = [eventDate, eventLocation].filter(Boolean).join(" · ");
+      const { html, text } = renderEmail(
+        {
+          greeting: "Hello,",
+          paragraphs: [
+            `You're invited! ${campusName} is hosting ${eventName}${whenWhere ? ` (${whenWhere})` : ""}, and we'd love for your family to join us.`,
+            `Come meet our team, see what career-connected learning looks like, and get every question answered in person. Families and students are both welcome.`,
+            `Just reply to this email to let us know you're coming, or come as you are. ${OPT_OUT_EN}`,
+          ],
+          cta: { label: "Learn more and apply", url: `${APP_URL}` },
+          closing: `Hope to see you there! — The ${campusName} Team`,
+        },
+        {
+          greeting: "Hola,",
+          paragraphs: [
+            `¡Está invitado/a! ${campusName} tendrá ${eventName}${whenWhere ? ` (${whenWhere})` : ""}, y nos encantaría que su familia nos acompañe.`,
+            `Venga a conocer a nuestro equipo, vea cómo es el aprendizaje conectado con carreras y obtenga respuestas a todas sus preguntas en persona. Las familias y los estudiantes son bienvenidos.`,
+            `Simplemente responda a este correo para avisarnos que vendrá, o venga sin avisar. ${OPT_OUT_ES}`,
+          ],
+          cta: { label: "Conozca más y aplique", url: `${APP_URL}` },
+          closing: `¡Esperamos verle allí! — El Equipo de ${campusName}`,
+        }
+      );
+      return {
+        subject: `You're invited: ${eventName} at ${campusName} / Está invitado/a`,
+        html,
+        text,
+      };
+    }
+
+    case "deadline": {
+      const deadline = payload.deadline ?? "soon";
+      const { html, text } = renderEmail(
+        {
+          greeting: "Hello,",
+          paragraphs: [
+            `A quick, friendly reminder: the application window at ${campusName} closes ${deadline}.`,
+            `Applying takes about five minutes on your phone, there is no fee, and applying does not commit you to anything — it simply keeps your family's options open.`,
+            `If anything is standing in your way — questions, documents, language — reply to this email and a real person will help. ${OPT_OUT_EN}`,
+          ],
+          cta: { label: "Apply before the deadline", url: `${APP_URL}/login` },
+          closing: `We're here to help. — The ${campusName} Enrollment Team`,
+        },
+        {
+          greeting: "Hola,",
+          paragraphs: [
+            `Un recordatorio rápido y amistoso: el período de solicitudes en ${campusName} cierra ${deadline}.`,
+            `La solicitud toma unos cinco minutos desde su teléfono, no tiene costo, y aplicar no le compromete a nada — simplemente mantiene abiertas las opciones de su familia.`,
+            `Si algo se lo impide — preguntas, documentos, idioma — responda a este correo y una persona real le ayudará. ${OPT_OUT_ES}`,
+          ],
+          cta: { label: "Aplique antes de la fecha límite", url: `${APP_URL}/login` },
+          closing: `Estamos para ayudarle. — El Equipo de Inscripción de ${campusName}`,
+        }
+      );
+      return {
+        subject: `Applications close ${deadline} — ${campusName} / Las solicitudes cierran pronto`,
+        html,
+        text,
+      };
+    }
+
+    case "custom": {
+      const paragraphsEn = (payload.bodyEn ?? "").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+      const paragraphsEs = (payload.bodyEs ?? "").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+      const cta =
+        payload.ctaLabel && payload.ctaUrl
+          ? { label: payload.ctaLabel, url: payload.ctaUrl }
+          : undefined;
+      const { html, text } = renderEmail(
+        {
+          greeting: "Hello,",
+          paragraphs: [...paragraphsEn, OPT_OUT_EN],
+          cta,
+          closing: `Warmly, the ${campusName} Team`,
+        },
+        {
+          greeting: "Hola,",
+          paragraphs: [...(paragraphsEs.length > 0 ? paragraphsEs : paragraphsEn), OPT_OUT_ES],
+          cta,
+          closing: `Cordialmente, el Equipo de ${campusName}`,
+        }
+      );
+      return {
+        subject: payload.subject || `A note from ${campusName}`,
+        html,
+        text,
+      };
+    }
+  }
+}
+
 export function inquiryWelcome({
   guardianFirstName,
   campusName,

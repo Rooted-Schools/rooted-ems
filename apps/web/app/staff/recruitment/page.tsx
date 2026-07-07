@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { createServerClient } from "@rooted-ems/database/server";
 import { redirect } from "next/navigation";
-import { getFollowUpQueue, getLeadPipelineSummary, getLeads } from "@/lib/queries";
+import { getCampaigns, getFollowUpQueue, getLeadPipelineSummary, getLeads } from "@/lib/queries";
 import { RecruitmentClient } from "./recruitment-client";
 
 export default async function StaffRecruitmentPage() {
@@ -12,10 +12,11 @@ export default async function StaffRecruitmentPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/staff-login");
 
-  const [queue, summary, leads, { data: campusRows }] = await Promise.all([
+  const [queue, summary, leads, campaigns, { data: campusRows }] = await Promise.all([
     getFollowUpQueue(),
     getLeadPipelineSummary(),
     getLeads(),
+    getCampaigns(),
     supabase.from("campus").select("id, name").order("name"),
   ]);
 
@@ -29,6 +30,7 @@ export default async function StaffRecruitmentPage() {
       queue={queue}
       summary={summary}
       leads={leads}
+      campaigns={campaigns}
       campuses={campuses}
       staffUserId={user.id}
     />
