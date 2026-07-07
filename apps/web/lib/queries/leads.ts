@@ -35,6 +35,10 @@ export interface LeadDetail extends LeadRow {
   notes: string | null;
   application_id: string | null;
   converted_at: string | null;
+  referral_code: string | null;
+  referred_by_name: string | null;
+  referral_count: number;
+  referral_applied: number;
   activities: LeadActivityRow[];
 }
 
@@ -251,11 +255,11 @@ export async function getCampaigns(campusId?: string, limit = 10): Promise<Campa
 export async function getLeadDetail(leadId: string): Promise<LeadDetail | null> {
   const supabase = await createServerClient();
 
-  const [{ data: lead, error }, { data: activities }] = await Promise.all([
+  const [{ data: lead, error }, { data: activities }, { data: referred }] = await Promise.all([
     supabase
       .from("lead")
       .select(
-        `${LEAD_LIST_SELECT}, sms_consent, preferred_language, source_detail, zip, notes, application_id, converted_at`
+        `${LEAD_LIST_SELECT}, sms_consent, preferred_language, source_detail, zip, notes, application_id, converted_at, referral_code, referred_by:referred_by_lead_id (first_name, last_name)`
       )
       .eq("id", leadId)
       .single(),
@@ -265,6 +269,8 @@ export async function getLeadDetail(leadId: string): Promise<LeadDetail | null> 
       .eq("lead_id", leadId)
       .order("created_at", { ascending: false })
       .limit(100),
+    // Families this lead referred, with whether each applied.
+    supabase.from("lead").select("application_id").eq("referred_by_lead_id", leadId),
   ]);
 
   if (error || !lead) {
@@ -273,6 +279,8 @@ export async function getLeadDetail(leadId: string): Promise<LeadDetail | null> 
   }
 
   const row = lead as Record<string, unknown>;
+  const referredRows = (referred ?? []) as { application_id: string | null }[];
+  const referredBy = row.referred_by as Record<string, string> | null;
   return {
     ...toLeadRow(row),
     sms_consent: row.sms_consent === true,
@@ -282,6 +290,10 @@ export async function getLeadDetail(leadId: string): Promise<LeadDetail | null> 
     notes: (row.notes as string | null) ?? null,
     application_id: (row.application_id as string | null) ?? null,
     converted_at: (row.converted_at as string | null) ?? null,
+    referral_code: (row.referral_code as string | null) ?? null,
+    referred_by_name: referredBy ? `${referredBy.first_name ?? ""} ${referredBy.last_name ?? ""}`.trim() || null : null,
+    referral_count: referredRows.length,
+    referral_applied: referredRows.filter((r) => r.application_id).length,
     activities: (activities ?? []).map((a: Record<string, unknown>) => {
       const actor = a.actor as Record<string, string> | null;
       return {

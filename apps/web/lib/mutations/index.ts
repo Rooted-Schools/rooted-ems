@@ -86,6 +86,7 @@ export {
   logLeadActivity,
   updateLead,
   deleteLead,
+  ensureReferralCode,
   stitchLeadToApplication,
   LEAD_STAGES,
   LEAD_SOURCES,
@@ -93,6 +94,17 @@ export {
   type UpdateLeadInput,
   type LeadStage,
 } from "./leads";
+
+// Event + RSVP mutations
+export {
+  createEvent,
+  updateEvent,
+  setRsvpStatus,
+  rsvpToEvent,
+  EVENT_TYPES,
+  type CreateEventInput,
+  type RsvpInput,
+} from "./events";
 
 // Lead campaign mutations
 export {

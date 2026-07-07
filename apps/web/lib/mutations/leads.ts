@@ -33,6 +33,8 @@ export interface CreateLeadInput {
   source?: string;
   source_detail?: string;
   notes?: string;
+  /** Set when this lead arrived via another family's referral link. */
+  referred_by_lead_id?: string;
 }
 
 // ─── Public inquiry (response engine entry point) ──────
@@ -101,6 +103,7 @@ export async function createLeadFromInquiry(
       pathway_interest: input.pathway_interest || null,
       source: input.source ?? "website",
       source_detail: input.source_detail || null,
+      referred_by_lead_id: input.referred_by_lead_id || null,
       stage: "new",
       next_follow_up_at: nextDay,
     })
@@ -117,6 +120,27 @@ export async function createLeadFromInquiry(
     activity_type: "inquiry",
     body: `Inquiry submitted via ${input.source ?? "website"}.`,
   });
+
+  // Credit the referrer on their own timeline so staff see the chain.
+  if (input.referred_by_lead_id) {
+    const { data: referrer } = await supabase
+      .from("lead")
+      .select("first_name, last_name")
+      .eq("id", input.referred_by_lead_id)
+      .single();
+    await supabase.from("lead_activity").insert({
+      lead_id: input.referred_by_lead_id,
+      activity_type: "note",
+      body: `Referred a new family: ${input.first_name.trim()} ${input.last_name.trim()}.`,
+    });
+    if (referrer) {
+      await supabase.from("lead_activity").insert({
+        lead_id: lead.id,
+        activity_type: "note",
+        body: `Referred by ${referrer.first_name} ${referrer.last_name}.`,
+      });
+    }
+  }
 
   const leadName = `${input.first_name.trim()} ${input.last_name.trim()}`;
 
@@ -340,6 +364,60 @@ export async function deleteLead(
   });
 
   return { data: null, error: null };
+}
+
+// ─── Referral codes ────────────────────────────────────
+
+/** URL-safe, unambiguous alphabet (no 0/O/1/I) for short shareable codes. */
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function makeCode(seed: number): string {
+  let code = "";
+  let n = seed;
+  for (let i = 0; i < 6; i++) {
+    code += CODE_ALPHABET[n % CODE_ALPHABET.length];
+    n = Math.floor(n / CODE_ALPHABET.length) + (i + 1) * 7;
+  }
+  return code;
+}
+
+/**
+ * Return a lead's referral code, generating one on first request. Codes are
+ * created lazily (not backfilled onto 1,300 rows) — a family only needs one
+ * the moment staff want to share their link.
+ */
+export async function ensureReferralCode(
+  leadId: string
+): Promise<MutationResult<{ code: string }>> {
+  const supabase = await createServerClient();
+
+  const { data: lead } = await supabase
+    .from("lead")
+    .select("referral_code, created_at")
+    .eq("id", leadId)
+    .single();
+  if (!lead) return { data: null, error: "Lead not found." };
+  if (lead.referral_code) return { data: { code: lead.referral_code as string }, error: null };
+
+  // Derive a stable-ish seed, retry on the (rare) unique collision.
+  const base = new Date((lead.created_at as string) ?? Date.now()).getTime();
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const code = makeCode(base + attempt * 104729);
+    const { error } = await supabase
+      .from("lead")
+      .update({ referral_code: code })
+      .eq("id", leadId)
+      .is("referral_code", null);
+    if (!error) {
+      const { data: check } = await supabase
+        .from("lead")
+        .select("referral_code")
+        .eq("id", leadId)
+        .single();
+      if (check?.referral_code) return { data: { code: check.referral_code as string }, error: null };
+    }
+  }
+  return { data: null, error: "Could not generate a referral code." };
 }
 
 // ─── Conversion stitch ─────────────────────────────────

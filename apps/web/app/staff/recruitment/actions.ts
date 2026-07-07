@@ -69,6 +69,50 @@ export async function staffDeleteLead(leadId: string, actorId: string) {
   return result;
 }
 
+// ─── Referral codes ───────────────────────────────────
+
+export async function staffGetReferralLink(leadId: string) {
+  await requireStaffSession();
+  const { ensureReferralCode } = await import("@/lib/mutations");
+  const result = await ensureReferralCode(leadId);
+  if (!result.error) revalidatePath(`/staff/recruitment/${leadId}`);
+  return result;
+}
+
+// ─── Events ───────────────────────────────────────────
+
+export async function staffCreateEvent(input: import("@/lib/mutations").CreateEventInput, actorId: string) {
+  await requireStaffSession();
+  const { createEvent } = await import("@/lib/mutations");
+  const result = await createEvent(input, actorId);
+  if (!result.error) revalidatePath("/staff/recruitment/events");
+  return result;
+}
+
+export async function staffSetRsvpStatus(
+  rsvpId: string,
+  eventId: string,
+  status: "registered" | "attended" | "no_show" | "cancelled",
+  actorId: string
+) {
+  await requireStaffSession();
+  const { setRsvpStatus } = await import("@/lib/mutations");
+  const result = await setRsvpStatus(rsvpId, status, actorId);
+  if (!result.error) revalidatePath(`/staff/recruitment/events/${eventId}`);
+  return result;
+}
+
+export async function staffTogglePublish(eventId: string, isPublished: boolean) {
+  await requireStaffSession();
+  const { updateEvent } = await import("@/lib/mutations");
+  const result = await updateEvent(eventId, { is_published: isPublished });
+  if (!result.error) {
+    revalidatePath("/staff/recruitment/events");
+    revalidatePath(`/staff/recruitment/events/${eventId}`);
+  }
+  return result;
+}
+
 // ─── Campaigns ────────────────────────────────────────
 
 const AUDIENCE_STAGE_SETS: Record<string, string[]> = {

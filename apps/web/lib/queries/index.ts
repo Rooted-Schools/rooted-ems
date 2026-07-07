@@ -123,6 +123,18 @@ export {
   type CampaignRow,
 } from "./leads";
 
+// Events + RSVP
+export {
+  getStaffEvents,
+  getEventDetail,
+  getUpcomingPublicEvents,
+  getPublicEvent,
+  type EventRow,
+  type EventDetail,
+  type RsvpRow,
+  type PublicEvent,
+} from "./events";
+
 // Recruitment funnel analytics
 export {
   getRecruitmentFunnel,

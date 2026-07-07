@@ -18,7 +18,16 @@ interface CampusOption {
 
 const GRADE_OPTIONS = ["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
 
-export function InquiryForm({ campuses }: { campuses: CampusOption[] }) {
+interface InquiryFormProps {
+  campuses: CampusOption[];
+  /** When arriving via /refer/[code]: the referrer's first name for the banner. */
+  referrerName?: string;
+  referredByLeadId?: string;
+  /** Referral links lock the campus to the referrer's campus. */
+  lockedCampusId?: string;
+}
+
+export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCampusId }: InquiryFormProps) {
   const { t, locale } = useLocale();
   const [isPending, startTransition] = useTransition();
   const [submitted, setSubmitted] = useState(false);
@@ -31,7 +40,7 @@ export function InquiryForm({ campuses }: { campuses: CampusOption[] }) {
     email: "",
     phone: "",
     sms_consent: false,
-    campus_id: campuses.length === 1 ? campuses[0].id : "",
+    campus_id: lockedCampusId ?? (campuses.length === 1 ? campuses[0].id : ""),
     student_first_name: "",
     entry_grade: "",
     pathway_interest: "",
@@ -59,6 +68,7 @@ export function InquiryForm({ campuses }: { campuses: CampusOption[] }) {
         ...form,
         preferred_language: locale,
         source: form.source || "website",
+        referred_by_lead_id: referredByLeadId,
       });
       if (result.error) {
         setError(result.error);
@@ -103,6 +113,16 @@ export function InquiryForm({ campuses }: { campuses: CampusOption[] }) {
           <LanguageToggle />
         </div>
 
+        {referrerName && (
+          <div className="rounded-xl border border-rooted-green/30 bg-rooted-green/5 px-4 py-3 mb-3 text-center">
+            <p className="text-sm text-ink">
+              🌱 <span className="font-semibold">{referrerName}</span>{" "}
+              {locale === "es"
+                ? "cree que su familia sería ideal para Rooted. ¡Cuéntenos sobre usted!"
+                : "thinks your family would be a great fit for Rooted. Tell us about yourself!"}
+            </p>
+          </div>
+        )}
         <Card>
           <CardHeader>
             <CardTitle className="text-xl">{t("inquiry.title")}</CardTitle>

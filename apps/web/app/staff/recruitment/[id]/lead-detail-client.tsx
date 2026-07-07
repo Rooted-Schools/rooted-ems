@@ -17,7 +17,7 @@ import {
 import { Select } from "@/components/ui/select";
 import type { LeadDetail } from "@/lib/queries/leads";
 import { formatRelativeTime } from "@/lib/queries/utils";
-import { staffDeleteLead, staffLogLeadActivity, staffUpdateLead } from "../actions";
+import { staffDeleteLead, staffGetReferralLink, staffLogLeadActivity, staffUpdateLead } from "../actions";
 import { PATHWAY_LABELS, SOURCE_LABELS, STAGE_CONFIG } from "../recruitment-client";
 
 const ACTIVITY_ICONS: Record<string, string> = {
@@ -54,6 +54,19 @@ export function LeadDetailClient({
   const [error, setError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [referralCode, setReferralCode] = useState<string | null>(lead?.referral_code ?? null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const appBase = process.env.NEXT_PUBLIC_APP_URL ?? "https://enroll.rootedschool.org";
+  const referralLink = referralCode ? `${appBase}/refer/${referralCode}` : null;
+
+  function getReferralLink() {
+    if (!lead) return;
+    startTransition(async () => {
+      const result = await staffGetReferralLink(lead.id);
+      if (result.data?.code) setReferralCode(result.data.code);
+    });
+  }
 
   if (!lead) {
     return (
@@ -252,6 +265,42 @@ export function LeadDetailClient({
               <p className="text-ink">
                 {lead.next_follow_up_at ? formatRelativeTime(lead.next_follow_up_at) : "None scheduled"}
               </p>
+            </div>
+            {lead.referred_by_name && (
+              <div>
+                <p className="text-xs text-stone">Referred by</p>
+                <p className="text-ink">🌱 {lead.referred_by_name}</p>
+              </div>
+            )}
+            <div className="pt-2 border-t border-stone/10">
+              <p className="text-xs text-stone mb-1">Refer-a-family link</p>
+              {referralLink ? (
+                <div className="flex items-center gap-2">
+                  <code className="text-xs bg-stone/10 rounded px-2 py-1 flex-1 truncate">{referralLink}</code>
+                  <button
+                    type="button"
+                    onClick={() => { navigator.clipboard.writeText(referralLink); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }}
+                    className="text-xs text-rooted-green hover:underline whitespace-nowrap"
+                  >
+                    {linkCopied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={getReferralLink}
+                  disabled={isPending}
+                  className="text-xs text-rooted-green hover:underline"
+                >
+                  Generate link to share
+                </button>
+              )}
+              {lead.referral_count > 0 && (
+                <p className="text-xs text-stone mt-1">
+                  Referred {lead.referral_count} famil{lead.referral_count === 1 ? "y" : "ies"}
+                  {lead.referral_applied > 0 && ` · ${lead.referral_applied} applied`}
+                </p>
+              )}
             </div>
             <div className="pt-2 border-t border-stone/10">
               <label htmlFor="stage-select" className="text-xs text-stone block mb-1">Stage</label>

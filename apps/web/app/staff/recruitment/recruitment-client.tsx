@@ -188,6 +188,9 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, campuses, 
           {syncStatus && (
             <span className="text-xs text-stone">{syncStatus}</span>
           )}
+          <Link href={activeCampusId === "all" ? "/staff/recruitment/events" : `/staff/recruitment/events?campus=${activeCampusId}`}>
+            <Button variant="outline">🗓️ Events</Button>
+          </Link>
           <Link href={activeCampusId === "all" ? "/staff/recruitment/analytics" : `/staff/recruitment/analytics?campus=${activeCampusId}`}>
             <Button variant="outline">📊 Funnel</Button>
           </Link>

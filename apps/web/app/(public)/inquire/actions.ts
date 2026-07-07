@@ -14,6 +14,8 @@ export interface InquirySubmission {
   entry_grade: string;
   pathway_interest: string;
   source: string;
+  /** Set by the /refer/[code] landing when a family was referred. */
+  referred_by_lead_id?: string;
   /** Honeypot — humans never fill this; bots do. */
   website: string;
 }
@@ -43,6 +45,8 @@ export async function submitInquiry(input: InquirySubmission) {
     student_first_name: input.student_first_name?.slice(0, 100) || undefined,
     entry_grade: input.entry_grade?.slice(0, 10) || undefined,
     pathway_interest: input.pathway_interest?.slice(0, 50) || undefined,
-    source: VALID_SOURCES.has(input.source) ? input.source : "website",
+    source: input.referred_by_lead_id ? "referral" : VALID_SOURCES.has(input.source) ? input.source : "website",
+    source_detail: input.referred_by_lead_id ? "Family referral link" : undefined,
+    referred_by_lead_id: input.referred_by_lead_id || undefined,
   });
 }

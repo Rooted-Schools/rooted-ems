@@ -503,6 +503,47 @@ export function renderCampaignEmail(
   }
 }
 
+export function eventRsvpConfirmation({
+  guardianFirstName,
+  campusName,
+  eventTitle,
+  whenText,
+  location,
+}: {
+  guardianFirstName?: string;
+  campusName: string;
+  eventTitle: string;
+  whenText: string;
+  location?: string;
+}): EmailTemplate {
+  const whereEn = location ? ` at ${location}` : "";
+  const { html, text } = renderEmail(
+    {
+      greeting: guardianFirstName ? `Hi ${guardianFirstName},` : "Hello,",
+      paragraphs: [
+        `You're registered for ${eventTitle} at ${campusName}. We're looking forward to meeting you!`,
+        `When: ${whenText}${location ? `\nWhere: ${location}` : ""}`,
+        "If your plans change or you have any questions, just reply to this email. See you soon!",
+      ],
+      closing: `Warmly, the ${campusName} Team`,
+    },
+    {
+      greeting: guardianFirstName ? `Hola ${guardianFirstName},` : "Hola,",
+      paragraphs: [
+        `Está registrado/a para ${eventTitle} en ${campusName}. ¡Esperamos conocerle!`,
+        `Cuándo: ${whenText}${location ? `\nDónde: ${location}` : ""}`,
+        "Si sus planes cambian o tiene preguntas, simplemente responda a este correo. ¡Nos vemos pronto!",
+      ],
+      closing: `Cordialmente, el Equipo de ${campusName}`,
+    }
+  );
+  return {
+    subject: `You're registered: ${eventTitle}${whereEn} / Está registrado/a`,
+    html,
+    text,
+  };
+}
+
 export function inquiryWelcome({
   guardianFirstName,
   campusName,
