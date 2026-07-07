@@ -49,6 +49,19 @@ export async function staffUpdateLead(leadId: string, input: UpdateLeadInput, ac
   return result;
 }
 
+/**
+ * On-demand pull of the campus Google Sheets interest forms — same engine
+ * the daily 14:00 UTC cron runs. Any staff member can trigger it; the sync
+ * only ever adds new families, so running it twice is harmless.
+ */
+export async function staffSyncLeadSheets() {
+  await requireStaffSession();
+  const { syncLeadSheets } = await import("@/lib/lead-sync");
+  const summary = await syncLeadSheets();
+  if (summary.added > 0) revalidatePath("/staff/recruitment");
+  return summary;
+}
+
 export async function staffDeleteLead(leadId: string, actorId: string) {
   await requireStaffSession();
   const result = await deleteLead(leadId, actorId);

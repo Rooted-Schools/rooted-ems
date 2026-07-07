@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/table";
 import type { CampaignRow, LeadPipelineSummary, LeadRow } from "@/lib/queries/leads";
 import { formatRelativeTime } from "@/lib/queries/utils";
-import { staffCancelCampaign, staffCreateLead } from "./actions";
+import { staffCancelCampaign, staffCreateLead, staffSyncLeadSheets } from "./actions";
 import { CampaignDialog } from "./campaign-dialog";
 import { CAMPAIGN_TEMPLATES, type CampaignTemplateKey } from "@/lib/email-templates";
 
@@ -104,6 +104,24 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, campuses, 
     });
   }
 
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  function syncSheets() {
+    setSyncStatus("Syncing…");
+    startTransition(async () => {
+      try {
+        const summary = await staffSyncLeadSheets();
+        setSyncStatus(
+          summary.added === 0
+            ? "Up to date — no new families on the forms."
+            : `Added ${summary.added} new famil${summary.added === 1 ? "y" : "ies"}${summary.welcomed > 0 ? ` (${summary.welcomed} welcomed just now)` : ""}.`
+        );
+        if (summary.added > 0) router.refresh();
+      } catch {
+        setSyncStatus("Sync failed — try again in a minute.");
+      }
+    });
+  }
+
   const updateNew = (patch: Partial<typeof EMPTY_LEAD>) =>
     setNewLead((l) => ({ ...l, ...patch }));
 
@@ -166,7 +184,13 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, campuses, 
             Every prospective family, from first hello to submitted application.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {syncStatus && (
+            <span className="text-xs text-stone">{syncStatus}</span>
+          )}
+          <Button variant="outline" onClick={syncSheets} disabled={isPending} title="Pull new sign-ups from the campus interest form spreadsheets">
+            🔄 Sync sheets
+          </Button>
           <Button variant="outline" onClick={() => setCampaignOpen(true)}>
             ✉️ Email Families
           </Button>
