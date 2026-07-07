@@ -123,5 +123,13 @@ export {
   type CampaignRow,
 } from "./leads";
 
+// Recruitment funnel analytics
+export {
+  getRecruitmentFunnel,
+  type RecruitmentFunnel,
+  type FunnelStage,
+  type SourceRow,
+} from "./recruitment-analytics";
+
 // Shared utilities
 export { formatRelativeTime } from "./utils";

@@ -188,6 +188,9 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, campuses, 
           {syncStatus && (
             <span className="text-xs text-stone">{syncStatus}</span>
           )}
+          <Link href={activeCampusId === "all" ? "/staff/recruitment/analytics" : `/staff/recruitment/analytics?campus=${activeCampusId}`}>
+            <Button variant="outline">📊 Funnel</Button>
+          </Link>
           <Button variant="outline" onClick={syncSheets} disabled={isPending} title="Pull new sign-ups from the campus interest form spreadsheets">
             🔄 Sync sheets
           </Button>
