@@ -155,6 +155,11 @@ function LandingContent({ schools }: LandingClientProps) {
               {t("public.getInfo")}
             </Link>
           </div>
+          <div className="mt-4">
+            <Link href="/events" className="text-sm font-medium text-rooted-green hover:underline">
+              {t("public.seeEvents")} &rarr;
+            </Link>
+          </div>
         </div>
       </section>
 

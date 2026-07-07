@@ -18,14 +18,20 @@ import { createServiceRoleClient } from "@rooted-ems/database/server";
 interface TablingSheet {
   campusShortCode: string;
   spreadsheetId: string;
-  gid: string;
+  /** Tab name — both campuses use a "Tabling Calendar" tab. */
+  sheetName: string;
 }
 
 const TABLING_SHEETS: TablingSheet[] = [
   {
     campusShortCode: "RSC",
     spreadsheetId: "184g06Aw31lSAx2Uabq0ftARVnekb5XKIvB53tOY5pRY",
-    gid: "230907814",
+    sheetName: "Tabling Calendar",
+  },
+  {
+    campusShortCode: "CRN",
+    spreadsheetId: "1_e79GJ3HTdUGVVQtMyS3RPbo_vRNfQyRJ6TL9nkqXe4",
+    sheetName: "Tabling Calendar",
   },
 ];
 
@@ -114,7 +120,9 @@ export async function syncTablingEvents(): Promise<TablingSyncSummary> {
     if (!campus) { summary.errors.push(`campus ${sheet.campusShortCode} not found`); continue; }
 
     try {
-      const url = `https://docs.google.com/spreadsheets/d/${sheet.spreadsheetId}/gviz/tq?tqx=out:csv&gid=${sheet.gid}`;
+      // headers=0 stops gviz from auto-detecting (and mangling) header rows on
+      // sheets with frozen rows — we locate the real header row ourselves.
+      const url = `https://docs.google.com/spreadsheets/d/${sheet.spreadsheetId}/gviz/tq?tqx=out:csv&headers=0&sheet=${encodeURIComponent(sheet.sheetName)}`;
       const res = await fetch(url, { signal: AbortSignal.timeout(20_000), cache: "no-store" });
       if (!res.ok) { summary.errors.push(`${sheet.campusShortCode}: HTTP ${res.status}`); continue; }
       const rows = parseCsv(await res.text());

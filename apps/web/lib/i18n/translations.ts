@@ -443,6 +443,7 @@ const dict = {
   "public.checkBackSoon":    { en: "Check back soon for upcoming enrollment windows.", es: "Vuelva pronto para conocer los próximos períodos de inscripción." },
   "public.applyNow":         { en: "Apply Now",             es: "Solicitar Ahora" },
   "public.getInfo":          { en: "Get More Info",         es: "Más Información" },
+  "public.seeEvents":        { en: "See upcoming events",    es: "Ver próximos eventos" },
 
   // ─── Public inquiry form ───────────────────────────────────────────────────
   "inquiry.title":            { en: "Tell us a little about you", es: "Cuéntenos un poco sobre usted" },
