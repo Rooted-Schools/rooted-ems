@@ -367,7 +367,9 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, campuses, 
                         <p className="font-medium text-ink">
                           {lead.first_name} {lead.last_name}
                         </p>
-                        <p className="text-xs text-stone">{lead.email ?? lead.phone ?? "—"}</p>
+                        <p className="text-xs text-stone">
+                          {[lead.email, lead.phone].filter(Boolean).join(" · ") || "—"}
+                        </p>
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-sm">
                         {lead.student_first_name ?? "—"}
