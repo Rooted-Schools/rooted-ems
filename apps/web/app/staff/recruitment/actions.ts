@@ -102,6 +102,14 @@ export async function staffSetRsvpStatus(
   return result;
 }
 
+export async function staffSyncTablingEvents() {
+  await requireStaffSession();
+  const { syncTablingEvents } = await import("@/lib/event-sync");
+  const summary = await syncTablingEvents();
+  if (summary.added > 0 || summary.updated > 0) revalidatePath("/staff/recruitment/events");
+  return summary;
+}
+
 export async function staffTogglePublish(eventId: string, isPublished: boolean) {
   await requireStaffSession();
   const { updateEvent } = await import("@/lib/mutations");

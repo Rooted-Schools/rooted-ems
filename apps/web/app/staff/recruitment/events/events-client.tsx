@@ -17,12 +17,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { EventRow } from "@/lib/queries";
-import { staffCreateEvent } from "../actions";
+import { staffCreateEvent, staffSyncTablingEvents } from "../actions";
 
 const TYPE_LABELS: Record<string, string> = {
   info_session: "Info Session",
   open_house: "Open House",
   tour: "Campus Tour",
+  tabling: "Tabling / Outreach",
   other: "Event",
 };
 
@@ -56,7 +57,26 @@ export function EventsClient({ events, campuses, activeCampusId, staffUserId }: 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...EMPTY });
   const [error, setError] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const set = (p: Partial<typeof form>) => setForm((f) => ({ ...f, ...p }));
+
+  function syncCalendar() {
+    setSyncStatus("Syncing…");
+    startTransition(async () => {
+      try {
+        const s = await staffSyncTablingEvents();
+        const changed = s.added + s.updated;
+        setSyncStatus(
+          changed === 0
+            ? `No confirmed events to import (${s.confirmed} confirmed, all current).`
+            : `Imported ${s.added} new, updated ${s.updated}${s.skipped_no_date > 0 ? ` · ${s.skipped_no_date} skipped (no clear date)` : ""}.`
+        );
+        if (changed > 0) router.refresh();
+      } catch {
+        setSyncStatus("Sync failed — try again in a minute.");
+      }
+    });
+  }
 
   const now = Date.now();
   const upcoming = events.filter((e) => new Date(e.starts_at).getTime() >= now);
@@ -101,7 +121,11 @@ export function EventsClient({ events, campuses, activeCampusId, staffUserId }: 
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium text-ink truncate">{e.title}</p>
-            {!e.is_published && <Badge variant="secondary">Draft</Badge>}
+            {e.event_type === "tabling" ? (
+              <Badge variant="warning">Tabling</Badge>
+            ) : !e.is_published ? (
+              <Badge variant="secondary">Draft</Badge>
+            ) : null}
           </div>
           <p className="text-xs text-stone">
             {TYPE_LABELS[e.event_type] ?? "Event"} · {whenText(e.starts_at)} · {e.campus_name}
@@ -127,9 +151,15 @@ export function EventsClient({ events, campuses, activeCampusId, staffUserId }: 
           <h1 className="text-2xl font-bold text-ink mt-1">Events</h1>
           <p className="text-sm text-stone mt-1">Info sessions, open houses, and tours — RSVPs flow into your pipeline.</p>
         </div>
-        <Button onClick={() => { setForm({ ...EMPTY, campus_id: campuses.length === 1 ? campuses[0].id : "" }); setError(null); setOpen(true); }}>
-          + New Event
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {syncStatus && <span className="text-xs text-stone">{syncStatus}</span>}
+          <Button variant="outline" onClick={syncCalendar} disabled={isPending} title="Import Confirmed events from the Tabling Calendar spreadsheet">
+            🔄 Sync calendar
+          </Button>
+          <Button onClick={() => { setForm({ ...EMPTY, campus_id: campuses.length === 1 ? campuses[0].id : "" }); setError(null); setOpen(true); }}>
+            + New Event
+          </Button>
+        </div>
       </div>
 
       <Card>

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { syncLeadSheets } from "@/lib/lead-sync";
+import { syncTablingEvents } from "@/lib/event-sync";
 
 /**
  * Cron endpoint that syncs the campus Google Sheets interest forms into the
@@ -21,11 +22,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const summary = await syncLeadSheets();
+  const [summary, tabling] = await Promise.all([syncLeadSheets(), syncTablingEvents()]);
   console.log(
-    `[cron/sync-lead-sheets] checked ${summary.checked}, added ${summary.added}, welcomed ${summary.welcomed}, errors ${summary.errors.length}`,
-    summary.errors.slice(0, 5)
+    `[cron/sync-lead-sheets] leads: checked ${summary.checked}, added ${summary.added}, welcomed ${summary.welcomed}; ` +
+      `tabling: confirmed ${tabling.confirmed}, added ${tabling.added}, updated ${tabling.updated}`,
+    [...summary.errors.slice(0, 3), ...tabling.errors.slice(0, 3)]
   );
 
-  return NextResponse.json({ ...summary, timestamp: new Date().toISOString() });
+  return NextResponse.json({ leads: summary, tabling, timestamp: new Date().toISOString() });
 }
