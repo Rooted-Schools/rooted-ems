@@ -34,6 +34,18 @@ export async function submitInquiry(input: InquirySubmission) {
     return { data: { id: "ok" }, error: null };
   }
 
+  // LG-0.4: generous per-IP throttle — stops floods, never a tabling event's
+  // shared wifi (limit is per hour).
+  const { checkRateLimit } = await import("@/lib/rate-limit");
+  const rl = await checkRateLimit("inquiry", 12, 60);
+  if (!rl.allowed) {
+    return {
+      data: null,
+      error:
+        "Too many submissions from this connection — please try again in a little while. / Demasiados envíos desde esta conexión — intente de nuevo en un momento.",
+    };
+  }
+
   return createLeadFromInquiry({
     campus_id: input.campus_id,
     first_name: input.first_name?.slice(0, 100) ?? "",
