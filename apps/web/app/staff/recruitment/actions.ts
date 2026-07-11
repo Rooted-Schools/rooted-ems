@@ -69,6 +69,38 @@ export async function staffDeleteLead(leadId: string, actorId: string) {
   return result;
 }
 
+// ─── Capture Kit: tagged link + QR (LG-1) ──────────────
+
+/**
+ * Build a source-tagged inquiry link and a downloadable QR code for it.
+ * Staff put the link on a school-website page or the QR on a flyer/yard
+ * sign; every lead that arrives is tagged with `src` so the funnel
+ * dashboard shows which placement produced it.
+ */
+export async function staffGenerateCaptureLink(
+  campusShortCode: string,
+  sourceTag: string
+) {
+  await requireStaffSession();
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://enroll.rootedschool.org";
+  const tag = (sourceTag || "flyer").replace(/[^a-zA-Z0-9_-]/g, "-").replace(/-+/g, "-").slice(0, 60).toLowerCase();
+  const params = new URLSearchParams({ src: tag });
+  if (campusShortCode) params.set("campus", campusShortCode);
+  const url = `${base}/inquire?${params.toString()}`;
+  const embedTag = `<script src="${base}/embed/inquiry?campus=${encodeURIComponent(campusShortCode)}&src=${encodeURIComponent(tag)}" async></script>`;
+
+  // Server-side QR (data URL — allowed by img-src 'self' data:). PNG so it
+  // drops straight into print materials.
+  const QRCode = (await import("qrcode")).default;
+  const qrDataUrl = await QRCode.toDataURL(url, {
+    width: 600,
+    margin: 2,
+    color: { dark: "#22281F", light: "#FFFFFF" },
+  });
+
+  return { url, embedTag, qrDataUrl };
+}
+
 // ─── Referral codes ───────────────────────────────────
 
 export async function staffGetReferralLink(leadId: string) {

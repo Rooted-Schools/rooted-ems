@@ -28,6 +28,7 @@ import type { CampaignRow, LeadPipelineSummary, LeadRow } from "@/lib/queries/le
 import { formatRelativeTime } from "@/lib/queries/utils";
 import { staffCancelCampaign, staffCreateLead, staffSyncLeadSheets } from "./actions";
 import { CampaignDialog } from "./campaign-dialog";
+import { ShareDialog } from "./share-dialog";
 import { CAMPAIGN_TEMPLATES, type CampaignTemplateKey } from "@/lib/email-templates";
 
 /* ─── Display config ─── */
@@ -67,7 +68,7 @@ interface RecruitmentClientProps {
   summary: LeadPipelineSummary;
   leads: LeadRow[];
   campaigns: CampaignRow[];
-  campuses: { id: string; name: string }[];
+  campuses: { id: string; name: string; short_code: string }[];
   /** Campus filter from ?campus= — "all" when viewing every campus. */
   activeCampusId: string;
   staffUserId: string;
@@ -94,6 +95,7 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, campuses, 
   const [stageFilter, setStageFilter] = useState("open");
   const [addOpen, setAddOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [newLead, setNewLead] = useState({ ...EMPTY_LEAD });
   const [error, setError] = useState<string | null>(null);
 
@@ -194,6 +196,9 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, campuses, 
           <Link href={activeCampusId === "all" ? "/staff/recruitment/analytics" : `/staff/recruitment/analytics?campus=${activeCampusId}`}>
             <Button variant="outline">📊 Funnel</Button>
           </Link>
+          <Button variant="outline" onClick={() => setShareOpen(true)} title="Make a tagged link or QR code for a flyer or the school website">
+            🔗 Share &amp; QR
+          </Button>
           <Button variant="outline" onClick={syncSheets} disabled={isPending} title="Pull new sign-ups from the campus interest form spreadsheets">
             🔄 Sync sheets
           </Button>
@@ -441,6 +446,9 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, campuses, 
         campuses={campuses}
         staffUserId={staffUserId}
       />
+
+      {/* Share & QR generator (Capture Kit) */}
+      <ShareDialog open={shareOpen} onOpenChange={setShareOpen} campuses={campuses} />
 
       {/* Add Lead dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>

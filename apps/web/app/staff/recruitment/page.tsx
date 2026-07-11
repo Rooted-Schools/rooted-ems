@@ -31,7 +31,7 @@ export default async function StaffRecruitmentPage({
     getLeadPipelineSummary(activeCampus),
     getLeads({ campusId: activeCampus }),
     getCampaigns(activeCampus),
-    supabase.from("campus").select("id, name").order("name"),
+    supabase.from("campus").select("id, name, short_code").order("name"),
   ]);
 
   // CMO admins (no explicit scoping) see all campuses; scoped staff see theirs.
@@ -39,7 +39,7 @@ export default async function StaffRecruitmentPage({
     .filter(
       (c: Record<string, string>) => accessibleIds.length === 0 || accessibleIds.includes(c.id)
     )
-    .map((c: Record<string, string>) => ({ id: c.id, name: c.name }));
+    .map((c: Record<string, string>) => ({ id: c.id, name: c.name, short_code: c.short_code }));
 
   return (
     <RecruitmentClient

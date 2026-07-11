@@ -16,9 +16,37 @@ const nextConfig = {
     "@rooted-ems/utils",
   ],
   async headers() {
+    // LG-1: the public inquiry form is meant to be embedded on the campus
+    // school websites, so it must NOT be frame-denied. It's unauthenticated
+    // and carries no sensitive data — a low-value clickjacking target — so
+    // frame-ancestors * is an acceptable, deliberate exception. Everything
+    // else (staff/family portals) keeps X-Frame-Options: DENY.
+    const embeddableCsp = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data:",
+      "connect-src 'self' https://szockdlohlmkyloubgtd.supabase.co https://accounts.google.com",
+      "frame-ancestors *",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join("; ");
+
     return [
       {
-        source: "/(.*)",
+        // Inquiry form + embed loader: framing allowed for school websites.
+        source: "/inquire",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Content-Security-Policy", value: embeddableCsp },
+        ],
+      },
+      {
+        // Everything except the embeddable inquiry form.
+        source: "/((?!inquire$).*)",
         headers: [
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },

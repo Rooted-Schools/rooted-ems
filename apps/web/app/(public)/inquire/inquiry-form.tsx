@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,9 +25,13 @@ interface InquiryFormProps {
   referredByLeadId?: string;
   /** Referral links lock the campus to the referrer's campus. */
   lockedCampusId?: string;
+  /** LG-1: ?src= tag identifying the page/flyer/campaign that sent this lead. */
+  sourceTag?: string;
+  /** LG-1: ?campus= preselection (still editable by the family). */
+  preselectedCampusId?: string;
 }
 
-export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCampusId }: InquiryFormProps) {
+export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCampusId, sourceTag, preselectedCampusId }: InquiryFormProps) {
   const { t, locale } = useLocale();
   const [isPending, startTransition] = useTransition();
   const [submitted, setSubmitted] = useState(false);
@@ -40,7 +44,7 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
     email: "",
     phone: "",
     sms_consent: false,
-    campus_id: lockedCampusId ?? (campuses.length === 1 ? campuses[0].id : ""),
+    campus_id: lockedCampusId ?? preselectedCampusId ?? (campuses.length === 1 ? campuses[0].id : ""),
     student_first_name: "",
     entry_grade: "",
     pathway_interest: "",
@@ -49,6 +53,19 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
   });
 
   const update = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
+
+  // LG-1: when embedded on a school website (via /embed/inquiry), post the
+  // rendered height so the host iframe can size itself with no scrollbars.
+  const embedded = typeof window !== "undefined" && window.parent !== window;
+  useEffect(() => {
+    if (!embedded) return;
+    const post = () =>
+      window.parent.postMessage({ rootedInquiryHeight: document.body.scrollHeight }, "*");
+    post();
+    const ro = new ResizeObserver(post);
+    ro.observe(document.body);
+    return () => ro.disconnect();
+  }, [embedded, submitted, error, showValidation]);
 
   const missingRequired =
     !form.first_name.trim() ||
@@ -69,6 +86,7 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
         preferred_language: locale,
         source: form.source || "website",
         referred_by_lead_id: referredByLeadId,
+        source_tag: sourceTag,
       });
       if (result.error) {
         setError(result.error);

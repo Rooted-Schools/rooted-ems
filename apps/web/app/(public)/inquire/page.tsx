@@ -10,7 +10,11 @@ export const metadata = {
 // Reads the locale cookie, so this page renders per-request.
 export const dynamic = "force-dynamic";
 
-export default async function InquirePage() {
+export default async function InquirePage({
+  searchParams,
+}: {
+  searchParams: { src?: string; campus?: string };
+}) {
   // Provider wraps the form so the language toggle actually re-renders it —
   // without it, useLocale() falls back to the default context and the page
   // is stuck in English (the landing and login pages follow this same pattern).
@@ -21,7 +25,7 @@ export default async function InquirePage() {
   const supabase = createServiceRoleClient();
   const { data } = await supabase
     .from("campus")
-    .select("id, name, city, state")
+    .select("id, name, short_code, city, state")
     .order("name");
 
   const campuses = (data ?? []).map((c: Record<string, string>) => ({
@@ -30,9 +34,22 @@ export default async function InquirePage() {
     location: [c.city, c.state].filter(Boolean).join(", "),
   }));
 
+  // LG-1 Capture Kit: ?src= tags where this lead came from (a school-website
+  // page, a flyer's QR, a specific campaign). ?campus= optionally preselects.
+  const sourceTag = searchParams?.src?.slice(0, 60);
+  const campusParam = searchParams?.campus;
+  const preselected = (data ?? []).find(
+    (c: Record<string, string>) =>
+      c.id === campusParam || c.short_code?.toLowerCase() === campusParam?.toLowerCase()
+  ) as Record<string, string> | undefined;
+
   return (
     <LocaleProvider initialLocale={initialLocale}>
-      <InquiryForm campuses={campuses} />
+      <InquiryForm
+        campuses={campuses}
+        sourceTag={sourceTag}
+        preselectedCampusId={preselected?.id}
+      />
     </LocaleProvider>
   );
 }
