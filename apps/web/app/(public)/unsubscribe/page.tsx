@@ -39,6 +39,12 @@ export default async function UnsubscribePage({
           activity_type: "note",
           body: "Family unsubscribed from recruitment emails via the email link.",
         });
+        // Exit any active nurture journeys immediately.
+        await supabase
+          .from("journey_enrollment")
+          .update({ status: "exited", exit_reason: "unsubscribed", ended_at: new Date().toISOString() })
+          .eq("lead_id", lead.id)
+          .eq("status", "active");
       }
     }
   }

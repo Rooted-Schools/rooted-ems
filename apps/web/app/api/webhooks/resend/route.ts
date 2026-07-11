@@ -65,6 +65,18 @@ export async function POST(request: NextRequest) {
 
   const recipients = event.data?.to ?? [];
 
+  // LG-2 engagement tracking: opens/clicks land on the lead so journeys and
+  // the lead detail reflect real interest.
+  if (event.type === "email.opened" || event.type === "email.clicked") {
+    const { createServiceRoleClient } = await import("@rooted-ems/database/server");
+    const supabase = createServiceRoleClient();
+    const col = event.type === "email.clicked" ? "last_email_clicked_at" : "last_email_opened_at";
+    for (const to of recipients) {
+      await supabase.from("lead").update({ [col]: new Date().toISOString() }).ilike("email", to.toLowerCase());
+    }
+    return NextResponse.json({ ok: true });
+  }
+
   if (event.type === "email.bounced") {
     // Suppress hard bounces; soft bounces (full mailbox etc.) get grace.
     const subType = event.data?.bounce?.subType ?? "";

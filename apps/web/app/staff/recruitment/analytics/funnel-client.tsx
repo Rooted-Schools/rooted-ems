@@ -1,12 +1,15 @@
 "use client";
 
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { RecruitmentFunnel } from "@/lib/queries";
 import { SOURCE_LABELS, PATHWAY_LABELS } from "../recruitment-client";
+import { staffRecordSpend } from "./actions";
 
 interface FunnelDashboardProps {
   funnel: RecruitmentFunnel;
@@ -43,6 +46,31 @@ function Bar({ pct, color = "bg-rooted-green" }: { pct: number; color?: string }
 
 export function FunnelDashboardClient({ funnel, campuses, activeCampusId }: FunnelDashboardProps) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [spendOpen, setSpendOpen] = useState(false);
+  const [spendAmount, setSpendAmount] = useState("");
+  const [spendChannel, setSpendChannel] = useState("ads");
+  const [spendMonth, setSpendMonth] = useState("");
+  const [spendCampus, setSpendCampus] = useState(activeCampusId !== "all" ? activeCampusId : "");
+  const [spendError, setSpendError] = useState<string | null>(null);
+
+  function recordSpend() {
+    setSpendError(null);
+    startTransition(async () => {
+      const r = await staffRecordSpend({
+        campus_id: spendCampus,
+        channel: spendChannel,
+        amount_dollars: parseFloat(spendAmount) || 0,
+        period_month: spendMonth || new Date().toISOString().slice(0, 7),
+      });
+      if (r.error) setSpendError(r.error);
+      else {
+        setSpendOpen(false);
+        setSpendAmount("");
+        router.refresh();
+      }
+    });
+  }
   const maxWeek = Math.max(1, ...funnel.weekly_new.map((w) => w.count));
   const maxZip = Math.max(1, ...funnel.top_zips.map((z) => z.count));
 
@@ -98,6 +126,9 @@ export function FunnelDashboardClient({ funnel, campuses, activeCampusId }: Funn
               ))}
             </Select>
           )}
+          <Button variant="outline" onClick={() => { setSpendCampus(activeCampusId !== "all" ? activeCampusId : ""); setSpendError(null); setSpendOpen(true); }}>
+            + Ad spend
+          </Button>
           <Button variant="outline" onClick={exportAll}>Export CSV</Button>
         </div>
       </div>
@@ -108,15 +139,24 @@ export function FunnelDashboardClient({ funnel, campuses, activeCampusId }: Funn
           { label: "Total leads", value: funnel.total_leads.toLocaleString() },
           { label: "Applied", value: (funnel.funnel.find((f) => f.label === "Applied")?.count ?? 0).toLocaleString(), sub: `${appliedRate}% of leads` },
           { label: "Enrolled", value: (funnel.funnel.find((f) => f.label === "Enrolled")?.count ?? 0).toLocaleString(), accent: true },
-          {
-            label: "Median time to first call",
-            value: funnel.response.median_hours_to_first_call === null
-              ? "—"
-              : funnel.response.median_hours_to_first_call < 48
-                ? `${funnel.response.median_hours_to_first_call}h`
-                : `${Math.round(funnel.response.median_hours_to_first_call / 24)}d`,
-            sub: funnel.response.contacted_sample > 0 ? `${funnel.response.contacted_sample} contacted` : "no calls logged yet",
-          },
+          funnel.spend.total_dollars > 0
+            ? {
+                label: "Cost per enrolled",
+                value: funnel.spend.cost_per_enrolled != null
+                  ? `$${funnel.spend.cost_per_enrolled.toLocaleString()}`
+                  : "—",
+                sub: `$${funnel.spend.total_dollars.toLocaleString()} spent`,
+                accent: true,
+              }
+            : {
+                label: "Median time to first call",
+                value: funnel.response.median_hours_to_first_call === null
+                  ? "—"
+                  : funnel.response.median_hours_to_first_call < 48
+                    ? `${funnel.response.median_hours_to_first_call}h`
+                    : `${Math.round(funnel.response.median_hours_to_first_call / 24)}d`,
+                sub: funnel.response.contacted_sample > 0 ? `${funnel.response.contacted_sample} contacted` : "no calls logged yet",
+              },
         ].map((s) => (
           <Card key={s.label}>
             <CardContent className="py-4">
@@ -284,6 +324,53 @@ export function FunnelDashboardClient({ funnel, campuses, activeCampusId }: Funn
           </CardContent>
         )}
       </Card>
+
+      {/* Ad-spend entry (LG-2 cost tracking) */}
+      {spendOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onClick={() => setSpendOpen(false)}>
+          <Card className="max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Record ad spend</CardTitle>
+              <CardDescription>Feeds cost per enrolled student on this dashboard.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {campuses.length > 1 && (
+                <div>
+                  <label className="block text-sm font-medium text-ink/70 mb-1">Campus</label>
+                  <Select value={spendCampus} onChange={(e) => setSpendCampus(e.target.value)}>
+                    <option value="">Choose…</option>
+                    {campuses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </Select>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-ink/70 mb-1">Amount ($)</label>
+                  <Input type="number" min="0" step="0.01" value={spendAmount} onChange={(e) => setSpendAmount(e.target.value)} placeholder="500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-ink/70 mb-1">Month</label>
+                  <Input type="month" value={spendMonth} onChange={(e) => setSpendMonth(e.target.value)} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-ink/70 mb-1">Channel</label>
+                <Select value={spendChannel} onChange={(e) => setSpendChannel(e.target.value)}>
+                  <option value="ads">Ads (Facebook / Google)</option>
+                  <option value="print">Print / flyers</option>
+                  <option value="event">Events / tabling</option>
+                  <option value="other">Other</option>
+                </Select>
+              </div>
+              {spendError && <p className="text-sm text-red-600">{spendError}</p>}
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" size="sm" onClick={() => setSpendOpen(false)} disabled={isPending}>Cancel</Button>
+                <Button size="sm" onClick={recordSpend} disabled={isPending}>{isPending ? "Saving…" : "Record"}</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

@@ -144,6 +144,10 @@ export async function createLeadFromInquiry(
 
   const leadName = `${input.first_name.trim()} ${input.last_name.trim()}`;
 
+  // LG-2: start the Push-to-Apply nurture journey (exits on apply/RSVP/call).
+  const { enrollLeadInJourney } = await import("./journeys");
+  await enrollLeadInJourney(lead.id, "push_to_apply");
+
   // Response engine — guarded: notification failures never lose the lead.
   await Promise.all([
     notifyLeadWelcome({
@@ -255,6 +259,11 @@ export async function logLeadActivity(
       .update({ stage: "contacted" })
       .eq("id", leadId)
       .eq("stage", "new");
+    // LG-2: a real staff call ends the automated drip — a human has it now.
+    if (activityType === "call") {
+      const { exitJourneys } = await import("./journeys");
+      await exitJourneys(leadId, "contacted");
+    }
   }
 
   return { data: null, error: null };
@@ -468,6 +477,10 @@ export async function stitchLeadToApplication(
       activity_type: "converted",
       body: "Family submitted an application — lead converted.",
     });
+
+    // LG-2: applying is the goal of Push-to-Apply — exit every active journey.
+    const { exitJourneys } = await import("./journeys");
+    await exitJourneys(leadId, "applied");
   } catch (err) {
     console.error("[stitchLeadToApplication]", err);
   }

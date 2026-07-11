@@ -24,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { CampaignRow, LeadPipelineSummary, LeadRow } from "@/lib/queries/leads";
+import type { CampaignRow, JourneyStat, LeadPipelineSummary, LeadRow } from "@/lib/queries/leads";
 import { formatRelativeTime } from "@/lib/queries/utils";
 import { staffCancelCampaign, staffCreateLead, staffSyncLeadSheets } from "./actions";
 import { CampaignDialog } from "./campaign-dialog";
@@ -68,6 +68,7 @@ interface RecruitmentClientProps {
   summary: LeadPipelineSummary;
   leads: LeadRow[];
   campaigns: CampaignRow[];
+  journeys: JourneyStat[];
   campuses: { id: string; name: string; short_code: string }[];
   /** Campus filter from ?campus= — "all" when viewing every campus. */
   activeCampusId: string;
@@ -88,7 +89,7 @@ const EMPTY_LEAD = {
   notes: "",
 };
 
-export function RecruitmentClient({ queue, summary, leads, campaigns, campuses, activeCampusId, staffUserId }: RecruitmentClientProps) {
+export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, campuses, activeCampusId, staffUserId }: RecruitmentClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
@@ -300,6 +301,30 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, campuses, 
                 </div>
               );
             })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Nurture journeys (LG-2) */}
+      {journeys.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">🌿 Nurture journeys</CardTitle>
+            <CardDescription>
+              Automated email sequences that run themselves — and stop the moment a family applies, RSVPs, or you log a call.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {journeys.map((j) => (
+              <div key={j.key} className="flex items-center justify-between gap-3 rounded-lg border border-stone/15 px-3 py-2">
+                <p className="text-sm font-medium text-ink">{j.name}</p>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-rooted-green font-semibold">{j.active} active</span>
+                  <span className="text-stone">{j.completed} completed</span>
+                  <span className="text-stone">{j.exited} exited</span>
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}

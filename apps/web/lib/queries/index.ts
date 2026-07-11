@@ -116,11 +116,13 @@ export {
   getLeadPipelineSummary,
   getLeadDetail,
   getCampaigns,
+  getJourneyStats,
   type LeadRow,
   type LeadDetail,
   type LeadActivityRow,
   type LeadPipelineSummary,
   type CampaignRow,
+  type JourneyStat,
 } from "./leads";
 
 // Events + RSVP

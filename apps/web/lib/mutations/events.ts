@@ -236,6 +236,10 @@ export async function rsvpToEvent(input: RsvpInput): Promise<MutationResult> {
       activity_type: "note",
       body: `RSVP'd to ${event.title}.`,
     });
+    // LG-2: an RSVP is engagement — exit the Push-to-Apply drip; the event
+    // follow-up takes over from here.
+    const { exitJourneys } = await import("./journeys");
+    await exitJourneys(leadId, "rsvp");
   }
 
   // Confirmation email (guarded)

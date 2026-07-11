@@ -308,6 +308,14 @@ export async function acceptOffer(
     },
   });
 
+  // LG-2: accepting a seat starts Keep-the-Seat (melt prevention) and ends
+  // any lingering pre-application drip.
+  if (offer.application_id) {
+    const { enrollByApplication, exitJourneysByApplication } = await import("./journeys");
+    await exitJourneysByApplication(offer.application_id, "applied");
+    await enrollByApplication(offer.application_id, "keep_the_seat");
+  }
+
   if (offer.campus_id && offer.application_id) {
     notifyStaffOfferAccepted({
       campusId: offer.campus_id,

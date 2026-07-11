@@ -252,6 +252,58 @@ export async function getCampaigns(campusId?: string, limit = 10): Promise<Campa
   });
 }
 
+export interface JourneyStat {
+  key: string;
+  name: string;
+  active: number;
+  completed: number;
+  exited: number;
+}
+
+/**
+ * Per-journey enrollment counts for the recruitment page (LG-2). Journeys are
+ * network-default (campus_id NULL) so counts are computed over the campus's
+ * leads via the enrollment→lead join, honoring RLS.
+ */
+export async function getJourneyStats(campusId?: string): Promise<JourneyStat[]> {
+  const supabase = await createServerClient();
+
+  const { data: journeys } = await supabase
+    .from("journey")
+    .select("id, key, name")
+    .eq("is_active", true);
+  if (!journeys || journeys.length === 0) return [];
+
+  const stats: JourneyStat[] = [];
+  for (const j of journeys) {
+    const countBy = async (status: string) => {
+      let q = supabase
+        .from("journey_enrollment")
+        .select("id, lead:lead_id!inner (campus_id)", { count: "exact", head: true })
+        .eq("journey_id", (j as Record<string, string>).id)
+        .eq("status", status);
+      if (campusId) q = q.eq("lead.campus_id", campusId);
+      const { count } = await q;
+      return count ?? 0;
+    };
+    const [active, completed, exited] = await Promise.all([
+      countBy("active"),
+      countBy("completed"),
+      countBy("exited"),
+    ]);
+    if (active + completed + exited > 0) {
+      stats.push({
+        key: (j as Record<string, string>).key,
+        name: (j as Record<string, string>).name,
+        active,
+        completed,
+        exited,
+      });
+    }
+  }
+  return stats;
+}
+
 export async function getLeadDetail(leadId: string): Promise<LeadDetail | null> {
   const supabase = await createServerClient();
 

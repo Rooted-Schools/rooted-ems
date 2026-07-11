@@ -7,7 +7,7 @@ import {
   resolveActiveCampus,
 } from "@/lib/auth/get-session";
 import { createServerClient } from "@rooted-ems/database/server";
-import { getCampaigns, getFollowUpQueue, getLeadPipelineSummary, getLeads } from "@/lib/queries";
+import { getCampaigns, getFollowUpQueue, getJourneyStats, getLeadPipelineSummary, getLeads } from "@/lib/queries";
 import { RecruitmentClient } from "./recruitment-client";
 
 export default async function StaffRecruitmentPage({
@@ -26,11 +26,12 @@ export default async function StaffRecruitmentPage({
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
 
   const supabase = await createServerClient();
-  const [queue, summary, leads, campaigns, { data: campusRows }] = await Promise.all([
+  const [queue, summary, leads, campaigns, journeys, { data: campusRows }] = await Promise.all([
     getFollowUpQueue(activeCampus),
     getLeadPipelineSummary(activeCampus),
     getLeads({ campusId: activeCampus }),
     getCampaigns(activeCampus),
+    getJourneyStats(activeCampus),
     supabase.from("campus").select("id, name, short_code").order("name"),
   ]);
 
@@ -47,6 +48,7 @@ export default async function StaffRecruitmentPage({
       summary={summary}
       leads={leads}
       campaigns={campaigns}
+      journeys={journeys}
       campuses={campuses}
       activeCampusId={activeCampus ?? "all"}
       staffUserId={session.user_id}

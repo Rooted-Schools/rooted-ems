@@ -38,6 +38,11 @@ export interface RecruitmentFunnel {
   top_zips: { zip: string; count: number }[];
   by_pathway: { pathway: string; count: number }[];
   weekly_new: { week: string; count: number }[];
+  /** LG-2 cost tracking: total ad spend (dollars) and cost per enrolled student. */
+  spend: {
+    total_dollars: number;
+    cost_per_enrolled: number | null;
+  };
   response: {
     /** Leads with at least one logged staff call. */
     contacted_sample: number;
@@ -171,6 +176,19 @@ export async function getRecruitmentFunnel(campusId?: string): Promise<Recruitme
   // 4) Response speed — only over leads with a logged staff call, denominator shown.
   const response = await computeResponseSpeed(supabase, campusId);
 
+  // 5) Cost per enrolled (LG-2): total recorded ad spend / enrolled-from-leads.
+  let spendQuery = supabase.from("channel_spend").select("amount_cents");
+  if (campusId) spendQuery = spendQuery.eq("campus_id", campusId);
+  const { data: spendRows } = await spendQuery;
+  const totalCents = (spendRows ?? []).reduce(
+    (sum, r) => sum + ((r as { amount_cents: number }).amount_cents ?? 0),
+    0
+  );
+  const spend = {
+    total_dollars: Math.round(totalCents) / 100,
+    cost_per_enrolled: enrolled > 0 && totalCents > 0 ? Math.round(totalCents / enrolled) / 100 : null,
+  };
+
   return {
     total_leads: total,
     stage_counts: stageCounts,
@@ -179,6 +197,7 @@ export async function getRecruitmentFunnel(campusId?: string): Promise<Recruitme
     top_zips,
     by_pathway,
     weekly_new,
+    spend,
     response,
   };
 }
