@@ -14,7 +14,7 @@ The requested component makes sense — but not as a new system. Three of its si
 | Lead source tracking | **✅ Live** — source + source_detail on every lead; funnel dashboard shows per-channel application conversion | UTM capture + QR generation (small) |
 | Customizable dashboards to manage leads | **✅ Live** — recruitment pipeline + funnel analytics, campus filter, CSV export | Cost-per-enrollment tracking (ad spend entry); saved views optional |
 | Automated drip emails | **🟡 ~60%** — welcome touch, re-engagement touch, batch campaigns with daily pacing and 4 branded templates | True multi-step **journeys** (Day 0/3/7/14 sequences with behavior-based exits) — and the LG-0 compliance layer below |
-| Custom landing page builder per school | **❌ New** — the flagship of this ask | Full build |
+| Custom landing page builder per school | **✂️ Cut in rev 3** — campuses will host landing pages on their own school websites | The **Capture Kit**: tagged inquiry links, embeddable form widget, QR generator — so website pages feed the pipeline with attribution |
 | Multiple admin levels | **🟡 Mostly** — system_admin / enrollment_manager / enrollment_staff with campus RLS | A **recruiter tier** that sees leads but never student records (FERPA boundary) |
 
 **Recommendation: build it — but in this order: LG-0 (prerequisites that gate everything, including work already live), then per-campus (conversion machinery for Columbia, generation machinery for Cleveland), scoped to the three genuinely-new subsystems plus connective tissue. Skip the rest — it exists.**
@@ -61,17 +61,16 @@ Inside the EMS, every new capture surface (landing page, ad webhook, QR scan) dr
 
 ## 5. The build: three new subsystems + connective tissue
 
-### Subsystem A — Landing Page Studio (the flagship; Cleveland-first)
+### Subsystem A — Capture Kit (REVISED: replaces the Landing Page Studio)
 
-Per-school, per-campaign landing pages that non-technical staff assemble in minutes, published at `enroll.rootedschool.org/p/[slug]` (e.g., `/p/cleveland-open-house`, `/p/crneal-healthcare`).
+*Rev 3 decision (Steven, July 2026): campuses will build landing pages on their existing school websites, so the in-app page builder is cut — pre-emptively applying this plan's own kill criteria. What survives is the part the school website cannot do: capture wired to the family record with source attribution.*
 
-**Design decision that matters: block-based, not freeform.** Staff choose and reorder pre-designed, Rooted-branded blocks and edit their *content* — never fonts, colors, or layout. This keeps every campus on-brand without a design-review bottleneck, keeps pages fast and mobile-first, and keeps the builder buildable in weeks instead of months. A freeform Wix-style builder is explicitly out of scope: off-brand pages, slow pages, maintenance tar pit.
+- **Parameterized inquiry links** — `/inquire?src=crneal-healthcare` — so any page on any school website (or any flyer) links or QRs to the inquiry form and every lead arrives tagged with which page or placement sent them. Tiny build; the form already exists.
+- **Embeddable inquiry widget** — one script tag drops the bilingual inquiry form *into* a school-website page, capturing the embedding page URL as the source. For when campuses want the form on the page, not a click away. (Promoted here from LG-3.)
+- **QR generator** — per tagged link/source, downloadable for print; the tabling kit checklist already assumes these exist.
+- **The operating rule (goes in the playbook chapter):** school websites never use native forms for enrollment interest. Every capture goes through the widget or a tagged link — otherwise the Google-Form-→-spreadsheet era quietly returns and attribution dies at the website boundary.
 
-**Block library v1:** Hero · Inquiry form (embedded — every page is a capture surface) · Pathway highlight cards (healthcare/tech/manufacturing with partner names) · Proof strip (evidence-led stats) · Testimonial (**publishes only with a media release on file — see LG-0.3**) · Upcoming events (live, RSVP built in) · FAQ accordion · Video · Deadline countdown. Every block carries EN/ES content.
-
-**Per-page mechanics:** unique slug; automatic source tagging; auto-generated **QR code** for print (flyers, yard signs, tabling kits — the tabling kit checklist already assumes these); page-view counting so the dashboard shows *visits → leads → applications* per page; publish/unpublish; campus-scoped ownership. Pages must meet WCAG accessibility — enforced by the blocks themselves, which is another argument for block-based.
-
-**Storage:** a `landing_page` table with a JSONB blocks array — no CMS dependency.
+**Accepted trade-offs:** no live events block or deadline countdowns on website pages (embeddable later if wanted); per-page *visit* counts are lost, but per-page *lead* counts — the number that matters — survive via source tags; page quality rides on whoever edits the school website, which is already true today.
 
 ### Subsystem B — Journey Builder (drip sequences done right; Columbia-first)
 
@@ -93,9 +92,7 @@ A new `recruiter` role between "no access" and enrollment_staff: full Recruitmen
 ### Connective tissue (small, high-leverage)
 
 - **UTM capture** — ad parameters auto-fill lead source detail
-- **QR generator** — per landing page and per source tag, downloadable for print
 - **Ad lead ingestion** — webhook endpoints for Meta Lead Ads and Google lead forms, response engine firing on arrival
-- **Embeddable inquiry widget** — one script tag for the campus marketing sites, retiring the Google-Form → spreadsheet chain for new capture
 - **Cost-per-enrollment tracking** — a simple ad-spend entry per campaign/channel so the funnel dashboard can answer the board's actual question: *what does an enrolled student cost, by channel?* Counts without dollars can't justify a marketing budget.
 
 ---
@@ -115,7 +112,8 @@ A new `recruiter` role between "no access" and enrollment_staff: full Recruitmen
 ```
 DISCOVER            CAPTURE              NURTURE               CONVERT              ENROLL              ARRIVE
 ────────            ───────              ───────               ───────              ──────              ──────
-Facebook ad ──┐     Landing pages   →    Push-to-Apply    →    Application     →    Offer + accept →    Keep-the-Seat
+Facebook ad ──┐     School-site pages →  Push-to-Apply    →    Application     →    Offer + accept →    Keep-the-Seat
+              │     (widget/tagged links)
 Google ad ────┤     Inquiry form         journey               (5 min, mobile,      Waitlist w/         journey
 QR on flyer ──┼──→  Ad webhooks     →    Pathway-matched       bilingual)           live position       Registration
 Tabling event ┤     Event RSVPs          content          →    Auto-stitch     →    Lottery w/     →    (pre-filled)
@@ -133,11 +131,11 @@ Everything right of CAPTURE already exists in production. This plan builds the l
 ## 8. Phasing and effort
 
 - **LG-0: Prerequisites** — unsubscribe/suppression/bounce, staff enablement + playbook chapter, media-release governance, rate limiting, retention policy, backup verification. *Days of work; gates everything, including the reintroduction campaign.*
-- **LG-1: Landing Page Studio + QR + UTM** — comparable to the campaign engine + events builds combined. **Cleveland-first**: it's the pre-opening campus that needs generation machinery.
-- **LG-2: Journeys + engagement webhooks + cost tracking** — comparable to the campaign engine build. **Columbia-first**: Push-to-Apply converts the 1,263; Keep-the-Seat protects the founding class. Likely pays for itself in retained enrollments.
-- **LG-3: Recruiter tier + ad ingestion + embed widget** — smallest phase; mostly RLS policy work and two webhook endpoints.
+- **LG-1: Capture Kit** — tagged inquiry links + embeddable widget + QR + UTM. *Shrunk from the plan's biggest phase to its smallest by the rev-3 decision to host landing pages on the school websites.* Cleveland-first, but cheap enough to ship network-wide at once.
+- **LG-2: Journeys + engagement webhooks + cost tracking** — now the largest and most valuable phase. **Columbia-first**: Push-to-Apply converts the 1,263; Keep-the-Seat protects the founding class. Likely pays for itself in retained enrollments.
+- **LG-3: Recruiter tier + ad ingestion** — small; RLS policy work and two webhook endpoints.
 
-Sequencing logic: LG-0 makes it safe, LG-2 converts what Columbia already holds, LG-1 generates what Cleveland doesn't yet have, LG-3 widens who can work the system.
+Sequencing logic: LG-0 makes it safe, LG-1 makes every school-website page and flyer a tagged capture surface, LG-2 converts what Columbia already holds, LG-3 widens who can work the system.
 
 ---
 
@@ -153,10 +151,8 @@ Sequencing logic: LG-0 makes it safe, LG-2 converts what Columbia already holds,
 
 ## 10. Is it worth the effort? (decision criteria)
 
-**Build it if:** (a) Cleveland's 2027 season is the target — a pre-opening year is exactly when a generation engine earns its keep; (b) each campus can name a content owner and a follow-up owner; (c) there's a real (even modest) ad budget with an owner; (d) campuses will run 3+ distinct campaigns/year — landing pages earn their keep at that cadence.
+**Build it if:** (a) Cleveland's 2027 season is the target — a pre-opening year is exactly when a generation engine earns its keep; (b) each campus can name a content owner and a follow-up owner; (c) there's a real (even modest) ad budget with an owner.
 
-**Don't build LG-1 (yet) if:** the only near-term need is Columbia's founding push — the existing CRM + campaigns + LG-2 journeys cover that — or no content owner exists.
-
-**Kill criteria (decide these now, not after):** if 90 days post-LG-1 fewer than ~5 pages exist or pages drive under ~10% of new leads, stop investing in the Studio and double down on journeys and human follow-up. Build the exit ramp into the plan so sunk cost never drives the roadmap.
+**Kill criteria (decide these now, not after):** if 90 days post-LG-2 journeys aren't moving lead→application conversion, or campuses aren't using tagged links (leads still arriving untagged), pause and fix adoption before building more. Build the exit ramp into the plan so sunk cost never drives the roadmap. *The Landing Page Studio already met this fate pre-emptively: campuses will host pages on their own websites, so the Studio was cut in rev 3 and only its capture layer survives.*
 
 **Do regardless of everything above:** LG-0 (it protects what's already running) and the **Keep-the-Seat journey** — melt costs enrolled students, and enrolled students are funding. If you build only one new thing, build that.
