@@ -336,6 +336,26 @@ export function waitlistPromoted({
 const OPT_OUT_EN = "If you'd rather not hear from us, just reply and let us know.";
 const OPT_OUT_ES = "Si prefiere no recibir estos mensajes, simplemente responda y háganoslo saber.";
 
+/**
+ * Per-recipient unsubscribe URL placeholder. Bulk senders (campaign cron,
+ * re-engagement, journeys) replace this with the lead's tokenized link at
+ * send time — one render per campaign, one cheap string swap per recipient.
+ */
+export const UNSUB_PLACEHOLDER = "%%UNSUB_URL%%";
+
+/** One-click unsubscribe footer appended to every BULK template. */
+function withCampaignFooter(t: EmailTemplate): EmailTemplate {
+  const footerHtml = `
+  <p style="margin:16px 0 0 0;font-size:12px;color:${MUTED_COLOR};text-align:center;">
+    <a href="${UNSUB_PLACEHOLDER}" style="color:${MUTED_COLOR};text-decoration:underline;">Unsubscribe / Cancelar suscripción</a>
+  </p>`;
+  return {
+    subject: t.subject,
+    html: t.html.replace(/<\/div>\s*$/, `${footerHtml}\n</div>`),
+    text: `${t.text}\n\nUnsubscribe / Cancelar suscripción: ${UNSUB_PLACEHOLDER}`,
+  };
+}
+
 export type CampaignTemplateKey = "reintroduction" | "event_invite" | "deadline" | "custom";
 
 export interface CampaignPayload {
@@ -401,11 +421,11 @@ export function renderCampaignEmail(
           closing: `Sería un honor darle la bienvenida a su familia. — El Equipo de Inscripción de ${campusName}`,
         }
       );
-      return {
+      return withCampaignFooter({
         subject: `Your seat at ${campusName} is waiting / Su cupo en ${campusName} le espera`,
         html,
         text,
-      };
+      });
     }
 
     case "event_invite": {
@@ -435,11 +455,11 @@ export function renderCampaignEmail(
           closing: `¡Esperamos verle allí! — El Equipo de ${campusName}`,
         }
       );
-      return {
+      return withCampaignFooter({
         subject: `You're invited: ${eventName} at ${campusName} / Está invitado/a`,
         html,
         text,
-      };
+      });
     }
 
     case "deadline": {
@@ -466,11 +486,11 @@ export function renderCampaignEmail(
           closing: `Estamos para ayudarle. — El Equipo de Inscripción de ${campusName}`,
         }
       );
-      return {
+      return withCampaignFooter({
         subject: `Applications close ${deadline} — ${campusName} / Las solicitudes cierran pronto`,
         html,
         text,
-      };
+      });
     }
 
     case "custom": {
@@ -494,11 +514,11 @@ export function renderCampaignEmail(
           closing: `Cordialmente, el Equipo de ${campusName}`,
         }
       );
-      return {
+      return withCampaignFooter({
         subject: payload.subject || `A note from ${campusName}`,
         html,
         text,
-      };
+      });
     }
   }
 }
@@ -605,11 +625,11 @@ export function leadReengagement({
       closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
     }
   );
-  return {
+  return withCampaignFooter({
     subject: `Still thinking about ${campusName}? We're here / ¿Aún considerando ${campusName}?`,
     html,
     text,
-  };
+  });
 }
 
 export function registrationNudge({

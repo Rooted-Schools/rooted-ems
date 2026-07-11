@@ -3,9 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { sendEmail } from "@/lib/email";
 import {
   renderCampaignEmail,
+  UNSUB_PLACEHOLDER,
   type CampaignPayload,
   type CampaignTemplateKey,
 } from "@/lib/email-templates";
+import { getSuppressedEmails, unsubscribeUrl } from "@/lib/email-compliance";
 
 /**
  * Cron endpoint that drains active email campaigns at each campaign's
@@ -63,7 +65,7 @@ export async function GET(request: NextRequest) {
     const batchSize = Math.min(campaign.daily_limit as number, RUN_CAP - totalSent);
     const { data: recipients, error: recErr } = await supabase
       .from("lead_campaign_recipient")
-      .select("id, lead_id, email")
+      .select("id, lead_id, email, lead:lead_id (unsubscribe_token, unsubscribed_at)")
       .eq("campaign_id", campaign.id as string)
       .eq("status", "pending")
       .limit(batchSize);
@@ -83,8 +85,28 @@ export async function GET(request: NextRequest) {
       continue;
     }
 
+    // LG-0.1: address-level suppression (bounces/complaints) checked per batch.
+    const suppressedSet = await getSuppressedEmails(
+      recipients.map((r) => (r.email as string) ?? "")
+    );
+
     let sent = 0;
     for (const recipient of recipients) {
+      const lead = recipient.lead as unknown as {
+        unsubscribe_token: string | null;
+        unsubscribed_at: string | null;
+      } | null;
+
+      // Unsubscribed or suppressed — mark and never send.
+      if (lead?.unsubscribed_at || suppressedSet.has((recipient.email as string).toLowerCase())) {
+        await supabase
+          .from("lead_campaign_recipient")
+          .update({ status: "suppressed" })
+          .eq("id", recipient.id as string)
+          .eq("status", "pending");
+        continue;
+      }
+
       // Claim before sending so a concurrent/retried run can't double-send.
       const { data: claimed } = await supabase
         .from("lead_campaign_recipient")
@@ -94,12 +116,18 @@ export async function GET(request: NextRequest) {
         .select("id");
       if (!claimed || claimed.length === 0) continue;
 
+      // Per-recipient one-click unsubscribe link + RFC 8058 headers.
+      const unsub = unsubscribeUrl(lead?.unsubscribe_token ?? "");
       const result = await sendEmail({
         to: recipient.email as string,
         subject: template.subject,
-        html: template.html,
-        text: template.text,
+        html: template.html.replaceAll(UNSUB_PLACEHOLDER, unsub),
+        text: template.text.replaceAll(UNSUB_PLACEHOLDER, unsub),
         replyTo: campus?.email ?? undefined,
+        headers: {
+          "List-Unsubscribe": `<${unsub}>`,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
       });
 
       if (result.ok) {

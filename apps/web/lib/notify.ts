@@ -755,18 +755,37 @@ export async function notifyStaffNewLead({
 export async function notifyLeadReengagement({
   lead,
   campusId,
+  unsubscribeToken,
 }: {
   lead: LeadContact;
   campusId: string;
+  /** LG-0.1: per-lead one-click unsubscribe (bulk send → link + headers required). */
+  unsubscribeToken?: string | null;
 }): Promise<void> {
   const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const template = emailTemplates.leadReengagement({
+    guardianFirstName: lead.first_name,
+    campusName,
+  });
+  const { unsubscribeUrl } = await import("@/lib/email-compliance");
+  const unsub = unsubscribeToken ? unsubscribeUrl(unsubscribeToken) : `${APP_LINK}/unsubscribe`;
   await Promise.all([
-    emailGuardian(
-      lead.email,
-      emailTemplates.leadReengagement({ guardianFirstName: lead.first_name, campusName }),
-      "notifyLeadReengagement",
-      campusEmail
-    ),
+    lead.email
+      ? sendEmail({
+          to: lead.email,
+          subject: template.subject,
+          html: template.html.replaceAll(emailTemplates.UNSUB_PLACEHOLDER, unsub),
+          text: template.text.replaceAll(emailTemplates.UNSUB_PLACEHOLDER, unsub),
+          replyTo: campusEmail ?? undefined,
+          headers: {
+            "List-Unsubscribe": `<${unsub}>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          },
+        }).then((r) => {
+          if (!r.ok && r.error !== "email not configured")
+            console.error("[notifyLeadReengagement] email failed", r.error);
+        })
+      : Promise.resolve(),
     smsGuardian(
       { phone: lead.phone, smsConsent: lead.sms_consent },
       `Rooted Schools: Hi ${lead.first_name} — still thinking about ${campusName}? We'd love to help with any questions. Just reply, or apply here: ${APP_LINK}/login\n¿Aún considerando ${campusName}? Responda con sus preguntas.`,

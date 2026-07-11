@@ -45,20 +45,29 @@ export async function createCampaign(
   if (!stages) return { data: null, error: "Unknown audience." };
   const dailyLimit = Math.min(Math.max(input.daily_limit || 150, 10), 500);
 
-  // Snapshot the audience (RLS restricts to the caller's campuses)
-  const { data: leads, error: leadErr } = await supabase
+  // Snapshot the audience (RLS restricts to the caller's campuses).
+  // LG-0.1: unsubscribed and suppressed addresses never enter a campaign.
+  const { data: rawLeads, error: leadErr } = await supabase
     .from("lead")
     .select("id, email")
     .eq("campus_id", input.campus_id)
     .in("stage", stages)
-    .not("email", "is", null);
+    .not("email", "is", null)
+    .is("unsubscribed_at", null);
 
   if (leadErr) {
     console.error("[createCampaign] audience", leadErr.message);
     return { data: null, error: "Failed to load the audience." };
   }
-  if (!leads || leads.length === 0) {
-    return { data: null, error: "No leads with an email address match that audience." };
+  const { getSuppressedEmails } = await import("@/lib/email-compliance");
+  const suppressedSet = await getSuppressedEmails(
+    (rawLeads ?? []).map((l: Record<string, string>) => l.email)
+  );
+  const leads = (rawLeads ?? []).filter(
+    (l: Record<string, string>) => !suppressedSet.has(l.email.toLowerCase())
+  );
+  if (leads.length === 0) {
+    return { data: null, error: "No emailable leads match that audience." };
   }
 
   const { data: campaign, error } = await supabase
