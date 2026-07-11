@@ -1,6 +1,6 @@
 # Rooted Grow: Lead Generation Engine — Plan and Outline
 
-*Status: PLAN ONLY — nothing in this document is built. Companion to `crm-concept-and-plan.md` and `competitive-analysis-and-roadmap.md`. Prepared July 2026.*
+*Status: PLAN ONLY — nothing in this document is built. Companion to `crm-concept-and-plan.md` and `competitive-analysis-and-roadmap.md`. Prepared July 2026; revised after red-team review to cover prerequisites, per-campus strategy, and governance gaps.*
 
 ---
 
@@ -12,92 +12,105 @@ The requested component makes sense — but not as a new system. Three of its si
 |---|---|---|
 | Built-in lead capture & management | **✅ Live** — inquiry form, pipeline, stages, follow-up queue, timeline, dedupe, sheet sync, event RSVPs, referral links | Nothing structural |
 | Lead source tracking | **✅ Live** — source + source_detail on every lead; funnel dashboard shows per-channel application conversion | UTM capture + QR generation (small) |
-| Customizable dashboards to manage leads | **✅ Live** — recruitment pipeline + funnel analytics, campus filter, CSV export | Saved views / per-user widgets (optional, low value at current team size) |
-| Automated drip emails | **🟡 ~60%** — welcome touch, re-engagement touch, batch campaigns with daily pacing and 4 branded templates | True multi-step **journeys** (Day 0/3/7/14 sequences with behavior-based exits) |
+| Customizable dashboards to manage leads | **✅ Live** — recruitment pipeline + funnel analytics, campus filter, CSV export | Cost-per-enrollment tracking (ad spend entry); saved views optional |
+| Automated drip emails | **🟡 ~60%** — welcome touch, re-engagement touch, batch campaigns with daily pacing and 4 branded templates | True multi-step **journeys** (Day 0/3/7/14 sequences with behavior-based exits) — and the LG-0 compliance layer below |
 | Custom landing page builder per school | **❌ New** — the flagship of this ask | Full build |
 | Multiple admin levels | **🟡 Mostly** — system_admin / enrollment_manager / enrollment_staff with campus RLS | A **recruiter tier** that sees leads but never student records (FERPA boundary) |
 
-**Recommendation: build it, scoped to the three genuinely-new subsystems (landing pages, journeys, recruiter tier) plus the connective tissue (UTM/QR, engagement tracking, ad ingestion). Skip the rest — it exists.**
+**Recommendation: build it — but in this order: LG-0 (prerequisites that gate everything, including work already live), then per-campus (conversion machinery for Columbia, generation machinery for Cleveland), scoped to the three genuinely-new subsystems plus connective tissue. Skip the rest — it exists.**
 
 ---
 
-## 2. Why this belongs inside the EMS (the architectural argument)
+## 2. The strategic frame: two campuses, two different problems
 
-One family = one record, from first click to first day. That is the Perla principle this whole platform follows, and it only works if every capture surface writes to the same `lead` table. A separate lead-gen product — even a well-integrated one — would create the exact seams the system exists to remove: duplicate family records, a sync layer to maintain, attribution that dies at the product boundary, and a second login for staff.
+Run the funnel backward before building anything. **C.R. Neal already holds 1,263 leads.** Against a founding class of roughly 150–200 seats, even a weak 10–15% lead-to-enrollment rate fills the school from the existing pipeline. **Columbia's bottleneck is conversion, not generation** — the reintroduction campaign, the Push-to-Apply journey, and disciplined human follow-up are worth more there than any new capture surface.
 
-Inside the EMS, every new capture surface (landing page, ad webhook, QR scan) drops into infrastructure that already exists and is already battle-tested with 1,300+ real leads:
+**Cleveland is the true lead-generation case:** 30 leads, opening fall 2027, an entire funnel to build. Landing pages, ad ingestion, QR-tagged tabling, and referral mechanics are exactly what a pre-opening year needs.
 
-- The **response engine** fires automatically (welcome email, staff routing, follow-up date)
-- The **attribution stitch** carries source → lead → application → offer → enrollment untouched
-- **Campus RLS** scopes everything to the right school with zero extra code
-- The **funnel dashboard** picks up every new source with zero extra code
-- Bilingual EN/ES, brand components, and the Resend/Twilio channels come free
+So the plan phases **per campus, not per feature**:
+
+- **Columbia (now → opening day):** LG-0 prerequisites → reintroduction campaign → Push-to-Apply + Keep-the-Seat journeys. Landing pages are optional polish here.
+- **Cleveland (fall 2026 → 2027 season):** full LG-1 → LG-3 build, giving Tim's team a complete generation engine a year before doors open — and producing the documented Enrollment & Recruitment playbook for every campus after.
+
+**The one number that sharpens this plan: seats per grade at each campus.** With it, the funnel dashboard can show "leads needed vs. leads held" per grade — turning recruitment from a volume instinct into arithmetic.
 
 ---
 
-## 3. The build: three new subsystems + connective tissue
+## 3. LG-0 — Prerequisites (these gate everything, including what's already live)
 
-### Subsystem A — Landing Page Studio (the flagship)
+Red-team findings. None of these are optional, and several matter before the *existing* campaign engine sends its first big batch.
 
-Per-school, per-campaign landing pages that non-technical staff assemble in minutes, published at `enroll.rootedschool.org/p/[slug]` (e.g., `/p/crneal-healthcare`, `/p/cleveland-open-house`).
+1. **Unsubscribe, suppression, and bounce handling.** Today's campaigns carry a "reply to opt out" line with no one-click unsubscribe link, no suppression list, and no bounce processing. CAN-SPAM expects a functioning, automatically-honored opt-out; Gmail/Yahoo bulk-sender rules expect an RFC-8058 one-click unsubscribe header; and bounced addresses that keep receiving sends are how a sending domain's reputation dies. Build: a tokenized unsubscribe link on every campaign/journey email, a `suppressed` flag every sender checks, and a Resend bounce/complaint webhook that marks addresses invalid. **This gates the 1,263-family reintroduction campaign regardless of any other decision.**
+2. **Staff enablement — adoption before construction.** The teams this engine serves don't yet know the Recruitment tab exists (Columbia's enrollment manager account has never signed in). Before LG-anything: a walkthrough for Lalah's and Tim's teams, a one-page quick-start, and codification as the **Enrollment & Recruitment chapter of the 22-playbook framework** — which is also how this replicates to future campuses. Software without adoption is the most expensive kind of shelf-ware.
+3. **Media-release governance.** Testimonial blocks and photos of students/families require signed media releases, and quotes about enrolled students brush against FERPA. Rule: no testimonial or photo publishes without a release on file; each campus names an owner for that file.
+4. **Rate limiting on public endpoints.** The inquiry and RSVP forms have honeypots but no rate limits; a spam flood would pollute the pipeline and fire real emails. Add per-IP throttling before adding more public capture surfaces.
+5. **Data retention policy.** Leads who never convert are marketing PII with no defined lifecycle. Adopt a purge-or-anonymize window (e.g., 24 months after last activity), documented and automated.
+6. **Backup/recovery verification.** Confirm the Supabase project's point-in-time recovery configuration and write the one-page restore runbook. Twenty minutes of diligence protecting all of it.
 
-**Design decision that matters: block-based, not freeform.** Staff choose and reorder pre-designed, Rooted-branded blocks and edit their *content* — never fonts, colors, or layout. This is what keeps 3 campuses (and someday 10) on-brand without a design review bottleneck, keeps every page fast and mobile-first, and keeps the builder buildable in weeks instead of months. A freeform drag-and-drop builder (Wix-style) is explicitly out of scope: it produces off-brand pages, slow pages, and a maintenance tar pit.
+LG-0 is small — days, not weeks — and most of it hardens systems already in production.
 
-**Block library v1:**
-1. **Hero** — headline, subhead, campus logo, photo, CTA button
-2. **Inquiry form** — the existing form, embedded; every page IS a capture surface
-3. **Pathway highlight** — healthcare/tech/manufacturing cards with partner names (Prisma Health, etc.)
-4. **Proof strip** — stats (IBC rates, growth data) in Rooted's evidence-led voice
-5. **Testimonial** — family/student quote with photo
-6. **Upcoming events** — auto-populated from the live events system, RSVP built in
-7. **FAQ accordion** — seeded from the answer-before-they-ask library
-8. **Video embed**
-9. **Countdown** — application deadline urgency
-10. **Bilingual toggle** — every block carries EN/ES content, same as the rest of the platform
+---
 
-**Per-page mechanics:** unique slug; automatic source tagging (every lead from `/p/crneal-healthcare` arrives tagged `landing_page / crneal-healthcare`); auto-generated **QR code** for print (flyers, yard signs, tabling kits — closes the loop with the tabling calendar); page-view counting so the funnel dashboard can show *visits → leads → applications* per page; publish/unpublish; campus-scoped ownership.
+## 4. Why this belongs inside the EMS (the architectural argument)
 
-**Storage:** a `landing_page` table with a JSONB `blocks` array — no CMS dependency, versioned like everything else.
+One family = one record, from first click to first day. That principle only works if every capture surface writes to the same `lead` table. A separate lead-gen product — even well-integrated — creates the seams the system exists to remove: duplicate family records, a sync layer, attribution that dies at the product boundary, a second login.
 
-### Subsystem B — Journey Builder (drip sequences done right)
+Inside the EMS, every new capture surface (landing page, ad webhook, QR scan) drops into infrastructure already battle-tested with 1,300+ real leads: the response engine fires automatically; the attribution stitch carries source → lead → application → offer → enrollment untouched; campus RLS scopes everything with zero extra code; the funnel dashboard picks up every new source automatically; bilingual EN/ES, brand components, and the email/SMS channels come free.
 
-Upgrade the campaign engine from "one email, paced daily" to **multi-step sequences with exits**. Not a visual flowchart canvas (over-engineering at this scale) — a simple ordered list: *Step 1, Day 0: Welcome → Step 2, Day 3: Pathway story → Step 3, Day 7: Event invite → Step 4, Day 14: Apply nudge.*
+---
 
-**The non-negotiable feature is the exit rule.** A journey stops the moment the family applies, RSVPs, gets a logged staff call, or opts out. This is Steven's "better communication, not more communication" principle in code — nobody gets a "have you thought about applying?" email the day after they applied. (The infrastructure for this is cheap: the attribution stitch and activity timeline already record every one of those exit events.)
+## 5. The build: three new subsystems + connective tissue
+
+### Subsystem A — Landing Page Studio (the flagship; Cleveland-first)
+
+Per-school, per-campaign landing pages that non-technical staff assemble in minutes, published at `enroll.rootedschool.org/p/[slug]` (e.g., `/p/cleveland-open-house`, `/p/crneal-healthcare`).
+
+**Design decision that matters: block-based, not freeform.** Staff choose and reorder pre-designed, Rooted-branded blocks and edit their *content* — never fonts, colors, or layout. This keeps every campus on-brand without a design-review bottleneck, keeps pages fast and mobile-first, and keeps the builder buildable in weeks instead of months. A freeform Wix-style builder is explicitly out of scope: off-brand pages, slow pages, maintenance tar pit.
+
+**Block library v1:** Hero · Inquiry form (embedded — every page is a capture surface) · Pathway highlight cards (healthcare/tech/manufacturing with partner names) · Proof strip (evidence-led stats) · Testimonial (**publishes only with a media release on file — see LG-0.3**) · Upcoming events (live, RSVP built in) · FAQ accordion · Video · Deadline countdown. Every block carries EN/ES content.
+
+**Per-page mechanics:** unique slug; automatic source tagging; auto-generated **QR code** for print (flyers, yard signs, tabling kits — the tabling kit checklist already assumes these); page-view counting so the dashboard shows *visits → leads → applications* per page; publish/unpublish; campus-scoped ownership. Pages must meet WCAG accessibility — enforced by the blocks themselves, which is another argument for block-based.
+
+**Storage:** a `landing_page` table with a JSONB blocks array — no CMS dependency.
+
+### Subsystem B — Journey Builder (drip sequences done right; Columbia-first)
+
+Upgrade the campaign engine from "one email, paced daily" to **multi-step sequences with exits**. Not a visual flowchart canvas — a simple ordered list: *Day 0: Welcome → Day 3: Pathway story → Day 7: Event invite → Day 14: Apply nudge.*
+
+**The non-negotiable feature is the exit rule.** A journey stops the moment the family applies, RSVPs, gets a logged staff call, unsubscribes, or is suppressed (LG-0.1). "Better communication, not more communication," in code.
 
 **v1 journeys (pre-built, editable):**
-- **Push to Apply** — new leads: welcome → pathway content (matched to their stated interest) → event invite → deadline nudge
-- **Keep the Seat** — accepted families: congratulations → registration checklist → what-to-expect → first-day countdown (this is the melt-prevention sequence from the Tier 2 roadmap; it lands here)
-- **Event follow-up** — attended vs. no-show branches, feeding off the existing attendance tracking
+- **Push to Apply** — new leads: welcome → pathway content matched to stated interest → event invite → deadline nudge
+- **Keep the Seat** — accepted families: congratulations → registration checklist → what-to-expect → first-day countdown. *The melt-prevention sequence; it lands here.*
+- **Event follow-up** — attended vs. no-show branches, off existing attendance tracking
 
-**Engagement tracking (the "every message opened" gap):** enable Resend webhooks → record opens/clicks as `lead_activity` rows → journeys branch on them ("clicked healthcare story → send healthcare event invite") and the lead detail shows real engagement. One webhook endpoint; the timeline UI already exists.
+**Engagement tracking:** Resend open/click webhooks → `lead_activity` rows → journeys branch on them, and the lead timeline shows real engagement. Closes the "every message opened makes the next message smarter" gap from the Perla vision.
 
 ### Subsystem C — Recruiter tier (multiple admin levels, completed)
 
-A new `recruiter` role between "no access" and enrollment_staff: full Recruitment module (leads, events, campaigns, landing pages) for their campus, **zero access to applications, student records, documents, or lottery** — a hard FERPA boundary, enforced in RLS, not UI.
-
-Why it matters: recruitment help is often part-time staff, AmeriCorps members, or parent ambassadors. Today you can't give them the CRM without giving them student records. This role makes the "founding families as recruiters" strategy operationally safe, and it's mostly policy work on the RLS layer that already exists.
+A new `recruiter` role between "no access" and enrollment_staff: full Recruitment module (leads, events, campaigns, landing pages) for their campus, **zero access to applications, student records, documents, or lottery** — a hard FERPA boundary enforced in RLS, not UI. Makes part-time recruiters, AmeriCorps members, and parent ambassadors operationally safe.
 
 ### Connective tissue (small, high-leverage)
 
-- **UTM capture** — `?utm_source=facebook&utm_campaign=juneteenth` on any page auto-fills lead source detail; paid ads become traceable to enrollments
-- **QR generator** — per landing page and per source tag; downloadable for print; the tabling kit checklist already assumes these exist
-- **Ad lead ingestion** — webhook endpoints for Meta Lead Ads and Google lead forms, so ad-platform leads flow straight into the pipeline with the response engine firing (Harmony's two highest-volume channels)
-- **Embeddable inquiry widget** — one script tag that puts the inquiry form on the campus Squarespace/marketing sites, finally retiring the Google-Form-→-spreadsheet-→-sync chain for new capture (the sync stays for history)
+- **UTM capture** — ad parameters auto-fill lead source detail
+- **QR generator** — per landing page and per source tag, downloadable for print
+- **Ad lead ingestion** — webhook endpoints for Meta Lead Ads and Google lead forms, response engine firing on arrival
+- **Embeddable inquiry widget** — one script tag for the campus marketing sites, retiring the Google-Form → spreadsheet chain for new capture
+- **Cost-per-enrollment tracking** — a simple ad-spend entry per campaign/channel so the funnel dashboard can answer the board's actual question: *what does an enrolled student cost, by channel?* Counts without dollars can't justify a marketing budget.
 
 ---
 
-## 4. What I would deliberately NOT build
+## 6. What I would deliberately NOT build
 
-- **Freeform page builder** — brand risk + maintenance tar pit (argued above)
+- **Freeform page builder** — brand risk + maintenance tar pit
 - **A/B testing engine** — meaningless below ~1,000 visits/page/month; revisit at network scale
-- **Per-user dashboard widget customization** — three-campus teams need one great dashboard, not a widget library
-- **Marketing-suite creep** (social schedulers, ad buying) — stay a capture-and-nurture engine; buy ads in the ad platforms
-- **A separate lead-gen product/database** — the whole argument of section 2
+- **Per-user dashboard widgets** — three-campus teams need one great dashboard, not a widget library
+- **Marketing-suite creep** (social schedulers, ad buying) — stay a capture-and-nurture engine
+- **A separate lead-gen product/database** — the whole argument of section 4
 
 ---
 
-## 5. The complete funnel, end to end (what "truly robust" looks like)
+## 7. The complete funnel, end to end
 
 ```
 DISCOVER            CAPTURE              NURTURE               CONVERT              ENROLL              ARRIVE
@@ -110,36 +123,40 @@ Referral link ┤     Embed widget         Event invites         attribution    
 Word of mouth ┘     Walk-in (staff)      Re-engagement                                                  First day 🎓
                           │                    │                     │                    │
                           └────────────────────┴──── ONE FAMILY RECORD ──────────────────┘
-                                    Funnel dashboard: visits → leads → apps → enrolled, by source
+              Funnel dashboard: visits → leads → apps → enrolled — by source, with cost per enrollment
 ```
 
-Everything right of CAPTURE already exists in production. This plan builds the left edge and the NURTURE spine.
+Everything right of CAPTURE already exists in production. This plan builds the left edge and the NURTURE spine — under the LG-0 compliance layer.
 
 ---
 
-## 6. Phasing and effort (relative to what this week's builds cost)
+## 8. Phasing and effort
 
-- **LG-1: Landing Page Studio + QR + UTM** — the flagship; comparable to the campaign engine + events builds combined. Ship first: it's the piece campuses feel immediately and the one that makes every *other* channel (ads, flyers, tabling) measurable.
-- **LG-2: Journeys + engagement webhooks** — comparable to the campaign engine build; the Keep-the-Seat journey alone (melt prevention) likely pays for the whole phase in retained enrollments.
+- **LG-0: Prerequisites** — unsubscribe/suppression/bounce, staff enablement + playbook chapter, media-release governance, rate limiting, retention policy, backup verification. *Days of work; gates everything, including the reintroduction campaign.*
+- **LG-1: Landing Page Studio + QR + UTM** — comparable to the campaign engine + events builds combined. **Cleveland-first**: it's the pre-opening campus that needs generation machinery.
+- **LG-2: Journeys + engagement webhooks + cost tracking** — comparable to the campaign engine build. **Columbia-first**: Push-to-Apply converts the 1,263; Keep-the-Seat protects the founding class. Likely pays for itself in retained enrollments.
 - **LG-3: Recruiter tier + ad ingestion + embed widget** — smallest phase; mostly RLS policy work and two webhook endpoints.
 
-Sequencing logic: LG-1 creates the destinations, LG-2 creates the follow-through, LG-3 widens who can work the system and where leads come from.
+Sequencing logic: LG-0 makes it safe, LG-2 converts what Columbia already holds, LG-1 generates what Cleveland doesn't yet have, LG-3 widens who can work the system.
 
 ---
 
-## 7. Risks and honest caveats
+## 9. Risks and honest caveats
 
-1. **Content is the constraint, not software.** The Journey Builder needs pathway stories, testimonials, and FAQ copy written — per campus, bilingual. Software without a content owner per campus becomes empty scaffolding. (Mitigation: v1 ships with network-level default content; campuses override.)
-2. **Deliverability scales with volume.** Journeys multiply email volume; the existing pacing infrastructure helps, but at some point `enroll.rootedschool.org` wants a dedicated sending subdomain and list-hygiene discipline.
-3. **The follow-up owner problem doesn't go away.** Same as the blueprint's open question #3: this amplifies a human owner at each campus; it doesn't replace one.
-4. **Maintenance surface grows.** Every subsystem added is one more thing the (currently one-person) engineering function maintains. The block-based/no-CMS choices above are deliberately boring for this reason.
+1. **Content is the constraint, not software.** Journeys and pages need pathway stories, testimonials (with releases), and FAQ copy — per campus, bilingual. Software without a content owner per campus is empty scaffolding. *Mitigation: v1 ships with network-level default content; campuses override; the media-release file is part of the content owner's job.*
+2. **The engine has no fuel line without ad budget.** Landing pages + UTM + ad webhooks assume paid spend exists. Without it, the layer serves organic traffic only (QR, tabling, referrals) — still useful, but a fraction of projected value. *A per-campus marketing budget and an ads owner are decision inputs, not afterthoughts.*
+3. **Deliverability scales with volume.** Journeys multiply email; beyond LG-0's hygiene, plan a dedicated sending subdomain as volume grows.
+4. **The follow-up owner problem doesn't go away.** This amplifies a human owner at each campus; it doesn't replace one.
+5. **Maintenance lands on a one-person engineering function.** Every subsystem is one more thing to maintain — hence the deliberately boring choices (block-based, no CMS, no flowchart canvas). Each phase ships with a runbook, and the playbook chapter documents operations so the bus factor is a known, written-down risk rather than an unspoken one.
 
 ---
 
-## 8. Decision criteria (is it worth the effort?)
+## 10. Is it worth the effort? (decision criteria)
 
-Build it if you believe: (a) campuses will run 3+ distinct campaigns/year each (pathway pushes, event pushes, deadline pushes) — landing pages earn their keep at that cadence; (b) someone at each campus will own content and follow-up; (c) the 2027-28 cycle (C.R. Neal Year 2, Cleveland Year 1) is the target, giving LG-1→LG-3 a comfortable runway this fall.
+**Build it if:** (a) Cleveland's 2027 season is the target — a pre-opening year is exactly when a generation engine earns its keep; (b) each campus can name a content owner and a follow-up owner; (c) there's a real (even modest) ad budget with an owner; (d) campuses will run 3+ distinct campaigns/year — landing pages earn their keep at that cadence.
 
-Don't build it (yet) if: this summer's founding-class push is the only near-term campaign (the existing CRM + campaigns already cover that), or no campus content owner exists.
+**Don't build LG-1 (yet) if:** the only near-term need is Columbia's founding push — the existing CRM + campaigns + LG-2 journeys cover that — or no content owner exists.
 
-One more honest note: the highest-ROI single item in this entire plan is probably the **Keep-the-Seat journey** (LG-2), not the landing pages — melt costs enrolled students, and enrolled students are funding. If you build only one thing, build that.
+**Kill criteria (decide these now, not after):** if 90 days post-LG-1 fewer than ~5 pages exist or pages drive under ~10% of new leads, stop investing in the Studio and double down on journeys and human follow-up. Build the exit ramp into the plan so sunk cost never drives the roadmap.
+
+**Do regardless of everything above:** LG-0 (it protects what's already running) and the **Keep-the-Seat journey** — melt costs enrolled students, and enrolled students are funding. If you build only one new thing, build that.
