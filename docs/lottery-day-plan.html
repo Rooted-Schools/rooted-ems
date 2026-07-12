@@ -1,0 +1,235 @@
+<title>Lottery Day — The Explained Lottery · Build Plan</title>
+<style>
+  :root{
+    --ground:#FAFAF7; --card:#FFFFFF; --ink:#22281F; --muted:#6B7263;
+    --accent:#81A780; --accent-deep:#4A6B4F; --line:#E3E6DC;
+    --live:#4A6B4F; --live-bg:#EAF1E9; --warn:#8A6D2F; --warn-bg:#F5EEDD; --gap:#7A5A5A; --gap-bg:#F2E7E7;
+    --mock-chrome:#EDEEE8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ground:#191E16; --card:#222820; --ink:#E8EAE2; --muted:#9AA391;
+      --accent:#8FB58E; --accent-deep:#A9C9A8; --line:#333B2E;
+      --live:#A9C9A8; --live-bg:#2A352A; --warn:#D3B36A; --warn-bg:#3A3320; --gap:#C99B9B; --gap-bg:#3A2B2B;
+      --mock-chrome:#2A3026;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#191E16; --card:#222820; --ink:#E8EAE2; --muted:#9AA391;
+    --accent:#8FB58E; --accent-deep:#A9C9A8; --line:#333B2E;
+    --live:#A9C9A8; --live-bg:#2A352A; --warn:#D3B36A; --warn-bg:#3A3320; --gap:#C99B9B; --gap-bg:#3A2B2B;
+    --mock-chrome:#2A3026;
+  }
+  :root[data-theme="light"]{
+    --ground:#FAFAF7; --card:#FFFFFF; --ink:#22281F; --muted:#6B7263;
+    --accent:#81A780; --accent-deep:#4A6B4F; --line:#E3E6DC;
+    --live:#4A6B4F; --live-bg:#EAF1E9; --warn:#8A6D2F; --warn-bg:#F5EEDD; --gap:#7A5A5A; --gap-bg:#F2E7E7;
+    --mock-chrome:#EDEEE8;
+  }
+  body{background:var(--ground); color:var(--ink); margin:0;
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif; font-size:17px; line-height:1.65;}
+  .wrap{max-width:47rem; margin:0 auto; padding:3.5rem 1.25rem 6rem;}
+  .eyebrow{font-family:ui-sans-serif,system-ui,sans-serif; font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--accent-deep); font-weight:600;}
+  h1{font-size:2.1rem; line-height:1.15; margin:.4rem 0 .6rem; text-wrap:balance; font-weight:600;}
+  .standfirst{font-size:1.05rem; color:var(--muted); margin:0 0 .75rem; font-style:italic;}
+  .meta{font-family:ui-sans-serif,system-ui,sans-serif; font-size:.8rem; color:var(--muted); display:flex; gap:.6rem; flex-wrap:wrap; margin-bottom:2.5rem;}
+  .meta .tag{background:var(--warn-bg); color:var(--warn); border-radius:3px; padding:.15rem .5rem; font-weight:700; letter-spacing:.06em;}
+  section{margin-top:3rem;}
+  h2{font-size:1.35rem; font-weight:600; margin:0 0 1rem; text-wrap:balance; padding-top:1.4rem; border-top:2px solid var(--accent);}
+  h2 .n{color:var(--accent-deep); font-variant-numeric:tabular-nums; margin-right:.5rem;}
+  h3{font-size:1.02rem; margin:1.6rem 0 .5rem; font-weight:700;}
+  p{margin:.75rem 0;} strong{font-weight:700;}
+  ul,ol{padding-left:1.3rem; margin:.75rem 0;} li{margin:.4rem 0;}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.82em; background:var(--mock-chrome); padding:.1em .35em; border-radius:4px;}
+  .callout{background:var(--card); border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:6px; padding:1rem 1.25rem; margin:1.5rem 0;}
+  .callout p{margin:.4rem 0;}
+  .verdict{background:var(--card); border:1px solid var(--accent); border-radius:8px; padding:1.1rem 1.35rem; margin:1.5rem 0; font-size:1.02rem;}
+  .steps{font-family:ui-sans-serif,system-ui,sans-serif; font-size:.88rem; line-height:1.55; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:1rem 1.25rem; margin:1rem 0;}
+  .steps ol{margin:.25rem 0;} .steps li{margin:.5rem 0;}
+  .accept{font-family:ui-sans-serif,system-ui,sans-serif; font-size:.82rem; background:var(--live-bg); color:var(--live); border-radius:6px; padding:.7rem 1rem; margin:.75rem 0;}
+  .accept strong{letter-spacing:.06em;}
+  /* ── Mockups ── */
+  .mockrow{display:grid; grid-template-columns:1fr; gap:1.5rem; margin:1.5rem 0;}
+  @media(min-width:760px){ .mockrow{grid-template-columns:1fr 1fr;} }
+  .browser{border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--card); font-family:ui-sans-serif,system-ui,sans-serif;}
+  .browser .bar{background:var(--mock-chrome); padding:.45rem .7rem; display:flex; align-items:center; gap:.45rem; border-bottom:1px solid var(--line);}
+  .browser .dot{width:.55rem; height:.55rem; border-radius:50%; background:var(--muted); opacity:.35;}
+  .browser .url{flex:1; background:var(--card); border:1px solid var(--line); border-radius:99px; font-size:.62rem; color:var(--muted); padding:.15rem .6rem; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .screen{padding:1.1rem; font-size:.8rem; line-height:1.5;}
+  .m-cap{font-family:ui-sans-serif,system-ui,sans-serif; font-size:.75rem; color:var(--muted); text-align:center; margin-top:.5rem;}
+  .m-card{border:1px solid var(--line); border-radius:10px; padding: .9rem 1rem; margin:.6rem 0; background:var(--card);}
+  .m-pill{display:inline-block; font-size:.62rem; font-weight:700; padding:.12rem .55rem; border-radius:999px; letter-spacing:.03em;}
+  .m-pill.wait{background:var(--warn-bg); color:var(--warn);}
+  .m-pill.tier{background:var(--live-bg); color:var(--live);}
+  .m-h{font-weight:800; font-size:.95rem; margin:.1rem 0 .3rem;}
+  .m-sub{color:var(--muted); font-size:.7rem;}
+  .m-big{font-size:1.5rem; font-weight:800; color:var(--accent-deep); line-height:1.1; font-variant-numeric:tabular-nums;}
+  .m-row{display:flex; gap:.6rem; align-items:baseline; justify-content:space-between; padding:.35rem 0; border-bottom:1px dashed var(--line); font-variant-numeric:tabular-nums;}
+  .m-row:last-child{border-bottom:none;}
+  .m-btn{display:block; text-align:center; background:var(--accent); color:#fff; border-radius:8px; padding:.5rem; font-weight:700; font-size:.75rem; margin-top:.7rem;}
+  .m-btn.ghost{background:transparent; color:var(--accent-deep); border:1.5px solid var(--accent);}
+  .m-stepline{display:flex; gap:.35rem; margin:.7rem 0 .2rem;}
+  .m-step{flex:1; text-align:center;}
+  .m-step .b{width:1.35rem; height:1.35rem; border-radius:50%; margin:0 auto .25rem; display:flex; align-items:center; justify-content:center; font-size:.62rem; font-weight:800; border:2px solid var(--accent); color:var(--accent-deep); background:var(--card);}
+  .m-step.done .b{background:var(--accent); color:#fff;}
+  .m-step .t{font-size:.55rem; color:var(--muted); letter-spacing:.02em;}
+  .m-note{background:var(--live-bg); border-radius:8px; padding:.6rem .8rem; font-size:.7rem; color:var(--live); margin-top:.6rem;}
+  .risk-t{font-family:ui-sans-serif,system-ui,sans-serif; font-size:.85rem;}
+  footer{margin-top:4rem; padding-top:1.25rem; border-top:1px solid var(--line); font-family:ui-sans-serif,system-ui,sans-serif; font-size:.78rem; color:var(--muted);}
+</style>
+<div class="wrap">
+  <p class="eyebrow">Rooted School Foundation · Enrollment Platform · Next Feature</p>
+  <h1>Lottery Day: the Explained Lottery</h1>
+  <p class="standfirst">Turn the most anxious moment in a family's journey into the most trust-building one — and close the real gap where non-selected families currently hear nothing.</p>
+  <div class="meta">
+    <span class="tag">PLAN — READY FOR STEP-BY-STEP EXECUTION</span>
+    <span>July 2026</span><span>·</span><span>Written to be executed phase-by-phase by any capable model</span>
+  </div>
+
+  <section>
+    <h2><span class="n">1</span>Why this is the next big feature</h2>
+    <ul>
+      <li><strong>It's imminent.</strong> C.R. Neal holds 1,263 leads against a founding class of ~150–200 seats. If even a fraction converts, the lottery <em>will</em> run — and lottery day becomes the single highest-stakes family touchpoint before school opens.</li>
+      <li><strong>There's a real product gap, verified in code.</strong> Today, finalizing a lottery creates offers for winners — and <em>nothing</em> for everyone else. Non-selected families sit at status <code>lottery_assigned</code> in silence until staff manually waitlist them one at a time. Phase LD-3 closes this loop.</li>
+      <li><strong>No vendor does this.</strong> Research on New Orleans' OneApp showed families' anger came from <em>opacity, not outcomes</em> — the algorithm worked; nobody explained it. SchoolMint and Avela run compliant lotteries; neither explains a family's result to them. This is the most Rooted-shaped feature on the roadmap: transparency as equity.</li>
+      <li><strong>It's cheap relative to its weight.</strong> Every hard part already exists — seeded reproducible lottery, tiers, snapshots, live waitlist positions, bilingual notify/email/SMS rails. This feature is mostly <em>assembly and language</em>.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>The end result — design mockups</h2>
+    <p>Two surfaces carry the feature. Left: what a <strong>waitlisted family</strong> sees the moment results go out (the hardest message, delivered with total clarity). Right: the <strong>public explainer</strong> any family can read before lottery day.</p>
+    <div class="mockrow">
+      <div>
+        <div class="browser">
+          <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">enroll.rootedschool.org/family/lottery/…</span></div>
+          <div class="screen">
+            <div class="m-sub">C.R. NEAL ACADEMY · LOTTERY RESULTS · JUNE 1, 2026</div>
+            <div class="m-h">Maya's lottery result <span class="m-pill wait">WAITLIST #4</span></div>
+            <div class="m-card">
+              <div class="m-row"><span>Applicants for Grade 6</span><strong>212</strong></div>
+              <div class="m-row"><span>Seats available</span><strong>50</strong></div>
+              <div class="m-row"><span>Maya's group</span><span class="m-pill tier">GENERAL POOL</span></div>
+              <div class="m-row"><span>Maya's place in line today</span><span class="m-big">#4</span></div>
+            </div>
+            <div class="m-card">
+              <div class="m-sub" style="font-weight:700; letter-spacing:.05em;">WHAT HAPPENED</div>
+              <p style="margin:.4rem 0;">Every applicant received a random number from a published draw. Siblings of enrolled students were seated first, then the general pool in number order. Maya drew a spot just past the last open seat — so she's <strong>4th in line</strong>, and the list moves whenever a family declines.</p>
+            </div>
+            <div class="m-card">
+              <div class="m-sub" style="font-weight:700; letter-spacing:.05em;">WHAT HAPPENS NEXT</div>
+              <p style="margin:.4rem 0;">Seats often open in the first weeks. If Maya reaches #1 when a seat opens, you'll get an offer by email and text with <strong>7 days</strong> to accept. Her live position always shows on your dashboard.</p>
+            </div>
+            <span class="m-btn ghost">Ver en español</span>
+            <div class="m-note">🔍 Verification details — the draw seed and Maya's number — are available on request. Every result is reproducible and audited.</div>
+          </div>
+        </div>
+        <p class="m-cap">Mock A — family result page (waitlisted variant; the offered variant celebrates + routes into the existing offer flow)</p>
+      </div>
+      <div>
+        <div class="browser">
+          <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">enroll.rootedschool.org/how-the-lottery-works</span></div>
+          <div class="screen">
+            <div class="m-sub">ROOTED SCHOOLS · EN / ES</div>
+            <div class="m-h">How our lottery works</div>
+            <p style="margin:.3rem 0 .1rem;">When more families apply than we have seats, the law requires a random lottery. Here's exactly how ours works — nothing hidden.</p>
+            <div class="m-stepline">
+              <div class="m-step done"><div class="b">1</div><div class="t">You apply<br>(free, 5 min)</div></div>
+              <div class="m-step done"><div class="b">2</div><div class="t">Every child gets<br>a random number</div></div>
+              <div class="m-step"><div class="b">3</div><div class="t">Seats fill in<br>priority order</div></div>
+              <div class="m-step"><div class="b">4</div><div class="t">Offer or a real<br>place in line</div></div>
+            </div>
+            <div class="m-card">
+              <div class="m-sub" style="font-weight:700; letter-spacing:.05em;">PRIORITY GROUPS AT C.R. NEAL</div>
+              <div class="m-row"><span>1 · Siblings of enrolled students</span><span class="m-pill tier">FIRST</span></div>
+              <div class="m-row"><span>2 · General pool</span><span class="m-pill tier">THEN</span></div>
+              <div class="m-sub" style="margin-top:.4rem;">Groups are set by our authorizer-approved policy. Within each group, order is purely the random draw.</div>
+            </div>
+            <div class="m-card">
+              <div class="m-sub" style="font-weight:700; letter-spacing:.05em;">OUR PROMISES</div>
+              <p style="margin:.35rem 0;">• The draw is seeded and <strong>reproducible</strong> — it can be independently re-run and verified.<br>• Nobody can move a child up the list. Not staff. Not us.<br>• Waitlisted families see their <strong>live position</strong>, always.</p>
+            </div>
+            <span class="m-btn">Start an application</span>
+          </div>
+        </div>
+        <p class="m-cap">Mock B — public bilingual explainer (priority groups render from each campus's real rule set, never hardcoded)</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>Phases — step-by-step for the executing model</h2>
+    <p><strong>Global guardrails for every phase</strong> (non-negotiable): ❶ Never modify <code>packages/utils</code>' <code>runDeterministicLottery</code> or <code>generateLotterySeed</code> — the audit trail depends on them. ❷ Every user-facing string gets EN + ES entries in <code>apps/web/lib/i18n/translations.ts</code>; family emails use the bilingual <code>renderEmail</code> pattern in <code>lib/email-templates.ts</code>. ❸ Copy existing patterns — notify fan-outs from <code>lib/notify.ts</code>, public pages from <code>app/(public)/inquire/page.tsx</code> (LocaleProvider wrapper), service-role reads only after RLS-proven ownership (see <code>getWaitlistStandings</code> in <code>lib/queries/family.ts</code>). ❹ New DB changes = numbered migration file in <code>supabase/migrations/</code> AND applied to prod project <code>szockdlohlmkyloubgtd</code> via Supabase MCP. ❺ Verify each phase: <code>npx tsc --noEmit && npx vitest run && npx next build</code> in <code>apps/web</code>; commit per phase with the Co-Authored-By line; push and confirm CI.</p>
+
+    <h3>LD-1 · The public explainer (smallest, ship first)</h3>
+    <div class="steps"><ol>
+      <li>Create <code>app/(public)/how-the-lottery-works/page.tsx</code> — server component, <code>dynamic = "force-dynamic"</code>, wrapped in <code>LocaleProvider</code> with <code>getLocale()</code> (copy the inquire page shell exactly).</li>
+      <li>Content sections: what a lottery is and when it runs · the 4-step timeline (apply → draw → priority order → offer/waitlist) · priority groups <strong>rendered per campus from the live <code>lottery_rule_set.priority_tiers</code></strong> (service-role read; fall back to the sibling-only default in <code>lib/mutations/lottery.ts</code>) · the three promises (reproducible, untouchable, live position) · FAQ accordion (6–8 questions) · Apply CTA.</li>
+      <li>All copy via new <code>lottery.*</code> translation keys — bilingual, 6th-grade reading level, no jargon ("random number," never "deterministic seed" in family copy).</li>
+      <li>Link it from: the landing page hero area, the inquiry thank-you card, and the <code>applicationReceived</code> email template (one added sentence + link).</li>
+    </ol></div>
+    <div class="accept"><strong>ACCEPT:</strong> /how-the-lottery-works renders both languages via the toggle; tier list shows C.R. Neal's actual rule set; page is linked from all three entry points; build green.</div>
+
+    <h3>LD-2 · The family result experience</h3>
+    <div class="steps"><ol>
+      <li>New query in <code>lib/queries/family.ts</code>: <code>getLotteryOutcome(applicationId)</code> — RLS-proven ownership first (user client fetches the application), then service role reads the matching <code>lottery_entry_snapshot</code> row + run stats (total applicants, total seats, tier label) + current <code>waitlist_position</code> effective rank (reuse <code>getWaitlistStandings</code> math).</li>
+      <li>New page <code>app/family/lottery/[applicationId]/page.tsx</code> per Mock A: result header, the numbers card, "What happened" in plain language (tier + draw framing), "What happens next" (offer deadline / live position / how the line moves), and a collapsed "Verification details" section (run date, seed fingerprint — first 8 chars — and the child's random number).</li>
+      <li>Family dashboard (<code>app/family/dashboard/page.tsx</code>): waitlisted cards gain a "See what happened →" link to the new page; offered cards keep routing to the existing offer flow.</li>
+      <li>Do not build a new notification here — LD-3 owns notification.</li>
+    </ol></div>
+    <div class="accept"><strong>ACCEPT:</strong> a waitlisted family can open their result page and see tier, applicants, seats, live rank, and next steps in either language; a family that was never in a lottery gets a graceful empty state; ownership enforced (another family's applicationId 404s).</div>
+
+    <h3>LD-3 · Close the loop on finalize (the real gap)</h3>
+    <div class="steps"><ol>
+      <li>New mutation in <code>lib/mutations/lottery.ts</code>: <code>completeLotteryResults(runId, actorId)</code> — for every snapshot with <code>is_selected = false</code>, in <code>final_rank</code> order: <code>ensureWaitlist</code> for the run's campus/grade/year, then create the <code>waitlist_position</code> (position = rank order), set application status <code>waitlisted</code>, and audit-log. Idempotent: skip applications already holding an active waitlist_position or offer. Follow the existing <code>addToWaitlist</code> shape.</li>
+      <li>Upgrade <code>notifyFamilyApplicationWaitlisted</code> in <code>lib/notify.ts</code> to full fan-out: in-app + bilingual email (new template <code>lotteryResultWaitlisted</code> with position + link to the LD-2 page) + consented SMS. These are <strong>transactional</strong> — exempt from marketing suppression, matching the offer notifications.</li>
+      <li>Call it from <code>completeLotteryResults</code> per family, sequentially (hundreds of sends is fine — mirror the campaign cron's per-recipient loop, no new pacing infra).</li>
+      <li>Staff UI (<code>app/staff/lottery/[id]/lottery-detail-client.tsx</code>): on an <code>official</code> run, next to "Send Offers," add <strong>"Waitlist &amp; notify non-selected (N)"</strong> with a confirm dialog stating exactly what will send. Show completion state after.</li>
+    </ol></div>
+    <div class="accept"><strong>ACCEPT:</strong> after finalize + both buttons, zero applications remain in <code>lottery_assigned</code>; every non-selected family holds a waitlist position matching their lottery rank and received in-app + email (+ SMS if consented); re-clicking sends nothing twice.</div>
+
+    <h3>LD-4 · The transparency artifact (authorizer-grade)</h3>
+    <div class="steps"><ol>
+      <li>New route <code>app/staff/lottery/[id]/report/page.tsx</code>: a print-styled (<code>@media print</code>) run report — campus, grade, run number, executed-by/at, seed fingerprint, per-tier applicant/seat/offer/waitlist counts, snapshot count, and a plain-English methodology paragraph. No student names on the default view; a "with names" toggle for internal audit only.</li>
+      <li>"Print / Save PDF" button (window.print) + link from the lottery detail page.</li>
+      <li>Decision-gated (see §4 D3): optional anonymized public summary block on /how-the-lottery-works listing completed runs ("Grade 6 · June 1 · 212 applicants · 50 seats").</li>
+    </ol></div>
+    <div class="accept"><strong>ACCEPT:</strong> staff can produce a one-page printable report for Voorhees/authorizer for any official run; numbers reconcile exactly with snapshots.</div>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span>Key decisions (defaults chosen — override before build)</h2>
+    <ul>
+      <li><strong>D1 — Show the child's raw draw number?</strong> Default: yes, but only inside the collapsed "Verification details" section. Headline is always tier + place in line, which is what families can act on.</li>
+      <li><strong>D2 — Auto-waitlist on finalize?</strong> Default: no silent automation — one explicit staff button with a confirm dialog ("this will notify 162 families"). Lottery day deserves a human on the trigger.</li>
+      <li><strong>D3 — Public anonymized run summaries?</strong> Default: build behind a flag, ship off. Steven decides with the authorizer; counts-only summaries are strong trust signals but set a precedent.</li>
+      <li><strong>D4 — SMS on results?</strong> Default: yes for consented families (transactional). It's the single message most worth a text.</li>
+      <li><strong>D5 — Where the explanation lives:</strong> dedicated page (<code>/family/lottery/[id]</code>), not a modal — it's linkable from email, printable, and calm.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="n">5</span>Risks</h2>
+    <ul class="risk-t">
+      <li><strong>Copy is legally load-bearing.</strong> "Nobody can move a child up the list" and tier descriptions must match the authorizer-approved policy exactly. Mitigation: Lalah + authorizer review the explainer copy before LD-1 publishes; tiers render from the live rule set, never hardcoded prose.</li>
+      <li><strong>Position visibility can cut both ways.</strong> #4 feels hopeful; #87 feels crushing. Mitigation: below ~top-20, lead with "on the waitlist" framing and historical movement language rather than the raw number headline (number still available).</li>
+      <li><strong>Notification burst on lottery day.</strong> Hundreds of simultaneous transactional emails is fine for Resend, but a bad template ships at maximum blast radius. Mitigation: mandatory send-to-self test on the new template + a 5-family pilot batch option in the confirm dialog.</li>
+      <li><strong>Timing.</strong> This must land before C.R. Neal's lottery date — LD-1 and LD-3 are the must-haves for that day; LD-2 and LD-4 can trail by days if needed.</li>
+      <li><strong>Rule-set drift.</strong> If a campus edits tiers after a run, the explainer and the historical result must not disagree — result pages read the run's snapshot, never the current rule set.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="n">6</span>Open questions for Steven</h2>
+    <ol>
+      <li><strong>Seats per grade at C.R. Neal, and the planned lottery date</strong> — sets the deadline for LD-1/LD-3 and the "leads needed vs. held" math the funnel dashboard still wants.</li>
+      <li><strong>Does Voorhees/VU-CIL prescribe a lottery-report format?</strong> If yes, LD-4 matches it exactly instead of inventing one.</li>
+      <li><strong>Who reviews the Spanish copy?</strong> Machine-drafted ES has been fine for transactional mail; the lottery explainer deserves a native-speaker pass.</li>
+      <li><strong>D3 above:</strong> publish anonymized run summaries publicly, or keep reports staff/authorizer-only?</li>
+      <li><strong>Should RSV run through the same flow this cycle</strong> (re-enrollment lottery, if any), or is this CRN + Cleveland-2027 only?</li>
+    </ol>
+    <div class="verdict"><strong>Recommended build order:</strong> LD-1 → LD-3 → LD-2 → LD-4. The explainer sets expectations before results exist; closing the silent-waitlist gap is the operational must-have; the result page and report complete the trust story. Total scope ≈ the events build — days, not weeks — with every hard primitive already in production.</div>
+  </section>
+
+  <footer>Lottery Day · The Explained Lottery · Build plan, July 2026 · Nothing in this document is built · Mockups are design intent, not screenshots · Source of truth for current lottery code: apps/web/lib/mutations/lottery.ts</footer>
+</div>
