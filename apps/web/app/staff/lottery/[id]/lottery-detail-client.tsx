@@ -298,6 +298,9 @@ export function StaffLotteryDetailClient({
             <Button variant="outline" onClick={() => handleActionClick("Waitlist & notify non-selected")} disabled={isPending}>
               {isPending ? "Working..." : "Waitlist & notify non-selected"}
             </Button>
+            <Link href={`/staff/lottery/${run!.id}/report`}>
+              <Button variant="outline">Print report</Button>
+            </Link>
             <Button variant="outline" onClick={() => handleActionClick("Archive")} disabled={isPending}>
               {isPending ? "Archiving..." : "Archive"}
             </Button>

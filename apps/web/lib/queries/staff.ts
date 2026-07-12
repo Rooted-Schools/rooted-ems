@@ -438,6 +438,134 @@ export async function getStaffLotteryDetail(
   return { run, entrants };
 }
 
+// ─── Lottery Run Report ─────────────────────────────────
+//
+// Staff/authorizer-facing print report (LD-4). Distinct from
+// getStaffLotteryDetail above because it needs campus_id (for the access
+// check), finalized_at, and — most importantly — the immutable
+// lottery_entry_snapshot rows rather than the live-editable lottery_entry
+// table, since this report is the evidence trail handed to an authorizer.
+// Snapshot rows only exist once a run has been finalized (see
+// finalizeLotteryRun in lib/mutations/lottery.ts).
+
+const DEFAULT_TIER_LABEL = "Sibling enrolled at campus";
+
+/**
+ * Defensively pull tier labels out of a rule set's priority_tiers JSONB.
+ * Falls back to the single sibling-priority label when the array is
+ * missing, empty, or malformed. Mirrors the extraction used in
+ * app/(public)/how-the-lottery-works/page.tsx and lib/queries/family.ts.
+ */
+function extractTierLabels(raw: unknown): string[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [DEFAULT_TIER_LABEL];
+  const labels = raw
+    .map((item) => {
+      const label = (item as Record<string, unknown> | null)?.label;
+      return typeof label === "string" && label.trim() ? label : null;
+    })
+    .filter((label): label is string => label !== null);
+  return labels.length > 0 ? labels : [DEFAULT_TIER_LABEL];
+}
+
+export interface LotteryReportRun {
+  id: string;
+  campusId: string;
+  campusName: string;
+  grade: string;
+  runNumber: number;
+  status: string;
+  totalApplicants: number;
+  totalSeats: number;
+  randomSeed: string | null;
+  seedFingerprint: string | null;
+  executedByName: string | null;
+  executedAt: string | null;
+  finalizedAt: string | null;
+}
+
+export interface LotteryReportEntrant {
+  studentName: string;
+  priorityTier: number;
+  randomNumber: number;
+  finalRank: number;
+  isSelected: boolean;
+}
+
+export async function getStaffLotteryReport(runId: string): Promise<{
+  run: LotteryReportRun | null;
+  tierLabels: string[];
+  entrants: LotteryReportEntrant[];
+}> {
+  const supabase = await createServerClient();
+
+  const { data: runData, error: runError } = await supabase
+    .from("lottery_run")
+    .select(`
+      id, status, run_number, random_seed,
+      total_applicants, total_seats,
+      campus_id, executed_at, finalized_at,
+      campus:campus_id (name),
+      grade_level:grade_level_id (grade),
+      rule_set:lottery_rule_set_id (priority_tiers),
+      executor:executed_by (full_name)
+    `)
+    .eq("id", runId)
+    .single();
+
+  if (runError || !runData) {
+    console.error("[getStaffLotteryReport]", runError?.message);
+    return { run: null, tierLabels: [], entrants: [] };
+  }
+
+  const row = runData as Record<string, unknown>;
+  const campus = row.campus as Record<string, string> | null;
+  const grade = row.grade_level as Record<string, string> | null;
+  const ruleSet = row.rule_set as unknown as Record<string, unknown> | null;
+  const executor = row.executor as unknown as Record<string, string> | null;
+  const randomSeed = (row.random_seed as string) ?? null;
+
+  const tierLabels = extractTierLabels(ruleSet?.priority_tiers);
+
+  const run: LotteryReportRun = {
+    id: row.id as string,
+    campusId: row.campus_id as string,
+    campusName: campus?.name ?? "",
+    grade: grade?.grade ? `Grade ${grade.grade}` : "",
+    runNumber: (row.run_number as number) ?? 0,
+    status: row.status as string,
+    totalApplicants: (row.total_applicants as number) ?? 0,
+    totalSeats: (row.total_seats as number) ?? 0,
+    randomSeed,
+    seedFingerprint: randomSeed ? randomSeed.slice(0, 8) : null,
+    executedByName: executor?.full_name ?? null,
+    executedAt: (row.executed_at as string) ?? null,
+    finalizedAt: (row.finalized_at as string) ?? null,
+  };
+
+  const { data: snapData, error: snapError } = await supabase
+    .from("lottery_entry_snapshot")
+    .select("student_name, priority_tier, random_number, final_rank, is_selected")
+    .eq("lottery_run_id", runId)
+    .order("final_rank", { ascending: true });
+
+  if (snapError) {
+    console.error("[getStaffLotteryReport:snapshots]", snapError.message);
+    return { run, tierLabels, entrants: [] };
+  }
+
+  const entrants: LotteryReportEntrant[] = (snapData ?? []).map(
+    (e: Record<string, unknown>) => ({
+      studentName: (e.student_name as string) ?? "Unknown",
+      priorityTier: (e.priority_tier as number) ?? 0,
+      randomNumber: (e.random_number as number) ?? 0,
+      finalRank: (e.final_rank as number) ?? 0,
+      isSelected: (e.is_selected as boolean) ?? false,
+    })
+  );
+
+  return { run, tierLabels, entrants };
+}
+
 // ─── Offer Queries ──────────────────────────────────────
 
 export async function getStaffOffers(campusIds?: string[]): Promise<{ offers: OfferRow[]; stats: OfferStats }> {
