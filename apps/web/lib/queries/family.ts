@@ -1,5 +1,6 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { formatRelativeTime } from "./utils";
+import { getGradeLabel } from "@/lib/application-helpers";
 
 // ─── Document Types ─────────────────────────────────────
 
@@ -684,4 +685,163 @@ export async function getFamilyPendingOffers(
       application_id: app?.id as string,
     };
   });
+}
+
+// ─── Lottery Result Types & Query ────────────────────────
+
+export interface LotteryOutcome {
+  hasResult: boolean;
+  studentFirstName: string;
+  campusName: string;
+  isSelected: boolean;
+  gradeLabel: string;
+  totalApplicants: number;
+  totalSeats: number;
+  tierLabel: string;
+  randomNumber: number | null;
+  seedFingerprint: string | null;
+  executedAt: string | null;
+  waitlist: WaitlistStanding | null;
+}
+
+const DEFAULT_TIER_LABEL = "Sibling enrolled at campus";
+
+/**
+ * Defensively pull tier labels out of a rule set's priority_tiers JSONB.
+ * Falls back to the single sibling-priority label when the array is
+ * missing, empty, or malformed. Mirrors the extraction used in
+ * app/(public)/how-the-lottery-works/page.tsx.
+ */
+function extractTierLabels(raw: unknown): string[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [DEFAULT_TIER_LABEL];
+  const labels = raw
+    .map((item) => {
+      const label = (item as Record<string, unknown> | null)?.label;
+      return typeof label === "string" && label.trim() ? label : null;
+    })
+    .filter((label): label is string => label !== null);
+  return labels.length > 0 ? labels : [DEFAULT_TIER_LABEL];
+}
+
+/**
+ * Fetch a family's lottery result for a single application.
+ *
+ * Ownership is proven FIRST via the RLS user client — the application read
+ * is scoped to the guardian's household by RLS (same pattern as every other
+ * family query in this file). Only once that row comes back do we escalate
+ * to the service-role client to read the lottery snapshot/run, because that
+ * read needs cross-table access (rule set tiers, other waitlist entries)
+ * that family RLS rightly forbids. If the RLS read returns nothing — the
+ * application doesn't exist, or belongs to another family — we return null
+ * and never touch service-role data. Fails closed.
+ */
+export async function getLotteryOutcome(applicationId: string): Promise<LotteryOutcome | null> {
+  const supabase = await createServerClient();
+
+  const { data: app, error } = await supabase
+    .from("application")
+    .select(
+      `
+      id, campus_id, status,
+      student:student_id (first_name),
+      campus:campus_id (name)
+    `
+    )
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (error || !app) return null; // ownership fails closed
+
+  const student = app.student as unknown as Record<string, string> | null;
+  const campus = app.campus as unknown as Record<string, string> | null;
+  const studentFirstName = student?.first_name ?? "";
+  const campusName = campus?.name ?? "";
+
+  const service = createServiceRoleClient();
+
+  const { data: snapshot, error: snapshotError } = await service
+    .from("lottery_entry_snapshot")
+    .select("id, lottery_run_id, priority_tier, random_number, is_selected, application_id")
+    .eq("application_id", applicationId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (snapshotError) {
+    console.error("[getLotteryOutcome] snapshot", snapshotError.message);
+  }
+
+  if (!snapshot) {
+    return {
+      hasResult: false,
+      studentFirstName,
+      campusName,
+      isSelected: false,
+      gradeLabel: "",
+      totalApplicants: 0,
+      totalSeats: 0,
+      tierLabel: "",
+      randomNumber: null,
+      seedFingerprint: null,
+      executedAt: null,
+      waitlist: null,
+    };
+  }
+
+  const { data: run, error: runError } = await service
+    .from("lottery_run")
+    .select(
+      `
+      id, executed_at, random_seed, total_applicants, total_seats, lottery_rule_set_id,
+      grade_level:grade_level_id (grade)
+    `
+    )
+    .eq("id", snapshot.lottery_run_id as string)
+    .maybeSingle();
+
+  if (runError) {
+    console.error("[getLotteryOutcome] run", runError.message);
+  }
+
+  const runRow = run as Record<string, unknown> | null;
+  const runGrade = runRow?.grade_level as unknown as Record<string, string> | null;
+  const gradeLabel = runGrade?.grade ? getGradeLabel(runGrade.grade) : "";
+
+  let tierLabels: string[] = [DEFAULT_TIER_LABEL];
+  if (runRow?.lottery_rule_set_id) {
+    const { data: ruleSet } = await service
+      .from("lottery_rule_set")
+      .select("priority_tiers")
+      .eq("id", runRow.lottery_rule_set_id as string)
+      .maybeSingle();
+    tierLabels = extractTierLabels((ruleSet as Record<string, unknown> | null)?.priority_tiers);
+  }
+
+  const tierIndex = snapshot.priority_tier as number;
+  const tierLabel =
+    tierIndex >= 0 && tierIndex < tierLabels.length ? tierLabels[tierIndex] : "General pool";
+
+  const isSelected = snapshot.is_selected as boolean;
+  const randomSeed = runRow?.random_seed as string | null;
+
+  let waitlist: WaitlistStanding | null = null;
+  if (!isSelected) {
+    const standings = await getWaitlistStandings([applicationId]);
+    waitlist = standings.get(applicationId) ?? null;
+  }
+
+  return {
+    hasResult: true,
+    studentFirstName,
+    campusName,
+    isSelected,
+    gradeLabel,
+    totalApplicants: (runRow?.total_applicants as number) ?? 0,
+    totalSeats: (runRow?.total_seats as number) ?? 0,
+    tierLabel,
+    randomNumber: (snapshot.random_number as number) ?? null,
+    seedFingerprint: randomSeed ? randomSeed.slice(0, 8) : null,
+    executedAt: (runRow?.executed_at as string) ?? null,
+    waitlist,
+  };
 }

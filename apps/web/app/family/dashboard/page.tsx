@@ -99,7 +99,7 @@ export default async function FamilyDashboardPage() {
         return { href: "/family/registration", label: t("dashboard.completeReg") };
       case "registered":
       case "enrolled":
-      case "waitlisted": // no family-facing waitlist page exists → no button
+      case "waitlisted": // "See what happened" link rendered inline in the card body instead of the action row
       case "declined":
       case "expired":
       case "withdrawn":
@@ -235,6 +235,12 @@ export default async function FamilyDashboardPage() {
                           </p>
                         )}
                         <p className="text-sm text-ink/60">{t("card.waitlistNote")}</p>
+                        <Link
+                          href={`/family/lottery/${card.id}`}
+                          className="text-sm text-rooted-green hover:underline inline-block"
+                        >
+                          {t("card.seeLotteryResult")} &rarr;
+                        </Link>
                       </div>
                     ) : (
                       <p className="text-sm text-ink/60">{t("card.closedNote")}</p>

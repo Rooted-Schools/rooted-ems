@@ -48,6 +48,7 @@ export {
   getFamilyMessages,
   getFamilyOfferDetail,
   getFamilyPendingOffers,
+  getLotteryOutcome,
   type FamilyNotification,
   type EnrollmentWindowInfo,
   type FamilyAppSummary,
@@ -56,6 +57,7 @@ export {
   type FamilyMessageRow,
   type FamilyOfferDetail,
   type FamilyPendingOffer,
+  type LotteryOutcome,
 } from "./family";
 
 // Staff management queries (lottery, offers, waitlist, enrollment, comms, settings)
