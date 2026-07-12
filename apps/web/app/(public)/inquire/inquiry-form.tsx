@@ -111,6 +111,9 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
               <Link href="/" className="text-sm text-rooted-green hover:underline">
                 {t("inquiry.backHome")}
               </Link>
+              <Link href="/how-the-lottery-works" className="text-sm text-rooted-green hover:underline">
+                {t("lottery.learnLink")}
+              </Link>
             </div>
           </CardContent>
         </Card>

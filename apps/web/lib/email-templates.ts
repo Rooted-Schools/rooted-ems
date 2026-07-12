@@ -127,7 +127,7 @@ export function applicationReceived({
       greeting: "Hello,",
       paragraphs: [
         `We've received your enrollment application for ${studentEn(studentFirstName)} at ${campusName}. Thank you for choosing us!`,
-        "Our enrollment team will review the application and reach out with next steps. You can check the status anytime in your family portal.",
+        `Our enrollment team will review the application and reach out with next steps. You can check the status anytime in your family portal. If more families apply than we have seats, a fair random lottery decides placement — you can read exactly how it works at ${APP_URL}/how-the-lottery-works.`,
       ],
       cta: { label: "View your application", url: `${APP_URL}/family/applications` },
       closing: "Warmly, the Rooted Schools Enrollment Team",
@@ -136,7 +136,7 @@ export function applicationReceived({
       greeting: "Hola,",
       paragraphs: [
         `Hemos recibido su solicitud de inscripción para ${studentEs(studentFirstName)} en ${campusName}. ¡Gracias por elegirnos!`,
-        "Nuestro equipo de inscripción revisará la solicitud y se comunicará con usted con los próximos pasos. Puede consultar el estado en cualquier momento en su portal familiar.",
+        `Nuestro equipo de inscripción revisará la solicitud y se comunicará con usted con los próximos pasos. Puede consultar el estado en cualquier momento en su portal familiar. Si aplican más familias que los cupos disponibles, una lotería aleatoria y justa decide los lugares — puede leer exactamente cómo funciona en ${APP_URL}/how-the-lottery-works.`,
       ],
       cta: { label: "Ver su solicitud", url: `${APP_URL}/family/applications` },
       closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
