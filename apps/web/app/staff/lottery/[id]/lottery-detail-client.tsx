@@ -29,6 +29,7 @@ import {
   staffArchiveLottery,
   staffSendLotteryOffers,
   staffSimulateLottery,
+  staffCompleteLotteryResults,
 } from "../actions";
 import type { LotterySimulation } from "@/lib/mutations";
 
@@ -96,6 +97,7 @@ export function StaffLotteryDetailClient({
   const [sendOffersDialogOpen, setSendOffersDialogOpen] = useState(false);
   const [offerExpiresIn, setOfferExpiresIn] = useState("14");
   const [simulation, setSimulation] = useState<LotterySimulation | null>(null);
+  const [completeResultsDialogOpen, setCompleteResultsDialogOpen] = useState(false);
 
   /* ─── Action Handlers ─── */
 
@@ -193,6 +195,30 @@ export function StaffLotteryDetailClient({
     });
   }
 
+  function handleCompleteResults() {
+    if (!run) return;
+    setCompleteResultsDialogOpen(true);
+  }
+
+  function doCompleteResults() {
+    if (!run) return;
+    setCompleteResultsDialogOpen(false);
+    setFeedback(null);
+    startTransition(async () => {
+      const result = await staffCompleteLotteryResults(run.id, staffUserId);
+      if (result.error) {
+        setFeedback({ type: "error", message: result.error });
+      } else {
+        const count = result.data?.waitlisted ?? 0;
+        setFeedback({
+          type: "success",
+          message: `${count} famil${count === 1 ? "y" : "ies"} waitlisted and notified.`,
+        });
+        router.refresh();
+      }
+    });
+  }
+
   function handleActionClick(label: string) {
     switch (label) {
       case "Run Preview":
@@ -204,6 +230,9 @@ export function StaffLotteryDetailClient({
         break;
       case "Send Offers":
         handleSendOffers();
+        break;
+      case "Waitlist & notify non-selected":
+        handleCompleteResults();
         break;
       case "Archive":
         handleArchive();
@@ -265,6 +294,9 @@ export function StaffLotteryDetailClient({
           <>
             <Button onClick={() => handleActionClick("Send Offers")} disabled={isPending}>
               {isPending ? "Sending..." : "Send Offers"}
+            </Button>
+            <Button variant="outline" onClick={() => handleActionClick("Waitlist & notify non-selected")} disabled={isPending}>
+              {isPending ? "Working..." : "Waitlist & notify non-selected"}
             </Button>
             <Button variant="outline" onClick={() => handleActionClick("Archive")} disabled={isPending}>
               {isPending ? "Archiving..." : "Archive"}
@@ -582,6 +614,30 @@ export function StaffLotteryDetailClient({
           <DialogFooter>
             <Button variant="outline" onClick={() => setArchiveDialogOpen(false)}>Cancel</Button>
             <Button variant="destructive" onClick={doArchive}>Archive</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Complete Results (Waitlist Non-Selected) Dialog ─── */}
+      <Dialog open={completeResultsDialogOpen} onOpenChange={setCompleteResultsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Waitlist &amp; Notify Non-Selected Families</DialogTitle>
+            <DialogDescription>
+              This will place every family who wasn&apos;t selected onto the waitlist in lottery order and
+              email/text them their result. This can&apos;t be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm space-y-1">
+            <p className="font-medium text-ink">{run.name}</p>
+            <p className="text-stone">{run.campus} &middot; {run.grade}</p>
+            <p className="text-stone">{waitlistedCount} not selected</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCompleteResultsDialogOpen(false)}>Cancel</Button>
+            <Button onClick={doCompleteResults} className="bg-rooted-green hover:bg-rooted-green/90 text-white">
+              Waitlist &amp; Notify
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

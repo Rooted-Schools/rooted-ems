@@ -9,6 +9,7 @@ import {
   archiveLotteryRun,
   sendOffersFromLottery,
   simulateLotteryRun,
+  completeLotteryResults,
   type CreateLotteryRunInput,
 } from "@/lib/mutations";
 
@@ -93,6 +94,21 @@ export async function staffSendLotteryOffers(
     revalidatePath("/staff/offers");
     revalidatePath("/staff/applications");
     revalidatePath("/staff/dashboard");
+  }
+
+  return result;
+}
+
+// ─── Complete Lottery Results (Waitlist Non-Selected) ─
+
+export async function staffCompleteLotteryResults(runId: string, actorId: string) {
+  await requireStaffSession();
+  const result = await completeLotteryResults(runId, actorId);
+
+  if (!result.error) {
+    revalidatePath("/staff/lottery");
+    revalidatePath(`/staff/lottery/${runId}`);
+    revalidatePath("/staff/waitlist");
   }
 
   return result;

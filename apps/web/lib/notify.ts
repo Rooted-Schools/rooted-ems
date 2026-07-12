@@ -253,27 +253,58 @@ export async function notifyFamilyNeedsInfo({
   });
 }
 
-/** Application placed on waitlist. */
+/**
+ * Application placed on waitlist. Full fan-out: in-app + bilingual email +
+ * consented SMS — a family that was in the lottery must hear their result,
+ * so (like notifyFamilyOfOffer) this is transactional and is NOT gated by
+ * marketing suppression. `position` is optional so existing callers
+ * (lib/mutations/bulk.ts, lib/mutations/applications.ts) keep compiling and
+ * behaving unchanged — they just don't have a rank number to include.
+ */
 export async function notifyFamilyApplicationWaitlisted({
   applicationId,
   studentName,
   campusId,
+  position,
 }: {
   applicationId: string;
   studentName?: string;
   campusId?: string;
+  position?: number;
 }): Promise<void> {
-  const { userId } = await getGuardianContact(applicationId);
-  if (!userId) return;
-  const { name: campusName } = await resolveCampus(campusId);
-  await notify({
-    userId,
-    subject: `You're on the waitlist at ${campusName}`,
-    body: `${studentName ? `${studentName}'s application` : "Your application"} has been placed on the waitlist at ${campusName}. We'll contact you as soon as a seat becomes available.`,
-    link: `/family/applications`,
-    campusId,
-    logTag: "notifyFamilyApplicationWaitlisted",
-  });
+  const contact = await getGuardianContact(applicationId);
+  const { userId, email } = contact;
+  if (!userId && !email) return;
+  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const studentFirstName = firstNameOf(studentName);
+  const positionSuffix = position != null ? ` — currently #${position}` : "";
+  await Promise.all([
+    userId
+      ? notify({
+          userId,
+          subject: `You're on the waitlist at ${campusName}`,
+          body: `${studentName ? `${studentName}'s application` : "Your application"} has been placed on the waitlist at ${campusName}${positionSuffix}. We'll contact you as soon as a seat becomes available.`,
+          link: `/family/applications`,
+          campusId,
+          logTag: "notifyFamilyApplicationWaitlisted",
+        })
+      : Promise.resolve(),
+    emailGuardian(
+      email,
+      emailTemplates.lotteryResultWaitlisted({ studentFirstName, campusName, position }),
+      "notifyFamilyApplicationWaitlisted",
+      campusEmail
+    ),
+    smsGuardian(
+      contact,
+      `Rooted Schools: The lottery for ${campusName} has been held. ${studentFirstName ?? "Your student"} is ${
+        position != null ? `#${position} on the waitlist` : "on the waitlist"
+      } — we'll reach out if a seat opens. See your dashboard: ${APP_LINK}/family/dashboard\nEl sorteo para ${campusName} se realizó. ${
+        studentFirstName ?? "Su estudiante"
+      } está en la lista de espera — le avisaremos si se abre un cupo.`,
+      "notifyFamilyApplicationWaitlisted"
+    ),
+  ]);
 }
 
 /**

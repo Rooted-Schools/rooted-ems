@@ -73,6 +73,7 @@ export {
   archiveLotteryRun,
   sendOffersFromLottery,
   simulateLotteryRun,
+  completeLotteryResults,
   type CreateLotteryRunInput,
   type PriorityTierDef,
   type LotterySimulation,

@@ -327,6 +327,52 @@ export function waitlistPromoted({
   };
 }
 
+/**
+ * Sent when staff complete lottery results: every non-selected family gets
+ * their honest result plus a real, ranked place on the waitlist.
+ * `position` is optional so the message still reads well when a caller
+ * doesn't have a rank on hand (falls back to "on the waitlist").
+ */
+export function lotteryResultWaitlisted({
+  studentFirstName,
+  campusName,
+  position,
+}: {
+  studentFirstName?: string;
+  campusName: string;
+  position?: number;
+}): EmailTemplate {
+  const positionEn = position != null ? `currently #${position} on the waitlist` : "on the waitlist";
+  const positionEs =
+    position != null ? `actualmente en el puesto #${position} de la lista de espera` : "en la lista de espera";
+  const { html, text } = renderEmail(
+    {
+      greeting: "The lottery results are in.",
+      paragraphs: [
+        `The lottery for ${campusName} has been held. ${studentEn(studentFirstName)} wasn't selected for an initial seat, but has a real place on the waitlist: ${positionEn}.`,
+        `Seats often open in the first weeks — if a seat opens and ${studentEn(studentFirstName)} is next, we'll email and text you with time to accept. You can see the live position anytime in your family portal.`,
+      ],
+      cta: { label: "See your dashboard", url: `${APP_URL}/family/dashboard` },
+      closing: "We know waiting is hard, and we're rooting for a seat to open. — the Rooted Schools Enrollment Team",
+    },
+    {
+      greeting: "Ya tenemos los resultados del sorteo.",
+      paragraphs: [
+        `Se ha realizado el sorteo para ${campusName}. ${studentEs(studentFirstName)} no fue seleccionado(a) para un cupo inicial, pero tiene un lugar real en la lista de espera: ${positionEs}.`,
+        `Los cupos suelen abrirse en las primeras semanas — si se abre un cupo y ${studentEs(studentFirstName)} es el/la siguiente, le enviaremos un correo electrónico y un mensaje de texto con tiempo para aceptar. Puede ver la posición en vivo en cualquier momento en su portal familiar.`,
+      ],
+      cta: { label: "Ver su panel", url: `${APP_URL}/family/dashboard` },
+      closing:
+        "Sabemos que esperar es difícil, y esperamos que se abra un cupo pronto. — el Equipo de Inscripción de Rooted Schools",
+    }
+  );
+  return {
+    subject: `Lottery result for ${studentEn(studentFirstName)} / Resultado del sorteo`,
+    html,
+    text,
+  };
+}
+
 // ─── Campaign templates ───────────────────────────────────────────────────────
 // Staff-launched batch emails to leads (see /staff/recruitment → Email
 // Families). Every template is bilingual, carries the Rooted-branded wrapper,

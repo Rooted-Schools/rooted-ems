@@ -1,6 +1,8 @@
 import { createServerClient } from "@rooted-ems/database/server";
 import { generateLotterySeed, runDeterministicLottery } from "@rooted-ems/utils";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
+import { notifyFamilyApplicationWaitlisted } from "@/lib/notify";
+import { ensureWaitlist, addToWaitlist } from "./waitlist";
 import type { MutationResult } from "./applications";
 
 // ─── Types ─────────────────────────────────────────────
@@ -754,4 +756,161 @@ export async function sendOffersFromLottery(
   }
 
   return { data: { offersCreated }, error: null };
+}
+
+// ─── Complete Lottery Results (Waitlist Non-Selected) ──
+//
+// Closes the loop finalizeLotteryRun leaves open: everyone NOT selected sits
+// at `lottery_assigned` with no waitlist entry and no notification until
+// staff run this. Reuses ensureWaitlist/addToWaitlist (lib/mutations/
+// waitlist.ts) rather than writing waitlist_position rows directly, so
+// waitlist semantics (application status, audit logging) stay in one place.
+//
+// Idempotent: safe to click twice. Applications that already have an active
+// waitlist_position OR a pending/accepted offer are skipped rather than
+// double-added or re-notified.
+
+export async function completeLotteryResults(
+  runId: string,
+  actorId: string
+): Promise<MutationResult<{ waitlisted: number }>> {
+  const supabase = await createServerClient();
+
+  // The run carries campus_id/grade_level_id directly, but school_year_id
+  // lives one hop away on enrollment_window (see supabase/migrations/
+  // 00004_applications.sql: enrollment_window.school_year_id).
+  const { data: run, error: runError } = await supabase
+    .from("lottery_run")
+    .select("id, status, campus_id, grade_level_id, enrollment_window_id")
+    .eq("id", runId)
+    .single();
+
+  if (runError || !run) {
+    return { data: null, error: "Lottery run not found." };
+  }
+
+  if (run.status !== "official") {
+    return { data: null, error: `Cannot complete results — status is ${run.status}, must be official.` };
+  }
+
+  const { data: window, error: windowError } = await supabase
+    .from("enrollment_window")
+    .select("school_year_id")
+    .eq("id", run.enrollment_window_id as string)
+    .single();
+
+  if (windowError || !window) {
+    console.error("[completeLotteryResults] enrollment_window", windowError?.message);
+    return { data: null, error: "Enrollment window not found for this lottery run." };
+  }
+
+  const waitlistResult = await ensureWaitlist(
+    run.campus_id as string,
+    run.grade_level_id as string,
+    window.school_year_id as string,
+    run.enrollment_window_id as string
+  );
+
+  if (waitlistResult.error || !waitlistResult.data) {
+    return { data: null, error: waitlistResult.error ?? "Failed to resolve waitlist." };
+  }
+
+  const waitlistId = waitlistResult.data.id;
+
+  // Non-selected snapshots, in lottery-rank order. The snapshot already
+  // carries student_name, so no application/student join is needed here.
+  const { data: snapshots, error: snapshotError } = await supabase
+    .from("lottery_entry_snapshot")
+    .select("application_id, final_rank, student_name")
+    .eq("lottery_run_id", runId)
+    .eq("is_selected", false)
+    .order("final_rank", { ascending: true });
+
+  if (snapshotError) {
+    console.error("[completeLotteryResults] snapshots", snapshotError.message);
+    return { data: null, error: "Failed to load lottery results." };
+  }
+
+  const rows = (snapshots ?? []) as Array<{
+    application_id: string;
+    final_rank: number;
+    student_name: string;
+  }>;
+
+  if (rows.length === 0) {
+    return { data: { waitlisted: 0 }, error: null };
+  }
+
+  const appIds = rows.map((r) => r.application_id);
+
+  // Idempotency check, batched: an application already on an active waitlist
+  // or already holding a pending/accepted offer is skipped.
+  const [{ data: existingPositions }, { data: existingOffers }] = await Promise.all([
+    supabase
+      .from("waitlist_position")
+      .select("application_id")
+      .in("application_id", appIds)
+      .is("removed_at", null),
+    supabase
+      .from("offer")
+      .select("application_id")
+      .in("application_id", appIds)
+      .in("status", ["pending", "accepted"]),
+  ]);
+
+  const skip = new Set<string>([
+    ...((existingPositions ?? []) as Array<{ application_id: string }>).map((r) => r.application_id),
+    ...((existingOffers ?? []) as Array<{ application_id: string }>).map((r) => r.application_id),
+  ]);
+
+  let waitlisted = 0;
+
+  for (const row of rows) {
+    if (skip.has(row.application_id)) continue;
+
+    const added = await addToWaitlist({
+      waitlist_id: waitlistId,
+      application_id: row.application_id,
+      position_number: row.final_rank,
+    });
+
+    if (added.error) {
+      console.error("[completeLotteryResults] addToWaitlist", added.error, {
+        applicationId: row.application_id,
+      });
+      continue;
+    }
+
+    waitlisted++;
+
+    // Guarded so one family's notification failure never aborts the batch.
+    try {
+      await notifyFamilyApplicationWaitlisted({
+        applicationId: row.application_id,
+        campusId: run.campus_id as string,
+        studentName: row.student_name,
+        position: row.final_rank,
+      });
+    } catch (err) {
+      console.error("[completeLotteryResults] notify failed", err, {
+        applicationId: row.application_id,
+      });
+    }
+  }
+
+  await logAuditEvent({
+    table_name: "lottery_run",
+    record_id: runId,
+    action: AuditAction.Update,
+    actor_id: actorId,
+    campus_id: run.campus_id as string,
+    new_data: { waitlisted },
+    metadata: {
+      total_non_selected: rows.length,
+      waitlisted,
+      skipped: rows.length - waitlisted,
+    },
+  });
+
+  return { data: { waitlisted }, error: null };
 }
