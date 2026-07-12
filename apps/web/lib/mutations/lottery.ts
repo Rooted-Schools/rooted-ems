@@ -864,20 +864,28 @@ export async function completeLotteryResults(
   ]);
 
   let waitlisted = 0;
+  // Sequential 1-based position among the families we actually add. This
+  // matches both the rest of the waitlist system (positions start at 1, not
+  // at seats+1) and what getWaitlistStandings will show the family on their
+  // dashboard — so the "#N" in the email never disagrees with the portal.
+  // Rows are already sorted by final_rank, so sequential order == lottery order.
+  let position = 0;
 
   for (const row of rows) {
     if (skip.has(row.application_id)) continue;
 
+    position++;
     const added = await addToWaitlist({
       waitlist_id: waitlistId,
       application_id: row.application_id,
-      position_number: row.final_rank,
+      position_number: position,
     });
 
     if (added.error) {
       console.error("[completeLotteryResults] addToWaitlist", added.error, {
         applicationId: row.application_id,
       });
+      position--; // roll back — this family wasn't actually placed
       continue;
     }
 
@@ -889,7 +897,7 @@ export async function completeLotteryResults(
         applicationId: row.application_id,
         campusId: run.campus_id as string,
         studentName: row.student_name,
-        position: row.final_rank,
+        position,
       });
     } catch (err) {
       console.error("[completeLotteryResults] notify failed", err, {
