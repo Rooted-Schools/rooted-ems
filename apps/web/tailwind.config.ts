@@ -34,6 +34,16 @@ const config: Config = {
         ink: "#111111",
         "warm-white": "#FAF9F7",
         stone: "#A8A29E",
+        /* ── UX handoff palette additions — surfaces + semantic ── */
+        sunken: "#F2EEE5",             // table headers, chrome, progress track
+        line: "#E9E6DE",               // hairlines
+        "light-green": "#B5E5BE",      // badges on dark, pills
+        "rooted-green-700": "#6E9270", // primary hover
+        /* Semantic — distinct from the accent hue */
+        warn: "#F3A632",               // needs attention
+        "warn-text": "#B57B12",        // accessible warn text on light
+        error: "#F3403B",              // inside-72h urgency only
+        info: "#486EFF",               // rare
       },
       fontFamily: {
         sans: [
