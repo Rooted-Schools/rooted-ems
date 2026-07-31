@@ -162,6 +162,71 @@ export async function getWaitlistStandings(
   return standings;
 }
 
+export interface RegistrationSummary {
+  completed: number;
+  total: number;
+  /** Required items still outstanding, with a plain-language hint. */
+  outstanding: { name: string; hint: string }[];
+}
+
+/** Registration item statuses that count as "done" (mirrors the packet UI + nudge cron). */
+const REG_DONE_STATUSES = new Set(["submitted", "verified", "skipped"]);
+
+/**
+ * Outstanding required registration items for ONE application, for the family
+ * home's primary "Your turn: N documents" card.
+ *
+ * Service-role (packet/enrollment rows aren't family-RLS-readable), so callers
+ * MUST pass an application id already proven to belong to the requesting user —
+ * same contract as getWaitlistStandings. Returns null when there's no packet.
+ */
+export async function getRegistrationSummary(
+  applicationId: string
+): Promise<RegistrationSummary | null> {
+  const supabase = createServiceRoleClient();
+
+  const { data: enrollment } = await supabase
+    .from("enrollment")
+    .select("id, campus_id, school_year_id")
+    .eq("application_id", applicationId)
+    .maybeSingle();
+  if (!enrollment) return null;
+
+  const [{ data: items }, { data: requirements }] = await Promise.all([
+    supabase
+      .from("registration_item")
+      .select("item_type, status")
+      .eq("enrollment_id", enrollment.id as string),
+    supabase
+      .from("packet_requirement")
+      .select("item_type, name, description")
+      .eq("campus_id", enrollment.campus_id as string)
+      .eq("school_year_id", enrollment.school_year_id as string)
+      .eq("is_required", true)
+      .eq("is_active", true)
+      .order("sort_order"),
+  ]);
+
+  const reqs = (requirements ?? []) as Array<{ item_type: string; name: string; description: string | null }>;
+  if (reqs.length === 0) return null;
+
+  const doneTypes = new Set(
+    ((items ?? []) as Array<{ item_type: string; status: string }>)
+      .filter((i) => REG_DONE_STATUSES.has(i.status))
+      .map((i) => i.item_type)
+  );
+
+  const outstanding = reqs
+    .filter((r) => !doneTypes.has(r.item_type))
+    .map((r) => ({ name: r.name, hint: r.description ?? "" }));
+
+  return {
+    completed: reqs.length - outstanding.length,
+    total: reqs.length,
+    outstanding,
+  };
+}
+
 // ─── Queries ─────────────────────────────────────────────
 
 /**

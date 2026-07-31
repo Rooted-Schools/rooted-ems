@@ -44,6 +44,8 @@ export {
   getActiveEnrollmentWindows,
   getFamilyDashboardApps,
   getFamilyJourneyCards,
+  getRegistrationSummary,
+  type RegistrationSummary,
   getFamilyDocuments,
   getFamilyMessages,
   getFamilyOfferDetail,

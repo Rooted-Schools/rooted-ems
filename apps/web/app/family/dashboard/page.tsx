@@ -4,7 +4,7 @@ import { JourneyTimeline } from "@/components/ui/journey-timeline";
 import Link from "next/link";
 import { createServerClient } from "@rooted-ems/database/server";
 import { redirect } from "next/navigation";
-import { getFamilyJourneyCards, type FamilyJourneyCard } from "@/lib/queries";
+import { getFamilyJourneyCards, getRegistrationSummary, type FamilyJourneyCard, type RegistrationSummary } from "@/lib/queries";
 import { getStatusConfig } from "@/lib/application-helpers";
 import { getLocale } from "@/lib/i18n/get-locale";
 import { tx } from "@/lib/i18n/translations";
@@ -66,6 +66,14 @@ export default async function FamilyDashboardPage() {
   });
   const primary = sortedCards[0] as FamilyJourneyCard | undefined;
   const others = sortedCards.slice(1);
+
+  // For a registering primary child, load the real outstanding items so the
+  // headline and card can name exactly what's left (the app id is RLS-proven
+  // above). Registration is where families stall, so this detail is the point.
+  const regSummary: RegistrationSummary | null =
+    primary && (primary.status === "accepted" || primary.status === "placement_review")
+      ? await getRegistrationSummary(primary.id)
+      : null;
 
   const daysLeftText = (d: number) =>
     d === 0
@@ -150,11 +158,15 @@ export default async function FamilyDashboardPage() {
           ? t("dashboard.headline.respondBy").replace("{date}", longDate(card.pending_offer.expires_at))
           : t("dashboard.headline.checkApplication").replace("{name}", name);
       case "accepted":
-      case "placement_review":
-        // Spec wants "Your turn: N documents" (N = outstanding packet
-        // requirements). That count isn't in getFamilyJourneyCards — degrades
-        // to a plain-language equivalent instead of inventing a query.
+      case "placement_review": {
+        // "Your turn: N documents" from the real outstanding count; falls back
+        // to plain "Finish registration" when the packet has no items left or
+        // isn't set up yet.
+        const n = regSummary?.outstanding.length ?? 0;
+        if (n === 1) return t("dashboard.headline.yourTurnOne");
+        if (n > 1) return t("dashboard.headline.yourTurnDocs").replace("{n}", String(n));
         return t("dashboard.headline.finishRegistration");
+      }
       case "registered":
       case "enrolled":
         return t("dashboard.headline.enrolled").replace("{name}", name);
@@ -290,6 +302,24 @@ export default async function FamilyDashboardPage() {
                 {daysLeftText(primaryCard.pending_offer.days_remaining)}
               </span>
             </p>
+          )}
+
+          {regSummary && regSummary.outstanding.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-ink">
+                {t("dashboard.reg.progress")
+                  .replace("{done}", String(regSummary.completed))
+                  .replace("{total}", String(regSummary.total))}
+              </p>
+              <ul className="space-y-2">
+                {regSummary.outstanding.map((item) => (
+                  <li key={item.name} className="border border-line rounded-lg px-3 py-2.5">
+                    <p className="text-sm font-medium text-ink">{item.name}</p>
+                    {item.hint && <p className="text-xs text-stone mt-0.5">{item.hint}</p>}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {action && (
