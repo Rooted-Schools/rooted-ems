@@ -1,6 +1,6 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { FamilyHeader } from "@/components/layout/family-header";
-import { getFamilyPendingOffers } from "@/lib/queries";
+import { FamilyTabBar } from "@/components/layout/family-tabbar";
 import { LocaleProvider } from "@/lib/i18n/locale-context";
 import { ToastProvider } from "@/components/ui/toast";
 import { cookies } from "next/headers";
@@ -25,33 +25,28 @@ export default async function FamilyLayout({
     redirect("/login");
   }
 
-  // Fetch pending offer count and unread notification count for nav badges
+  // Unread message count powers the Messages badge in both the desktop
+  // header nav and the phone bottom tab bar.
   const db = createServiceRoleClient();
-  const [pendingOffers, unreadResult] = await Promise.all([
-    getFamilyPendingOffers(user.id),
-    db
-      .from("notification")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("is_read", false),
-  ]);
+  const { count } = await db
+    .from("notification")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("is_read", false);
 
-  const unreadCount = (unreadResult as { count: number | null }).count ?? 0;
+  const unreadCount = count ?? 0;
   const cookieStore = await cookies();
   const initialLocale = (cookieStore.get("NEXT_LOCALE")?.value as Locale | undefined) ?? "en";
 
   return (
     <LocaleProvider initialLocale={initialLocale}>
       <ToastProvider>
-      <div className="min-h-screen bg-rooted-gray">
-        <FamilyHeader
-          userEmail={user.email}
-          userPhone={user.phone}
-          pendingOfferCount={pendingOffers.length}
-          unreadNotificationCount={unreadCount}
-        />
-        <main className="max-w-5xl mx-auto py-6 px-4">{children}</main>
-      </div>
+        <div className="min-h-screen bg-warm-white">
+          <FamilyHeader unreadMessageCount={unreadCount} />
+          {/* pb-[72px] keeps content clear of the fixed 58px+ phone bottom tab bar */}
+          <main className="max-w-5xl mx-auto py-6 px-4 pb-[72px] md:pb-6">{children}</main>
+          <FamilyTabBar unreadMessageCount={unreadCount} />
+        </div>
       </ToastProvider>
     </LocaleProvider>
   );

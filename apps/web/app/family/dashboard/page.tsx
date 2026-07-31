@@ -1,16 +1,10 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { JourneyTimeline } from "@/components/ui/journey-timeline";
 import Link from "next/link";
 import { createServerClient } from "@rooted-ems/database/server";
 import { redirect } from "next/navigation";
-import {
-  getFamilyJourneyCards,
-  getFamilyNotifications,
-  getActiveEnrollmentWindows,
-  type FamilyJourneyCard,
-} from "@/lib/queries";
+import { getFamilyJourneyCards, type FamilyJourneyCard } from "@/lib/queries";
 import { getStatusConfig } from "@/lib/application-helpers";
 import { getLocale } from "@/lib/i18n/get-locale";
 import { tx } from "@/lib/i18n/translations";
@@ -18,24 +12,38 @@ import { tx } from "@/lib/i18n/translations";
 export const dynamic = "force-dynamic";
 
 /**
- * Maps application status → 0-based position on the 5-step journey
- * (Applied → Verified → Offered → Accepted → Registered).
- * Steps before the index render filled; 5 means the journey is complete.
- * Statuses absent here (waitlisted / declined / expired / withdrawn) are
- * off the happy path and render a status note instead of the stepper.
+ * Maps application status → 0-based position on the plain-language 4-step
+ * "Where {name} is" journey (Applied → Offered a seat → Finish registration →
+ * First day). Statuses absent here (waitlisted / declined / expired /
+ * withdrawn) are off the happy path and render a status note instead.
  */
-const JOURNEY_INDEX: Record<string, number> = {
+const JOURNEY2_INDEX: Record<string, number> = {
   draft: 0,
-  submitted: 1,
-  needs_info: 1,
-  verified: 2,
-  lottery_assigned: 2,
-  offered: 2,
-  accepted: 4,
-  placement_review: 4,
-  registered: 5,
-  enrolled: 5,
+  submitted: 0,
+  needs_info: 0,
+  verified: 0,
+  lottery_assigned: 0,
+  offered: 1,
+  accepted: 2,
+  placement_review: 2,
+  registered: 3,
+  enrolled: 4,
 };
+
+/**
+ * Sort key for choosing the ONE primary "active child" card the page leads
+ * with. Lower = more urgent = more likely to be the thing a parent needs to
+ * see first. Everything else on the page stays quiet by comparison.
+ */
+function priorityRank(card: FamilyJourneyCard): number {
+  if (card.pending_offer?.is_urgent) return 0;
+  if (card.pending_offer) return 1;
+  if (card.status === "draft") return 2;
+  if (card.status === "accepted" || card.status === "placement_review") return 3;
+  if (card.status === "waitlisted") return 4;
+  if (["submitted", "needs_info", "verified", "lottery_assigned"].includes(card.status)) return 5;
+  return 6; // registered / enrolled / declined / expired / withdrawn
+}
 
 export default async function FamilyDashboardPage() {
   const supabase = await createServerClient();
@@ -48,21 +56,16 @@ export default async function FamilyDashboardPage() {
   const t = (key: Parameters<typeof tx>[0]) => tx(key, locale);
   const localeTag = locale === "es" ? "es-US" : "en-US";
 
-  const [cards, notifications, enrollmentWindows] = await Promise.all([
-    getFamilyJourneyCards(),
-    getFamilyNotifications(user.id, 5),
-    getActiveEnrollmentWindows(),
-  ]);
-
+  const cards = await getFamilyJourneyCards();
   const hasApps = cards.length > 0;
 
-  const journeySteps = [
-    t("steps.applied"),
-    t("steps.verified"),
-    t("steps.offered"),
-    t("steps.accepted"),
-    t("steps.registered"),
-  ];
+  const sortedCards = [...cards].sort((a, b) => {
+    const diff = priorityRank(a) - priorityRank(b);
+    if (diff !== 0) return diff;
+    return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+  });
+  const primary = sortedCards[0] as FamilyJourneyCard | undefined;
+  const others = sortedCards.slice(1);
 
   const daysLeftText = (d: number) =>
     d === 0
@@ -70,6 +73,20 @@ export default async function FamilyDashboardPage() {
       : d === 1
         ? t("offers.oneDayLeft")
         : `${d} ${t("offers.daysLeftSuffix")}`;
+
+  const longDate = (iso: string) =>
+    new Date(iso).toLocaleDateString(localeTag, {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    });
+
+  const shortDate = (iso: string) =>
+    new Date(iso).toLocaleDateString(localeTag, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
 
   // ONE next-action per card, derived from status
   const actionFor = (
@@ -99,7 +116,7 @@ export default async function FamilyDashboardPage() {
         return { href: "/family/registration", label: t("dashboard.completeReg") };
       case "registered":
       case "enrolled":
-      case "waitlisted": // "See what happened" link rendered inline in the card body instead of the action row
+      case "waitlisted": // "See what happened" link rendered inline instead of the action row
       case "declined":
       case "expired":
       case "withdrawn":
@@ -114,384 +131,308 @@ export default async function FamilyDashboardPage() {
     }
   };
 
-  // Determine farthest stage for the "How Enrollment Works" guide
-  const statusOrder = ["draft", "submitted", "needs_info", "verified", "lottery_assigned", "offered", "accepted", "registered"];
-  const farthestStatus = cards.reduce((max, a) => {
-    const idx = statusOrder.indexOf(a.status);
-    return idx > max ? idx : max;
-  }, -1);
-  const currentStep = farthestStatus <= 1 ? 1 : farthestStatus <= 4 ? 2 : farthestStatus === 5 ? 3 : farthestStatus === 6 ? 4 : farthestStatus >= 7 ? 5 : 0;
+  const nameOf = (card: FamilyJourneyCard) => card.student_name || t("dashboard.resume.newApp");
 
-  // Derive a friendly name from the user's email or metadata
-  const displayName =
-    user.user_metadata?.full_name?.split(" ")[0] ??
-    user.email?.split("@")[0] ??
-    t("dashboard.there");
+  // The single task-shaped headline. Degrades where data doesn't exist yet —
+  // see the deviation notes in the phase-1a handoff report.
+  function headlineFor(card: FamilyJourneyCard): string {
+    const name = nameOf(card);
+    switch (card.status) {
+      case "draft":
+        return t("dashboard.headline.finishApplication").replace("{name}", name);
+      case "submitted":
+      case "needs_info":
+      case "verified":
+      case "lottery_assigned":
+        return t("dashboard.headline.nothingToDo");
+      case "offered":
+        return card.pending_offer
+          ? t("dashboard.headline.respondBy").replace("{date}", longDate(card.pending_offer.expires_at))
+          : t("dashboard.headline.checkApplication").replace("{name}", name);
+      case "accepted":
+      case "placement_review":
+        // Spec wants "Your turn: N documents" (N = outstanding packet
+        // requirements). That count isn't in getFamilyJourneyCards — degrades
+        // to a plain-language equivalent instead of inventing a query.
+        return t("dashboard.headline.finishRegistration");
+      case "registered":
+      case "enrolled":
+        return t("dashboard.headline.enrolled").replace("{name}", name);
+      case "waitlisted":
+        return card.waitlist_standing
+          ? t("dashboard.headline.waitlistPosition")
+              .replace("{name}", name)
+              .replace("{position}", String(card.waitlist_standing.position))
+          : t("dashboard.headline.waitlistGeneric").replace("{name}", name);
+      default:
+        return t("dashboard.headline.checkApplication").replace("{name}", name);
+    }
+  }
+
+  function shortNoteFor(card: FamilyJourneyCard): string {
+    switch (card.status) {
+      case "registered":
+      case "enrolled":
+        return t("dashboard.otherNote.nothingNeeded");
+      case "draft":
+        return t("dashboard.otherNote.notStarted");
+      case "offered":
+        return t("dashboard.otherNote.waitingResponse");
+      case "accepted":
+      case "placement_review":
+        return t("dashboard.otherNote.registering");
+      case "waitlisted":
+        return t("dashboard.otherNote.waitlisted");
+      case "submitted":
+      case "needs_info":
+      case "verified":
+      case "lottery_assigned":
+        return t("dashboard.otherNote.inReview");
+      default:
+        return t("dashboard.otherNote.closed");
+    }
+  }
+
+  const journey2Steps = [
+    t("steps.applied"),
+    t("journey2.offeredSeat"),
+    t("journey2.finishRegistration"),
+    t("journey2.firstDay"),
+  ];
+
+  if (!hasApps) {
+    return (
+      <div className="max-w-xl mx-auto">
+        <Card>
+          <CardContent className="py-10 text-center space-y-3">
+            <p className="text-ink font-medium">{t("dashboard.noApplications")}</p>
+            <p className="text-sm text-stone">{t("dashboard.startFirstApp")}</p>
+            <Link href="/family/applications/new" className="inline-block pt-2">
+              <Button>{t("dashboard.startNewApplication")}</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const primaryCard = primary as FamilyJourneyCard;
+  const primaryName = nameOf(primaryCard);
+  const action = actionFor(primaryCard);
+  const isPrimaryAsk = !!action && !action.outline;
+
+  const eyebrow = [
+    primaryName,
+    primaryCard.grade ? `${t("offers.grade")} ${primaryCard.grade}` : "",
+    primaryCard.campus_name,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  let reassurance: string | null = null;
+  if (isPrimaryAsk) {
+    reassurance =
+      primaryCard.status === "offered" && primaryCard.pending_offer
+        ? t("dashboard.reassurance.withDate")
+            .replace("{name}", primaryName)
+            .replace("{date}", longDate(primaryCard.pending_offer.expires_at))
+        : t("dashboard.reassurance.general");
+  }
+
+  const journeyIndex = JOURNEY2_INDEX[primaryCard.status];
+  const onJourney = journeyIndex !== undefined;
+  const journeyAria =
+    journeyIndex !== undefined && journeyIndex >= journey2Steps.length
+      ? t("journey.aria.complete")
+      : `${t("journey.aria.step")} ${(journeyIndex ?? 0) + 1} ${t("journey.aria.of")} ${journey2Steps.length}: ${journey2Steps[journeyIndex ?? 0]}`;
+
+  // Help line — a plain-text sentence with an inline link, assembled from a
+  // translated template so word order stays correct in both languages.
+  const helpLinkText = t("dashboard.helpLine.messageLink");
+  const helpTemplate = primaryCard.campus_phone
+    ? t("dashboard.helpLine.withPhone")
+    : t("dashboard.helpLine.noPhone");
+  const [helpBefore, helpAfterRaw] = helpTemplate.split("{link}");
+  const helpAfter = primaryCard.campus_phone
+    ? helpAfterRaw.replace("{phone}", primaryCard.campus_phone)
+    : helpAfterRaw;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-ink">
-            {t("dashboard.welcomeBack")}, {displayName}
-          </h1>
-          <p className="text-sm text-stone mt-1">
-            {user.email}
-          </p>
-        </div>
-        <Link href="/family/applications/new">
-          <Button>{t("dashboard.startNewApplication")}</Button>
+    <div className="max-w-2xl mx-auto space-y-8">
+      {/* Quiet top-right entry point for a second application — deliberately
+          low-weight so it never competes with the primary card below. */}
+      <div className="flex justify-end -mb-4">
+        <Link
+          href="/family/applications/new"
+          className="text-xs font-medium text-stone hover:text-rooted-green transition-colors"
+        >
+          + {t("dashboard.startNewApplication")}
         </Link>
       </div>
 
-      {/* ─── Per-child journey cards ─── */}
+      {/* ─── Eyebrow + task headline ─── */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-ink">
-            {t("dashboard.yourApplications")}
-          </h2>
-          <Link
-            href="/family/applications"
-            className="text-sm text-rooted-green hover:underline"
-          >
-            {t("dashboard.viewAll")} &rarr;
-          </Link>
-        </div>
+        <p className="text-[11px] uppercase tracking-[0.12em] text-stone font-semibold">
+          {eyebrow}
+        </p>
+        <h1 className="text-[27px] md:text-[34px] font-extrabold uppercase tracking-wide text-ink leading-tight mt-1">
+          {headlineFor(primaryCard)}
+        </h1>
+      </div>
 
-        {!hasApps ? (
-          <Card>
-            <CardContent className="py-8 text-center">
-              <p className="text-stone mb-1">{t("dashboard.noApplications")}</p>
-              <p className="text-sm text-stone mb-4">{t("dashboard.startFirstApp")}</p>
-              <Link href="/family/applications/new">
-                <Button>{t("dashboard.startNewApplication")}</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {cards.map((card) => {
-              const cfg = getStatusConfig(card.status);
-              const statusKey = `status.${card.status}` as Parameters<typeof tx>[0];
-              const localizedStatus = tx(statusKey, locale);
-              const statusLabel = localizedStatus === statusKey ? cfg.label : localizedStatus;
+      {/* ─── Primary card — the one element that may look like it needs the parent ─── */}
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          {primaryCard.status === "offered" && primaryCard.pending_offer && (
+            <p className="text-sm text-ink/70">
+              {t("offers.expiresOn")} {longDate(primaryCard.pending_offer.expires_at)} ·{" "}
+              <span className={primaryCard.pending_offer.is_urgent ? "font-semibold text-error" : "font-semibold"}>
+                {daysLeftText(primaryCard.pending_offer.days_remaining)}
+              </span>
+            </p>
+          )}
 
-              const journeyIndex = JOURNEY_INDEX[card.status];
-              const onJourney = journeyIndex !== undefined;
-              const journeyAria =
-                journeyIndex !== undefined && journeyIndex >= journeySteps.length
-                  ? t("journey.aria.complete")
-                  : `${t("journey.aria.step")} ${(journeyIndex ?? 0) + 1} ${t("journey.aria.of")} ${journeySteps.length}: ${journeySteps[journeyIndex ?? 0]}`;
+          {action && (
+            <Link href={action.href} className="block">
+              <Button
+                className={`w-full ${action.urgent ? "bg-error hover:bg-error/90 text-white" : ""}`}
+                variant={action.outline ? "outline" : "default"}
+              >
+                {action.label}
+              </Button>
+            </Link>
+          )}
 
-              const isDraft = card.status === "draft";
-              const studentTitle = card.student_name || t("dashboard.resume.newApp");
-              const subtitle = [
-                card.campus_name,
-                card.grade ? `${t("offers.grade")} ${card.grade}` : "",
-              ]
-                .filter(Boolean)
-                .join(" · ");
-              const action = actionFor(card);
+          {isPrimaryAsk && (
+            <p className="text-xs text-stone text-center">{t("dashboard.takesTwoMinutes")}</p>
+          )}
 
-              return (
-                <Card
-                  key={card.id}
-                  className={
-                    isDraft
-                      ? "border-rooted-green/40 bg-rooted-green/5"
-                      : card.registration_complete
-                        ? "border-rooted-green/30"
-                        : undefined
-                  }
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <CardTitle className="text-base truncate">
-                          {studentTitle}
-                        </CardTitle>
-                        {subtitle && <CardDescription>{subtitle}</CardDescription>}
-                      </div>
-                      <Badge variant={cfg.variant} className="shrink-0">
-                        {statusLabel}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {onJourney ? (
-                      <JourneyTimeline
-                        steps={journeySteps}
-                        currentIndex={journeyIndex}
-                        size="sm"
-                        ariaLabel={journeyAria}
-                      />
-                    ) : card.status === "waitlisted" ? (
-                      <div className="space-y-1">
-                        {card.waitlist_standing && (
-                          <p className="text-sm font-semibold text-rooted-green">
-                            {t("card.waitlistStanding")
-                              .replace("{position}", String(card.waitlist_standing.position))
-                              .replace("{total}", String(card.waitlist_standing.total))}
-                          </p>
-                        )}
-                        <p className="text-sm text-ink/60">{t("card.waitlistNote")}</p>
-                        <Link
-                          href={`/family/lottery/${card.id}`}
-                          className="text-sm text-rooted-green hover:underline inline-block"
-                        >
-                          {t("card.seeLotteryResult")} &rarr;
-                        </Link>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-ink/60">{t("card.closedNote")}</p>
-                    )}
+          {primaryCard.registration_complete && (
+            <p className="text-sm font-medium text-rooted-green">{t("card.celebration")}</p>
+          )}
 
-                    {card.registration_complete && (
-                      <p className="text-sm font-medium text-rooted-green">
-                        🎓 {t("card.celebration")}
-                      </p>
-                    )}
-                    {isDraft && (
-                      <p className="text-sm text-ink/60">{t("card.draftHint")}</p>
-                    )}
+          {reassurance && (
+            <div className="bg-rooted-green/5 border-t border-rooted-green/20 -mx-6 -mb-6 px-6 py-3 mt-2">
+              <p className="text-sm text-ink/70">{reassurance}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-xs text-stone">
-                        {t("common.updated")}{" "}
-                        {new Date(card.updated_at).toLocaleDateString(
-                          localeTag,
-                          { month: "short", day: "numeric", year: "numeric" }
-                        )}
-                      </span>
-                      {action && (
-                        <Link href={action.href} className="shrink-0">
-                          <Button
-                            size="sm"
-                            variant={action.outline ? "outline" : "default"}
-                            className={
-                              action.urgent
-                                ? "bg-red-600 hover:bg-red-700 text-white"
-                                : undefined
-                            }
-                          >
-                            {action.label}
-                          </Button>
-                        </Link>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+      {/* ─── Where {name} is ─── */}
+      <div>
+        <h2 className="text-sm font-semibold text-ink mb-3">
+          {t("dashboard.whereIs").replace("{name}", primaryName)}
+        </h2>
+        {onJourney ? (
+          <div className="space-y-2">
+            <JourneyTimeline
+              steps={journey2Steps}
+              currentIndex={journeyIndex}
+              size="md"
+              ariaLabel={journeyAria}
+            />
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone">
+              {primaryCard.submitted_at && (
+                <span>{t("dashboard.appliedOn").replace("{date}", shortDate(primaryCard.submitted_at))}</span>
+              )}
+              {journeyIndex > 0 && (
+                <span>{t("dashboard.updatedOn").replace("{date}", shortDate(primaryCard.updated_at))}</span>
+              )}
+            </div>
           </div>
+        ) : primaryCard.status === "waitlisted" ? (
+          <div className="space-y-1">
+            {primaryCard.waitlist_standing && (
+              <p className="text-sm font-semibold text-rooted-green">
+                {t("card.waitlistStanding")
+                  .replace("{position}", String(primaryCard.waitlist_standing.position))
+                  .replace("{total}", String(primaryCard.waitlist_standing.total))}
+              </p>
+            )}
+            <p className="text-sm text-ink/60">{t("card.waitlistNote")}</p>
+            <Link
+              href={`/family/lottery/${primaryCard.id}`}
+              className="text-sm text-rooted-green hover:underline inline-block"
+            >
+              {t("card.seeLotteryResult")} &rarr;
+            </Link>
+          </div>
+        ) : (
+          <p className="text-sm text-ink/60">{t("card.closedNote")}</p>
         )}
       </div>
 
-      {/* ─── Our Schools — Clickable logos ─── */}
-      <div>
-        <h2 className="text-base font-semibold text-ink mb-3">
-          {t("dashboard.ourSchools")}
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            {
-              name: "Rooted School Vancouver",
-              location: "Vancouver, WA",
-              logo: "/logos/rooted-vancouver.png",
-              shortCode: "RSV",
-              containerClass: "h-24 flex items-center justify-center mb-3",
-              logoClass: "max-h-24 max-w-full object-contain",
-              borderColor: "border-t-rooted-green",
-              hoverBorder: "hover:border-rooted-green/50",
-              badgeClass: "bg-rooted-green/10 text-rooted-green border-rooted-green/30",
-              footerClass: "bg-rooted-green/5 border-t border-rooted-green/20",
-              daysClass: "bg-rooted-green text-white",
-            },
-            {
-              name: "C.R. Neal Academy",
-              location: "Columbia, SC",
-              logo: "/logos/cr-neal-academy.png",
-              shortCode: "CRN",
-              containerClass: "h-24 flex items-center justify-center mb-3",
-              logoClass: "max-h-24 max-w-full object-contain",
-              borderColor: "border-t-amber-600",
-              hoverBorder: "hover:border-amber-400/50",
-              badgeClass: "bg-amber-50 text-amber-700 border-amber-300",
-              footerClass: "bg-amber-50 border-t border-amber-200",
-              daysClass: "bg-amber-500 text-white",
-            },
-            {
-              name: "Rooted Schools Cleveland",
-              location: "Cleveland, OH",
-              logo: "/logos/rooted-cleveland.png",
-              shortCode: "RSC",
-              containerClass: "h-24 flex items-center justify-center mb-3",
-              logoClass: "max-h-24 max-w-full object-contain",
-              borderColor: "border-t-blue-600",
-              hoverBorder: "hover:border-blue-400/50",
-              badgeClass: "bg-blue-50 text-blue-700 border-blue-300",
-              footerClass: "bg-blue-50 border-t border-blue-200",
-              daysClass: "bg-blue-600 text-white",
-            },
-          ].map((school) => {
-            const campusWindow = enrollmentWindows.find(
-              (w) => w.campus_name === school.name
-            );
-            const isOpen = !!campusWindow;
-            const cardContent = (
-              <Card className={`transition-shadow border-2 border-t-4 overflow-hidden ${school.borderColor} ${isOpen ? `hover:shadow-md cursor-pointer group ${school.hoverBorder}` : "opacity-75"}`}>
-                <CardContent className="py-6 flex flex-col items-center text-center">
-                  <div className={school.containerClass}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={school.logo}
-                      alt={school.name}
-                      className={`${school.logoClass} ${isOpen ? "group-hover:scale-105 transition-transform" : ""}`}
-                    />
-                  </div>
-                  <p className="text-xs text-stone mt-1">{school.location}</p>
-                  <Badge variant="outline" className={`mt-2 ${isOpen ? school.badgeClass : ""}`}>
-                    {isOpen ? t("dashboard.acceptingApps") : t("dashboard.comingSoon")}
-                  </Badge>
-                </CardContent>
-                {isOpen && campusWindow && (
-                  <div className={`${school.footerClass} px-4 py-2.5 flex items-center justify-between`}>
-                    <p className="text-xs text-ink/60">
-                      {t("dashboard.applyBy")} <span className="font-semibold text-ink">{campusWindow.close_date}</span>
-                    </p>
-                    {campusWindow.days_remaining != null && (
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${school.daysClass}`}>
-                        {campusWindow.days_remaining}{t("dashboard.daysLeftShort")}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </Card>
-            );
+      {/* ─── Other children — one quiet line each, not an equal-weight card ─── */}
+      {others.length > 0 && (
+        <div className="space-y-0.5">
+          {others.map((card) => {
+            const cfg = getStatusConfig(card.status);
+            const statusKey = `status.${card.status}` as Parameters<typeof tx>[0];
+            const localizedStatus = tx(statusKey, locale);
+            const statusLabel = localizedStatus === statusKey ? cfg.label : localizedStatus;
 
-            return isOpen ? (
-              <Link
-                key={school.shortCode}
-                href={`/family/applications/new?campus=${school.shortCode}`}
+            return (
+              <div
+                key={card.id}
+                className="flex items-center justify-between gap-3 text-sm py-2 border-b border-line last:border-0"
               >
-                {cardContent}
-              </Link>
-            ) : (
-              <div key={school.shortCode}>{cardContent}</div>
+                <span className="text-ink/80 min-w-0 truncate">
+                  {nameOf(card)}
+                  {card.grade ? ` · ${t("offers.grade")} ${card.grade}` : ""}
+                  {" — "}
+                  {statusLabel} · {shortNoteFor(card)}
+                </span>
+                <Link
+                  href={`/family/applications/${card.id}`}
+                  className="text-rooted-green hover:underline shrink-0 text-xs font-semibold"
+                >
+                  {t("dashboard.view")}
+                </Link>
+              </div>
             );
           })}
         </div>
-      </div>
+      )}
 
-      {/* ─── What to expect + Notifications ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Enrollment Steps */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              {t("dashboard.howItWorks")}
-            </CardTitle>
-            <CardDescription>
-              {t("dashboard.howItWorksDesc")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {[
-                {
-                  step: 1,
-                  title: t("dashboard.step1Title"),
-                  desc: t("dashboard.step1Desc"),
-                },
-                {
-                  step: 2,
-                  title: t("dashboard.step2Title"),
-                  desc: t("dashboard.step2Desc"),
-                },
-                {
-                  step: 3,
-                  title: t("dashboard.step3Title"),
-                  desc: t("dashboard.step3Desc"),
-                },
-                {
-                  step: 4,
-                  title: t("dashboard.step4Title"),
-                  desc: t("dashboard.step4Desc"),
-                },
-                {
-                  step: 5,
-                  title: t("dashboard.step5Title"),
-                  desc: t("dashboard.step5Desc"),
-                },
-              ].map((s) => {
-                const isComplete = hasApps && s.step < currentStep;
-                const isCurrent = hasApps && s.step === currentStep;
-                return (
-                  <div key={s.step} className={`flex gap-3 ${isCurrent ? "bg-rooted-green/5 -mx-2 px-2 py-1.5 rounded-lg" : ""}`}>
-                    <div
-                      className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold shrink-0 mt-0.5 ${
-                        isComplete
-                          ? "bg-rooted-green text-white border-2 border-rooted-green"
-                          : isCurrent
-                            ? "bg-white text-rooted-green border-2 border-rooted-green"
-                            : "border border-stone/30 text-stone"
-                      }`}
-                    >
-                      {isComplete ? "✓" : s.step}
-                    </div>
-                    <div>
-                      <p className={`text-sm font-medium ${isCurrent ? "text-rooted-green" : isComplete ? "text-ink/60" : "text-ink"}`}>
-                        {s.title}
-                        {isCurrent && <span className="text-[10px] ml-2 text-rooted-green font-bold uppercase">{t("dashboard.current")}</span>}
-                      </p>
-                      <p className="text-xs text-stone mt-0.5">{s.desc}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+      {/* ─── How enrollment works — collapsed to a single link ─── */}
+      <details className="group">
+        <summary className="cursor-pointer list-none text-sm font-medium text-rooted-green hover:underline inline-flex items-center gap-1.5">
+          {t("dashboard.howItWorks")}
+          <svg
+            className="w-3.5 h-3.5 transition-transform group-open:rotate-180"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+          </svg>
+        </summary>
+        <ol className="mt-3 space-y-2.5 text-sm text-ink/70">
+          {[1, 2, 3, 4, 5].map((step) => (
+            <li key={step} className="flex gap-2.5">
+              <span className="text-stone font-semibold shrink-0">{step}.</span>
+              <span>
+                <span className="text-ink font-medium">
+                  {t(`dashboard.step${step}Title` as Parameters<typeof tx>[0])}
+                </span>
+                {" — "}
+                {t(`dashboard.step${step}Desc` as Parameters<typeof tx>[0])}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </details>
 
-        {/* Notifications */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t("dashboard.notifications")}</CardTitle>
-            <CardDescription>{t("dashboard.notificationsDesc")}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {notifications.length === 0 ? (
-              <p className="text-sm text-stone text-center py-4">
-                {t("dashboard.noNotifications")}
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {notifications.map((n) => (
-                  <div
-                    key={n.id}
-                    className="flex items-start gap-3 pb-3 border-b border-rooted-gray last:border-0 last:pb-0"
-                  >
-                    <div
-                      className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
-                        n.read ? "bg-stone/50" : "bg-rooted-green"
-                      }`}
-                    />
-                    <div className="min-w-0">
-                      <p className="text-sm text-ink/70">{n.message}</p>
-                      <p className="text-xs text-stone mt-0.5">
-                        {new Date(n.created_at).toLocaleDateString(localeTag, {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* ─── Help line ─── */}
+      <p className="text-sm text-stone">
+        {helpBefore}
+        <Link href="/family/messages" className="text-rooted-green hover:underline">
+          {helpLinkText}
+        </Link>
+        {helpAfter}
+      </p>
     </div>
   );
 }

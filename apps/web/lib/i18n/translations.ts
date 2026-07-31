@@ -12,6 +12,8 @@ export type Locale = "en" | "es";
 const dict = {
   // ─── Navigation ───────────────────────────────────────────────────────────
   "nav.dashboard":      { en: "Dashboard",       es: "Panel" },
+  "nav.home":           { en: "Home",             es: "Inicio" },
+  "nav.account":        { en: "Account",          es: "Cuenta" },
   "nav.applications":   { en: "Applications",    es: "Solicitudes" },
   "nav.offers":         { en: "Offers",           es: "Ofertas" },
   "nav.documents":      { en: "Documents",        es: "Documentos" },
@@ -57,12 +59,52 @@ const dict = {
   "dashboard.respond":              { en: "Respond",                     es: "Responder" },
   "dashboard.ourSchools":           { en: "Our Schools",                 es: "Nuestras Escuelas" },
 
-  // ─── Enrollment Steps ─────────────────────────────────────────────────────
+  // ─── Family home rewrite (UX Phase 1A) — the next action as the headline ──
+  "dashboard.headline.finishApplication":  { en: "Finish {name}'s application",              es: "Termine la solicitud de {name}" },
+  "dashboard.headline.nothingToDo":        { en: "Nothing to do right now",                  es: "No hay nada que hacer por ahora" },
+  "dashboard.headline.respondBy":          { en: "Respond by {date}",                         es: "Responda antes del {date}" },
+  "dashboard.headline.finishRegistration": { en: "Finish registration",                       es: "Termine el registro" },
+  "dashboard.headline.enrolled":           { en: "{name} is enrolled",                        es: "{name} está matriculado/a" },
+  "dashboard.headline.waitlistPosition":   { en: "{name} is number {position} on the waitlist", es: "{name} es el número {position} en la lista de espera" },
+  "dashboard.headline.waitlistGeneric":    { en: "{name} is on the waitlist",                 es: "{name} está en la lista de espera" },
+  "dashboard.headline.checkApplication":   { en: "Check {name}'s application",                es: "Revise la solicitud de {name}" },
+  "dashboard.takesTwoMinutes":             { en: "Takes about 2 minutes · your answers save as you go", es: "Toma unos 2 minutos · sus respuestas se guardan mientras avanza" },
+  "dashboard.reassurance.withDate":        { en: "{name}'s seat is held until {date}. We'll email you if anything is still missing.", es: "El cupo de {name} se reserva hasta el {date}. Le enviaremos un correo si falta algo." },
+  "dashboard.reassurance.general":         { en: "We'll email you if anything is still missing.", es: "Le enviaremos un correo si falta algo." },
+  "dashboard.whereIs":                     { en: "Where {name} is",                           es: "Dónde está {name}" },
+  "dashboard.appliedOn":                   { en: "Applied {date}",                            es: "Solicitó el {date}" },
+  "dashboard.updatedOn":                   { en: "Updated {date}",                            es: "Actualizado el {date}" },
+  "dashboard.view":                        { en: "View",                                      es: "Ver" },
+  "dashboard.otherNote.nothingNeeded":     { en: "nothing needed",                            es: "no se necesita nada" },
+  "dashboard.otherNote.notStarted":        { en: "not started",                               es: "no iniciada" },
+  "dashboard.otherNote.waitingResponse":   { en: "waiting on your response",                  es: "esperando su respuesta" },
+  "dashboard.otherNote.registering":       { en: "registration in progress",                  es: "registro en progreso" },
+  "dashboard.otherNote.waitlisted":        { en: "on the waitlist",                           es: "en lista de espera" },
+  "dashboard.otherNote.inReview":          { en: "in review",                                 es: "en revisión" },
+  "dashboard.otherNote.closed":            { en: "closed",                                    es: "cerrada" },
+  "dashboard.helpLine.messageLink":        { en: "Message the school",                        es: "Envíe un mensaje a la escuela" },
+  "dashboard.helpLine.withPhone":          { en: "Questions? {link} or call {phone}.",        es: "¿Preguntas? {link} o llame al {phone}." },
+  "dashboard.helpLine.noPhone":            { en: "Questions? {link}.",                        es: "¿Preguntas? {link}." },
+
+  // ─── Enrollment Steps (5-step model — per-application status badges) ─────
   "steps.applied":        { en: "Applied",        es: "Solicitado" },
   "steps.verified":       { en: "Verified",       es: "Verificado" },
   "steps.offered":        { en: "Offered",        es: "Ofrecido" },
   "steps.accepted":       { en: "Accepted",       es: "Aceptado" },
   "steps.registered":     { en: "Registered",     es: "Registrado" },
+
+  // ─── "Where {name} is" plain-language journey (UX Phase 1A) ──────────────
+  "journey2.offeredSeat":        { en: "Offered a seat",       es: "Le ofrecimos un cupo" },
+  "journey2.finishRegistration": { en: "Finish registration",  es: "Termine el registro" },
+  "journey2.firstDay":           { en: "First day",            es: "Primer día" },
+
+  // ─── Family account page ──────────────────────────────────────────────────
+  "account.title":         { en: "Account",                es: "Cuenta" },
+  "account.contactInfo":   { en: "Contact information",     es: "Información de contacto" },
+  "account.email":         { en: "Email",                   es: "Correo electrónico" },
+  "account.phone":         { en: "Phone",                   es: "Teléfono" },
+  "account.language":      { en: "Language",                es: "Idioma" },
+  "account.notProvided":   { en: "Not provided",            es: "No proporcionado" },
 
   // ─── Offers ───────────────────────────────────────────────────────────────
   "offers.heading":          { en: "Your Offers",           es: "Sus Ofertas" },

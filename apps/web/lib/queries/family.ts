@@ -91,6 +91,8 @@ export interface FamilyJourneyCard {
   registration_complete: boolean;
   /** Live waitlist standing when the application is waitlisted, else null. */
   waitlist_standing: WaitlistStanding | null;
+  /** Campus contact number, when set (campus.phone) — powers the family-facing help line. */
+  campus_phone: string | null;
 }
 
 /**
@@ -179,7 +181,7 @@ export async function getFamilyJourneyCards(): Promise<FamilyJourneyCard[]> {
       `
       id, status, submitted_at, updated_at,
       student:student_id (first_name, last_name),
-      campus:campus_id (name),
+      campus:campus_id (name, phone),
       grade_level:grade_level_id (grade)
     `
     )
@@ -244,6 +246,7 @@ export async function getFamilyJourneyCards(): Promise<FamilyJourneyCard[]> {
       pending_offer: offerByApp.get(row.id as string) ?? null,
       registration_complete: status === "registered" || status === "enrolled",
       waitlist_standing: standings.get(row.id as string) ?? null,
+      campus_phone: (campus?.phone as string | undefined) ?? null,
     };
   });
 }
