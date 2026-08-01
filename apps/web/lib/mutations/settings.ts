@@ -104,7 +104,7 @@ export async function assignStaffRole(
       const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
         input.user_email,
         {
-          redirectTo: `${appUrl}/staff/dashboard`,
+          redirectTo: `${appUrl}/staff/today`,
         }
       );
       if (inviteError) return { data: null, error: inviteError.message };

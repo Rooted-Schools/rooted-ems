@@ -1450,3 +1450,442 @@ export async function getStaffPacketRequirements(
 
   return (data ?? []) as PacketRequirementRow[];
 }
+
+// ═══════════════════════════════════════════════════════
+//  Staff "Today" exception queue — Phase 2
+//  All four queries below are campus-scoped and read only
+//  tables that already exist. None fabricate data: an
+//  exception class with no real backing rows returns an
+//  empty array so the corresponding row simply never renders.
+// ═══════════════════════════════════════════════════════
+
+// ─── Expiring Offers ────────────────────────────────────
+
+export interface ExpiringOfferRow {
+  id: string;
+  application_id: string;
+  student_name: string;
+  grade: string;
+  campus_id: string;
+  campus_name: string;
+  expires_at: string;
+  hours_left: number;
+  guardian_phone: string | null;
+  guardian_sms_consent: boolean;
+}
+
+/**
+ * Pending offers expiring within `hours` (default 5 days). Used to build the
+ * "N offers expire <day>" row. Red-vs-amber urgency is decided by the caller
+ * from `hours_left` (red only inside 72h, per the design handoff).
+ */
+export async function getExpiringOffers(
+  hours: number = 120,
+  campusIds?: string[]
+): Promise<ExpiringOfferRow[]> {
+  const supabase = createServiceRoleClient();
+  const cutoff = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+
+  let query = supabase
+    .from("offer")
+    .select(`
+      id, application_id, campus_id, expires_at,
+      application:application_id (
+        student:student_id (first_name, last_name),
+        guardian:guardian_id (phone, sms_consent)
+      ),
+      campus:campus_id (name),
+      grade_level:grade_level_id (grade)
+    `)
+    .eq("status", "pending")
+    .lte("expires_at", cutoff)
+    .order("expires_at", { ascending: true });
+
+  if (campusIds && campusIds.length > 0) {
+    query = query.in("campus_id", campusIds);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("[getExpiringOffers]", error.message);
+    return [];
+  }
+
+  const now = Date.now();
+
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const app = row.application as unknown as Record<string, unknown> | null;
+    const student = app?.student as unknown as Record<string, string> | null;
+    const guardian = app?.guardian as unknown as Record<string, unknown> | null;
+    const campus = row.campus as Record<string, string> | null;
+    const grade = row.grade_level as Record<string, string> | null;
+    const expiresAt = row.expires_at as string;
+    const hoursLeft = Math.max(0, Math.round((new Date(expiresAt).getTime() - now) / (1000 * 60 * 60)));
+
+    return {
+      id: row.id as string,
+      application_id: row.application_id as string,
+      student_name: student ? `${student.first_name} ${student.last_name}` : "Unknown",
+      grade: grade?.grade ? `Grade ${grade.grade}` : "",
+      campus_id: row.campus_id as string,
+      campus_name: campus?.name ?? "",
+      expires_at: expiresAt,
+      hours_left: hoursLeft,
+      guardian_phone: (guardian?.phone as string) ?? null,
+      guardian_sms_consent: guardian?.sms_consent === true,
+    };
+  });
+}
+
+// ─── Stalled Registrations ──────────────────────────────
+
+export interface StalledRegistrationRow {
+  application_id: string;
+  enrollment_id: string;
+  student_name: string;
+  campus_id: string;
+  campus_name: string;
+  days_stalled: number;
+  /** item_type values still pending (not yet submitted) for this family */
+  outstanding_item_types: string[];
+}
+
+export interface StalledRegistrationsResult {
+  rows: StalledRegistrationRow[];
+  /** The most common outstanding item_type across the whole stalled set, and
+   *  its display name (from packet_requirement.name where resolvable) — this
+   *  is the "modal blocking requirement" the cause-grouping sentence names. */
+  modalItemType: { item_type: string; name: string; count: number } | null;
+}
+
+/**
+ * Registrations (registration_packet still pending/in_progress) whose last
+ * activity is `days` or older. "Last activity" is registration_packet.updated_at,
+ * which is bumped whenever a registration_item under it changes (see
+ * lib/mutations/registration.ts completeRegistrationItem) — a reasonable proxy
+ * for "the family or staff hasn't touched this in N days."
+ */
+export async function getStalledRegistrations(
+  days: number = 5,
+  campusIds?: string[]
+): Promise<StalledRegistrationsResult> {
+  const supabase = createServiceRoleClient();
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  let packetQuery = supabase
+    .from("registration_packet")
+    .select(`
+      id, enrollment_id, updated_at, status,
+      enrollment:enrollment_id (
+        id, campus_id, application_id, school_year_id,
+        student:student_id (first_name, last_name),
+        campus:campus_id (name)
+      )
+    `)
+    .in("status", ["pending", "in_progress"])
+    .lte("updated_at", cutoff)
+    .order("updated_at", { ascending: true });
+
+  const { data: packets, error } = await packetQuery;
+
+  if (error) {
+    console.error("[getStalledRegistrations] packets", error.message);
+    return { rows: [], modalItemType: null };
+  }
+
+  // Filter by campus in application code — the enrollment join's campus_id
+  // isn't filterable via a top-level `.in()` on registration_packet.
+  const scoped = (packets ?? []).filter((row: Record<string, unknown>) => {
+    if (!campusIds || campusIds.length === 0) return true;
+    const enrollment = row.enrollment as unknown as Record<string, unknown> | null;
+    return enrollment ? campusIds.includes(enrollment.campus_id as string) : false;
+  });
+
+  if (scoped.length === 0) {
+    return { rows: [], modalItemType: null };
+  }
+
+  const enrollmentIds = scoped
+    .map((row: Record<string, unknown>) => (row.enrollment as Record<string, unknown> | null)?.id as string)
+    .filter(Boolean);
+
+  const { data: items, error: itemsError } = await supabase
+    .from("registration_item")
+    .select("enrollment_id, item_type")
+    .in("enrollment_id", enrollmentIds)
+    .eq("status", "pending");
+
+  if (itemsError) {
+    console.error("[getStalledRegistrations] items", itemsError.message);
+  }
+
+  const itemsByEnrollment = new Map<string, string[]>();
+  const itemTypeCounts = new Map<string, number>();
+  for (const item of (items ?? []) as Record<string, unknown>[]) {
+    const enrollmentId = item.enrollment_id as string;
+    const itemType = item.item_type as string;
+    if (!itemsByEnrollment.has(enrollmentId)) itemsByEnrollment.set(enrollmentId, []);
+    itemsByEnrollment.get(enrollmentId)!.push(itemType);
+    itemTypeCounts.set(itemType, (itemTypeCounts.get(itemType) ?? 0) + 1);
+  }
+
+  const now = Date.now();
+  const rows: StalledRegistrationRow[] = scoped.map((row: Record<string, unknown>) => {
+    const enrollment = row.enrollment as unknown as Record<string, unknown> | null;
+    const student = enrollment?.student as unknown as Record<string, string> | null;
+    const campus = enrollment?.campus as unknown as Record<string, string> | null;
+    const enrollmentId = (enrollment?.id as string) ?? "";
+    const daysStalled = Math.floor((now - new Date(row.updated_at as string).getTime()) / (1000 * 60 * 60 * 24));
+
+    return {
+      application_id: (enrollment?.application_id as string) ?? "",
+      enrollment_id: enrollmentId,
+      student_name: student ? `${student.first_name} ${student.last_name}` : "Unknown",
+      campus_id: (enrollment?.campus_id as string) ?? "",
+      campus_name: campus?.name ?? "",
+      days_stalled: daysStalled,
+      outstanding_item_types: itemsByEnrollment.get(enrollmentId) ?? [],
+    };
+  });
+
+  let modalItemType: StalledRegistrationsResult["modalItemType"] = null;
+  if (itemTypeCounts.size > 0) {
+    let bestType = "";
+    let bestCount = -1;
+    for (const [type, count] of itemTypeCounts.entries()) {
+      if (count > bestCount) {
+        bestType = type;
+        bestCount = count;
+      }
+    }
+
+    // Resolve a human name from packet_requirement where available; fall back
+    // to a prettified item_type ("emergency_contact" -> "Emergency Contact").
+    const { data: reqRow } = await supabase
+      .from("packet_requirement")
+      .select("name")
+      .eq("item_type", bestType)
+      .limit(1)
+      .maybeSingle();
+
+    const prettified = bestType
+      .split("_")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+
+    modalItemType = {
+      item_type: bestType,
+      name: (reqRow?.name as string) ?? prettified,
+      count: bestCount,
+    };
+  }
+
+  return { rows, modalItemType };
+}
+
+// ─── Releasable Seats ───────────────────────────────────
+
+export interface ReleasableSeatGroup {
+  campus_id: string;
+  campus_name: string;
+  grade_level_id: string;
+  grade: string;
+  /** Seats currently open (total capacity minus everything actively holding a seat) */
+  open_seats: number;
+  /** min(open_seats, waitlist demand) — the number actually actionable right now */
+  releasable: number;
+  /** Next-in-line waitlist entries, ordered by position, capped to `releasable` */
+  next_in_line: Array<{ waitlist_position_id: string; student_name: string; position: number }>;
+}
+
+/**
+ * Seats that are open (capacity not currently held by an active enrollment or
+ * a live offer) AND have families waiting for them on the waitlist. This is
+ * computed directly from enrollment/offer/waitlist rows — not from
+ * capacity_plan's manually-maintained counters — so it reflects real declines
+ * and withdrawals rather than a staff-updated snapshot.
+ */
+export async function getReleasableSeats(campusIds?: string[]): Promise<ReleasableSeatGroup[]> {
+  const supabase = createServiceRoleClient();
+
+  const { data: currentYear } = await supabase
+    .from("school_year")
+    .select("id")
+    .eq("is_current", true)
+    .maybeSingle();
+
+  if (!currentYear) return [];
+
+  let planQuery = supabase
+    .from("capacity_plan")
+    .select(`
+      total_seats, campus_id, grade_level_id,
+      campus:campus_id (name),
+      grade_level:grade_level_id (grade)
+    `)
+    .eq("school_year_id", currentYear.id as string)
+    .gt("total_seats", 0);
+
+  if (campusIds && campusIds.length > 0) {
+    planQuery = planQuery.in("campus_id", campusIds);
+  }
+
+  const { data: plans, error: planError } = await planQuery;
+
+  if (planError) {
+    console.error("[getReleasableSeats] capacity_plan", planError.message);
+    return [];
+  }
+  if (!plans || plans.length === 0) return [];
+
+  const results: ReleasableSeatGroup[] = [];
+
+  for (const plan of plans as Record<string, unknown>[]) {
+    const campusId = plan.campus_id as string;
+    const gradeLevelId = plan.grade_level_id as string;
+    const total = (plan.total_seats as number) ?? 0;
+
+    const [{ count: heldEnrollment }, { count: heldOffers }, { data: waitlist }] = await Promise.all([
+      supabase
+        .from("enrollment")
+        .select("id", { count: "exact", head: true })
+        .eq("campus_id", campusId)
+        .eq("grade_level_id", gradeLevelId)
+        .eq("school_year_id", currentYear.id as string)
+        .in("status", ["pending", "active"]),
+      supabase
+        .from("offer")
+        .select("id", { count: "exact", head: true })
+        .eq("campus_id", campusId)
+        .eq("grade_level_id", gradeLevelId)
+        .eq("status", "pending"),
+      supabase
+        .from("waitlist")
+        .select(`
+          id,
+          waitlist_position (
+            id, position_number, removed_at,
+            application:application_id (student:student_id (first_name, last_name))
+          )
+        `)
+        .eq("campus_id", campusId)
+        .eq("grade_level_id", gradeLevelId)
+        .eq("school_year_id", currentYear.id as string)
+        .maybeSingle(),
+    ]);
+
+    const held = (heldEnrollment ?? 0) + (heldOffers ?? 0);
+    const openSeats = Math.max(0, total - held);
+
+    if (openSeats === 0) continue;
+
+    const positions = ((waitlist as unknown as Record<string, unknown> | null)?.waitlist_position ?? []) as Record<string, unknown>[];
+    const activePositions = positions
+      .filter((p) => !p.removed_at)
+      .sort((a, b) => (a.position_number as number) - (b.position_number as number));
+
+    if (activePositions.length === 0) continue;
+
+    const releasable = Math.min(openSeats, activePositions.length);
+
+    const campus = plan.campus as Record<string, string> | null;
+    const grade = plan.grade_level as Record<string, string> | null;
+
+    results.push({
+      campus_id: campusId,
+      campus_name: campus?.name ?? "",
+      grade_level_id: gradeLevelId,
+      grade: grade?.grade ? `Grade ${grade.grade}` : "",
+      open_seats: openSeats,
+      releasable,
+      next_in_line: activePositions.slice(0, releasable).map((p) => {
+        const app = p.application as unknown as Record<string, unknown> | null;
+        const student = app?.student as unknown as Record<string, string> | null;
+        return {
+          waitlist_position_id: p.id as string,
+          student_name: student ? `${student.first_name} ${student.last_name}` : "Unknown",
+          position: p.position_number as number,
+        };
+      }),
+    });
+  }
+
+  return results;
+}
+
+// ─── Duplicate Suspects ─────────────────────────────────
+
+export interface DuplicateSuspectRow {
+  phone: string;
+  guardians: Array<{ guardian_id: string; name: string; household_id: string }>;
+}
+
+/**
+ * Guardians in different households who share a normalized phone number but
+ * spell their name differently — a real, schema-backed signal (guardian.phone
+ * + guardian.household_id both already exist; no new table needed). Scoped to
+ * campuses by restricting to guardians who have at least one application at
+ * an accessible campus.
+ */
+export async function getDuplicateSuspects(campusIds?: string[]): Promise<DuplicateSuspectRow[]> {
+  const supabase = createServiceRoleClient();
+
+  // Resolve the set of guardian_ids in scope via their applications' campus_id.
+  let guardianIdQuery = supabase.from("application").select("guardian_id");
+  if (campusIds && campusIds.length > 0) {
+    guardianIdQuery = guardianIdQuery.in("campus_id", campusIds);
+  }
+  const { data: scopedApps, error: appError } = await guardianIdQuery;
+  if (appError) {
+    console.error("[getDuplicateSuspects] applications", appError.message);
+    return [];
+  }
+  const scopedGuardianIds = [...new Set((scopedApps ?? []).map((r: Record<string, unknown>) => r.guardian_id as string))];
+  if (scopedGuardianIds.length === 0) return [];
+
+  const { data: guardians, error } = await supabase
+    .from("guardian")
+    .select("id, household_id, first_name, last_name, phone")
+    .in("id", scopedGuardianIds)
+    .not("phone", "is", null);
+
+  if (error) {
+    console.error("[getDuplicateSuspects] guardians", error.message);
+    return [];
+  }
+
+  const byPhone = new Map<string, Record<string, unknown>[]>();
+  for (const g of (guardians ?? []) as Record<string, unknown>[]) {
+    const digits = ((g.phone as string) ?? "").replace(/\D/g, "");
+    if (digits.length < 10) continue;
+    const normalized = digits.slice(-10); // compare by last 10 digits (US numbers)
+    if (!byPhone.has(normalized)) byPhone.set(normalized, []);
+    byPhone.get(normalized)!.push(g);
+  }
+
+  const suspects: DuplicateSuspectRow[] = [];
+  for (const [phone, group] of byPhone.entries()) {
+    // Only a real duplicate signal when the phone spans more than one household
+    // AND the name spelling actually differs (otherwise it's just a shared
+    // family phone for the same guardian across siblings' applications).
+    const distinctHouseholds = new Set(group.map((g) => g.household_id as string));
+    if (distinctHouseholds.size < 2) continue;
+
+    const distinctNames = new Set(
+      group.map((g) => `${(g.first_name as string).trim().toLowerCase()} ${(g.last_name as string).trim().toLowerCase()}`)
+    );
+    if (distinctNames.size < 2) continue;
+
+    suspects.push({
+      phone,
+      guardians: group.map((g) => ({
+        guardian_id: g.id as string,
+        name: `${g.first_name} ${g.last_name}`,
+        household_id: g.household_id as string,
+      })),
+    });
+  }
+
+  return suspects;
+}

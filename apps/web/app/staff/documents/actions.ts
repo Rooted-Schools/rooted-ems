@@ -13,6 +13,7 @@ export async function staffApproveDocument(documentId: string) {
     revalidatePath("/staff/documents");
     revalidatePath("/staff/applications");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;

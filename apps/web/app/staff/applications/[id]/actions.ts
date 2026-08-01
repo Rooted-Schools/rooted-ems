@@ -22,6 +22,7 @@ export async function changeApplicationStatus(
     revalidatePath(`/staff/applications/${applicationId}`);
     revalidatePath("/staff/applications");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
 
     // When staff requests more info, notify the family — non-blocking so a
     // notification failure never prevents the status transition from succeeding.
@@ -61,6 +62,7 @@ export async function staffWithdrawApplication(
     revalidatePath(`/staff/applications/${applicationId}`);
     revalidatePath("/staff/applications");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;
@@ -156,6 +158,7 @@ export async function staffMakeOffer(
     revalidatePath("/staff/applications");
     revalidatePath("/staff/offers");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;
@@ -175,6 +178,7 @@ export async function staffVerifyRegistrationItem(
     revalidatePath(`/staff/applications/${applicationId}`);
     revalidatePath("/staff/enrollment");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;
@@ -194,6 +198,7 @@ export async function staffSkipRegistrationItem(
     revalidatePath(`/staff/applications/${applicationId}`);
     revalidatePath("/staff/enrollment");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;
@@ -293,6 +298,7 @@ export async function staffCompleteAcademicAudit(
   revalidatePath("/staff/applications");
   revalidatePath("/staff/enrollment");
   revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   revalidatePath("/family/dashboard");
   revalidatePath("/family/registration");
 
@@ -317,6 +323,7 @@ export async function staffConfirmPacketComplete(applicationId: string) {
   revalidatePath("/staff/applications");
   revalidatePath("/staff/enrollment");
   revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
 
   return { data: null, error: null };
 }

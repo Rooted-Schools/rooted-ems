@@ -113,6 +113,7 @@ export async function familyAcceptReenrollment(
   revalidatePath("/family/registration");
   revalidatePath("/staff/enrollment");
   revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
 
   return { data: null, error: null };
 }
@@ -201,6 +202,7 @@ export async function familyDeclineReenrollment(
   revalidatePath("/family/dashboard");
   revalidatePath("/staff/enrollment");
   revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
 
   return { data: null, error: null };
 }

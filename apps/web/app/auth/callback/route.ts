@@ -22,7 +22,7 @@ function sanitizeRedirectPath(next: string | null, fallback: string): string {
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = sanitizeRedirectPath(searchParams.get("next"), "/staff/dashboard");
+  const next = sanitizeRedirectPath(searchParams.get("next"), "/staff/today");
 
   // Determine if this is a family login flow (for error redirect)
   const isFamily = next.startsWith("/family");

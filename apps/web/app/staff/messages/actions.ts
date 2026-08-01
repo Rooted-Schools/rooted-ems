@@ -26,5 +26,6 @@ export async function markStaffNotificationsRead(notificationIds: string[]) {
 
   revalidatePath("/staff/messages");
   revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   return { error: null };
 }

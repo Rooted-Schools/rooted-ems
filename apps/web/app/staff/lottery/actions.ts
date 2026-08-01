@@ -59,6 +59,7 @@ export async function staffFinalizeLottery(runId: string, executedBy: string) {
     revalidatePath("/staff/lottery");
     revalidatePath(`/staff/lottery/${runId}`);
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;
@@ -94,6 +95,7 @@ export async function staffSendLotteryOffers(
     revalidatePath("/staff/offers");
     revalidatePath("/staff/applications");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;

@@ -18,6 +18,7 @@ export async function staffPromoteFromWaitlist(
     revalidatePath("/staff/applications");
     revalidatePath("/staff/seats");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;
@@ -34,6 +35,7 @@ export async function staffRemoveFromWaitlist(
     revalidatePath("/staff/waitlist");
     revalidatePath("/staff/applications");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;

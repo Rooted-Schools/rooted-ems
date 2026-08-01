@@ -163,6 +163,7 @@ export async function staffInitiateReenrollment(
 
   revalidatePath("/staff/enrollment");
   revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
 
   return {
     data: { application_id: applicationId, enrollment_id: newEnrollmentId },

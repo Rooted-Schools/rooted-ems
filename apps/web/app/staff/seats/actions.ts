@@ -32,6 +32,7 @@ export async function staffUpdateCapacity(
     if (error) return { error: error.message };
     revalidatePath("/staff/seats");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
     revalidatePath("/staff/reports");
     return { error: null };
   } catch {

@@ -28,6 +28,7 @@ export async function staffCreateEnrollment(
     revalidatePath("/staff/enrollment");
     revalidatePath("/staff/applications");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;
@@ -45,6 +46,7 @@ export async function staffWithdrawEnrollment(
     revalidatePath("/staff/applications");
     revalidatePath("/staff/seats");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;
@@ -96,6 +98,7 @@ export async function staffActivateEnrollment(
   revalidatePath("/staff/enrollment");
   revalidatePath("/staff/applications");
   revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   revalidatePath("/family/dashboard");
 
   return { data: null, error: null };

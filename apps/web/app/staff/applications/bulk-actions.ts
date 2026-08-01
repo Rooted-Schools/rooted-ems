@@ -28,6 +28,7 @@ export async function staffBulkChangeStatus(
   if (results.some((r) => r.ok)) {
     revalidatePath("/staff/applications");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return results;
@@ -51,6 +52,7 @@ export async function staffBulkSendOffers(
     revalidatePath("/staff/applications");
     revalidatePath("/staff/offers");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return results;

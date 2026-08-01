@@ -55,7 +55,7 @@ export interface NavSection {
 export const NAV_SECTIONS: NavSection[] = [
   {
     items: [
-      { label: "Today", href: "/staff/dashboard", icon: "today", badgeKey: "today" },
+      { label: "Today", href: "/staff/today", icon: "today", badgeKey: "today" },
       { label: "Pipeline", href: "/staff/applications", icon: "pipeline" },
       {
         label: "Seats & Lottery",
@@ -236,7 +236,7 @@ export function StaffSidebar({
   function renderLink(item: NavItem) {
     const isActive =
       pathname === item.href ||
-      (item.href !== "/staff/dashboard" && pathname.startsWith(item.href));
+      (item.href !== "/staff/today" && pathname.startsWith(item.href));
     return (
       <Link
         key={item.href}
@@ -266,7 +266,7 @@ export function StaffSidebar({
       {/* Brand */}
       <div className="p-4 border-b border-stone/20">
         <Link
-          href={buildHref("/staff/dashboard")}
+          href={buildHref("/staff/today")}
           className="inline-flex items-center gap-2.5 no-underline hover:opacity-90 transition-opacity"
         >
           {/* Tree icon */}

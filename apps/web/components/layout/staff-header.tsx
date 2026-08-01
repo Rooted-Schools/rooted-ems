@@ -243,7 +243,7 @@ export function StaffHeader({
                   {visibleItems.map((item) => {
                     const isActive =
                       pathname === item.href ||
-                      (item.href !== "/staff/dashboard" &&
+                      (item.href !== "/staff/today" &&
                         pathname.startsWith(item.href));
                     return (
                       <Link

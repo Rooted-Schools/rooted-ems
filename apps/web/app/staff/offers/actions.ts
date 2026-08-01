@@ -34,6 +34,7 @@ export async function staffSendOffer(
     revalidatePath("/staff/offers");
     revalidatePath("/staff/applications");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;
@@ -52,6 +53,7 @@ export async function staffRevokeOffer(
     revalidatePath("/staff/applications");
     revalidatePath("/staff/seats");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;
@@ -66,6 +68,7 @@ export async function staffExpireOffer(offerId: string) {
     revalidatePath("/staff/applications");
     revalidatePath("/staff/seats");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;
@@ -84,6 +87,7 @@ export async function staffAcceptOfferOnBehalf(
     revalidatePath("/staff/applications");
     revalidatePath("/staff/seats");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;
@@ -134,6 +138,7 @@ export async function staffConvertToEnrollment(
     revalidatePath("/staff/applications");
     revalidatePath("/staff/seats");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;
@@ -155,6 +160,7 @@ export async function staffPromoteFromWaitlist(
     revalidatePath("/staff/applications");
     revalidatePath("/staff/seats");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;
@@ -172,6 +178,7 @@ export async function staffRemoveFromWaitlist(
     revalidatePath("/staff/waitlist");
     revalidatePath("/staff/applications");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
 
   return result;

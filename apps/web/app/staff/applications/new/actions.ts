@@ -28,6 +28,7 @@ export async function staffCreateApplicationAction(
     }
     revalidatePath("/staff/applications");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
     revalidatePath("/staff/recruitment");
   }
 
@@ -54,6 +55,7 @@ export async function staffFastTrackEnrollAction(
     revalidatePath("/staff/enrollment");
     revalidatePath("/staff/offers");
     revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
     revalidatePath("/staff/recruitment");
   }
 

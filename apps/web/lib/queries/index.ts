@@ -80,6 +80,10 @@ export {
   getStaffStudents,
   getStaffWorkQueue,
   getStaffPacketRequirements,
+  getExpiringOffers,
+  getStalledRegistrations,
+  getReleasableSeats,
+  getDuplicateSuspects,
   type LotteryRunRow,
   type MessageTemplateRow,
   type LotteryRunDetail,
@@ -103,6 +107,11 @@ export {
   type DocumentQueueStats,
   type RegistrationPacketDetail,
   type RegistrationItemRow,
+  type ExpiringOfferRow,
+  type StalledRegistrationRow,
+  type StalledRegistrationsResult,
+  type ReleasableSeatGroup,
+  type DuplicateSuspectRow,
 } from "./staff";
 
 // Demographic / equity queries
