@@ -326,3 +326,55 @@ export function IconInfo({ size = 20, ...props }: IconProps) {
     </svg>
   );
 }
+
+/* ─── Added for Phase 4: staff review queue mode ─── */
+
+export function IconRotateCw({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+      <path d="M21 3v6h-6" />
+    </svg>
+  );
+}
+
+export function IconZoomIn({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+      <path d="M11 8v6" />
+      <path d="M8 11h6" />
+    </svg>
+  );
+}
+
+export function IconZoomOut({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+      <path d="M8 11h6" />
+    </svg>
+  );
+}
+
+export function IconExternalLink({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <polyline points="15 3 21 3 21 9" />
+      <line x1="10" y1="14" x2="21" y2="3" />
+    </svg>
+  );
+}
+
+export function IconMoreHorizontal({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="19" cy="12" r="1" />
+      <circle cx="5" cy="12" r="1" />
+    </svg>
+  );
+}

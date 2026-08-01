@@ -257,6 +257,26 @@ export function PipelineClient({
   // Server already filtered by stage/search/campus/staleDays — display as-is.
   const filtered = rows;
 
+  // Phase 4: carry the current (server-paginated) id list into the review
+  // page's URL so "review" enters queue mode there. Rows are already capped
+  // server-side by pageSize, but we defensively cap again here so a future
+  // change to pageSize can never blow up the query string.
+  const MAX_QUEUE_IDS = 100;
+  const queueIds = useMemo(() => filtered.slice(0, MAX_QUEUE_IDS).map((r) => r.id), [filtered]);
+  const queueTruncated = filtered.length > MAX_QUEUE_IDS;
+
+  const reviewHref = useCallback(
+    (id: string) => {
+      const idx = queueIds.indexOf(id);
+      if (idx === -1) return `/staff/applications/${id}`;
+      const params = new URLSearchParams();
+      params.set("queue", queueIds.join(","));
+      params.set("pos", String(idx));
+      return `/staff/applications/${id}?${params.toString()}`;
+    },
+    [queueIds]
+  );
+
   const selectedRows = useMemo(() => filtered.filter((r) => selectedIds.has(r.id)), [filtered, selectedIds]);
   const selectedCount = selectedRows.length;
   const allSelected = filtered.length > 0 && selectedCount === filtered.length;
@@ -508,6 +528,11 @@ export function PipelineClient({
       </div>
 
       {/* Table */}
+      {queueTruncated && (
+        <p className="text-xs text-stone">
+          Review queue capped at the first {MAX_QUEUE_IDS} of {filtered.length} rows in this view — K/J will move within that set.
+        </p>
+      )}
       <div className="rounded-[10px] border border-line bg-white">
         {filtered.length === 0 ? (
           <EmptyState
@@ -544,7 +569,7 @@ export function PipelineClient({
                   <TableRow
                     key={app.id}
                     className={cn("cursor-pointer", selectedIds.has(app.id) && "bg-rooted-green/5")}
-                    onClick={() => router.push(`/staff/applications/${app.id}`)}
+                    onClick={() => router.push(reviewHref(app.id))}
                   >
                     <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
                       <input
@@ -566,7 +591,7 @@ export function PipelineClient({
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Link
-                        href={`/staff/applications/${app.id}`}
+                        href={reviewHref(app.id)}
                         className="text-xs font-medium text-deep-green hover:underline whitespace-nowrap"
                       >
                         Review
