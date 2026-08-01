@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
 import { IconMoreHorizontal } from "@/components/ui/icons";
+import { cn, displayClass } from "@/lib/utils";
 import type { ApplicationDetail } from "@/lib/queries";
 
 export interface HeaderAction {
@@ -112,7 +113,7 @@ export function ReviewHeader({
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-xl font-bold uppercase tracking-wide text-ink">{detail.student_name}</h1>
+            <h1 className="font-display text-xl font-bold uppercase tracking-wide text-ink">{detail.student_name}</h1>
             <Badge variant={pillVariant}>{pillLabel}</Badge>
           </div>
           <p className="text-sm text-stone mt-1">{metaParts.join(" · ")}</p>
@@ -127,7 +128,10 @@ export function ReviewHeader({
             size="sm"
             disabled={isPending}
             onClick={() => onAction(action.targetStatus)}
-            className={action.targetStatus === "verified" ? "rounded-[6px] bg-deep-green hover:bg-rooted-green-700" : "rounded-[6px]"}
+            className={cn(
+              displayClass,
+              action.targetStatus === "verified" ? "rounded-[6px] bg-deep-green hover:bg-rooted-green-700" : "rounded-[6px]"
+            )}
           >
             {action.targetStatus === "verified" ? "Verify" : action.targetStatus === "needs_info" ? "Request info" : action.label}
           </Button>

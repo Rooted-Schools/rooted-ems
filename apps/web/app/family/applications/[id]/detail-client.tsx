@@ -18,8 +18,10 @@ import { useRef } from "react";
 import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationDetail } from "@/lib/queries";
 import { uploadFile, getSignedUrl, validateFile, formatFileSize } from "@/lib/storage/upload";
+import { compressImageFile } from "@/lib/storage/compress-image";
 import { familyWithdrawApplication, familyAcceptOffer, familyDeclineOffer, familyAcceptDirect, familyDeclineDirect, familySubmitResponse, familyCreateDocumentRecord } from "../actions";
 import type { ReactNode } from "react";
+import { useLocale } from "@/lib/i18n/locale-context";
 import {
   IconPenLine,
   IconMail,
@@ -32,6 +34,7 @@ import {
   IconBan,
   IconFileText,
   IconCalendar,
+  IconInfo,
 } from "@/components/ui/icons";
 
 /* ─── Status guide — what happens at each stage ─── */
@@ -94,12 +97,17 @@ interface FamilyApplicationDetailClientProps {
 
 export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetailClientProps) {
   const router = useRouter();
+  // Only used for the Phase 5A capture-hint string below — the rest of this
+  // component's copy predates the i18n system and is out of scope here.
+  const { t } = useLocale();
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [showDeclineDialog, setShowDeclineDialog] = useState(false);
   const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
   const [responseText, setResponseText] = useState("");
   const [responseFile, setResponseFile] = useState<File | null>(null);
+  const [responseFileCompressed, setResponseFileCompressed] = useState(false);
+  const [responseFileCompressing, setResponseFileCompressing] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [submittingResponse, setSubmittingResponse] = useState(false);
   const [inlineResponseFeedback, setInlineResponseFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -200,6 +208,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
       setInlineResponseFeedback({ type: "success", message: "Your response has been sent! The enrollment team will follow up." });
       setResponseText("");
       setResponseFile(null);
+      setResponseFileCompressed(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
       router.refresh();
     } finally {
@@ -344,32 +353,52 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
               />
               <div>
                 <label className="block text-sm font-medium text-amber-900 mb-1">Attach a file (optional)</label>
+                {/* Camera-first (Phase 5A): capture="environment" opens the rear
+                    camera directly on phones; images are compressed client-side
+                    before validation. */}
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  disabled={submittingResponse}
-                  onChange={(e) => {
+                  accept="image/*,application/pdf"
+                  capture="environment"
+                  disabled={submittingResponse || responseFileCompressing}
+                  onChange={async (e) => {
                     const f = e.target.files?.[0] ?? null;
-                    if (f) {
-                      const err = validateFile(f);
-                      setFileError(err);
-                      setResponseFile(err ? null : f);
-                    } else {
+                    if (!f) {
                       setResponseFile(null);
+                      setResponseFileCompressed(false);
                       setFileError(null);
+                      return;
+                    }
+                    setResponseFileCompressing(true);
+                    try {
+                      const { file: processed, wasCompressed } = await compressImageFile(f);
+                      const err = validateFile(processed);
+                      setFileError(err);
+                      setResponseFile(err ? null : processed);
+                      setResponseFileCompressed(!err && wasCompressed);
+                    } finally {
+                      setResponseFileCompressing(false);
                     }
                   }}
                   className="w-full text-sm text-amber-900 file:mr-3 file:px-3 file:py-1 file:rounded file:border-0 file:bg-amber-100 file:text-amber-800 file:font-medium file:cursor-pointer"
                 />
+                <p className="flex items-start gap-1 text-xs text-amber-700 mt-1">
+                  <IconInfo size={12} className="shrink-0 mt-0.5" aria-hidden="true" />
+                  <span>{t("docs.captureHint")}</span>
+                </p>
+                {responseFileCompressing && <p className="text-xs text-amber-700 mt-1">{t("common.loading")}</p>}
                 {fileError && <p className="text-xs text-red-600 mt-1">{fileError}</p>}
                 {responseFile && !fileError && (
-                  <p className="text-xs text-amber-700 mt-1">{responseFile.name} ({formatFileSize(responseFile.size)})</p>
+                  <p className="text-xs text-amber-700 mt-1">
+                    {responseFile.name} ({formatFileSize(responseFile.size)}
+                    {responseFileCompressed ? ` · ${t("docs.compressed")}` : ""})
+                  </p>
                 )}
               </div>
               <Button
                 onClick={handleSubmitResponse}
-                disabled={submittingResponse || (!responseText.trim() && !responseFile) || !!fileError}
+                disabled={submittingResponse || responseFileCompressing || (!responseText.trim() && !responseFile) || !!fileError}
                 className="bg-amber-700 hover:bg-amber-800 text-white"
               >
                 {submittingResponse ? "Sending…" : "Send Response"}

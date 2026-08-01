@@ -25,7 +25,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
-import { cn } from "@/lib/utils";
+import { cn, displayClass } from "@/lib/utils";
 import { getStatusConfig, getGradeLabel, PIPELINE_STAGES } from "@/lib/application-helpers";
 import { buildCsv, downloadCsv } from "@/lib/csv";
 import { requestSameDocument, messageSelection, type BulkItemResult } from "./actions";
@@ -381,14 +381,17 @@ export function PipelineClient({
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-ink">Pipeline</h1>
+          <h1 className={cn("text-2xl font-bold text-ink", displayClass)}>Pipeline</h1>
           <p className="mt-1 text-sm text-stone">
             <span className="font-medium text-ink">{totalCount.toLocaleString("en-US")}</span> in {activeStageLabel.toLowerCase()}
           </p>
         </div>
         <Link
           href="/staff/applications/new"
-          className="inline-flex min-h-[44px] items-center justify-center rounded-[6px] bg-deep-green px-4 text-sm font-medium text-white transition-colors hover:bg-rooted-green-700"
+          className={cn(
+            "inline-flex min-h-[44px] items-center justify-center rounded-[6px] bg-deep-green px-4 text-sm font-medium text-white transition-colors hover:bg-rooted-green-700",
+            displayClass
+          )}
         >
           New application
         </Link>
@@ -440,7 +443,7 @@ export function PipelineClient({
 
       {/* Saved views */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-stone">Views</span>
+        <span className="font-display text-xs font-semibold uppercase tracking-wide text-stone">Views</span>
         {PRESET_VIEWS.map((view) => (
           <button
             key={view.id}
@@ -628,7 +631,10 @@ export function PipelineClient({
                   type="button"
                   disabled={isPending}
                   onClick={handleRequestSameDocument}
-                  className="inline-flex min-h-[36px] items-center justify-center rounded-[6px] bg-white px-3.5 text-sm font-medium text-deep-green transition-colors hover:bg-white/90 disabled:opacity-50"
+                  className={cn(
+                    "inline-flex min-h-[36px] items-center justify-center rounded-[6px] bg-white px-3.5 text-sm font-medium text-deep-green transition-colors hover:bg-white/90 disabled:opacity-50",
+                    displayClass
+                  )}
                 >
                   {isPending ? "Requesting…" : "Request the same document"}
                 </button>

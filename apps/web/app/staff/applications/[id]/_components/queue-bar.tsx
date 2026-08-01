@@ -31,7 +31,7 @@ function KeyChip({ children }: { children: ReactNode }) {
 export function QueueBar({ position, total, onPrev, onNext, onVerify, onRequestInfo, onExit, hasPrev, hasNext }: QueueBarProps) {
   return (
     <div className="sticky top-0 z-30 -mx-4 -mt-4 mb-2 flex flex-wrap items-center gap-3 bg-ink px-4 py-2.5 text-white sm:-mx-6 sm:px-6">
-      <span className="text-sm font-medium whitespace-nowrap">
+      <span className="font-display text-sm font-medium uppercase tracking-[0.08em] whitespace-nowrap">
         Review queue · {position} of {total}
       </span>
       <span className="hidden h-4 w-px bg-white/20 sm:block" aria-hidden="true" />

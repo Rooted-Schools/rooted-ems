@@ -46,13 +46,17 @@ const config: Config = {
         info: "#486EFF",               // rare
       },
       fontFamily: {
-        sans: [
-          "Arial",
-          "ui-sans-serif",
-          "system-ui",
-          "-apple-system",
-          "sans-serif",
-        ],
+        /* ── UX Phase 5A — type system ──
+         * Klavika (licensed) is substituted with a free Google Fonts pair,
+         * loaded via next/font/google in app/layout.tsx (no new dependency):
+         *   --font-display → Archivo 600/700   (the Klavika substitute —
+         *     uppercase only, for eyebrows / labels / buttons / headlines)
+         *   --font-body    → Instrument Sans 400-600 (sentence case, 1.6 leading)
+         * `sans` is repointed to the body stack so existing `font-sans` /
+         * default text becomes Instrument Sans automatically. */
+        sans: ["var(--font-body)", "system-ui", "-apple-system", "sans-serif"],
+        body: ["var(--font-body)", "system-ui", "-apple-system", "sans-serif"],
+        display: ["var(--font-display)", "system-ui", "-apple-system", "sans-serif"],
       },
       lineHeight: {
         body: "1.6",   /* Brand book: minimum 150% leading for body */

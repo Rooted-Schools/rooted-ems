@@ -24,6 +24,7 @@ import { SignaturePad } from "@/components/ui/signature-pad";
 import { useLocale } from "@/lib/i18n/locale-context";
 import { type TranslationKey } from "@/lib/i18n/translations";
 import { uploadFile, validateFile, formatFileSize } from "@/lib/storage/upload";
+import { compressImageFile } from "@/lib/storage/compress-image";
 import { familyCreateDocumentRecord } from "@/app/family/applications/actions";
 import {
   IconClipboardList,
@@ -34,6 +35,7 @@ import {
   IconPaperclip,
   IconHeartPulse,
   IconSettings,
+  IconInfo,
 } from "@/components/ui/icons";
 
 interface RegistrationItem {
@@ -510,6 +512,8 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
   const [wasPrefilled, setWasPrefilled] = useState(false);
   const [completionAck, setCompletionAck] = useState(false);
   const [uploadSelectedFile, setUploadSelectedFile] = useState<File | null>(null);
+  const [uploadWasCompressed, setUploadWasCompressed] = useState(false);
+  const [uploadCompressing, setUploadCompressing] = useState(false);
   const [uploadValidationError, setUploadValidationError] = useState<string | null>(null);
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
 
@@ -577,6 +581,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
     setWasPrefilled(!savedValues && !!prefillValues);
     setCompletionAck(false);
     setUploadSelectedFile(null);
+    setUploadWasCompressed(false);
     setUploadValidationError(null);
     setSignatureDataUrl(null);
     setError(null);
@@ -638,6 +643,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
     setLoadingItem(null);
     setCompletionTarget(null);
     setUploadSelectedFile(null);
+    setUploadWasCompressed(false);
     setUploadValidationError(null);
     setSignatureDataUrl(null);
   }
@@ -1188,30 +1194,49 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                           : "border-stone/30 hover:border-stone/50"
                       }`}
                     >
+                      {/* Camera-first (Phase 5A): capture="environment" opens the rear
+                          camera directly on phones; desktop still shows the normal
+                          picker. Selected images are compressed client-side before
+                          validation so the 10MB limit is rarely the blocker. */}
                       <input
                         type="file"
                         id="reg-upload-input"
-                        accept=".pdf,.jpg,.jpeg,.png"
+                        accept="image/*,application/pdf"
+                        capture="environment"
+                        disabled={uploadCompressing}
                         className="hidden"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (!file) return;
-                          const err = validateFile(file);
-                          setUploadValidationError(err);
-                          setUploadSelectedFile(err ? null : file);
+                          setUploadCompressing(true);
+                          try {
+                            const { file: processed, wasCompressed } = await compressImageFile(file);
+                            const err = validateFile(processed);
+                            setUploadValidationError(err);
+                            setUploadSelectedFile(err ? null : processed);
+                            setUploadWasCompressed(!err && wasCompressed);
+                          } finally {
+                            setUploadCompressing(false);
+                          }
                         }}
                       />
-                      {uploadSelectedFile ? (
+                      {uploadCompressing ? (
+                        <p className="text-sm text-stone">{t("common.loading")}</p>
+                      ) : uploadSelectedFile ? (
                         <div className="space-y-1">
                           <div className="flex justify-center text-rooted-green">
                             <IconCheckCircle size={28} />
                           </div>
                           <p className="text-sm font-medium text-ink">{uploadSelectedFile.name}</p>
-                          <p className="text-xs text-stone">{formatFileSize(uploadSelectedFile.size)}</p>
+                          <p className="text-xs text-stone">
+                            {formatFileSize(uploadSelectedFile.size)}
+                            {uploadWasCompressed ? ` · ${t("docs.compressed")}` : ""}
+                          </p>
                           <button
                             type="button"
                             onClick={() => {
                               setUploadSelectedFile(null);
+                              setUploadWasCompressed(false);
                               setUploadValidationError(null);
                               const input = document.getElementById("reg-upload-input") as HTMLInputElement;
                               if (input) input.value = "";
@@ -1231,6 +1256,10 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                         </label>
                       )}
                     </div>
+                    <p className="flex items-start gap-1 text-xs text-stone">
+                      <IconInfo size={12} className="shrink-0 mt-0.5" aria-hidden="true" />
+                      <span>{t("docs.captureHint")}</span>
+                    </p>
                     {uploadValidationError && (
                       <p className="text-xs text-red-600">{uploadValidationError}</p>
                     )}

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { cn, displayClass } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
 import { textExpiringOffers, sendRegistrationNudges, releaseSeats } from "./actions";
 
@@ -86,6 +86,7 @@ function ActionButton({
 }) {
   const className = cn(
     "inline-flex min-h-[44px] items-center justify-center rounded-[6px] px-4 text-sm font-medium transition-colors whitespace-nowrap disabled:opacity-50 disabled:pointer-events-none",
+    displayClass,
     ACTION_BUTTON_STYLE[style]
   );
   if (href) {
@@ -203,7 +204,7 @@ function ExceptionRowCard({
     >
       <div className="min-w-0 flex-1 basis-64">
         {row.eyebrow && (
-          <p className={cn("mb-1 text-[11px] font-semibold uppercase tracking-[0.08em]", EYEBROW_COLOR[row.urgency])}>
+          <p className={cn("mb-1 font-display text-[11px] font-semibold uppercase tracking-[0.08em]", EYEBROW_COLOR[row.urgency])}>
             {row.eyebrow}
           </p>
         )}
@@ -311,7 +312,10 @@ export function TodayClient({
         </div>
         <Link
           href="/staff/applications/new"
-          className="inline-flex min-h-[44px] items-center justify-center rounded-[6px] bg-deep-green px-4 text-sm font-medium text-white transition-colors hover:bg-rooted-green-700"
+          className={cn(
+            "inline-flex min-h-[44px] items-center justify-center rounded-[6px] bg-deep-green px-4 text-sm font-medium text-white transition-colors hover:bg-rooted-green-700",
+            displayClass
+          )}
         >
           New application
         </Link>
@@ -319,7 +323,7 @@ export function TodayClient({
 
       {/* Greeting */}
       <div>
-        <h1 className="text-2xl font-bold text-ink">
+        <h1 className={cn("text-2xl font-bold text-ink", displayClass)}>
           Good {timeOfDay}, {firstName}.
         </h1>
         <p className="mt-1 text-sm text-stone">
@@ -352,7 +356,7 @@ export function TodayClient({
       {/* Per-grade seat progress */}
       {seatProgress.length > 0 && (
         <div className="rounded-[10px] border border-line bg-white p-4 sm:p-[18px]">
-          <h2 className="mb-4 text-sm font-semibold text-ink">Seats by grade</h2>
+          <h2 className={cn("mb-4 text-sm font-semibold text-ink", displayClass)}>Seats by grade</h2>
           <div className="space-y-4">
             {seatProgress.map((group) => (
               <SeatProgressBar key={group.grade} group={group} />

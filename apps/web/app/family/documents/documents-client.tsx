@@ -15,8 +15,9 @@ import {
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
-import { IconFileText, IconAlertTriangle, IconInfo } from "@/components/ui/icons";
+import { IconFileText, IconAlertTriangle, IconInfo, IconX } from "@/components/ui/icons";
 import { uploadFile, getSignedUrl, formatFileSize, validateFile } from "@/lib/storage/upload";
+import { compressImageFile } from "@/lib/storage/compress-image";
 import { familyCreateDocumentRecord } from "@/app/family/applications/actions";
 import { useLocale } from "@/lib/i18n/locale-context";
 import { type TranslationKey } from "@/lib/i18n/translations";
@@ -361,8 +362,11 @@ function UploadDialog({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedApp, setSelectedApp] = useState(initialAppId ?? applications[0]?.id ?? "");
   const [docType, setDocType] = useState(initialDocType ?? "birth_certificate");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  // Item 3 (Phase 5A): multiple images can be selected/captured for a single
+  // requirement — each becomes its own document under that requirement.
+  const [selectedFiles, setSelectedFiles] = useState<{ file: File; wasCompressed: boolean }[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [compressing, setCompressing] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   // Item 10: filter out doc types already successfully uploaded for the selected app.
@@ -400,29 +404,51 @@ function UploadDialog({
     if (open) {
       setSelectedApp(initialAppId ?? applications[0]?.id ?? "");
       setDocType(initialDocType ?? "birth_certificate");
-      setSelectedFile(null);
+      setSelectedFiles([]);
       setValidationError(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }, [open, initialDocType, initialAppId, applications]);
 
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Camera-first capture (Phase 5A): compress each selected/captured image
+  // client-side before validating, then append to the running selection so
+  // a family can capture page 1, then page 2, etc. for a single requirement.
+  // The input's value is cleared immediately so re-triggering the same
+  // camera control fires another change event.
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (files.length === 0) return;
 
-    const error = validateFile(file);
-    if (error) {
-      setValidationError(error);
-      setSelectedFile(null);
-      return;
-    }
-
+    setCompressing(true);
     setValidationError(null);
-    setSelectedFile(file);
+    try {
+      const processed: { file: File; wasCompressed: boolean }[] = [];
+      const errors: string[] = [];
+      for (const original of files) {
+        const { file: maybeCompressed, wasCompressed } = await compressImageFile(original);
+        const error = validateFile(maybeCompressed);
+        if (error) {
+          errors.push(`${original.name}: ${error}`);
+          continue;
+        }
+        processed.push({ file: maybeCompressed, wasCompressed });
+      }
+      if (processed.length > 0) {
+        setSelectedFiles((prev) => [...prev, ...processed]);
+      }
+      if (errors.length > 0) setValidationError(errors.join(" "));
+    } finally {
+      setCompressing(false);
+    }
+  }
+
+  function removeSelectedFile(index: number) {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleUpload() {
-    if (!selectedFile || !selectedApp) return;
+    if (selectedFiles.length === 0 || !selectedApp) return;
 
     const app = applications.find((a) => a.id === selectedApp);
     if (!app) return;
@@ -430,40 +456,53 @@ function UploadDialog({
     setUploading(true);
 
     try {
-      // 1. Upload file to Supabase Storage
-      const result = await uploadFile(selectedFile, userId);
+      // Each selected/captured image (or the single PDF) uploads as its own
+      // document record under the same requirement/application.
+      let successCount = 0;
+      let lastSuccessName = "";
+      const failures: string[] = [];
 
-      if (result.error) {
-        onError(result.error);
-        setUploading(false);
-        return;
+      for (const { file } of selectedFiles) {
+        const result = await uploadFile(file, userId);
+        if (result.error) {
+          failures.push(`${file.name}: ${result.error}`);
+          continue;
+        }
+
+        const dbResult = await familyCreateDocumentRecord({
+          application_id: app.id,
+          student_id: app.student_id,
+          document_type: docType,
+          file_name: result.fileName,
+          file_size: result.fileSize,
+          mime_type: result.mimeType,
+          storage_path: result.storagePath,
+        });
+
+        if (dbResult.error) {
+          failures.push(`${file.name}: ${dbResult.error}`);
+          continue;
+        }
+
+        successCount++;
+        lastSuccessName = result.fileName;
       }
 
-      // 2. Create database record
-      const dbResult = await familyCreateDocumentRecord({
-        application_id: app.id,
-        student_id: app.student_id,
-        document_type: docType,
-        file_name: result.fileName,
-        file_size: result.fileSize,
-        mime_type: result.mimeType,
-        storage_path: result.storagePath,
-      });
-
-      if (dbResult.error) {
-        onError(dbResult.error);
-        setUploading(false);
-        return;
+      if (successCount > 0) {
+        onUploadComplete(
+          successCount === 1
+            ? `"${lastSuccessName}" ${t("docs.uploadSuccess")}`
+            : `${successCount} ${t("docs.filesUploaded")}`
+        );
+        onOpenChange(false);
+        setSelectedFiles([]);
+        setValidationError(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
       }
 
-      // Success
-      onUploadComplete(`"${result.fileName}" ${t("docs.uploadSuccess")}`);
-      onOpenChange(false);
-
-      // Reset form
-      setSelectedFile(null);
-      setValidationError(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (failures.length > 0) {
+        onError(failures.join(" "));
+      }
     } catch (err) {
       onError(t("docs.uploadUnexpected"));
     } finally {
@@ -520,7 +559,10 @@ function UploadDialog({
             </select>
           </div>
 
-          {/* File input */}
+          {/* File input — camera-first on phones: capture="environment" opens
+              the rear camera directly; desktop still shows the normal picker.
+              `multiple` + append-on-select supports capturing several pages
+              for one requirement (re-trigger this control for page 2, etc). */}
           <div>
             <label className="block text-sm font-medium text-ink/70 mb-1">
               {t("docs.file")}
@@ -528,17 +570,50 @@ function UploadDialog({
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+              accept="image/*,application/pdf"
+              capture="environment"
+              multiple
+              disabled={compressing}
               onChange={handleFileSelect}
-              className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 file:mr-3 file:px-3 file:py-1 file:rounded file:border-0 file:bg-rooted-green/10 file:text-rooted-green file:font-medium file:text-sm file:cursor-pointer"
+              className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 file:mr-3 file:px-3 file:py-1 file:rounded file:border-0 file:bg-rooted-green/10 file:text-rooted-green file:font-medium file:text-sm file:cursor-pointer disabled:opacity-60"
             />
+            <p className="flex items-start gap-1 text-xs text-stone mt-1.5">
+              <IconInfo size={12} className="shrink-0 mt-0.5" aria-hidden="true" />
+              <span>{t("docs.captureHint")}</span>
+            </p>
+            {compressing && (
+              <p className="text-xs text-stone mt-1">{t("common.loading")}</p>
+            )}
             {validationError && (
               <p className="text-xs text-red-600 mt-1">{validationError}</p>
             )}
-            {selectedFile && !validationError && (
-              <p className="text-xs text-stone mt-1">
-                {selectedFile.name} ({formatFileSize(selectedFile.size)})
-              </p>
+            {selectedFiles.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                <p className="text-xs font-medium text-ink/70">
+                  {t("docs.filesSelectedLabel").replace("{n}", String(selectedFiles.length))}
+                </p>
+                <ul className="space-y-1.5">
+                  {selectedFiles.map((sf, idx) => (
+                    <li
+                      key={`${sf.file.name}-${idx}`}
+                      className="flex items-center justify-between gap-2 rounded-md border border-stone/20 pl-2.5 pr-1 py-1 text-xs"
+                    >
+                      <span className="min-w-0 truncate text-ink">
+                        {sf.file.name} ({formatFileSize(sf.file.size)}
+                        {sf.wasCompressed ? ` · ${t("docs.compressed")}` : ""})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeSelectedFile(idx)}
+                        aria-label={`${t("docs.removeFile")} ${sf.file.name}`}
+                        className="inline-flex h-9 min-h-[44px] w-9 shrink-0 items-center justify-center rounded-[6px] text-stone hover:bg-rooted-gray-light hover:text-red-600"
+                      >
+                        <IconX size={14} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         </div>
@@ -553,7 +628,7 @@ function UploadDialog({
           </Button>
           <Button
             onClick={handleUpload}
-            disabled={uploading || !selectedFile || !selectedApp || !!validationError}
+            disabled={uploading || compressing || selectedFiles.length === 0 || !selectedApp}
           >
             {uploading ? t("reg.upload.uploading") : t("docs.upload")}
           </Button>

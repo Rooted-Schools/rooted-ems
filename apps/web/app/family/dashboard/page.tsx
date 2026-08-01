@@ -284,10 +284,10 @@ export default async function FamilyDashboardPage() {
 
       {/* ─── Eyebrow + task headline ─── */}
       <div>
-        <p className="text-[11px] uppercase tracking-[0.12em] text-stone font-semibold">
+        <p className="font-display text-[11px] uppercase tracking-[0.12em] text-stone font-semibold">
           {eyebrow}
         </p>
-        <h1 className="text-[27px] md:text-[34px] font-extrabold uppercase tracking-wide text-ink leading-tight mt-1">
+        <h1 className="font-display text-[27px] md:text-[34px] font-extrabold uppercase tracking-wide text-ink leading-tight mt-1">
           {headlineFor(primaryCard)}
         </h1>
       </div>
@@ -325,7 +325,7 @@ export default async function FamilyDashboardPage() {
           {action && (
             <Link href={action.href} className="block">
               <Button
-                className={`w-full ${action.urgent ? "bg-error hover:bg-error/90 text-white" : ""}`}
+                className={`w-full font-display uppercase tracking-[0.08em] ${action.urgent ? "bg-error hover:bg-error/90 text-white" : ""}`}
                 variant={action.outline ? "outline" : "default"}
               >
                 {action.label}

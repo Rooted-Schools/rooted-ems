@@ -452,6 +452,13 @@ const dict = {
   "docs.uploadSuccess":       { en: "uploaded successfully.", es: "se cargó correctamente." },
   "docs.uploadUnexpected":    { en: "An unexpected error occurred during upload.", es: "Ocurrió un error inesperado durante la carga." },
 
+  // ─── Camera-first capture (UX Phase 5A) ───────────────────────────────────
+  "docs.captureHint":         { en: "Lay the document flat, fill the frame, and avoid glare.", es: "Coloque el documento en una superficie plana, llene el encuadre y evite el brillo." },
+  "docs.compressed":          { en: "compressed",                      es: "comprimido" },
+  "docs.filesSelectedLabel":  { en: "{n} file(s) selected",            es: "{n} archivo(s) seleccionado(s)" },
+  "docs.removeFile":          { en: "Remove",                          es: "Quitar" },
+  "docs.filesUploaded":       { en: "files uploaded successfully.",    es: "archivos cargados correctamente." },
+
   // ─── Toasts ───────────────────────────────────────────────────────────────
   "toast.docUploaded":        { en: "Document uploaded",    es: "Documento cargado" },
   "toast.docUploadFailed":    { en: "Upload failed",        es: "Error al cargar el documento" },
