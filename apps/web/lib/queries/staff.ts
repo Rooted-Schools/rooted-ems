@@ -1,4 +1,5 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
+import { PIPELINE_STAGES, prettifyType } from "@/lib/application-helpers";
 
 // ─── Student Types ─────────────────────────────────────
 
@@ -1888,4 +1889,290 @@ export async function getDuplicateSuspects(campusIds?: string[]): Promise<Duplic
   }
 
   return suspects;
+}
+
+// ═══════════════════════════════════════════════════════
+//  Pipeline (Phase 3) — stage tab counts + per-row
+//  "what it needs", computed in batch (no N+1).
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Live, campus-scoped counts for each Pipeline stage tab. Reads every real
+ * application_status value in one query (mirrors getApplicationStats' shape)
+ * and folds them into the 6 stages defined in PIPELINE_STAGES — no fabricated
+ * numbers, a stage with zero matching applications just returns 0.
+ */
+export async function getPipelineStageCounts(
+  campusIds?: string[]
+): Promise<Record<string, number>> {
+  const supabase = createServiceRoleClient();
+
+  let query = supabase.from("application").select("status");
+  if (campusIds && campusIds.length > 0) {
+    query = query.in("campus_id", campusIds);
+  }
+
+  const { data, error } = await query;
+
+  const counts: Record<string, number> = {};
+  for (const stage of PIPELINE_STAGES) counts[stage.key] = 0;
+
+  if (error) {
+    console.error("[getPipelineStageCounts]", error.message);
+    return counts;
+  }
+
+  const byStatus = new Map<string, number>();
+  for (const row of (data ?? []) as Record<string, unknown>[]) {
+    const s = row.status as string;
+    byStatus.set(s, (byStatus.get(s) ?? 0) + 1);
+  }
+
+  for (const stage of PIPELINE_STAGES) {
+    counts[stage.key] = stage.statuses.reduce((sum, s) => sum + (byStatus.get(s) ?? 0), 0);
+  }
+
+  return counts;
+}
+
+export interface PipelineRowNeed {
+  /** What renders in the "What it needs" column. */
+  needsLabel: string;
+  /** Grouping key for the bulk bar's shared-cause computation — two rows
+   *  with the same causeKey are "the same blocking thing". Null when the
+   *  row has nothing outstanding (e.g. Enrolled) or the cause isn't a
+   *  single nameable item (e.g. "awaiting lottery results"). */
+  causeKey: string | null;
+  /** Human phrase for the cause, e.g. "missing Proof Of Residency" — the
+   *  bulk bar renders "All are ${causeLabel}" / "N of M are ${causeLabel}". */
+  causeLabel: string | null;
+}
+
+/**
+ * Per-application "what it needs" for the Pipeline table, computed in a
+ * fixed number of batch queries (one per data source touched by the visible
+ * page), never one query per row. The blocking requirement is derived from
+ * real tables only:
+ *   - Needs review (submitted/needs_info)   -> pending `document` rows
+ *   - Ready for lottery (verified/lottery_assigned) -> static, real status text
+ *   - Offer out (offered/accepted)          -> pending `offer.expires_at`,
+ *                                              or outstanding `registration_item`
+ *                                              vs required `packet_requirement`
+ *   - Registering (registered/placement_review) -> same registration-item gap
+ *     used by Phase 2's getStalledRegistrations / family.ts getRegistrationSummary
+ *   - Enrolled                              -> static "Nothing needed"
+ *   - Waitlist (waitlisted)                 -> real `waitlist_position.position_number`
+ * Rows with no real backing data degrade to a plain status sentence — never
+ * a fabricated document or item name.
+ */
+export async function getPipelineNeeds(
+  rows: Array<{ id: string; status: string }>
+): Promise<Map<string, PipelineRowNeed>> {
+  const supabase = createServiceRoleClient();
+  const result = new Map<string, PipelineRowNeed>();
+  if (rows.length === 0) return result;
+
+  const idsFor = (statuses: string[]) =>
+    rows.filter((r) => statuses.includes(r.status)).map((r) => r.id);
+
+  const needsReviewIds = idsFor(["submitted", "needs_info"]);
+  const offeredIds = idsFor(["offered"]);
+  const acceptedIds = idsFor(["accepted"]);
+  const registeringIds = idsFor(["registered", "placement_review"]);
+  const waitlistIds = idsFor(["waitlisted"]);
+  const enrollmentLookupIds = [...acceptedIds, ...registeringIds];
+
+  // ── Fire every batch query in parallel — one round trip per data source,
+  //    never per row. ────────────────────────────────────────────────────
+  const [documentsRes, offersRes, enrollmentsRes, waitlistRes] = await Promise.all([
+    needsReviewIds.length > 0
+      ? supabase
+          .from("document")
+          .select("application_id, document_type")
+          .eq("status", "pending")
+          .in("application_id", needsReviewIds)
+      : Promise.resolve({ data: [], error: null }),
+    offeredIds.length > 0
+      ? supabase
+          .from("offer")
+          .select("application_id, expires_at")
+          .eq("status", "pending")
+          .in("application_id", offeredIds)
+      : Promise.resolve({ data: [], error: null }),
+    enrollmentLookupIds.length > 0
+      ? supabase
+          .from("enrollment")
+          .select("id, application_id, campus_id, school_year_id")
+          .in("application_id", enrollmentLookupIds)
+      : Promise.resolve({ data: [], error: null }),
+    waitlistIds.length > 0
+      ? supabase
+          .from("waitlist_position")
+          .select("application_id, position_number")
+          .is("removed_at", null)
+          .in("application_id", waitlistIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  // ── Needs review: group pending documents by application ───────────────
+  const docsByApp = new Map<string, string[]>();
+  for (const row of (documentsRes.data ?? []) as Record<string, unknown>[]) {
+    const appId = row.application_id as string;
+    const type = row.document_type as string;
+    if (!docsByApp.has(appId)) docsByApp.set(appId, []);
+    docsByApp.get(appId)!.push(type);
+  }
+
+  for (const appId of needsReviewIds) {
+    const types = docsByApp.get(appId) ?? [];
+    if (types.length > 0) {
+      const names = types.map(prettifyType);
+      const label =
+        types.length === 1
+          ? `1 document: ${names[0]}`
+          : `${types.length} documents: ${names.slice(0, 2).join(", ")}${types.length > 2 ? ` +${types.length - 2} more` : ""}`;
+      result.set(appId, {
+        needsLabel: label,
+        causeKey: `document:${types[0]}`,
+        causeLabel: `missing ${names[0]}`,
+      });
+    } else {
+      const status = rows.find((r) => r.id === appId)?.status;
+      const label = status === "needs_info" ? "Information requested from family" : "Awaiting initial review";
+      result.set(appId, { needsLabel: label, causeKey: "info_requested", causeLabel: "waiting on a family response" });
+    }
+  }
+
+  // ── Ready for lottery: static, real status text — nothing to batch ──────
+  for (const row of rows) {
+    if (row.status === "verified") {
+      result.set(row.id, { needsLabel: "Ready for lottery run", causeKey: "ready_for_lottery", causeLabel: "ready for the lottery run" });
+    } else if (row.status === "lottery_assigned") {
+      result.set(row.id, { needsLabel: "Awaiting lottery results", causeKey: "lottery_assigned", causeLabel: "waiting on lottery results" });
+    }
+  }
+
+  // ── Offer out / offered: pending offer expiry ───────────────────────────
+  const offerByApp = new Map<string, string>();
+  for (const row of (offersRes.data ?? []) as Record<string, unknown>[]) {
+    offerByApp.set(row.application_id as string, row.expires_at as string);
+  }
+  for (const appId of offeredIds) {
+    const expiresAt = offerByApp.get(appId);
+    if (expiresAt) {
+      const dateLabel = new Date(expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      result.set(appId, {
+        needsLabel: `Response due ${dateLabel}`,
+        causeKey: "awaiting_response",
+        causeLabel: "awaiting the family's response",
+      });
+    } else {
+      result.set(appId, { needsLabel: "Awaiting family response", causeKey: "awaiting_response", causeLabel: "awaiting the family's response" });
+    }
+  }
+
+  // ── Offer out / accepted + Registering: registration-item gap ──────────
+  // Same approach as family.ts getRegistrationSummary / Phase 2's
+  // getStalledRegistrations: outstanding = required packet_requirement
+  // item_types minus registration_item rows already submitted/verified/skipped.
+  const enrollments = (enrollmentsRes.data ?? []) as Array<{
+    id: string;
+    application_id: string;
+    campus_id: string;
+    school_year_id: string;
+  }>;
+
+  if (enrollments.length > 0) {
+    const enrollmentIds = enrollments.map((e) => e.id);
+    const campusIds = [...new Set(enrollments.map((e) => e.campus_id))];
+    const schoolYearIds = [...new Set(enrollments.map((e) => e.school_year_id))];
+
+    const [{ data: items }, { data: requirements }] = await Promise.all([
+      supabase
+        .from("registration_item")
+        .select("enrollment_id, item_type, status")
+        .in("enrollment_id", enrollmentIds),
+      supabase
+        .from("packet_requirement")
+        .select("item_type, name, campus_id, school_year_id")
+        .in("campus_id", campusIds)
+        .in("school_year_id", schoolYearIds)
+        .eq("is_required", true)
+        .eq("is_active", true),
+    ]);
+
+    const REG_DONE_STATUSES = new Set(["submitted", "verified", "skipped"]);
+    const doneByEnrollment = new Map<string, Set<string>>();
+    for (const item of (items ?? []) as Record<string, unknown>[]) {
+      const enrollmentId = item.enrollment_id as string;
+      if (!REG_DONE_STATUSES.has(item.status as string)) continue;
+      if (!doneByEnrollment.has(enrollmentId)) doneByEnrollment.set(enrollmentId, new Set());
+      doneByEnrollment.get(enrollmentId)!.add(item.item_type as string);
+    }
+
+    const reqsByScope = new Map<string, Array<{ item_type: string; name: string }>>();
+    for (const req of (requirements ?? []) as Record<string, unknown>[]) {
+      const key = `${req.campus_id}::${req.school_year_id}`;
+      if (!reqsByScope.has(key)) reqsByScope.set(key, []);
+      reqsByScope.get(key)!.push({ item_type: req.item_type as string, name: req.name as string });
+    }
+
+    for (const enrollment of enrollments) {
+      const scopeKey = `${enrollment.campus_id}::${enrollment.school_year_id}`;
+      const required = reqsByScope.get(scopeKey) ?? [];
+      const done = doneByEnrollment.get(enrollment.id) ?? new Set<string>();
+      const outstanding = required.filter((r) => !done.has(r.item_type));
+      const appId = enrollment.application_id;
+      const status = rows.find((r) => r.id === appId)?.status;
+
+      if (outstanding.length > 0) {
+        const names = outstanding.map((r) => r.name);
+        const label =
+          outstanding.length === 1
+            ? `1 item: ${names[0]}`
+            : `${outstanding.length} items: ${names.slice(0, 2).join(", ")}${outstanding.length > 2 ? ` +${outstanding.length - 2} more` : ""}`;
+        result.set(appId, {
+          needsLabel: label,
+          causeKey: `registration_item:${outstanding[0].item_type}`,
+          causeLabel: `missing ${names[0]}`,
+        });
+      } else if (status === "placement_review") {
+        result.set(appId, { needsLabel: "Awaiting academic placement review", causeKey: "placement_review", causeLabel: "awaiting placement review" });
+      } else {
+        result.set(appId, { needsLabel: "Registration complete — pending next step", causeKey: null, causeLabel: null });
+      }
+    }
+  }
+
+  // Accepted/registering applications with no enrollment row yet (edge case —
+  // offer accepted but enrollment record not created) degrade honestly.
+  for (const appId of [...acceptedIds, ...registeringIds]) {
+    if (!result.has(appId)) {
+      result.set(appId, { needsLabel: "Registration not yet started", causeKey: "registration_not_started", causeLabel: "not yet started on registration" });
+    }
+  }
+
+  // ── Enrolled: static ─────────────────────────────────────────────────────
+  for (const row of rows) {
+    if (row.status === "enrolled") {
+      result.set(row.id, { needsLabel: "Nothing needed", causeKey: null, causeLabel: null });
+    }
+  }
+
+  // ── Waitlist: real position number ──────────────────────────────────────
+  const positionByApp = new Map<string, number>();
+  for (const row of (waitlistRes.data ?? []) as Record<string, unknown>[]) {
+    positionByApp.set(row.application_id as string, row.position_number as number);
+  }
+  for (const appId of waitlistIds) {
+    const position = positionByApp.get(appId);
+    result.set(
+      appId,
+      position != null
+        ? { needsLabel: `Waitlist position ${position}`, causeKey: "waitlist", causeLabel: "waiting for a seat to open" }
+        : { needsLabel: "Waitlist position pending", causeKey: "waitlist", causeLabel: "waiting for a seat to open" }
+    );
+  }
+
+  return result;
 }

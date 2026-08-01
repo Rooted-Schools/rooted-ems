@@ -91,8 +91,15 @@ export interface PipelineStage {
  */
 export async function getStaffApplications(opts?: {
   campusId?: string;
+  /** Multi-campus scoping (Pipeline) — takes precedence over campusId when non-empty. */
+  campusIds?: string[];
   status?: string;
+  /** Multi-status filter (Pipeline stage tabs) — takes precedence over `status` when non-empty. */
+  statuses?: string[];
   search?: string;
+  /** Only rows whose updated_at is at least this many days old — powers the
+   *  "Stalled 5+ days" saved view. Real filter, not a client-side illusion. */
+  staleDays?: number;
   /** 1-based page number */
   page?: number;
   pageSize?: number;
@@ -122,12 +129,21 @@ export async function getStaffApplications(opts?: {
     .order("updated_at", { ascending: false })
     .range(offset, offset + pageSize - 1);
 
-  if (opts?.campusId) {
+  if (opts?.campusIds && opts.campusIds.length > 0) {
+    query = query.in("campus_id", opts.campusIds);
+  } else if (opts?.campusId) {
     query = query.eq("campus_id", opts.campusId);
   }
 
-  if (opts?.status && opts.status !== "all") {
+  if (opts?.statuses && opts.statuses.length > 0) {
+    query = query.in("status", opts.statuses);
+  } else if (opts?.status && opts.status !== "all") {
     query = query.eq("status", opts.status);
+  }
+
+  if (opts?.staleDays && opts.staleDays > 0) {
+    const cutoff = new Date(Date.now() - opts.staleDays * 24 * 60 * 60 * 1000).toISOString();
+    query = query.lte("updated_at", cutoff);
   }
 
   // Name search: resolve matching student/guardian ids first, then filter the

@@ -1,242 +1,82 @@
-export const runtime = "edge";
+import {
+  getStaffApplications,
+  getPipelineStageCounts,
+  getPipelineNeeds,
+  getCampuses,
+} from "@/lib/queries";
+import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { statusesForStage, DEFAULT_PIPELINE_STAGE, PIPELINE_STAGES } from "@/lib/application-helpers";
+import { PipelineClient } from "./pipeline-client";
+
 export const dynamic = "force-dynamic";
 
-import { createServiceRoleClient } from "@rooted-ems/database/server";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import Link from "next/link";
-import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
-
-interface PipelineStudent {
-  id: string;
-  student_name: string;
-  campus_name: string;
-  grade: string;
-  status: string;
-  updated_at: string;
-  initials: string;
-}
-
-const PIPELINE_COLUMNS = [
-  { key: "draft", label: "Draft", color: "bg-rooted-gray border-stone/30", textColor: "text-ink/70" },
-  { key: "submitted", label: "Submitted", color: "bg-blue-50 border-blue-300", textColor: "text-blue-700" },
-  { key: "needs_info", label: "Needs Info", color: "bg-amber-50 border-amber-300", textColor: "text-amber-700" },
-  { key: "verified", label: "Verified", color: "bg-green-50 border-green-300", textColor: "text-green-700" },
-  { key: "lottery_assigned", label: "Lottery", color: "bg-purple-50 border-purple-300", textColor: "text-purple-700" },
-  { key: "waitlisted", label: "Waitlisted", color: "bg-orange-50 border-orange-300", textColor: "text-orange-700" },
-  { key: "offered", label: "Offered", color: "bg-indigo-50 border-indigo-300", textColor: "text-indigo-700" },
-  { key: "accepted", label: "Accepted", color: "bg-emerald-50 border-emerald-300", textColor: "text-emerald-700" },
-  { key: "registered", label: "Registered", color: "bg-rooted-green/10 border-rooted-green", textColor: "text-rooted-green-dark" },
-];
+const PAGE_SIZE = 50;
 
 export default async function PipelinePage({
   searchParams,
 }: {
-  searchParams: { campus?: string };
+  searchParams: { campus?: string; stage?: string; search?: string; page?: string; staleDays?: string };
 }) {
   const session = await requireStaffSession();
   const accessibleIds = getAccessibleCampusIds(session);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  // Same scoping shape as staff/today: an explicit campus selection narrows
+  // to just that campus; otherwise scope to everything this staff member can
+  // access (empty array = true org-wide admin, no filter applied downstream).
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
-  const supabase = createServiceRoleClient();
 
-  let appQuery = supabase
-    .from("application")
-    .select(
-      `
-      id, status, updated_at,
-      student:student_id (first_name, last_name),
-      campus:campus_id (name),
-      grade_level:grade_level_id (grade)
-    `
-    )
-    .order("updated_at", { ascending: false });
+  const stage = searchParams?.stage && PIPELINE_STAGES.some((s) => s.key === searchParams.stage)
+    ? searchParams.stage
+    : DEFAULT_PIPELINE_STAGE;
+  const statuses = statusesForStage(stage);
+  const searchParam = searchParams?.search || undefined;
+  const parsedPage = Number.parseInt(searchParams?.page ?? "1", 10);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const parsedStaleDays = Number.parseInt(searchParams?.staleDays ?? "", 10);
+  const staleDays = Number.isFinite(parsedStaleDays) && parsedStaleDays > 0 ? parsedStaleDays : undefined;
 
-  if (scopedCampusIds.length > 0) {
-    appQuery = appQuery.in("campus_id", scopedCampusIds);
-  }
+  const [{ rows: applications, totalCount }, stageCounts, allCampuses] = await Promise.all([
+    getStaffApplications({
+      campusIds: scopedCampusIds,
+      statuses,
+      search: searchParam,
+      staleDays,
+      page,
+      pageSize: PAGE_SIZE,
+    }),
+    getPipelineStageCounts(scopedCampusIds),
+    getCampuses(),
+  ]);
 
-  const { data: apps } = await appQuery;
-
-  const allApps: PipelineStudent[] = (apps ?? []).map(
-    (row: Record<string, unknown>) => {
-      const student = row.student as Record<string, string> | null;
-      const campus = row.campus as Record<string, string> | null;
-      const grade = row.grade_level as Record<string, string> | null;
-      const firstName = student?.first_name ?? "";
-      const lastName = student?.last_name ?? "";
-
-      return {
-        id: row.id as string,
-        student_name: `${firstName} ${lastName}`.trim() || "Unknown",
-        campus_name: campus?.name ?? "",
-        grade: grade?.grade ?? "",
-        status: row.status as string,
-        updated_at: new Date(row.updated_at as string).toLocaleDateString(
-          "en-US",
-          { month: "short", day: "numeric" }
-        ),
-        initials: `${firstName[0] ?? ""}${lastName[0] ?? ""}`,
-      };
-    }
+  // "What it needs" — one batch of queries covering exactly the rows on this
+  // page, never one query per row (see getPipelineNeeds).
+  const needsMap = await getPipelineNeeds(
+    applications.map((a) => ({ id: a.id, status: a.status }))
   );
 
-  const columnData = PIPELINE_COLUMNS.map((col) => ({
-    ...col,
-    students: allApps.filter((a) => a.status === col.key),
+  const rows = applications.map((app) => ({
+    ...app,
+    needsLabel: needsMap.get(app.id)?.needsLabel ?? "—",
+    causeKey: needsMap.get(app.id)?.causeKey ?? null,
+    causeLabel: needsMap.get(app.id)?.causeLabel ?? null,
   }));
 
-  // Also collect declined/withdrawn/expired into a separate bucket
-  const closedStatuses = ["declined", "withdrawn", "expired"];
-  const closedApps = allApps.filter((a) => closedStatuses.includes(a.status));
+  const campuses = allCampuses.filter(
+    (c) => accessibleIds.length === 0 || accessibleIds.includes(c.id)
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-ink">
-            Admissions Pipeline
-          </h1>
-          <p className="text-sm text-stone mt-1">
-            {allApps.length} total applications across the enrollment funnel
-          </p>
-        </div>
-      </div>
-
-      {/* Application Flow Diagram */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Application Flow</CardTitle>
-          <CardDescription>
-            Visual progression through the enrollment pipeline
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-1 overflow-x-auto pb-2">
-            {columnData.map((col, i) => (
-              <div key={col.key} className="flex items-center">
-                <div
-                  className={`px-3 py-2 rounded-lg border ${col.color} min-w-[90px] text-center`}
-                >
-                  <p className={`text-xs font-semibold ${col.textColor}`}>
-                    {col.label}
-                  </p>
-                  <p className={`text-lg font-bold ${col.textColor}`}>
-                    {col.students.length}
-                  </p>
-                </div>
-                {i < columnData.length - 1 && (
-                  <svg
-                    className="w-5 h-5 text-stone/50 shrink-0 mx-0.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                )}
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Kanban Board */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {columnData.map((col) => (
-          <Card key={col.key} className={`border-t-2 ${col.color.split(" ")[1]}`}>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm">{col.label}</CardTitle>
-                <Badge variant="secondary" className="text-xs">
-                  {col.students.length}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {col.students.length === 0 ? (
-                <p className="text-xs text-stone text-center py-4">
-                  No applications
-                </p>
-              ) : (
-                col.students.slice(0, 10).map((student) => (
-                  <Link
-                    key={student.id}
-                    href={`/staff/applications/${student.id}`}
-                    className="block no-underline"
-                  >
-                    <div className="p-2.5 rounded-lg border border-stone/20 bg-white hover:shadow-sm hover:border-stone/30 transition-all cursor-pointer">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-rooted-green/10 flex items-center justify-center shrink-0">
-                          <span className="text-[10px] font-bold text-rooted-green">
-                            {student.initials}
-                          </span>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-ink truncate">
-                            {student.student_name}
-                          </p>
-                          <p className="text-[10px] text-stone truncate">
-                            Grade {student.grade} &middot; {student.campus_name}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                ))
-              )}
-              {col.students.length > 10 && (
-                <Link
-                  href={`/staff/applications?status=${col.key}`}
-                  className="block text-xs text-rooted-green hover:text-deep-green text-center pt-1 no-underline"
-                >
-                  +{col.students.length - 10} more
-                </Link>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Closed/Inactive Applications */}
-      {closedApps.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-base">
-                Closed Applications
-              </CardTitle>
-              <Badge variant="secondary">{closedApps.length}</Badge>
-            </div>
-            <CardDescription>
-              Declined, withdrawn, or expired applications
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              {closedApps.map((app) => (
-                <Link
-                  key={app.id}
-                  href={`/staff/applications/${app.id}`}
-                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-rooted-gray-light no-underline"
-                >
-                  <span className="text-xs font-medium text-ink/60">
-                    {app.student_name}
-                  </span>
-                  <Badge variant="secondary" className="text-[10px]">
-                    {app.status}
-                  </Badge>
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+    <PipelineClient
+      rows={rows}
+      totalCount={totalCount}
+      page={page}
+      pageSize={PAGE_SIZE}
+      stageCounts={stageCounts}
+      campuses={campuses}
+      initialStage={stage}
+      initialSearch={searchParams?.search ?? ""}
+      initialCampus={searchParams?.campus ?? "all"}
+      initialStaleDays={searchParams?.staleDays ?? ""}
+    />
   );
 }

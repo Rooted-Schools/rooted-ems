@@ -48,3 +48,48 @@ export const GRADE_LABELS: Record<string, string> = {
 export function getGradeLabel(code: string) {
   return GRADE_LABELS[code] ?? `Grade ${code}`;
 }
+
+/**
+ * Phase 3 Pipeline stage tabs — collapses the application_status enum
+ * (12 lifecycle values in `application_status`, plus `placement_review` /
+ * `enrolled` added in migration 00024) into the 6 stages a reviewer actually
+ * thinks in. Mapping is literal from the design handoff's Phase 3 section:
+ *   Needs review      = submitted, needs_info
+ *   Ready for lottery  = verified, lottery_assigned
+ *   Offer out          = offered, accepted
+ *   Registering        = registered, placement_review
+ *   Enrolled           = enrolled
+ *   Waitlist           = waitlisted
+ * `draft` (not yet submitted) and the terminal statuses (declined, expired,
+ * withdrawn) intentionally have no stage — they never appear in Pipeline,
+ * same as they're absent from the old kanban's "closed" bucket being
+ * separate from the active funnel.
+ */
+export interface PipelineStageConfig {
+  key: string;
+  label: string;
+  statuses: string[];
+}
+
+export const PIPELINE_STAGES: PipelineStageConfig[] = [
+  { key: "needs_review", label: "Needs review", statuses: ["submitted", "needs_info"] },
+  { key: "ready_for_lottery", label: "Ready for lottery", statuses: ["verified", "lottery_assigned"] },
+  { key: "offer_out", label: "Offer out", statuses: ["offered", "accepted"] },
+  { key: "registering", label: "Registering", statuses: ["registered", "placement_review"] },
+  { key: "enrolled", label: "Enrolled", statuses: ["enrolled"] },
+  { key: "waitlist", label: "Waitlist", statuses: ["waitlisted"] },
+];
+
+export const DEFAULT_PIPELINE_STAGE = PIPELINE_STAGES[0].key;
+
+export function statusesForStage(stageKey: string): string[] {
+  return PIPELINE_STAGES.find((s) => s.key === stageKey)?.statuses ?? PIPELINE_STAGES[0].statuses;
+}
+
+/** Turn a snake_case type ("proof_of_residency") into "Proof Of Residency". */
+export function prettifyType(value: string): string {
+  return value
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}

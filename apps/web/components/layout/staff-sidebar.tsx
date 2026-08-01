@@ -56,7 +56,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     items: [
       { label: "Today", href: "/staff/today", icon: "today", badgeKey: "today" },
-      { label: "Pipeline", href: "/staff/applications", icon: "pipeline" },
+      { label: "Pipeline", href: "/staff/pipeline", icon: "pipeline" },
       {
         label: "Seats & Lottery",
         href: "/staff/lottery",
