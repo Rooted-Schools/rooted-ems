@@ -204,31 +204,76 @@ export async function createApplication(
     householdId = newHousehold.id;
   }
 
-  // 3. Create guardian
-  const { data: guardian, error: gErr } = await supabase
+  // 3. Find or create guardian — a returning family (household already
+  // existed above) reuses their own guardian record instead of creating a
+  // duplicate. Duplicate guardian rows for the same person are exactly what
+  // Today's "possible duplicate households" row surfaces (same phone,
+  // different guardian spelling) — so a second child's application must link
+  // to the existing guardian, not mint a new one.
+  //
+  // The prefill shown on the new-application form (getExistingHouseholdForUser)
+  // is editable, so whatever the parent confirms or changes here is the
+  // source of truth: this UPDATEs the shared guardian record in place
+  // (same policy already used for household.address_line1 above) rather than
+  // leaving stale values on it or forking a second guardian row.
+  const { data: existingGuardian } = await supabase
     .from("guardian")
-    .insert({
-      household_id: householdId,
-      user_id: user.id,
-      first_name: input.guardian_first_name,
-      last_name: input.guardian_last_name,
-      relationship: input.guardian_relationship,
-      email: input.guardian_email,
-      phone: input.guardian_phone,
-      phone_secondary: input.guardian_phone_secondary ?? null,
-      employer: input.guardian_employer ?? null,
-      occupation: input.guardian_occupation ?? null,
-      preferred_contact_method: input.guardian_preferred_contact_method ?? null,
-      preferred_language: input.guardian_preferred_language ?? null,
-      sms_consent: input.guardian_sms_consent ?? false,
-      is_primary: true,
-    })
     .select("id")
-    .single();
+    .eq("household_id", householdId)
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle();
 
-  if (gErr || !guardian) {
-    console.error("[createApplication] guardian", gErr?.message);
-    return { data: null, error: "Failed to create guardian record" };
+  let guardianId: string;
+  if (existingGuardian) {
+    guardianId = existingGuardian.id;
+    const { error: guardianUpdateError } = await supabase
+      .from("guardian")
+      .update({
+        first_name: input.guardian_first_name,
+        last_name: input.guardian_last_name,
+        relationship: input.guardian_relationship,
+        email: input.guardian_email,
+        phone: input.guardian_phone,
+        phone_secondary: input.guardian_phone_secondary ?? null,
+        employer: input.guardian_employer ?? null,
+        occupation: input.guardian_occupation ?? null,
+        preferred_contact_method: input.guardian_preferred_contact_method ?? null,
+        preferred_language: input.guardian_preferred_language ?? null,
+        sms_consent: input.guardian_sms_consent ?? false,
+      })
+      .eq("id", guardianId);
+
+    if (guardianUpdateError) {
+      console.error("[createApplication] guardian update", guardianUpdateError.message);
+    }
+  } else {
+    const { data: newGuardian, error: gErr } = await supabase
+      .from("guardian")
+      .insert({
+        household_id: householdId,
+        user_id: user.id,
+        first_name: input.guardian_first_name,
+        last_name: input.guardian_last_name,
+        relationship: input.guardian_relationship,
+        email: input.guardian_email,
+        phone: input.guardian_phone,
+        phone_secondary: input.guardian_phone_secondary ?? null,
+        employer: input.guardian_employer ?? null,
+        occupation: input.guardian_occupation ?? null,
+        preferred_contact_method: input.guardian_preferred_contact_method ?? null,
+        preferred_language: input.guardian_preferred_language ?? null,
+        sms_consent: input.guardian_sms_consent ?? false,
+        is_primary: true,
+      })
+      .select("id")
+      .single();
+
+    if (gErr || !newGuardian) {
+      console.error("[createApplication] guardian", gErr?.message);
+      return { data: null, error: "Failed to create guardian record" };
+    }
+    guardianId = newGuardian.id;
   }
 
   // 4. Create student
@@ -268,7 +313,7 @@ export async function createApplication(
 
   // 5. Link guardian to student
   await supabase.from("guardian_student").insert({
-    guardian_id: guardian.id,
+    guardian_id: guardianId,
     student_id: student.id,
     relationship: input.guardian_relationship,
     is_legal_guardian: true,
@@ -282,7 +327,7 @@ export async function createApplication(
       student_id: student.id,
       campus_id: input.campus_id,
       grade_level_id: input.grade_level_id,
-      guardian_id: guardian.id,
+      guardian_id: guardianId,
       status: "draft",
       has_sibling_enrolled: input.has_sibling_enrolled ?? false,
       source: input.source ?? null,

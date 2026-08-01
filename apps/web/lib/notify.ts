@@ -18,6 +18,7 @@ import { sendEmail } from "@/lib/email";
 import { sendSms } from "@/lib/sms";
 import * as emailTemplates from "@/lib/email-templates";
 import type { EmailTemplate } from "@/lib/email-templates";
+import { recordWaitlistPositionHistory } from "@/lib/mutations/waitlist-history";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -336,7 +337,7 @@ export async function notifyWaitlistMovement({
     // All still-active entries, in line order — ranks derive from this list.
     const { data: active, error } = await supabase
       .from("waitlist_position")
-      .select("application_id, position_number")
+      .select("id, application_id, position_number")
       .eq("waitlist_id", waitlistId)
       .is("removed_at", null)
       .order("position_number", { ascending: true });
@@ -346,11 +347,26 @@ export async function notifyWaitlistMovement({
       return;
     }
 
-    const rows = (active ?? []) as Array<{ application_id: string; position_number: number }>;
+    const rows = (active ?? []) as Array<{ id: string; application_id: string; position_number: number }>;
     const improved = rows
       .map((row, index) => ({ ...row, rank: index + 1 }))
       .filter((row) => row.position_number > removedPositionNumber);
     if (improved.length === 0) return;
+
+    // Log the honest new effective rank for every family who moved up so the
+    // family portal can show real movement later — never inferred. One row
+    // per affected waitlist_position; failures here never block notification.
+    await Promise.all(
+      improved.map((row) =>
+        recordWaitlistPositionHistory({
+          waitlistPositionId: row.id,
+          applicationId: row.application_id,
+          positionNumber: row.rank,
+          changeType: "recalculated",
+          reason: "Moved up after another family left the waitlist",
+        })
+      )
+    );
 
     // Batch-resolve guardian contact + student name for the affected apps
     const { data: apps, error: appsError } = await supabase

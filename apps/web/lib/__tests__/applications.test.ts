@@ -12,6 +12,8 @@ import {
   submitApplication,
   withdrawApplication,
   updateApplication,
+  createApplication,
+  type CreateApplicationInput,
 } from "@/lib/mutations/applications";
 
 vi.mock("@rooted-ems/database/server", async () => {
@@ -307,5 +309,86 @@ describe("updateApplication", () => {
       enrollment_window_id: "ew-2",
     });
     expect(hasEqFilter(appWrites[0], "id", APP_ID)).toBe(true);
+  });
+});
+
+// ─── createApplication (household inheritance) ─────────────────────────────
+//
+// A returning family's second (or later) child must link to the EXISTING
+// household + guardian rather than creating a duplicate guardian row — that
+// duplication is exactly what feeds Today's "possible duplicate households"
+// row. New families still get a fresh household + guardian as before.
+
+describe("createApplication", () => {
+  const baseInput: CreateApplicationInput = {
+    enrollment_window_id: "ew-1",
+    campus_id: "c-1",
+    grade_level_id: "gl-1",
+    student_first_name: "Elias",
+    student_last_name: "Rivera",
+    guardian_first_name: "Maria",
+    guardian_last_name: "Rivera",
+    guardian_relationship: "mother",
+    guardian_email: "maria@example.com",
+    guardian_phone: "555-0100",
+  };
+
+  it("creates a new household and guardian for a first-time family", async () => {
+    supabaseMock.setUser(OWNER);
+    supabaseMock.queueResult("household", { data: null, error: null }); // no existing household
+    supabaseMock.queueResult("household", { data: { id: "hh-1" }, error: null }); // insert result
+    supabaseMock.queueResult("guardian", { data: null, error: null }); // no existing guardian
+    supabaseMock.queueResult("guardian", { data: { id: "g-1" }, error: null }); // insert result
+    supabaseMock.queueResult("student", { data: { id: "stu-1" }, error: null });
+    supabaseMock.queueResult("application", { data: { id: "app-1" }, error: null });
+
+    const result = await createApplication(baseInput);
+
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual({ id: "app-1" });
+
+    const guardianWrites = supabaseMock.writes("guardian");
+    expect(guardianWrites).toHaveLength(1);
+    expect(guardianWrites[0].op).toBe("insert");
+    expect(guardianWrites[0].payload).toMatchObject({
+      household_id: "hh-1",
+      user_id: OWNER.id,
+      first_name: "Maria",
+      is_primary: true,
+    });
+
+    const appWrites = supabaseMock.writes("application");
+    expect(appWrites[0].payload).toMatchObject({ guardian_id: "g-1" });
+  });
+
+  it("reuses the existing household + guardian for a returning family's second child (no duplicate)", async () => {
+    supabaseMock.setUser(OWNER);
+    supabaseMock.queueResult("household", { data: { id: "hh-1" }, error: null }); // existing household
+    supabaseMock.queueResult("guardian", { data: { id: "g-1" }, error: null }); // existing guardian
+    supabaseMock.queueResult("guardian", { data: null, error: null }); // update result
+    supabaseMock.queueResult("student", { data: { id: "stu-2" }, error: null });
+    supabaseMock.queueResult("application", { data: { id: "app-2" }, error: null });
+
+    const result = await createApplication({
+      ...baseInput,
+      student_first_name: "Sofia",
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual({ id: "app-2" });
+
+    // Exactly one guardian write, and it's an UPDATE of the existing row —
+    // never a second insert (which would be the duplicate-guardian bug).
+    const guardianWrites = supabaseMock.writes("guardian");
+    expect(guardianWrites).toHaveLength(1);
+    expect(guardianWrites[0].op).toBe("update");
+    expect(hasEqFilter(guardianWrites[0], "id", "g-1")).toBe(true);
+    expect(guardianWrites[0].payload).toMatchObject({ first_name: "Maria" });
+
+    const appWrites = supabaseMock.writes("application");
+    expect(appWrites[0].payload).toMatchObject({ guardian_id: "g-1" });
+
+    const gsWrites = supabaseMock.writes("guardian_student");
+    expect(gsWrites[0].payload).toMatchObject({ guardian_id: "g-1" });
   });
 });

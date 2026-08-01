@@ -51,6 +51,8 @@ export {
   getFamilyOfferDetail,
   getFamilyPendingOffers,
   getLotteryOutcome,
+  getWaitlistHistory,
+  getExistingHouseholdForUser,
   type FamilyNotification,
   type EnrollmentWindowInfo,
   type FamilyAppSummary,
@@ -60,6 +62,9 @@ export {
   type FamilyOfferDetail,
   type FamilyPendingOffer,
   type LotteryOutcome,
+  type WaitlistStanding,
+  type WaitlistHistoryEntry,
+  type ExistingHouseholdInfo,
 } from "./family";
 
 // Staff management queries (lottery, offers, waitlist, enrollment, comms, settings)

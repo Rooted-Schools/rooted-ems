@@ -374,11 +374,23 @@ export default async function FamilyDashboardPage() {
         ) : primaryCard.status === "waitlisted" ? (
           <div className="space-y-1">
             {primaryCard.waitlist_standing && (
-              <p className="text-sm font-semibold text-rooted-green">
-                {t("card.waitlistStanding")
-                  .replace("{position}", String(primaryCard.waitlist_standing.position))
-                  .replace("{total}", String(primaryCard.waitlist_standing.total))}
-              </p>
+              <>
+                <p className="text-sm font-semibold text-rooted-green">
+                  {t("card.waitlistStanding")
+                    .replace("{position}", String(primaryCard.waitlist_standing.position))
+                    .replace("{total}", String(primaryCard.waitlist_standing.total))}
+                </p>
+                {/* Only shown when the movement is real (>=2 history rows AND
+                    a genuine improvement) — never an inferred prior position. */}
+                {primaryCard.waitlist_standing.movedFrom && (
+                  <p className="text-xs text-ink/60">
+                    {t("card.waitlistMoved")
+                      .replace("{from}", String(primaryCard.waitlist_standing.movedFrom.position))
+                      .replace("{to}", String(primaryCard.waitlist_standing.position))
+                      .replace("{date}", shortDate(primaryCard.waitlist_standing.movedFrom.asOf))}
+                  </p>
+                )}
+              </>
             )}
             <p className="text-sm text-ink/60">{t("card.waitlistNote")}</p>
             <Link

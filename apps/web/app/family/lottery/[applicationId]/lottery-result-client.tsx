@@ -131,12 +131,29 @@ export function LotteryResultClient({ outcome }: Props) {
           </div>
 
           {!isSelected && waitlist && (
-            <div className="border-t border-rooted-gray pt-3">
+            <div className="border-t border-rooted-gray pt-3 space-y-1">
               <p className="text-sm font-semibold text-rooted-green">
                 {t("lotteryResult.placeInLine")
                   .replace("{position}", String(waitlist.position))
                   .replace("{total}", String(waitlist.total))}
               </p>
+              {/* Real movement only — shown when at least 2 history rows exist
+                  AND the position genuinely improved. Never a fabricated
+                  "moved from" claim. */}
+              {waitlist.movedFrom && (
+                <p className="text-xs text-ink/60">
+                  {t("lotteryResult.movedFrom")
+                    .replace("{from}", String(waitlist.movedFrom.position))
+                    .replace("{to}", String(waitlist.position))
+                    .replace(
+                      "{date}",
+                      new Date(waitlist.movedFrom.asOf).toLocaleDateString(localeTag, {
+                        month: "long",
+                        day: "numeric",
+                      })
+                    )}
+                </p>
+              )}
             </div>
           )}
         </CardContent>

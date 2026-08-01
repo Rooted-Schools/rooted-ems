@@ -2,6 +2,7 @@ import { createServerClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
 import { notifyFamilyOfOffer, notifyWaitlistMovement } from "@/lib/notify";
+import { recordWaitlistPositionHistory } from "./waitlist-history";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -64,6 +65,15 @@ export async function addToWaitlist(
     },
   });
 
+  // First entry in this family's history ledger — the honest starting point
+  // for any later "moved up from N" comparison.
+  await recordWaitlistPositionHistory({
+    waitlistPositionId: data.id,
+    applicationId: input.application_id,
+    positionNumber: input.position_number,
+    changeType: "initial",
+  });
+
   return { data: { id: data.id }, error: null };
 }
 
@@ -113,6 +123,17 @@ export async function promoteFromWaitlist(
   if (updateError) {
     return { data: null, error: "Failed to update waitlist position." };
   }
+
+  // Record the promotion in the history ledger — this row's own change.
+  // (Everyone BEHIND this position who effectively moved up gets their own
+  // "recalculated" row from notifyWaitlistMovement below.)
+  await recordWaitlistPositionHistory({
+    waitlistPositionId: waitlistPositionId,
+    applicationId: pos.application_id as string,
+    positionNumber: pos.position_number as number,
+    changeType: "promoted",
+    reason: "Promoted to a seat offer",
+  });
 
   // Create an offer for this student
   const { data: offer, error: offerError } = await supabase
@@ -216,6 +237,18 @@ export async function removeFromWaitlist(
 
   const campusId =
     (position?.waitlist as unknown as Record<string, string> | null)?.campus_id ?? null;
+
+  // Record the removal in this row's own history — before the "everyone
+  // behind moved up" recalculation rows below.
+  if (position?.application_id && position?.position_number != null) {
+    await recordWaitlistPositionHistory({
+      waitlistPositionId: waitlistPositionId,
+      applicationId: position.application_id as string,
+      positionNumber: position.position_number as number,
+      changeType: "removed",
+      reason,
+    });
+  }
 
   await logAuditEvent({
     table_name: "waitlist_position",

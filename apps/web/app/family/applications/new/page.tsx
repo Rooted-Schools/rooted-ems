@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { createServerClient } from "@rooted-ems/database/server";
 import { redirect } from "next/navigation";
-import { getActiveEnrollmentWindows, getCampuses } from "@/lib/queries";
+import { getActiveEnrollmentWindows, getCampuses, getExistingHouseholdForUser } from "@/lib/queries";
 import { NewApplicationForm } from "./new-application-form";
 
 export default async function NewApplicationPage({
@@ -17,10 +17,15 @@ export default async function NewApplicationPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Fetch data needed by the form
-  const [windows, allCampuses] = await Promise.all([
+  // Fetch data needed by the form. A returning family's existing
+  // household/guardian (if any) prefills step 2 so a second child's
+  // application doesn't re-collect — and re-duplicate — the same contact
+  // info. See lib/mutations/applications.ts (createApplication) for the
+  // server-side link-vs-create logic this prefill feeds into.
+  const [windows, allCampuses, existingHousehold] = await Promise.all([
     getActiveEnrollmentWindows(),
     getCampuses(),
+    getExistingHouseholdForUser(user.id),
   ]);
 
   // Only show campuses that have an open enrollment window
@@ -62,6 +67,7 @@ export default async function NewApplicationPage({
       campuses={campuses}
       gradeLevels={grades}
       initialCampusId={preselectedCampus?.id}
+      existingHousehold={existingHousehold}
     />
   );
 }

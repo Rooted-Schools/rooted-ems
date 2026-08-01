@@ -69,6 +69,13 @@ export interface WaitlistStanding {
   position: number;
   /** Total active entries on the same waitlist. */
   total: number;
+  /**
+   * Real movement since the earliest recorded waitlist_position_history row
+   * for this application — never inferred. Null when fewer than 2 history
+   * rows exist yet (nothing honest to compare against) or the position has
+   * not actually improved. See getWaitlistHistory / recordWaitlistPositionHistory.
+   */
+  movedFrom: { position: number; asOf: string } | null;
 }
 
 export interface FamilyJourneyCard {
@@ -151,15 +158,79 @@ export async function getWaitlistStandings(
     byWaitlist.set(wid, list);
   }
 
+  // Batch-fetch the history ledger for the "moved up from N" line. Never
+  // fabricated: a movedFrom is only ever set below when at least 2 rows
+  // exist for the application AND the position genuinely improved.
+  const { data: historyRows, error: historyError } = await supabase
+    .from("waitlist_position_history")
+    .select("application_id, position_number, changed_at")
+    .in("application_id", applicationIds)
+    .order("changed_at", { ascending: true });
+
+  if (historyError) {
+    console.error("[getWaitlistStandings] history", historyError.message);
+  }
+
+  const historyByApp = new Map<string, Array<{ position_number: number; changed_at: string }>>();
+  for (const row of historyRows ?? []) {
+    const r = row as Record<string, unknown>;
+    const appId = r.application_id as string;
+    const list = historyByApp.get(appId) ?? [];
+    list.push({ position_number: r.position_number as number, changed_at: r.changed_at as string });
+    historyByApp.set(appId, list);
+  }
+
   for (const row of mine) {
     const r = row as Record<string, unknown>;
     const numbers = byWaitlist.get(r.waitlist_id as string) ?? [];
     const myNumber = r.position_number as number;
     const rank = numbers.filter((n) => n < myNumber).length + 1;
-    standings.set(r.application_id as string, { position: rank, total: numbers.length });
+
+    let movedFrom: WaitlistStanding["movedFrom"] = null;
+    const hist = historyByApp.get(r.application_id as string) ?? [];
+    if (hist.length >= 2) {
+      const first = hist[0];
+      const last = hist[hist.length - 1];
+      if (last.position_number < first.position_number) {
+        movedFrom = { position: first.position_number, asOf: last.changed_at };
+      }
+    }
+
+    standings.set(r.application_id as string, { position: rank, total: numbers.length, movedFrom });
   }
 
   return standings;
+}
+
+/**
+ * Full ordered history of waitlist position changes for ONE application —
+ * the raw ledger (supabase/migrations/00034_waitlist_position_history.sql)
+ * that getWaitlistStandings uses internally to compute `movedFrom`. Exposed
+ * separately for any surface that wants the full sequence of changes rather
+ * than just a from/to summary.
+ *
+ * Service-role, same contract as getWaitlistStandings: callers must pass
+ * only an application id already proven to belong to the requesting user.
+ */
+export interface WaitlistHistoryEntry {
+  position_number: number;
+  change_type: string;
+  changed_at: string;
+}
+
+export async function getWaitlistHistory(applicationId: string): Promise<WaitlistHistoryEntry[]> {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from("waitlist_position_history")
+    .select("position_number, change_type, changed_at")
+    .eq("application_id", applicationId)
+    .order("changed_at", { ascending: true });
+
+  if (error) {
+    console.error("[getWaitlistHistory]", error.message);
+    return [];
+  }
+  return (data ?? []) as WaitlistHistoryEntry[];
 }
 
 export interface RegistrationSummary {
@@ -753,6 +824,84 @@ export async function getFamilyPendingOffers(
       application_id: app?.id as string,
     };
   });
+}
+
+// ─── Household Inheritance (returning families) ──────────
+
+/**
+ * A returning family's existing household + their own guardian record on it,
+ * for prefilling a SECOND (or later) child's application instead of
+ * re-collecting — and re-duplicating — the same guardian/household data.
+ * See lib/mutations/applications.ts (createApplication), which independently
+ * re-resolves the household/guardian by user_id server-side and is the
+ * actual source of truth for linking vs. creating; this query only powers
+ * the new-application form's prefill.
+ *
+ * Read-only, RLS-scoped (household_own / guardian_own already restrict both
+ * tables to rows the caller's own user_id owns) — no service-role escalation
+ * needed.
+ */
+export interface ExistingHouseholdInfo {
+  household_id: string;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  primary_language: string | null;
+  guardian: {
+    first_name: string;
+    last_name: string;
+    relationship: string;
+    email: string | null;
+    phone: string | null;
+    sms_consent: boolean;
+  } | null;
+}
+
+export async function getExistingHouseholdForUser(
+  userId: string
+): Promise<ExistingHouseholdInfo | null> {
+  const supabase = await createServerClient();
+
+  const { data: household, error } = await supabase
+    .from("household")
+    .select("id, address_line1, address_line2, city, state, zip, primary_language")
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !household) return null;
+
+  const { data: guardian } = await supabase
+    .from("guardian")
+    .select("first_name, last_name, relationship, email, phone, sms_consent")
+    .eq("household_id", household.id as string)
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle();
+
+  const g = guardian as Record<string, unknown> | null;
+
+  return {
+    household_id: household.id as string,
+    address_line1: (household.address_line1 as string) ?? null,
+    address_line2: (household.address_line2 as string) ?? null,
+    city: (household.city as string) ?? null,
+    state: (household.state as string) ?? null,
+    zip: (household.zip as string) ?? null,
+    primary_language: (household.primary_language as string) ?? null,
+    guardian: g
+      ? {
+          first_name: g.first_name as string,
+          last_name: g.last_name as string,
+          relationship: g.relationship as string,
+          email: (g.email as string) ?? null,
+          phone: (g.phone as string) ?? null,
+          sms_consent: (g.sms_consent as boolean) ?? false,
+        }
+      : null,
+  };
 }
 
 // ─── Lottery Result Types & Query ────────────────────────

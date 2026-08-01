@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { GRADE_LABELS } from "@/lib/application-helpers";
-import type { EnrollmentWindowInfo, CampusRow } from "@/lib/queries";
+import type { EnrollmentWindowInfo, CampusRow, ExistingHouseholdInfo } from "@/lib/queries";
 import {
   familyCreateApplication,
   familySubmitApplication,
@@ -33,6 +33,14 @@ interface NewApplicationFormProps {
   gradeLevels: GradeLevel[];
   /** Pre-selected campus id passed from the dashboard's school card link */
   initialCampusId?: string;
+  /**
+   * A returning family's existing household + guardian, when one exists.
+   * Prefills the guardian step so a second (or later) child's application
+   * doesn't re-collect the same contact info — the prefill is editable, and
+   * whatever the parent confirms/changes is what createApplication persists
+   * back onto the shared guardian record (no duplicate is created).
+   */
+  existingHousehold?: ExistingHouseholdInfo | null;
 }
 
 /* ───────────── step definitions ───────────── */
@@ -278,15 +286,35 @@ function buildAutosaveInput(
 
 /* ───────────── page component ───────────── */
 
-export function NewApplicationForm({ windows, campuses, gradeLevels, initialCampusId }: NewApplicationFormProps) {
+export function NewApplicationForm({
+  windows,
+  campuses,
+  gradeLevels,
+  initialCampusId,
+  existingHousehold,
+}: NewApplicationFormProps) {
   const { t, locale } = useLocale();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [stepIndex, setStepIndex] = useState(0);
-  // Item 9: pre-populate campus if the dashboard passed ?campus=X
+  const existingGuardian = existingHousehold?.guardian ?? null;
+  // Item 9: pre-populate campus if the dashboard passed ?campus=X.
+  // A returning family's guardian contact info is prefilled from their
+  // existing household so a second child's application doesn't re-collect —
+  // and re-duplicate — the same guardian record. Still fully editable.
   const [form, setForm] = useState<FormData>(() => ({
     ...INITIAL,
     campusId: initialCampusId ?? "",
+    ...(existingGuardian
+      ? {
+          guardianFirstName: existingGuardian.first_name,
+          guardianLastName: existingGuardian.last_name,
+          guardianRelationship: existingGuardian.relationship,
+          guardianEmail: existingGuardian.email ?? "",
+          guardianPhone: existingGuardian.phone ?? "",
+          smsConsent: existingGuardian.sms_consent,
+        }
+      : {}),
   }));
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [showValidation, setShowValidation] = useState(false);
@@ -634,6 +662,11 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {existingGuardian && (
+              <div className="bg-rooted-green/5 border border-rooted-green/20 rounded-md px-3 py-2 text-sm text-ink/70">
+                {t("appForm.prefillBanner")}
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label={t("appForm.firstName")} required id="guardian-first-name">
                 <Input
