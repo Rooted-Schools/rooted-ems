@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -15,20 +15,32 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/select";
+import {
+  IconSprout,
+  IconMail,
+  IconMessageSquare,
+  IconPhone,
+  IconPenLine,
+  IconArrowLeftRight,
+  IconRefreshCw,
+  IconCheckCircle,
+  IconClipboardList,
+  IconBan,
+} from "@/components/ui/icons";
 import type { LeadDetail } from "@/lib/queries/leads";
 import { formatRelativeTime } from "@/lib/queries/utils";
 import { staffDeleteLead, staffGetReferralLink, staffLogLeadActivity, staffUpdateLead } from "../actions";
 import { PATHWAY_LABELS, SOURCE_LABELS, STAGE_CONFIG } from "../recruitment-client";
 
-const ACTIVITY_ICONS: Record<string, string> = {
-  inquiry: "🌱",
-  email: "📧",
-  sms: "💬",
-  call: "📞",
-  note: "📝",
-  stage_change: "🔀",
-  reengagement: "👋",
-  converted: "🎉",
+const ACTIVITY_ICONS: Record<string, ReactNode> = {
+  inquiry: <IconSprout size={16} />,
+  email: <IconMail size={16} />,
+  sms: <IconMessageSquare size={16} />,
+  call: <IconPhone size={16} />,
+  note: <IconPenLine size={16} />,
+  stage_change: <IconArrowLeftRight size={16} />,
+  reengagement: <IconRefreshCw size={16} />,
+  converted: <IconCheckCircle size={16} />,
 };
 
 const FOLLOW_UP_OPTIONS = [
@@ -163,16 +175,16 @@ export function LeadDetailClient({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => openLog("call")} disabled={isPending}>
-            📞 Log a call
+          <Button className="gap-1.5" onClick={() => openLog("call")} disabled={isPending}>
+            <IconPhone size={16} /> Log a call
           </Button>
-          <Button variant="outline" onClick={() => openLog("note")} disabled={isPending}>
-            📝 Add note
+          <Button variant="outline" className="gap-1.5" onClick={() => openLog("note")} disabled={isPending}>
+            <IconPenLine size={16} /> Add note
           </Button>
           {!lead.application_id && (
             <Link href={`/staff/applications/new?lead=${lead.id}`}>
-              <Button variant="outline" disabled={isPending}>
-                📋 Start application
+              <Button variant="outline" className="gap-1.5" disabled={isPending}>
+                <IconClipboardList size={16} /> Start application
               </Button>
             </Link>
           )}
@@ -183,8 +195,8 @@ export function LeadDetailClient({
       {lead.application_id && (
         <Card className="border-rooted-green/40 bg-rooted-green/5">
           <CardContent className="py-3 flex items-center justify-between">
-            <p className="text-sm font-medium text-rooted-green">
-              🎉 This family applied{lead.converted_at ? ` ${formatRelativeTime(lead.converted_at)}` : ""} — they&apos;re in the enrollment pipeline now.
+            <p className="text-sm font-medium text-rooted-green flex items-center gap-1.5">
+              <IconCheckCircle size={16} /> This family applied{lead.converted_at ? ` ${formatRelativeTime(lead.converted_at)}` : ""} — they&apos;re in the enrollment pipeline now.
             </p>
             <Link href={`/staff/applications/${lead.application_id}`}>
               <Button size="sm" variant="outline">View application &rarr;</Button>
@@ -217,8 +229,12 @@ export function LeadDetailClient({
               ) : (
                 <p className="text-ink/60">No phone</p>
               )}
-              <p className="text-xs text-stone mt-1">
-                {lead.sms_consent ? "✅ OK to text" : "🚫 No text consent"} · prefers {lead.preferred_language === "es" ? "Spanish" : "English"}
+              <p className="text-xs text-stone mt-1 flex items-center gap-1">
+                {lead.sms_consent ? (
+                  <><IconCheckCircle size={14} /> OK to text</>
+                ) : (
+                  <><IconBan size={14} /> No text consent</>
+                )}{" "}· prefers {lead.preferred_language === "es" ? "Spanish" : "English"}
               </p>
             </div>
             <div>
@@ -269,7 +285,7 @@ export function LeadDetailClient({
             {lead.referred_by_name && (
               <div>
                 <p className="text-xs text-stone">Referred by</p>
-                <p className="text-ink">🌱 {lead.referred_by_name}</p>
+                <p className="text-ink flex items-center gap-1"><IconSprout size={14} /> {lead.referred_by_name}</p>
               </div>
             )}
             <div className="pt-2 border-t border-stone/10">
@@ -350,8 +366,8 @@ export function LeadDetailClient({
                     key={activity.id}
                     className="flex items-start gap-3 pb-3 border-b border-stone/10 last:border-0 last:pb-0"
                   >
-                    <span className="text-lg leading-none mt-0.5">
-                      {ACTIVITY_ICONS[activity.activity_type] ?? "•"}
+                    <span className="text-stone mt-0.5" aria-hidden="true">
+                      {ACTIVITY_ICONS[activity.activity_type] ?? <span className="text-lg leading-none">•</span>}
                     </span>
                     <div className="min-w-0">
                       <p className="text-sm text-ink/80">{activity.body ?? activity.activity_type}</p>

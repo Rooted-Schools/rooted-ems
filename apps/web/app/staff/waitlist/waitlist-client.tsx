@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { IconClipboardList } from "@/components/ui/icons";
 import {
   Table,
   TableBody,
@@ -136,7 +137,7 @@ export function WaitlistClient({
         <Card>
           <CardContent className="py-8">
             <EmptyState
-              icon="📋"
+              icon={<IconClipboardList size={40} />}
               title="No students on waitlist"
               description="Students will be added to the waitlist after a lottery when there are more applicants than seats."
             />

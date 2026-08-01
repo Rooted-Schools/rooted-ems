@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
+import { IconCheckCircle, IconHelpCircle } from "@/components/ui/icons";
 
 export const metadata = { title: "Unsubscribe — Rooted Schools" };
 
@@ -52,7 +53,9 @@ export default async function UnsubscribePage({
   return (
     <div className="min-h-screen bg-warm-white flex items-center justify-center px-4">
       <div className="max-w-md w-full text-center bg-white border border-stone/20 rounded-xl px-6 py-10 space-y-4">
-        <div className="text-4xl">{ok ? "👋" : "🤔"}</div>
+        <div className="flex justify-center text-rooted-green">
+          {ok ? <IconCheckCircle size={40} /> : <IconHelpCircle size={40} />}
+        </div>
         {ok ? (
           <>
             <h1 className="text-xl font-bold text-ink">You&apos;re unsubscribed</h1>

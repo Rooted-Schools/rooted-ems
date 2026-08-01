@@ -39,6 +39,17 @@ import {
   staffConfirmPacketComplete,
 } from "./actions";
 import type { RegistrationPacketDetail } from "@/lib/queries";
+import {
+  IconClipboardList,
+  IconAlertTriangle,
+  IconCheckCircle,
+  IconMail,
+  IconGraduationCap,
+  IconSprout,
+  IconFileText,
+  IconRefreshCw,
+  IconClock,
+} from "@/components/ui/icons";
 
 /* ─── Document status badge ─── */
 const docStatusConfig: Record<string, { label: string; variant: "success" | "warning" | "destructive" }> = {
@@ -539,7 +550,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
         <Card className="border-blue-200 bg-blue-50/40">
           <CardContent className="py-4">
             <div className="flex items-start gap-3">
-              <span className="text-2xl" aria-hidden="true">📋</span>
+              <IconClipboardList size={24} className="text-blue-700 shrink-0" aria-hidden="true" />
               <div className="flex-1">
                 <p className="text-sm font-semibold text-ink">Application Ready for Review</p>
                 <p className="text-xs text-ink/60 mt-0.5">
@@ -563,7 +574,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
         <Card className="border-amber-200 bg-amber-50/40">
           <CardContent className="py-4">
             <div className="flex items-start gap-3">
-              <span className="text-2xl" aria-hidden="true">⚠️</span>
+              <IconAlertTriangle size={24} className="text-amber-700 shrink-0" aria-hidden="true" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-ink">Waiting for Family Response</p>
                 {detail.review_notes && (
@@ -584,7 +595,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
         <Card className="border-green-200 bg-green-50/30">
           <CardContent className="py-4">
             <div className="flex items-start gap-3">
-              <span className="text-2xl" aria-hidden="true">✅</span>
+              <IconCheckCircle size={24} className="text-green-700 shrink-0" aria-hidden="true" />
               <div>
                 <p className="text-sm font-semibold text-ink">Application Verified</p>
                 <p className="text-xs text-ink/60 mt-0.5">
@@ -599,7 +610,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
         <Card className="border-blue-200 bg-blue-50/30">
           <CardContent className="py-4">
             <div className="flex items-start gap-3">
-              <span className="text-2xl" aria-hidden="true">📋</span>
+              <IconClipboardList size={24} className="text-blue-700 shrink-0" aria-hidden="true" />
               <div>
                 <p className="text-sm font-semibold text-ink">Awaiting Registration Packet</p>
                 <p className="text-xs text-ink/60 mt-0.5">
@@ -614,7 +625,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
         <Card className="border-blue-200 bg-blue-50/40">
           <CardContent className="py-4">
             <div className="flex items-start gap-3">
-              <span className="text-2xl" aria-hidden="true">📬</span>
+              <IconMail size={24} className="text-blue-700 shrink-0" aria-hidden="true" />
               <div>
                 <p className="text-sm font-semibold text-ink">Registration Packet Submitted — Awaiting Verification</p>
                 <p className="text-xs text-ink/60 mt-0.5">
@@ -629,7 +640,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
         <Card className="border-purple-200 bg-purple-50/30">
           <CardContent className="py-4">
             <div className="flex items-start gap-3">
-              <span className="text-2xl" aria-hidden="true">🎓</span>
+              <IconGraduationCap size={24} className="text-purple-700 shrink-0" aria-hidden="true" />
               <div>
                 <p className="text-sm font-semibold text-ink">Pending Academic Audit</p>
                 <p className="text-xs text-ink/60 mt-0.5">
@@ -644,7 +655,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
         <Card className="border-green-300 bg-green-50/40">
           <CardContent className="py-4">
             <div className="flex items-start gap-3">
-              <span className="text-2xl" aria-hidden="true">🌱</span>
+              <IconSprout size={24} className="text-green-700 shrink-0" aria-hidden="true" />
               <div>
                 <p className="text-sm font-semibold text-ink">Fully Enrolled</p>
                 <p className="text-xs text-ink/60 mt-0.5">
@@ -825,7 +836,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
                         <TableRow key={doc.id}>
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-2">
-                              <span aria-hidden="true">📄</span>
+                              <IconFileText size={16} className="text-stone shrink-0" aria-hidden="true" />
                               <div>
                                 {doc.file_name}
                                 {doc.status === "rejected" && doc.rejection_reason && (
@@ -906,10 +917,10 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
                   <Card>
                     <CardContent className="py-4">
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl" aria-hidden="true">
-                          {registrationPacket.packet_status === "complete" ? "🎓" :
-                           registrationPacket.packet_status === "submitted" ? "📋" :
-                           registrationPacket.packet_status === "in_progress" ? "🔄" : "⏳"}
+                        <span className="text-ink/70 shrink-0" aria-hidden="true">
+                          {registrationPacket.packet_status === "complete" ? <IconGraduationCap size={24} /> :
+                           registrationPacket.packet_status === "submitted" ? <IconClipboardList size={24} /> :
+                           registrationPacket.packet_status === "in_progress" ? <IconRefreshCw size={24} /> : <IconClock size={24} />}
                         </span>
                         <div>
                           <p className="text-sm font-semibold text-ink">
@@ -945,7 +956,8 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
                                 });
                               }}
                             >
-                              ✓ Confirm Verification Complete → Move to Placement Review
+                              <IconCheckCircle size={16} className="mr-1" aria-hidden="true" />
+                              Confirm Verification Complete → Move to Placement Review
                             </Button>
                           </div>
                         )}
@@ -1044,7 +1056,10 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
                                       </Button>
                                     )}
                                     {item.status === "verified" && (
-                                      <span className="text-xs text-green-600 font-medium">✓ Done</span>
+                                      <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
+                                        <IconCheckCircle size={14} aria-hidden="true" />
+                                        Done
+                                      </span>
                                     )}
                                   </div>
                                 </TableCell>
@@ -1071,7 +1086,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
                 <Card className={detail.status === "enrolled" ? "border-green-200 bg-green-50/20" : "border-blue-200 bg-blue-50/20"}>
                   <CardHeader>
                     <div className="flex items-center gap-2">
-                      <span className="text-xl" aria-hidden="true">🎓</span>
+                      <IconGraduationCap size={20} className="text-ink/70 shrink-0" aria-hidden="true" />
                       <div>
                         <CardTitle className="text-base">Academic Audit & Placement</CardTitle>
                         <CardDescription>

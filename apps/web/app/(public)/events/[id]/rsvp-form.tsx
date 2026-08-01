@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { IconCheckCircle } from "@/components/ui/icons";
 import { useLocale } from "@/lib/i18n/locale-context";
 import { submitRsvp } from "../actions";
 
@@ -33,7 +34,9 @@ export function RsvpForm({ eventId, campusId, isFull }: { eventId: string; campu
   if (done) {
     return (
       <div className="rounded-xl border border-rooted-green/30 bg-rooted-green/5 p-6 text-center space-y-2">
-        <div className="text-3xl">🎉</div>
+        <div className="flex justify-center text-rooted-green">
+          <IconCheckCircle size={32} />
+        </div>
         <p className="font-semibold text-ink">{es ? "¡Está registrado/a!" : "You're registered!"}</p>
         <p className="text-sm text-ink/70">
           {es

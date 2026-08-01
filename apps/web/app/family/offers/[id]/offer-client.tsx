@@ -18,6 +18,7 @@ import { useToast } from "@/components/ui/toast";
 import type { FamilyOfferDetail } from "@/lib/queries";
 import { familyAcceptOffer, familyDeclineOffer } from "../../applications/actions";
 import { useLocale } from "@/lib/i18n/locale-context";
+import { IconAlertTriangle, IconBan, IconCheckCircle, IconClock } from "@/components/ui/icons";
 
 interface Props {
   offer: FamilyOfferDetail;
@@ -50,7 +51,9 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
     return (
       <Card>
         <CardContent className="py-10 text-center space-y-4">
-          <div className="text-4xl">✅</div>
+          <div className="flex justify-center text-rooted-green">
+            <IconCheckCircle size={40} />
+          </div>
           <h2 className="text-xl font-bold text-ink">{t("offers.offerAccepted")}</h2>
           <p className="text-sm text-stone max-w-xs mx-auto">
             {t("offers.alreadyAcceptedPre")} {offer.student_name} {t("common.at")}{" "}
@@ -70,7 +73,9 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
     return (
       <Card>
         <CardContent className="py-10 text-center space-y-4">
-          <div className="text-4xl">🚫</div>
+          <div className="flex justify-center text-stone">
+            <IconBan size={40} />
+          </div>
           <h2 className="text-xl font-bold text-ink">{t("offers.offerDeclined")}</h2>
           <p className="text-sm text-stone max-w-xs mx-auto">
             {t("offers.declinedPre")} {offer.student_name}. {t("offers.declinedPost")}
@@ -87,7 +92,9 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
     return (
       <Card>
         <CardContent className="py-10 text-center space-y-4">
-          <div className="text-4xl">⏰</div>
+          <div className="flex justify-center text-stone">
+            <IconClock size={40} />
+          </div>
           <h2 className="text-xl font-bold text-ink">{t("offers.offerExpired")}</h2>
           <p className="text-sm text-stone max-w-xs mx-auto">
             {t("offers.expiredPre")} {offer.student_name} {t("offers.expiredPost")}
@@ -138,7 +145,9 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
     <>
       {/* ── Congratulations header ── */}
       <div className="bg-rooted-green/10 border border-rooted-green/30 rounded-xl p-6 text-center space-y-2">
-        <div className="text-5xl">🎉</div>
+        <div className="flex justify-center text-rooted-green">
+          <IconCheckCircle size={40} />
+        </div>
         <h1 className="text-2xl font-bold text-ink">
           {t("offers.congratulations")}
         </h1>
@@ -203,7 +212,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
       {/* ── Urgency banner ── */}
       {offer.is_urgent && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 flex items-start gap-2">
-          <span className="shrink-0 mt-0.5">⚠️</span>
+          <IconAlertTriangle size={16} className="shrink-0 mt-0.5" />
           <span>
             {t("offers.urgentBanner")}
           </span>
@@ -242,15 +251,15 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
           <p className="text-sm font-semibold text-ink">{t("offers.whatHappens")}</p>
           <div className="space-y-2 text-sm text-ink/70">
             <div className="flex items-start gap-2">
-              <span className="text-rooted-green mt-0.5 shrink-0">✓</span>
+              <IconCheckCircle size={16} className="text-rooted-green mt-0.5 shrink-0" />
               <span>{t("offers.seatSecuredAt")} {offer.campus_name}.</span>
             </div>
             <div className="flex items-start gap-2">
-              <span className="text-rooted-green mt-0.5 shrink-0">✓</span>
+              <IconCheckCircle size={16} className="text-rooted-green mt-0.5 shrink-0" />
               <span>{t("offers.portalNext")}</span>
             </div>
             <div className="flex items-start gap-2">
-              <span className="text-rooted-green mt-0.5 shrink-0">✓</span>
+              <IconCheckCircle size={16} className="text-rooted-green mt-0.5 shrink-0" />
               <span>{t("offers.regFinalized")}</span>
             </div>
           </div>

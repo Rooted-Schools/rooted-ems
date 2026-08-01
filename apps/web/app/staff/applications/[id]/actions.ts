@@ -214,7 +214,7 @@ export async function staffCompleteAcademicAudit(
   await requireStaffSession();
   // Record audit as an internal note
   const noteContent = [
-    `📋 ACADEMIC AUDIT COMPLETE`,
+    `ACADEMIC AUDIT COMPLETE`,
     `Confirmed Grade: ${auditData.confirmedGrade}`,
     auditData.academicSupports.length > 0
       ? `Academic Supports: ${auditData.academicSupports.join(", ")}`

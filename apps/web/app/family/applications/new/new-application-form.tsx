@@ -714,7 +714,7 @@ export function NewApplicationForm({ windows, campuses, gradeLevels, initialCamp
               </label>
             </div>
             <p className="text-xs text-stone">
-              📋 {t("appForm.regNote")}
+              {t("appForm.regNote")}
             </p>
           </CardContent>
         </Card>

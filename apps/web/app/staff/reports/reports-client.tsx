@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,13 +12,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { IconBarChart, IconUsers, IconTrendingUp, IconClipboardList, IconSearch } from "@/components/ui/icons";
 import type { ReportData } from "./page";
 
 interface ReportConfig {
   id: string;
   title: string;
   description: string;
-  icon: string;
+  icon: ReactNode;
   recordCount: number;
 }
 
@@ -76,35 +77,35 @@ export function ReportsClient({ data }: { data: ReportData }) {
       id: "pipeline",
       title: "Pipeline Summary",
       description: "Application counts by status with conversion rates.",
-      icon: "📊",
+      icon: <IconBarChart size={24} />,
       recordCount: data.pipeline.reduce((sum, r) => sum + r.count, 0),
     },
     {
       id: "demographics",
       title: "Demographics Report",
       description: "Applicant demographics by race/ethnicity.",
-      icon: "👥",
+      icon: <IconUsers size={24} />,
       recordCount: data.demographics.reduce((sum, r) => sum + r.count, 0),
     },
     {
       id: "capacity",
       title: "Capacity Utilization",
       description: "Seats offered, accepted, and registered vs. total capacity.",
-      icon: "📈",
+      icon: <IconTrendingUp size={24} />,
       recordCount: data.capacity.length,
     },
     {
       id: "compliance",
       title: "Compliance Export",
       description: "Enrollment data for state reporting.",
-      icon: "📋",
+      icon: <IconClipboardList size={24} />,
       recordCount: data.enrollments.length,
     },
     {
       id: "audit",
       title: "Audit Trail",
       description: "System actions with timestamps and change details.",
-      icon: "🔍",
+      icon: <IconSearch size={24} />,
       recordCount: data.auditEvents.length,
     },
   ];
@@ -340,7 +341,7 @@ export function ReportsClient({ data }: { data: ReportData }) {
           >
             <CardHeader>
               <div className="flex items-start gap-3">
-                <span className="text-2xl" aria-hidden="true">
+                <span className="text-stone" aria-hidden="true">
                   {report.icon}
                 </span>
                 <div className="flex-1">

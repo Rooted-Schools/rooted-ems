@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/lib/i18n/locale-context";
 import type { LotteryOutcome } from "@/lib/queries";
+import { IconCheckCircle, IconClock, IconSearch, IconTicket } from "@/components/ui/icons";
 
 interface Props {
   outcome: LotteryOutcome | null;
@@ -20,7 +21,9 @@ export function LotteryResultClient({ outcome }: Props) {
     return (
       <Card>
         <CardContent className="py-10 text-center space-y-4">
-          <div className="text-4xl">🔍</div>
+          <div className="flex justify-center text-stone">
+            <IconSearch size={40} />
+          </div>
           <h1 className="text-xl font-bold text-ink">{t("lotteryResult.notFoundTitle")}</h1>
           <p className="text-sm text-stone max-w-sm mx-auto">
             {t("lotteryResult.notFoundBody")}
@@ -38,7 +41,9 @@ export function LotteryResultClient({ outcome }: Props) {
     return (
       <Card>
         <CardContent className="py-10 text-center space-y-4">
-          <div className="text-4xl">🎟️</div>
+          <div className="flex justify-center text-stone">
+            <IconTicket size={40} />
+          </div>
           <h1 className="text-xl font-bold text-ink">{t("lotteryResult.noResultYetTitle")}</h1>
           <p className="text-sm text-stone max-w-sm mx-auto">
             {t("lotteryResult.noResultYetBody")}
@@ -87,7 +92,9 @@ export function LotteryResultClient({ outcome }: Props) {
             : "bg-amber-50 border-amber-200"
         }`}
       >
-        <div className="text-5xl">{isSelected ? "🎉" : "📋"}</div>
+        <div className={`flex justify-center ${isSelected ? "text-rooted-green" : "text-amber-600"}`}>
+          {isSelected ? <IconCheckCircle size={40} /> : <IconClock size={40} />}
+        </div>
         <h1 className="text-2xl font-bold text-ink">
           {name} — <span className="font-normal">{campusName}</span>
         </h1>
@@ -159,21 +166,21 @@ export function LotteryResultClient({ outcome }: Props) {
           <div className="space-y-2 text-sm text-ink/70">
             {isSelected ? (
               <div className="flex items-start gap-2">
-                <span className="text-rooted-green mt-0.5 shrink-0">✓</span>
+                <IconCheckCircle size={16} className="text-rooted-green mt-0.5 shrink-0" />
                 <span>{t("lotteryResult.nextOffered1")}</span>
               </div>
             ) : (
               <>
                 <div className="flex items-start gap-2">
-                  <span className="text-rooted-green mt-0.5 shrink-0">✓</span>
+                  <IconCheckCircle size={16} className="text-rooted-green mt-0.5 shrink-0" />
                   <span>{t("lotteryResult.nextWaitlisted1")}</span>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-rooted-green mt-0.5 shrink-0">✓</span>
+                  <IconCheckCircle size={16} className="text-rooted-green mt-0.5 shrink-0" />
                   <span>{t("lotteryResult.nextWaitlisted2").replace("{name}", name)}</span>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-rooted-green mt-0.5 shrink-0">✓</span>
+                  <IconCheckCircle size={16} className="text-rooted-green mt-0.5 shrink-0" />
                   <span>{t("lotteryResult.nextWaitlisted3")}</span>
                 </div>
               </>

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { IconRefreshCw } from "@/components/ui/icons";
 import type { EventRow } from "@/lib/queries";
 import { staffCreateEvent, staffSyncTablingEvents } from "../actions";
 
@@ -153,8 +154,9 @@ export function EventsClient({ events, campuses, activeCampusId, staffUserId }: 
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {syncStatus && <span className="text-xs text-stone">{syncStatus}</span>}
-          <Button variant="outline" onClick={syncCalendar} disabled={isPending} title="Import Confirmed events from the Tabling Calendar spreadsheet">
-            🔄 Sync calendar
+          <Button variant="outline" onClick={syncCalendar} disabled={isPending} title="Import Confirmed events from the Tabling Calendar spreadsheet" className="gap-1.5">
+            <IconRefreshCw size={16} />
+            Sync calendar
           </Button>
           <Button onClick={() => { setForm({ ...EMPTY, campus_id: campuses.length === 1 ? campuses[0].id : "" }); setError(null); setOpen(true); }}>
             + New Event

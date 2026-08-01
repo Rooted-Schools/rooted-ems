@@ -548,7 +548,7 @@ export function EditApplicationClient({ draft, windows, campuses, gradeLevels }:
               />
             </Field>
             <p className="text-xs text-stone">
-              📋 {t("appForm.regNote")}
+              {t("appForm.regNote")}
             </p>
           </CardContent>
         </Card>

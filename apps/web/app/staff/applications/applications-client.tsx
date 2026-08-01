@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "@/components/ui/empty-state";
+import { IconClipboardList } from "@/components/ui/icons";
 import { Pagination } from "@/components/ui/pagination";
 import {
   Dialog,
@@ -477,7 +478,7 @@ export function StaffApplicationsClient({
         <CardContent className="pt-6 px-0">
           {filtered.length === 0 ? (
             <EmptyState
-              icon="📋"
+              icon={<IconClipboardList size={40} />}
               title="No applications found"
               description={
                 search || campusFilter !== "all"

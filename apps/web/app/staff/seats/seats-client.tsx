@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { IconPenLine } from "@/components/ui/icons";
 import { staffUpdateCapacity } from "./actions";
 
 interface SeatRow {
@@ -326,7 +327,7 @@ export function SeatsClient({ rows }: SeatsClientProps) {
                               className="text-xs text-stone hover:text-rooted-green transition-colors"
                               title="Edit total seats"
                             >
-                              ✏️
+                              <IconPenLine size={14} />
                             </button>
                           )}
                         </td>

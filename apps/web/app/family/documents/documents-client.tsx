@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
+import { IconFileText, IconAlertTriangle, IconInfo } from "@/components/ui/icons";
 import { uploadFile, getSignedUrl, formatFileSize, validateFile } from "@/lib/storage/upload";
 import { familyCreateDocumentRecord } from "@/app/family/applications/actions";
 import { useLocale } from "@/lib/i18n/locale-context";
@@ -176,7 +177,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
 
       {/* Item 8: set timing expectations so families don't think docs are needed right now */}
       <div className="flex items-start gap-2.5 p-3 rounded-lg bg-blue-50 border border-blue-100 text-sm text-blue-800">
-        <span className="shrink-0 mt-0.5">ℹ️</span>
+        <span className="shrink-0 mt-0.5"><IconInfo size={16} /></span>
         <span>
           {t("docs.infoPre")} <strong>{t("docs.infoStrong")}</strong>{t("docs.infoPost")}
         </span>
@@ -215,7 +216,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
         <Card>
           <CardContent className="py-8">
             <EmptyState
-              icon="📄"
+              icon={<IconFileText size={40} />}
               title={t("docs.noDocs")}
               description={
                 applications.length === 0
@@ -255,7 +256,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
                           className="flex items-center justify-between p-3 rounded-md border border-stone/20"
                         >
                           <div className="flex items-center gap-3 min-w-0">
-                            <span className="text-xl shrink-0" aria-hidden="true">📄</span>
+                            <span className="shrink-0 text-stone" aria-hidden="true"><IconFileText size={18} /></span>
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-ink truncate">{doc.file_name}</p>
                               <p className="text-xs text-stone">
@@ -266,8 +267,9 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
                                 {studentNames.length === 1 && <> &middot; {doc.student_name}</>}
                               </p>
                               {doc.status === "rejected" && doc.rejection_reason && (
-                                <p className="text-xs text-red-600 mt-1 font-medium">
-                                  ⚠️ {t("docs.reason")} {doc.rejection_reason}
+                                <p className="text-xs text-red-600 mt-1 font-medium flex items-center gap-1">
+                                  <IconAlertTriangle size={12} />
+                                  {t("docs.reason")} {doc.rejection_reason}
                                 </p>
                               )}
                             </div>

@@ -173,7 +173,6 @@ export function DocumentQueueClient({ initialRows, stats, campusOptions }: Props
       {filteredRows.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center">
-            <p className="text-3xl mb-3">✅</p>
             <p className="text-sm text-stone">
               {campusFilter === "all"
                 ? "No documents pending review."

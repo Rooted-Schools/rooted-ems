@@ -8,6 +8,7 @@ import { getFamilyPendingOffers } from "@/lib/queries";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { IconMail } from "@/components/ui/icons";
 import { getLocale } from "@/lib/i18n/get-locale";
 import { tx } from "@/lib/i18n/translations";
 
@@ -35,7 +36,9 @@ export default async function FamilyOffersPage() {
       {offers.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center space-y-3">
-            <div className="text-3xl">📬</div>
+            <div className="flex justify-center text-stone">
+              <IconMail size={32} />
+            </div>
             <p className="text-sm text-stone">
               {t("offers.noPending")}
             </p>

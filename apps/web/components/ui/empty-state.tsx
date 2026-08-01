@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 interface EmptyStateProps {
-  icon?: string;
+  icon?: React.ReactNode;
   title: string;
   description?: string;
   children?: React.ReactNode;
@@ -12,7 +12,7 @@ export function EmptyState({ icon, title, description, children, className }: Em
   return (
     <div className={cn("flex flex-col items-center justify-center py-12 px-4 text-center", className)}>
       {icon && (
-        <span className="text-4xl mb-4" aria-hidden="true">
+        <span className="text-stone/60 mb-4" aria-hidden="true">
           {icon}
         </span>
       )}

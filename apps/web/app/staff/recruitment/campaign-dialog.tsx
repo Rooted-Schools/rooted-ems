@@ -132,7 +132,7 @@ export function CampaignDialog({ open, onOpenChange, campuses, staffUserId }: Ca
         {launched !== null ? (
           <>
             <DialogHeader>
-              <DialogTitle>🚀 Campaign launched</DialogTitle>
+              <DialogTitle>Campaign launched</DialogTitle>
               <DialogDescription>
                 {launched.toLocaleString()} famil{launched === 1 ? "y" : "ies"} enrolled. Sending starts
                 with today&apos;s batch and continues automatically at {dailyLimit}/day. Every send

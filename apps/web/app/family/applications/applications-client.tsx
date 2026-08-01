@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { IconFileText } from "@/components/ui/icons";
 import Link from "next/link";
 import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationRow } from "@/lib/queries";
@@ -74,7 +75,7 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
 
       {!hasApplications ? (
         <EmptyState
-          icon="📝"
+          icon={<IconFileText size={40} />}
           title={t("apps.noApplications")}
           description="Start a new application to enroll your child at a rootedschool campus."
         >

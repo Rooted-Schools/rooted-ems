@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, type ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +25,16 @@ import { useLocale } from "@/lib/i18n/locale-context";
 import { type TranslationKey } from "@/lib/i18n/translations";
 import { uploadFile, validateFile, formatFileSize } from "@/lib/storage/upload";
 import { familyCreateDocumentRecord } from "@/app/family/applications/actions";
+import {
+  IconClipboardList,
+  IconFileText,
+  IconGraduationCap,
+  IconCheckCircle,
+  IconInbox,
+  IconPaperclip,
+  IconHeartPulse,
+  IconSettings,
+} from "@/components/ui/icons";
 
 interface RegistrationItem {
   id: string;
@@ -71,52 +81,12 @@ interface RegistrationClientProps {
   userId: string;
 }
 
-const ITEM_ICONS: Record<string, string> = {
-  emergency_contact: "🚨",
-  medical_info: "🏥",
-  medication_auth: "💊",
-  food_allergy_plan: "🥜",
-  tech_policy: "💻",
-  handbook_ack: "📖",
-  discipline_policy: "📋",
-  media_release: "📷",
-  field_trip: "🚌",
-  internet_safety: "🔒",
-  anti_bullying: "🤝",
-  uniform_policy: "👔",
-  ferpa_consent: "📝",
-  pickup_auth: "🚗",
-  immunization_records: "💉",
-  proof_of_residency: "🏠",
-  proof_of_age: "📄",
-  lthc_form: "⚕️",
-  sc_health_exam: "🩺",
-  sc_dental_screen: "🦷",
-  oh_custody_affidavit: "⚖️",
-  income_verification: "💰",
-  iep_records: "📚",
-  "504_plan": "♿",
-  home_language_survey: "🌐",
-  mckinney_vento: "🏘️",
-  previous_school_records: "🎓",
-  frl_app: "🍽️",
-  military_family: "🎖️",
-  transport: "🚌",
-  before_after_care: "🕐",
-  parent_id: "🪪",
-  custody_docs: "⚖️",
-  student_photo: "📸",
-  sports_physical: "🏃",
-  wa_health_exam: "🩺",
-};
-
-
 /* ─── Category icons (labels come from translations) ─── */
-const ITEM_CATEGORY_ICONS: Record<string, string> = {
-  health:   "🏥",
-  policies: "📋",
-  records:  "📄",
-  services: "⚙️",
+const ITEM_CATEGORY_ICONS: Record<string, ComponentType<{ size?: number; className?: string }>> = {
+  health:   IconHeartPulse,
+  policies: IconClipboardList,
+  records:  IconFileText,
+  services: IconSettings,
 };
 
 const ITEM_TO_CATEGORY: Record<string, string> = {
@@ -546,7 +516,9 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
   if (enrollments.length === 0) {
     return (
       <div className="text-center py-16 max-w-md mx-auto">
-        <div className="text-4xl mb-4">📋</div>
+        <div className="flex justify-center text-rooted-green mb-4">
+          <IconClipboardList size={40} />
+        </div>
         <h3 className="text-lg font-semibold text-ink mb-2">{t("reg.emptyTitle")}</h3>
         <p className="text-stone text-sm">
           {t("reg.emptyBody")} <a href="/family/offers" className="text-rooted-green underline font-medium">{t("offers.heading")}</a> {t("reg.emptyBodyEnd")}
@@ -731,7 +703,9 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
         <Card className="border-rooted-green/30 bg-rooted-green/5">
           <CardContent className="py-5">
             <div className="flex items-start gap-4">
-              <span className="text-3xl" aria-hidden="true">🎓</span>
+              <span className="text-rooted-green shrink-0" aria-hidden="true">
+                <IconGraduationCap size={32} />
+              </span>
               <div>
                 <p className="text-base font-bold text-ink">
                   {t("reg.welcome")}
@@ -847,9 +821,12 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
               {Object.keys(ITEM_CATEGORY_ICONS).map((catKey) => {
                 if (!groupedRequirements[catKey]) return null;
                 const prog = categoryProgress[catKey] ?? { done: 0, total: 0 };
+                const CategoryIcon = ITEM_CATEGORY_ICONS[catKey];
                 return (
                   <div key={catKey} className="flex items-center gap-1.5">
-                    <span className="text-xs">{ITEM_CATEGORY_ICONS[catKey]}</span>
+                    <span className="text-stone">
+                      <CategoryIcon size={14} />
+                    </span>
                     <span className="text-[10px] text-stone">
                       {t(`reg.cat.${catKey}` as TranslationKey)}
                     </span>
@@ -891,13 +868,16 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
           if (!reqs || reqs.length === 0) return null;
           const prog = categoryProgress[catKey] ?? { done: 0, total: 0 };
           const allDone = prog.done === prog.total;
+          const CategoryIcon = ITEM_CATEGORY_ICONS[catKey];
 
           return (
             <Card key={catKey} className={allDone ? "border-green-200/60" : ""}>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">{ITEM_CATEGORY_ICONS[catKey]}</span>
+                    <span className="text-ink/70">
+                      <CategoryIcon size={20} />
+                    </span>
                     <CardTitle className="text-sm">{t(`reg.cat.${catKey}` as TranslationKey)}</CardTitle>
                   </div>
                   <span className={`text-xs font-semibold ${allDone ? "text-green-600" : "text-stone"}`}>
@@ -923,9 +903,6 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-lg shrink-0">
-                          {ITEM_ICONS[req.item_type] ?? "📄"}
-                        </span>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-medium text-ink">
@@ -1023,7 +1000,9 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
           <CardContent className="py-5">
             <div className="flex items-center justify-between">
               <div className="flex items-start gap-3">
-                <span className="text-2xl" aria-hidden="true">🎉</span>
+                <span className="text-rooted-green shrink-0" aria-hidden="true">
+                  <IconCheckCircle size={24} />
+                </span>
                 <div>
                   <p className="text-base font-bold text-ink">
                     {allItemsComplete ? t("reg.allComplete") : t("reg.requiredComplete")}
@@ -1052,9 +1031,13 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
       {packetSubmitted && (
         <Card className="border-green-300 bg-green-50">
           <CardContent className="py-6 text-center">
-            <span className="text-4xl block mb-3" aria-hidden="true">
-              {enrollment.packet?.status === "complete" ? "🎓" : "📬"}
-            </span>
+            <div className="flex justify-center text-green-700 mb-3" aria-hidden="true">
+              {enrollment.packet?.status === "complete" ? (
+                <IconGraduationCap size={36} />
+              ) : (
+                <IconInbox size={36} />
+              )}
+            </div>
             <p className="text-lg font-bold text-green-800">
               {enrollment.packet?.status === "complete"
                 ? t("reg.packComplete")
@@ -1096,8 +1079,9 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
 
               <div className="space-y-4 py-4">
                 {config.mode === "form" && wasPrefilled && (
-                  <p className="text-xs text-rooted-green bg-rooted-green/5 border border-rooted-green/20 rounded-md px-3 py-2">
-                    ✓ {t("reg.prefilledHint")}
+                  <p className="flex items-start gap-1.5 text-xs text-rooted-green bg-rooted-green/5 border border-rooted-green/20 rounded-md px-3 py-2">
+                    <IconCheckCircle size={14} className="shrink-0 mt-0.5" aria-hidden="true" />
+                    <span>{t("reg.prefilledHint")}</span>
                   </p>
                 )}
                 {config.mode === "form" && config.fields.map((field) => (
@@ -1219,7 +1203,9 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                       />
                       {uploadSelectedFile ? (
                         <div className="space-y-1">
-                          <p className="text-2xl">✅</p>
+                          <div className="flex justify-center text-rooted-green">
+                            <IconCheckCircle size={28} />
+                          </div>
                           <p className="text-sm font-medium text-ink">{uploadSelectedFile.name}</p>
                           <p className="text-xs text-stone">{formatFileSize(uploadSelectedFile.size)}</p>
                           <button
@@ -1237,7 +1223,9 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                         </div>
                       ) : (
                         <label htmlFor="reg-upload-input" className="cursor-pointer block">
-                          <p className="text-2xl mb-2">📎</p>
+                          <div className="flex justify-center text-stone mb-2">
+                            <IconPaperclip size={28} />
+                          </div>
                           <p className="text-sm font-medium text-ink">{t("reg.upload.clickToChoose")}</p>
                           <p className="text-xs text-stone mt-1">{t("reg.upload.formats")}</p>
                         </label>

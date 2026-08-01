@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { IconTicket, IconClipboardList } from "@/components/ui/icons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -437,7 +438,7 @@ export function OffersClient({
               <Card>
                 <CardContent className="py-8">
                   <EmptyState
-                    icon="🎫"
+                    icon={<IconTicket size={40} />}
                     title="No offers yet"
                     description={
                       eligibleApplicants.length > 0
@@ -582,7 +583,7 @@ export function OffersClient({
               <Card>
                 <CardContent className="py-8">
                   <EmptyState
-                    icon="📋"
+                    icon={<IconClipboardList size={40} />}
                     title="No students on waitlist"
                     description="Students will be added to the waitlist after a lottery when there are more applicants than seats."
                   />

@@ -6,6 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import {
+  IconInbox,
+  IconAlertTriangle,
+  IconCheckCircle,
+  IconClock,
+  IconPaperclip,
+} from "@/components/ui/icons";
 
 interface WorkItem {
   id: string;
@@ -23,7 +30,7 @@ const QUEUE_CATEGORIES = [
     label: "New Submissions",
     description: "Awaiting initial staff review",
     statuses: ["submitted"],
-    icon: "📥",
+    icon: IconInbox,
     borderColor: "border-l-blue-500",
   },
   {
@@ -31,7 +38,7 @@ const QUEUE_CATEGORIES = [
     label: "Missing Info",
     description: "Waiting for family to provide documents",
     statuses: ["needs_info"],
-    icon: "⚠️",
+    icon: IconAlertTriangle,
     borderColor: "border-l-amber-500",
   },
   {
@@ -39,7 +46,7 @@ const QUEUE_CATEGORIES = [
     label: "Verified — Ready",
     description: "Verified and ready for lottery or offer",
     statuses: ["verified"],
-    icon: "✅",
+    icon: IconCheckCircle,
     borderColor: "border-l-green-500",
   },
   {
@@ -47,7 +54,7 @@ const QUEUE_CATEGORIES = [
     label: "Pending Response",
     description: "Awaiting family response to seat offers",
     statuses: ["offered"],
-    icon: "⏰",
+    icon: IconClock,
     borderColor: "border-l-red-500",
   },
   {
@@ -55,7 +62,7 @@ const QUEUE_CATEGORIES = [
     label: "Pending Enrollment",
     description: "Accepted offer — awaiting registration completion",
     statuses: ["accepted"],
-    icon: "📎",
+    icon: IconPaperclip,
     borderColor: "border-l-purple-500",
   },
 ];
@@ -153,7 +160,7 @@ export default async function StaffInboxPage({
             >
               <CardContent className="p-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-lg">{cat.icon}</span>
+                  <cat.icon size={20} aria-hidden="true" />
                   <span
                     className={`text-2xl font-bold ${
                       cat.items.length > 0 ? "text-ink" : "text-stone/50"
@@ -178,7 +185,7 @@ export default async function StaffInboxPage({
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-base">{cat.icon}</span>
+                  <cat.icon size={18} aria-hidden="true" />
                   <CardTitle className="text-base">{cat.label}</CardTitle>
                   <Badge
                     variant={cat.items.length > 0 ? "default" : "secondary"}

@@ -6,6 +6,7 @@ import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { IconTicket } from "@/components/ui/icons";
 import { getStaffLotteryRuns, getCampuses } from "@/lib/queries";
 import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 import { NewLotteryRunDialog } from "./new-lottery-dialog";
@@ -83,7 +84,7 @@ export default async function StaffLotteryPage({
         <Card>
           <CardContent className="py-8">
             <EmptyState
-              icon="🎲"
+              icon={<IconTicket size={40} />}
               title="No lottery runs yet"
               description="Create a lottery run when you have more applicants than available seats for a grade level."
             >

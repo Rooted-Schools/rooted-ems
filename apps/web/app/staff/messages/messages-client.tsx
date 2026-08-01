@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { IconMail, IconMailOpen } from "@/components/ui/icons";
 import { markStaffNotificationsRead } from "./actions";
 
 interface StaffMessage {
@@ -84,7 +85,7 @@ export function StaffMessagesClient({ messages }: StaffMessagesClientProps) {
             <CardContent className="py-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                  <span className="text-lg" aria-hidden="true">📩</span>
+                  <IconMail size={20} className="text-amber-600" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-amber-600">{unreadCount}</p>
@@ -97,7 +98,7 @@ export function StaffMessagesClient({ messages }: StaffMessagesClientProps) {
             <CardContent className="py-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-rooted-gray flex items-center justify-center shrink-0">
-                  <span className="text-lg" aria-hidden="true">📧</span>
+                  <IconMailOpen size={20} className="text-ink/60" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-ink/60">{readCount}</p>
@@ -113,7 +114,7 @@ export function StaffMessagesClient({ messages }: StaffMessagesClientProps) {
         <Card className="border-dashed">
           <CardContent className="py-12">
             <EmptyState
-              icon="📬"
+              icon={<IconMail size={40} />}
               title="No notifications yet"
               description="You will receive notifications here when families take action — submitting applications, uploading documents, accepting offers, or completing registration."
             />
@@ -171,8 +172,8 @@ export function StaffMessagesClient({ messages }: StaffMessagesClientProps) {
                         !msg.is_read ? "bg-amber-100" : "bg-rooted-gray-light"
                       }`}
                     >
-                      <span className="text-base" aria-hidden="true">
-                        {!msg.is_read ? "📩" : "📧"}
+                      <span className="shrink-0" aria-hidden="true">
+                        {!msg.is_read ? <IconMail size={16} /> : <IconMailOpen size={16} />}
                       </span>
                     </div>
                     {!msg.is_read && (

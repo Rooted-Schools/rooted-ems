@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { LanguageToggle } from "@/components/ui/language-toggle";
+import { IconSprout } from "@/components/ui/icons";
 import { useLocale } from "@/lib/i18n/locale-context";
 import { submitInquiry } from "./actions";
 
@@ -101,7 +102,9 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
       <div className="min-h-screen bg-gradient-to-b from-rooted-green/5 to-warm-white flex items-center justify-center px-4">
         <Card className="max-w-md w-full text-center">
           <CardContent className="py-10 space-y-4">
-            <div className="text-4xl">🌱</div>
+            <div className="flex justify-center text-rooted-green">
+              <IconSprout size={40} />
+            </div>
             <h1 className="text-xl font-bold text-ink">{t("inquiry.thanksTitle")}</h1>
             <p className="text-sm text-ink/70">{t("inquiry.thanksBody")}</p>
             <div className="flex flex-col gap-2 pt-2">
@@ -136,11 +139,14 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
 
         {referrerName && (
           <div className="rounded-xl border border-rooted-green/30 bg-rooted-green/5 px-4 py-3 mb-3 text-center">
-            <p className="text-sm text-ink">
-              🌱 <span className="font-semibold">{referrerName}</span>{" "}
-              {locale === "es"
-                ? "cree que su familia sería ideal para Rooted. ¡Cuéntenos sobre usted!"
-                : "thinks your family would be a great fit for Rooted. Tell us about yourself!"}
+            <p className="text-sm text-ink flex items-center justify-center gap-1.5">
+              <IconSprout size={16} className="text-rooted-green shrink-0" />
+              <span>
+                <span className="font-semibold">{referrerName}</span>{" "}
+                {locale === "es"
+                  ? "cree que su familia sería ideal para Rooted. ¡Cuéntenos sobre usted!"
+                  : "thinks your family would be a great fit for Rooted. Tell us about yourself!"}
+              </span>
             </p>
           </div>
         )}

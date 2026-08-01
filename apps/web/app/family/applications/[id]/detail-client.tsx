@@ -19,32 +19,46 @@ import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationDetail } from "@/lib/queries";
 import { uploadFile, getSignedUrl, validateFile, formatFileSize } from "@/lib/storage/upload";
 import { familyWithdrawApplication, familyAcceptOffer, familyDeclineOffer, familyAcceptDirect, familyDeclineDirect, familySubmitResponse, familyCreateDocumentRecord } from "../actions";
+import type { ReactNode } from "react";
+import {
+  IconPenLine,
+  IconMail,
+  IconAlertTriangle,
+  IconCheckCircle,
+  IconTicket,
+  IconBell,
+  IconClipboardList,
+  IconGraduationCap,
+  IconBan,
+  IconFileText,
+  IconCalendar,
+} from "@/components/ui/icons";
 
 /* ─── Status guide — what happens at each stage ─── */
-function getStatusExplanation(status: string): { title: string; explanation: string; icon: string } {
+function getStatusExplanation(status: string): { title: string; explanation: string; icon: ReactNode } {
   switch (status) {
     case "draft":
-      return { title: "Draft", explanation: "Your application has been started but not yet submitted. Complete all required fields and documents, then submit before the enrollment window closes.", icon: "📝" };
+      return { title: "Draft", explanation: "Your application has been started but not yet submitted. Complete all required fields and documents, then submit before the enrollment window closes.", icon: <IconPenLine size={24} /> };
     case "submitted":
-      return { title: "Under Review", explanation: "Your application has been received and is being reviewed by our enrollment team. We may contact you if we need any additional information.", icon: "📬" };
+      return { title: "Under Review", explanation: "Your application has been received and is being reviewed by our enrollment team. We may contact you if we need any additional information.", icon: <IconMail size={24} /> };
     case "needs_info":
-      return { title: "Information Needed", explanation: "We need additional information or documents to continue processing your application. Please check your email or upload the requested items.", icon: "⚠️" };
+      return { title: "Information Needed", explanation: "We need additional information or documents to continue processing your application. Please check your email or upload the requested items.", icon: <IconAlertTriangle size={24} /> };
     case "verified":
-      return { title: "Verified", explanation: "All information and documents have been verified. Your application will be included in the upcoming enrollment lottery.", icon: "✅" };
+      return { title: "Verified", explanation: "All information and documents have been verified. Your application will be included in the upcoming enrollment lottery.", icon: <IconCheckCircle size={24} /> };
     case "lottery_assigned":
-      return { title: "In Lottery", explanation: "Your application has been entered into the enrollment lottery. Results will be shared once the lottery is run.", icon: "🎲" };
+      return { title: "In Lottery", explanation: "Your application has been entered into the enrollment lottery. Results will be shared once the lottery is run.", icon: <IconTicket size={24} /> };
     case "offered":
-      return { title: "Seat Offered!", explanation: "Congratulations! A seat has been offered to your student. Please respond before the deadline below to secure your spot.", icon: "🎉" };
+      return { title: "Seat Offered!", explanation: "Congratulations! A seat has been offered to your student. Please respond before the deadline below to secure your spot.", icon: <IconBell size={24} /> };
     case "accepted":
-      return { title: "Offer Accepted", explanation: "You have accepted the enrollment offer. Complete the registration process to finalize your student's enrollment.", icon: "✅" };
+      return { title: "Offer Accepted", explanation: "You have accepted the enrollment offer. Complete the registration process to finalize your student's enrollment.", icon: <IconCheckCircle size={24} /> };
     case "waitlisted":
-      return { title: "Waitlisted", explanation: "Your student is on the waitlist. We will notify you if a seat becomes available.", icon: "📋" };
+      return { title: "Waitlisted", explanation: "Your student is on the waitlist. We will notify you if a seat becomes available.", icon: <IconClipboardList size={24} /> };
     case "registered":
-      return { title: "Registered", explanation: "Your student is fully enrolled and registered. Welcome to the rootedschools family!", icon: "🎓" };
+      return { title: "Registered", explanation: "Your student is fully enrolled and registered. Welcome to the rootedschools family!", icon: <IconGraduationCap size={24} /> };
     case "withdrawn":
-      return { title: "Withdrawn", explanation: "This application has been withdrawn.", icon: "🚫" };
+      return { title: "Withdrawn", explanation: "This application has been withdrawn.", icon: <IconBan size={24} /> };
     default:
-      return { title: status, explanation: "", icon: "📄" };
+      return { title: status, explanation: "", icon: <IconFileText size={24} /> };
   }
 }
 
@@ -183,7 +197,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
           return;
         }
       }
-      setInlineResponseFeedback({ type: "success", message: "✅ Your response has been sent! The enrollment team will follow up." });
+      setInlineResponseFeedback({ type: "success", message: "Your response has been sent! The enrollment team will follow up." });
       setResponseText("");
       setResponseFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -271,7 +285,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
         <Card className="border-green-300 bg-green-50">
           <CardContent className="py-5">
             <div className="flex items-start gap-3">
-              <span className="text-2xl" aria-hidden="true">✅</span>
+              <IconCheckCircle size={24} className="text-green-700 shrink-0" aria-hidden="true" />
               <div className="space-y-3">
                 <div>
                   <p className="text-sm font-semibold text-green-900">Application submitted — you&apos;re all set for now</p>
@@ -289,9 +303,10 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                   </ol>
                 </div>
                 {detail.documents.length === 0 && (
-                  <div className="pt-1">
+                  <div className="pt-1 flex items-start gap-1.5">
+                    <IconFileText size={14} className="text-green-700 shrink-0 mt-0.5" aria-hidden="true" />
                     <p className="text-xs text-green-700">
-                      📎 <span className="font-medium">Documents may be required.</span>{" "}
+                      <span className="font-medium">Documents may be required.</span>{" "}
                       <Link href="/family/documents" className="underline hover:no-underline">
                         Go to Documents
                       </Link>{" "}
@@ -311,7 +326,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
           <CardContent className="py-5 space-y-4">
             {detail.review_notes && (
               <div className="flex items-start gap-3">
-                <span className="text-2xl" aria-hidden="true">📋</span>
+                <IconClipboardList size={24} className="text-amber-700 shrink-0" aria-hidden="true" />
                 <div>
                   <p className="text-sm font-semibold text-amber-900">What the enrollment team needs from you</p>
                   <p className="text-sm text-amber-800 mt-1 whitespace-pre-wrap">{detail.review_notes}</p>
@@ -381,7 +396,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
           <Card className={isUrgent ? "border-red-300 bg-red-50" : "border-amber-200 bg-amber-50/30"}>
             <CardContent className="py-5">
               <div className="flex items-start gap-4">
-                <span className="text-3xl" aria-hidden="true">🎉</span>
+                <IconBell size={32} className={isUrgent ? "text-red-700 shrink-0" : "text-amber-700 shrink-0"} aria-hidden="true" />
                 <div className="flex-1">
                   <p className="text-base font-bold text-ink">
                     {isExpired ? "Offer Expired" : "You Have a Seat Offer!"}
@@ -397,7 +412,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                         ? "bg-red-100 text-red-800"
                         : "bg-amber-100 text-amber-800"
                     }`}>
-                      <span aria-hidden="true">{isUrgent ? "⏰" : "📅"}</span>
+                      <span aria-hidden="true">{isUrgent ? <IconAlertTriangle size={14} /> : <IconCalendar size={14} />}</span>
                       {daysLeft === 1
                         ? "Expires tomorrow!"
                         : daysLeft === 0
@@ -432,7 +447,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
         <Card className={needsAction ? "border-amber-200 bg-amber-50/30" : "border-rooted-green/20 bg-rooted-green/5"}>
           <CardContent className="py-4">
             <div className="flex items-start gap-3">
-              <span className="text-2xl" aria-hidden="true">{statusExplanation.icon}</span>
+              <span className="text-ink/70 shrink-0" aria-hidden="true">{statusExplanation.icon}</span>
               <div>
                 <p className="text-sm font-semibold text-ink">{statusExplanation.title}</p>
                 <p className="text-sm text-ink/60 mt-0.5">{statusExplanation.explanation}</p>
@@ -518,7 +533,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                       className="flex items-center justify-between p-3 rounded-md border border-stone/20"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-lg" aria-hidden="true">📄</span>
+                        <IconFileText size={18} className="text-stone shrink-0" aria-hidden="true" />
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-ink truncate">
                             {doc.file_name}
@@ -527,8 +542,9 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                             Uploaded {formatDate(doc.created_at)}
                           </p>
                           {doc.status === "rejected" && doc.rejection_reason && (
-                            <p className="text-xs text-red-600 mt-0.5 font-medium">
-                              ⚠️ {doc.rejection_reason}
+                            <p className="text-xs text-red-600 mt-0.5 font-medium flex items-start gap-1">
+                              <IconAlertTriangle size={14} className="shrink-0 mt-0.5" aria-hidden="true" />
+                              <span>{doc.rejection_reason}</span>
                             </p>
                           )}
                         </div>

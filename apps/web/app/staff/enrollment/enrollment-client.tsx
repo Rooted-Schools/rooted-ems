@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
+import { IconGraduationCap } from "@/components/ui/icons";
 import {
   Table,
   TableBody,
@@ -175,7 +176,7 @@ export function EnrollmentClient({
         <Card>
           <CardContent className="py-8">
             <EmptyState
-              icon="🎓"
+              icon={<IconGraduationCap size={40} />}
               title="No enrollments yet"
               description="Enrolled students will appear here after they accept an offer and complete registration."
             />

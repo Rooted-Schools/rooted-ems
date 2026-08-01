@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
+import { IconMail, IconPhone, IconBell, IconPenLine } from "@/components/ui/icons";
 import {
   staffSendNotification,
   staffCreateTemplate,
@@ -77,11 +78,17 @@ interface CommsClientProps {
 
 // ─── Constants ──────────────────────────────────────────
 
-const channelIcons: Record<string, string> = {
-  email: "📧",
-  sms: "📱",
-  in_app: "🔔",
-};
+function ChannelIcon({ channel, size = 14 }: { channel: string; size?: number }) {
+  switch (channel) {
+    case "sms":
+      return <IconPhone size={size} />;
+    case "in_app":
+      return <IconBell size={size} />;
+    case "email":
+    default:
+      return <IconMail size={size} />;
+  }
+}
 
 const channelLabels: Record<string, string> = {
   email: "Email",
@@ -249,7 +256,7 @@ export function CommsClient({
             <Card>
               <CardContent className="py-8">
                 <EmptyState
-                  icon="📧"
+                  icon={<IconMail size={40} />}
                   title="No messages sent yet"
                   description="Use the 'New Message' button to send your first notification to families."
                 />
@@ -274,7 +281,14 @@ export function CommsClient({
                             : "text-stone hover:bg-rooted-gray"
                         }`}
                       >
-                        {ch === "all" ? "All" : channelIcons[ch]} {ch === "all" ? "" : channelLabels[ch]}
+                        {ch === "all" ? (
+                          "All"
+                        ) : (
+                          <span className="inline-flex items-center gap-1">
+                            <ChannelIcon channel={ch} size={14} />
+                            {channelLabels[ch]}
+                          </span>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -303,8 +317,8 @@ export function CommsClient({
                             onClick={() => setExpandedMsgId(isExpanded ? null : msg.id)}
                           >
                             <TableCell>
-                              <span className="text-base" title={channelLabels[msg.channel] ?? msg.channel} aria-hidden="true">
-                                {channelIcons[msg.channel] ?? "📧"}
+                              <span className="inline-flex items-center text-stone" title={channelLabels[msg.channel] ?? msg.channel} aria-hidden="true">
+                                <ChannelIcon channel={msg.channel} size={16} />
                               </span>
                             </TableCell>
                             <TableCell className="text-ink/70 text-sm">
@@ -376,7 +390,7 @@ export function CommsClient({
             <CardContent>
               {templates.length === 0 ? (
                 <EmptyState
-                  icon="📝"
+                  icon={<IconPenLine size={40} />}
                   title="No templates created"
                   description="Create reusable message templates to speed up your communication workflow."
                 >
@@ -394,8 +408,9 @@ export function CommsClient({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-sm font-semibold text-ink">{tpl.name}</span>
-                          <Badge variant="outline" className="text-[10px]">
-                            {channelIcons[tpl.channel] ?? ""} {channelLabels[tpl.channel] ?? tpl.channel}
+                          <Badge variant="outline" className="text-[10px] inline-flex items-center gap-1">
+                            <ChannelIcon channel={tpl.channel} size={12} />
+                            {channelLabels[tpl.channel] ?? tpl.channel}
                           </Badge>
                           {!tpl.is_active && (
                             <Badge variant="secondary" className="text-[10px]">Archived</Badge>
@@ -665,7 +680,10 @@ function NewMessageDialog({
                       : "bg-white text-ink/70 border-stone/30 hover:bg-rooted-gray-light"
                   }`}
                 >
-                  {channelIcons[ch]} {channelLabels[ch]}
+                  <span className="inline-flex items-center gap-1.5">
+                    <ChannelIcon channel={ch} size={14} />
+                    {channelLabels[ch]}
+                  </span>
                 </button>
               ))}
             </div>
@@ -927,7 +945,10 @@ function NewTemplateDialog({
                       : "bg-white text-ink/70 border-stone/30 hover:bg-rooted-gray-light"
                   }`}
                 >
-                  {channelIcons[ch]} {channelLabels[ch]}
+                  <span className="inline-flex items-center gap-1.5">
+                    <ChannelIcon channel={ch} size={14} />
+                    {channelLabels[ch]}
+                  </span>
                 </button>
               ))}
             </div>

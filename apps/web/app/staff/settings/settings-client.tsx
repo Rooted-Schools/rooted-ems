@@ -6,6 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  IconBuilding,
+  IconCalendar,
+  IconClipboardList,
+  IconUsers,
+  IconGraduationCap,
+} from "@/components/ui/icons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
 import {
@@ -157,7 +164,7 @@ function CampusTab({ campuses }: { campuses: CampusRow[] }) {
       <CardContent>
         {campuses.length === 0 ? (
           <EmptyState
-            icon="🏫"
+            icon={<IconBuilding size={40} />}
             title="No campuses configured"
             description="Campus configuration is managed in the database."
           />
@@ -383,7 +390,7 @@ function EnrollmentWindowsTab({
         )}
         {windows.length === 0 ? (
           <EmptyState
-            icon="📅"
+            icon={<IconCalendar size={40} />}
             title="No enrollment windows"
             description="Create an enrollment window to allow families to submit applications."
           />
@@ -431,45 +438,6 @@ function EnrollmentWindowsTab({
 }
 
 // ─── Registration Requirements Tab ──────────────────────
-
-const ITEM_ICONS: Record<string, string> = {
-  emergency_contact: "🚨",
-  medical_info: "🏥",
-  medication_auth: "💊",
-  food_allergy_plan: "🥜",
-  tech_policy: "💻",
-  handbook_ack: "📖",
-  discipline_policy: "📋",
-  media_release: "📷",
-  field_trip: "🚌",
-  internet_safety: "🔒",
-  anti_bullying: "🤝",
-  uniform_policy: "👔",
-  ferpa_consent: "📝",
-  pickup_auth: "🚗",
-  immunization_records: "💉",
-  proof_of_residency: "🏠",
-  proof_of_age: "📄",
-  lthc_form: "⚕️",
-  sc_health_exam: "🩺",
-  sc_dental_screen: "🦷",
-  oh_custody_affidavit: "⚖️",
-  income_verification: "💰",
-  iep_records: "📚",
-  "504_plan": "♿",
-  home_language_survey: "🌐",
-  mckinney_vento: "🏘️",
-  previous_school_records: "🎓",
-  frl_app: "🍽️",
-  military_family: "🎖️",
-  transport: "🚌",
-  before_after_care: "🕐",
-  parent_id: "🪪",
-  custody_docs: "⚖️",
-  student_photo: "📸",
-  sports_physical: "🏃",
-  wa_health_exam: "🩺",
-};
 
 const CATEGORY_LABELS: Record<number, string> = {
   1: "Core Forms",
@@ -627,7 +595,7 @@ function RegistrationRequirementsTab({
 
         {filtered.length === 0 ? (
           <EmptyState
-            icon="📋"
+            icon={<IconClipboardList size={40} />}
             title="No requirements configured"
             description={`No registration requirements found for ${campusName}. Run the packet requirements seed migration to populate items.`}
           />
@@ -653,9 +621,6 @@ function RegistrationRequirementsTab({
                         }`}
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <span className="text-lg flex-shrink-0">
-                            {ITEM_ICONS[req.item_type] ?? "📄"}
-                          </span>
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-ink truncate">{req.name}</p>
                             {req.description && (
@@ -896,7 +861,7 @@ function StaffUsersTab({
         )}
         {users.length === 0 ? (
           <EmptyState
-            icon="👥"
+            icon={<IconUsers size={40} />}
             title="No staff users"
             description="Staff users will appear here once they are assigned campus roles."
           />
@@ -952,7 +917,6 @@ function StaffUsersTab({
                           className="flex items-center justify-between py-1.5 px-3 rounded-md bg-rooted-gray-light group"
                         >
                           <div className="flex items-center gap-2">
-                            <span className="text-xs" aria-hidden="true">🏫</span>
                             <span className="text-sm text-ink/70">{assignment.campus_name}</span>
                             <span className="text-[10px] text-stone">
                               {roleLabels[assignment.role] ?? assignment.role}
@@ -1079,7 +1043,7 @@ function SchoolYearsGradesTab({
         <CardContent>
           {schoolYears.length === 0 ? (
             <EmptyState
-              icon="📅"
+              icon={<IconCalendar size={40} />}
               title="No school years configured"
               description="School years are managed in the database."
             />
@@ -1143,7 +1107,7 @@ function SchoolYearsGradesTab({
         <CardContent>
           {campusGrades.length === 0 ? (
             <EmptyState
-              icon="🎓"
+              icon={<IconGraduationCap size={40} />}
               title="No grade levels configured"
               description="Grade levels for this campus can be added in the database."
             />

@@ -48,7 +48,7 @@ export default async function StaffLayout({
     <ToastProvider>
     <div className="flex min-h-screen bg-rooted-gray">
       <Suspense fallback={<aside className="hidden md:block w-64 bg-white border-r border-stone/20 min-h-screen" />}>
-        <StaffSidebar highestRole={highestRole} />
+        <StaffSidebar highestRole={highestRole} messagesUnreadCount={unreadNotificationCount} />
       </Suspense>
       <div className="flex-1 flex flex-col">
         <Suspense fallback={<div className="h-[5.5rem]" />}>

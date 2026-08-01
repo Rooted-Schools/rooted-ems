@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import type { CampaignRow, JourneyStat, LeadPipelineSummary, LeadRow } from "@/lib/queries/leads";
 import { formatRelativeTime } from "@/lib/queries/utils";
+import { IconCalendar, IconBarChart, IconLink, IconRefreshCw, IconMail, IconPhone, IconSprout } from "@/components/ui/icons";
 import { staffCancelCampaign, staffCreateLead, staffSyncLeadSheets } from "./actions";
 import { CampaignDialog } from "./campaign-dialog";
 import { ShareDialog } from "./share-dialog";
@@ -192,19 +193,19 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
             <span className="text-xs text-stone">{syncStatus}</span>
           )}
           <Link href={activeCampusId === "all" ? "/staff/recruitment/events" : `/staff/recruitment/events?campus=${activeCampusId}`}>
-            <Button variant="outline">🗓️ Events</Button>
+            <Button variant="outline" className="gap-1.5"><IconCalendar size={16} /> Events</Button>
           </Link>
           <Link href={activeCampusId === "all" ? "/staff/recruitment/analytics" : `/staff/recruitment/analytics?campus=${activeCampusId}`}>
-            <Button variant="outline">📊 Funnel</Button>
+            <Button variant="outline" className="gap-1.5"><IconBarChart size={16} /> Funnel</Button>
           </Link>
-          <Button variant="outline" onClick={() => setShareOpen(true)} title="Make a tagged link or QR code for a flyer or the school website">
-            🔗 Share &amp; QR
+          <Button variant="outline" className="gap-1.5" onClick={() => setShareOpen(true)} title="Make a tagged link or QR code for a flyer or the school website">
+            <IconLink size={16} /> Share &amp; QR
           </Button>
-          <Button variant="outline" onClick={syncSheets} disabled={isPending} title="Pull new sign-ups from the campus interest form spreadsheets">
-            🔄 Sync sheets
+          <Button variant="outline" className="gap-1.5" onClick={syncSheets} disabled={isPending} title="Pull new sign-ups from the campus interest form spreadsheets">
+            <IconRefreshCw size={16} /> Sync sheets
           </Button>
-          <Button variant="outline" onClick={() => setCampaignOpen(true)}>
-            ✉️ Email Families
+          <Button variant="outline" className="gap-1.5" onClick={() => setCampaignOpen(true)}>
+            <IconMail size={16} /> Email Families
           </Button>
           <Button onClick={() => { setNewLead({ ...EMPTY_LEAD, campus_id: campuses.length === 1 ? campuses[0].id : "" }); setError(null); setAddOpen(true); }}>
             + Add Lead
@@ -216,8 +217,8 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
       {queue.length > 0 && (
         <Card className="border-amber-300 bg-amber-50/50">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">
-              📞 Follow up today ({queue.length})
+            <CardTitle className="text-base flex items-center gap-1.5">
+              <IconPhone size={16} /> Follow up today ({queue.length})
             </CardTitle>
             <CardDescription>
               Fast follow-up wins families — these leads are due (or overdue) for a touch.
@@ -261,7 +262,7 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
       {campaigns.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">✉️ Campaigns</CardTitle>
+            <CardTitle className="text-base flex items-center gap-1.5"><IconMail size={16} /> Campaigns</CardTitle>
             <CardDescription>
               Batch emails send automatically each morning at each campaign&apos;s daily pace.
             </CardDescription>
@@ -309,7 +310,7 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
       {journeys.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">🌿 Nurture journeys</CardTitle>
+            <CardTitle className="text-base flex items-center gap-1.5"><IconSprout size={16} /> Nurture journeys</CardTitle>
             <CardDescription>
               Automated email sequences that run themselves — and stop the moment a family applies, RSVPs, or you log a call.
             </CardDescription>
