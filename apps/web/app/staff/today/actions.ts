@@ -5,20 +5,7 @@ import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { requireStaffSession, getAccessibleCampusIds, hasMinRole } from "@/lib/auth/get-session";
 import { notifyFamilyOfferExpiringSoon, notifyFamilyRegistrationNudge } from "@/lib/notify";
 import { promoteFromWaitlist } from "@/lib/mutations";
-
-/**
- * Whether Twilio is actually configured in this environment. SMS sends
- * silently no-op inside lib/sms.ts when it isn't — this flag lets the
- * server action tell the caller the truth instead of claiming a text
- * went out that never left the process.
- */
-function smsIsConfigured(): boolean {
-  return Boolean(
-    process.env.TWILIO_ACCOUNT_SID &&
-      process.env.TWILIO_AUTH_TOKEN &&
-      process.env.TWILIO_FROM_NUMBER
-  );
-}
+import { isSmsConfigured } from "@/lib/sms";
 
 export interface TextExpiringOffersResult {
   ok: boolean;
@@ -41,7 +28,7 @@ export async function textExpiringOffers(offerIds: string[]): Promise<TextExpiri
   const accessibleIds = getAccessibleCampusIds(session);
 
   if (offerIds.length === 0) {
-    return { ok: true, smsConfigured: smsIsConfigured(), texted: 0, total: 0 };
+    return { ok: true, smsConfigured: isSmsConfigured(), texted: 0, total: 0 };
   }
 
   const supabase = createServiceRoleClient();
@@ -59,7 +46,7 @@ export async function textExpiringOffers(offerIds: string[]): Promise<TextExpiri
 
   if (error) {
     console.error("[textExpiringOffers]", error.message);
-    return { ok: false, smsConfigured: smsIsConfigured(), texted: 0, total: 0, error: "Could not load offers." };
+    return { ok: false, smsConfigured: isSmsConfigured(), texted: 0, total: 0, error: "Could not load offers." };
   }
 
   // Campus-scope: restrict to campuses this staff member can access.
@@ -67,7 +54,7 @@ export async function textExpiringOffers(offerIds: string[]): Promise<TextExpiri
     accessibleIds.length === 0 || accessibleIds.includes(row.campus_id as string)
   );
 
-  const configured = smsIsConfigured();
+  const configured = isSmsConfigured();
   if (!configured) {
     return { ok: true, smsConfigured: false, texted: 0, total: rows.length };
   }

@@ -18,6 +18,29 @@ const SEND_TIMEOUT_MS = 10_000;
 
 let warnedNotConfigured = false;
 
+/**
+ * The single sentinel every caller checks to tell "no provider configured"
+ * apart from a real send failure. Exported so nobody has to string-match a
+ * literal that could drift.
+ */
+export const SMS_NOT_CONFIGURED = "sms not configured";
+
+/**
+ * Whether Twilio credentials are present in this environment. The three vars
+ * are all-or-nothing: a partial set is treated as not configured, because a
+ * half-configured provider fails at send time instead of at boot.
+ *
+ * Callers use this to tell staff the truth ("SMS is not connected") rather
+ * than reporting a text that never left the process.
+ */
+export function isSmsConfigured(): boolean {
+  return Boolean(
+    process.env.TWILIO_ACCOUNT_SID &&
+      process.env.TWILIO_AUTH_TOKEN &&
+      process.env.TWILIO_FROM_NUMBER
+  );
+}
+
 export interface SendSmsInput {
   /** E.164 or US 10-digit; normalized best-effort before sending. */
   to: string;
@@ -55,12 +78,14 @@ export async function sendSms({ to, body }: SendSmsInput): Promise<SendSmsResult
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   const fromNumber = process.env.TWILIO_FROM_NUMBER;
 
+  // Checked inline rather than via isSmsConfigured() so TypeScript narrows
+  // all three to string for the request below.
   if (!accountSid || !authToken || !fromNumber) {
     if (!warnedNotConfigured) {
       console.debug("[sendSms] TWILIO_* env vars not set — SMS delivery disabled");
       warnedNotConfigured = true;
     }
-    return { ok: false, error: "sms not configured" };
+    return { ok: false, error: SMS_NOT_CONFIGURED };
   }
 
   const normalized = normalizePhone(to);

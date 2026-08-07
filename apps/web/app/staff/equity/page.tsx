@@ -8,6 +8,8 @@ import {
   getAccessibleCampusIds,
   resolveActiveCampus,
 } from "@/lib/auth/get-session";
+import { SectionTabs } from "@/components/layout/section-tabs";
+import { INSIGHTS_TABS } from "@/lib/section-tabs";
 
 export default async function EquityPage({
   searchParams,
@@ -29,10 +31,17 @@ export default async function EquityPage({
   );
 
   return (
-    <EquityClient
-      data={data}
-      campuses={campuses}
-      initialCampus={searchParams?.campus ?? "all"}
-    />
+    <div className="space-y-6">
+      <SectionTabs
+        tabs={INSIGHTS_TABS}
+        activeHref="/staff/equity"
+        campusParam={searchParams?.campus}
+      />
+      <EquityClient
+        data={data}
+        campuses={campuses}
+        initialCampus={searchParams?.campus ?? "all"}
+      />
+    </div>
   );
 }

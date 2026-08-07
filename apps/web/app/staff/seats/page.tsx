@@ -3,6 +3,8 @@ export const dynamic = "force-dynamic";
 
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { SectionTabs } from "@/components/layout/section-tabs";
+import { SEATS_LOTTERY_TABS } from "@/lib/section-tabs";
 import { SeatsClient } from "./seats-client";
 
 export default async function SeatManagementPage({
@@ -71,5 +73,14 @@ export default async function SeatManagementPage({
     };
   });
 
-  return <SeatsClient rows={rows} />;
+  return (
+    <div className="space-y-6">
+      <SectionTabs
+        tabs={SEATS_LOTTERY_TABS}
+        activeHref="/staff/seats"
+        campusParam={searchParams?.campus}
+      />
+      <SeatsClient rows={rows} />
+    </div>
+  );
 }

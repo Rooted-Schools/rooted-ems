@@ -9,6 +9,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { IconTicket } from "@/components/ui/icons";
 import { getStaffLotteryRuns, getCampuses } from "@/lib/queries";
 import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { SectionTabs } from "@/components/layout/section-tabs";
+import { SEATS_LOTTERY_TABS } from "@/lib/section-tabs";
 import { NewLotteryRunDialog } from "./new-lottery-dialog";
 
 const statusVariants: Record<string, { label: string; variant: "default" | "secondary" | "success" | "warning" }> = {
@@ -66,6 +68,11 @@ export default async function StaffLotteryPage({
 
   return (
     <div className="space-y-6">
+      <SectionTabs
+        tabs={SEATS_LOTTERY_TABS}
+        activeHref="/staff/lottery"
+        campusParam={searchParams?.campus}
+      />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-ink">Lottery</h1>

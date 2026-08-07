@@ -1,18 +1,16 @@
 export const dynamic = "force-dynamic";
 
-import { createServerClient } from "@rooted-ems/database/server";
-import { redirect } from "next/navigation";
 import { getLeadDetail } from "@/lib/queries";
+import { requireStaffSession } from "@/lib/auth/get-session";
 import { LeadDetailClient } from "./lead-detail-client";
 
 export default async function LeadDetailPage({ params }: { params: { id: string } }) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/staff-login");
+  // Was an ad-hoc getUser() check, which only proved *someone* was signed in —
+  // an authenticated family account passed it. Lead RLS still returned nothing,
+  // but the guard shouldn't lean on that. Same gate as every other staff route.
+  const session = await requireStaffSession();
 
   const lead = await getLeadDetail(params.id);
 
-  return <LeadDetailClient lead={lead} staffUserId={user.id} />;
+  return <LeadDetailClient lead={lead} staffUserId={session.user_id} />;
 }

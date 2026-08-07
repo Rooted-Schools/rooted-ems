@@ -15,7 +15,7 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { sendNotification } from "@/lib/mutations";
 import { sendEmail } from "@/lib/email";
-import { sendSms } from "@/lib/sms";
+import { sendSms, SMS_NOT_CONFIGURED } from "@/lib/sms";
 import * as emailTemplates from "@/lib/email-templates";
 import type { EmailTemplate } from "@/lib/email-templates";
 import { recordWaitlistPositionHistory } from "@/lib/mutations/waitlist-history";
@@ -79,7 +79,7 @@ async function smsGuardian(
 ): Promise<void> {
   if (!contact.smsConsent || !contact.phone) return;
   const result = await sendSms({ to: contact.phone, body });
-  if (!result.ok && result.error !== "sms not configured") {
+  if (!result.ok && result.error !== SMS_NOT_CONFIGURED) {
     console.error(`[${logTag}] sms failed`, result.error);
   }
 }
@@ -464,7 +464,7 @@ export async function notifyFamilyOfOffer({
     userId
       ? notify({
           userId,
-          subject: studentName ? `🎉 Seat offer for ${studentName} at ${campusName}` : `🎉 You have a seat offer at ${campusName}`,
+          subject: studentName ? `Seat offer for ${studentName} at ${campusName}` : `You have a seat offer at ${campusName}`,
           body: `Congratulations! A seat has been offered${studentName ? ` for ${studentName}` : ""} at ${campusName}. Please respond by ${deadline} to secure your spot.`,
           link: `/family/offers/${offerId}`,
           campusId,
@@ -511,7 +511,7 @@ export async function notifyFamilyOfferExpiringSoon({
     userId
       ? notify({
           userId,
-          subject: `⏰ Your seat offer at ${campusName} expires soon`,
+          subject: `Your seat offer at ${campusName} expires soon`,
           body: `Your seat offer${studentName ? ` for ${studentName}` : ""} at ${campusName} expires on ${deadline}. Please respond before the deadline to keep your spot.`,
           link: `/family/offers/${offerId}`,
           campusId,
@@ -582,7 +582,7 @@ export async function notifyFamilyDocumentVerified({
   const readableType = documentType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   await notify({
     userId,
-    subject: `✅ ${readableType} verified`,
+    subject: `${readableType} verified`,
     body: `Your ${readableType} has been reviewed and verified by the enrollment team. You're all set on this one.`,
     link: `/family/documents`,
     campusId,
@@ -671,7 +671,7 @@ export async function notifyFamilyRegistrationComplete({
     userId
       ? notify({
           userId,
-          subject: `🎓 Enrollment complete${studentName ? ` for ${studentName}` : ""}!`,
+          subject: `Enrollment complete${studentName ? ` for ${studentName}` : ""}!`,
           body: `All registration items have been verified. ${studentName ? `${studentName} is` : "Your student is"} officially enrolled at ${campusName}. Welcome to the Rooted Schools family — we're proud to have you with us.`,
           link: `/family/registration`,
           campusId,
@@ -686,7 +686,7 @@ export async function notifyFamilyRegistrationComplete({
     ),
     smsGuardian(
       contact,
-      `Rooted Schools: 🎓 ${studentFirstName ?? "Your student"} is officially enrolled at ${campusName}! Welcome to the family.\n¡${studentFirstName ?? "Su estudiante"} está oficialmente inscrito/a en ${campusName}! Bienvenidos.`,
+      `Rooted Schools: ${studentFirstName ?? "Your student"} is officially enrolled at ${campusName}! Welcome to the family.\n¡${studentFirstName ?? "Su estudiante"} está oficialmente inscrito/a en ${campusName}! Bienvenidos.`,
       "notifyFamilyRegistrationComplete"
     ),
   ]);
@@ -1117,7 +1117,7 @@ export async function notifyFamilyStudentEnrolled({
   const grade = gradeLabel ? ` in ${gradeLabel}` : "";
   await notify({
     userId,
-    subject: `🎉 ${studentName ?? "Your student"} is officially enrolled at ${campusName}!`,
+    subject: `${studentName ?? "Your student"} is officially enrolled at ${campusName}!`,
     body: `Congratulations! ${studentName ?? "Your student"} is now fully enrolled${grade} at ${campusName}. At Rooted Schools, every student graduates with a career credential and a clear plan. We're excited to get started. Log in to your portal to view orientation details and next steps.`,
     link: `/family/applications/${applicationId}`,
     campusId,

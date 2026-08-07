@@ -3,7 +3,9 @@ export const dynamic = "force-dynamic";
 
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { ReportsClient } from "./reports-client";
-import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { requireStaffSession, hasMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { SectionTabs } from "@/components/layout/section-tabs";
+import { INSIGHTS_TABS } from "@/lib/section-tabs";
 
 export interface ReportData {
   pipeline: { status: string; count: number }[];
@@ -190,5 +192,18 @@ export default async function StaffReportsPage({
     auditEvents,
   };
 
-  return <ReportsClient data={reportData} />;
+  const insightsTabs = hasMinRole(session, "enrollment_manager")
+    ? INSIGHTS_TABS
+    : INSIGHTS_TABS.filter((t) => t.href === "/staff/reports");
+
+  return (
+    <div className="space-y-6">
+      <SectionTabs
+        tabs={insightsTabs}
+        activeHref="/staff/reports"
+        campusParam={searchParams?.campus}
+      />
+      <ReportsClient data={reportData} />
+    </div>
+  );
 }

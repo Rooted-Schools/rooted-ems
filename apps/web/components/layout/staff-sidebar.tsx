@@ -35,9 +35,15 @@ export interface NavItem {
   label: string;
   href: string;
   icon: IconName;
-  /** Minimum role required to see this item (default: compliance_auditor = everyone) */
+  /** Minimum role required to see this item (default: compliance_auditor = every ranked staff role) */
   minRole?: MinRole;
   badgeKey?: BadgeKey;
+  /**
+   * Extra path prefixes that belong to this destination, so the rail stays lit
+   * while the user is on a page absorbed into this section (e.g. /staff/seats
+   * under "Seats & Lottery"). `href` is always treated as one of them.
+   */
+  activePaths?: string[];
 }
 
 export interface NavSection {
@@ -56,16 +62,27 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     items: [
       { label: "Today", href: "/staff/today", icon: "today", badgeKey: "today" },
-      { label: "Pipeline", href: "/staff/pipeline", icon: "pipeline" },
+      {
+        label: "Pipeline",
+        href: "/staff/pipeline",
+        icon: "pipeline",
+        activePaths: ["/staff/applications", "/staff/documents", "/staff/students", "/staff/enrollment"],
+      },
       {
         label: "Seats & Lottery",
         href: "/staff/lottery",
         icon: "seats-lottery",
         minRole: "enrollment_manager",
+        activePaths: ["/staff/seats", "/staff/offers", "/staff/waitlist"],
       },
       { label: "Recruitment", href: "/staff/recruitment", icon: "recruitment" },
       { label: "Messages", href: "/staff/messages", icon: "messages", badgeKey: "messages" },
-      { label: "Insights", href: "/staff/reports", icon: "insights" },
+      {
+        label: "Insights",
+        href: "/staff/reports",
+        icon: "insights",
+        activePaths: ["/staff/equity", "/staff/audit"],
+      },
     ],
   },
 ];
@@ -194,7 +211,7 @@ interface StaffSidebarProps {
 }
 
 export function StaffSidebar({
-  highestRole = "compliance_auditor",
+  highestRole = "none",
   todayCount,
   messagesUnreadCount,
 }: StaffSidebarProps) {
@@ -207,7 +224,10 @@ export function StaffSidebar({
     return campusParam ? `${base}?campus=${campusParam}` : base;
   }
 
-  const userLevel = ROLE_LEVEL[highestRole] ?? 1;
+  // Unknown or absent role ⇒ level 0, below every nav item. Never fall back to
+  // the compliance_auditor floor: an unranked role must not see a rail it was
+  // never granted (see NO_ROLE in lib/auth/get-session.ts).
+  const userLevel = ROLE_LEVEL[highestRole] ?? 0;
 
   const badgeCounts: Partial<Record<BadgeKey, number | undefined>> = {
     today: todayCount,
@@ -234,9 +254,12 @@ export function StaffSidebar({
   }
 
   function renderLink(item: NavItem) {
+    const ownedPaths = [item.href, ...(item.activePaths ?? [])];
     const isActive =
       pathname === item.href ||
-      (item.href !== "/staff/today" && pathname.startsWith(item.href));
+      ownedPaths.some(
+        (path) => path !== "/staff/today" && pathname.startsWith(path)
+      );
     return (
       <Link
         key={item.href}

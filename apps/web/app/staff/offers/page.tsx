@@ -5,6 +5,8 @@ import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { getStaffOffers, getStaffWaitlist } from "@/lib/queries";
 import { OffersClient } from "./offers-client";
 import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { SectionTabs } from "@/components/layout/section-tabs";
+import { SEATS_LOTTERY_TABS } from "@/lib/section-tabs";
 
 export default async function StaffOffersPage({
   searchParams,
@@ -65,13 +67,20 @@ export default async function StaffOffersPage({
   });
 
   return (
-    <OffersClient
-      offers={offers}
-      stats={stats}
-      staffUserId={session.user_id}
-      eligibleApplicants={eligibleApplicants}
-      waitlistEntries={waitlistData.entries}
-      waitlistCampusCounts={waitlistData.campusCounts}
-    />
+    <div className="space-y-6">
+      <SectionTabs
+        tabs={SEATS_LOTTERY_TABS}
+        activeHref="/staff/offers"
+        campusParam={searchParams?.campus}
+      />
+      <OffersClient
+        offers={offers}
+        stats={stats}
+        staffUserId={session.user_id}
+        eligibleApplicants={eligibleApplicants}
+        waitlistEntries={waitlistData.entries}
+        waitlistCampusCounts={waitlistData.campusCounts}
+      />
+    </div>
   );
 }
