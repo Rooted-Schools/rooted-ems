@@ -9,36 +9,23 @@ import Link from "next/link";
 import { getStatusConfig, getFamilyStatusLabel, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationRow } from "@/lib/queries";
 import { useLocale } from "@/lib/i18n/locale-context";
+import type { TranslationKey } from "@/lib/i18n/translations";
 
-function getStatusMessage(status: string): string {
-  switch (status) {
-    case "draft":
-      return "Application started but not yet submitted.";
-    case "submitted":
-      return "Application received and under review.";
-    case "needs_info":
-      return "Additional information or documents are required.";
-    case "verified":
-      return "All information verified. Awaiting lottery.";
-    case "lottery_assigned":
-      return "Entered into the enrollment lottery.";
-    case "offered":
-      return "Congratulations! A seat has been offered.";
-    case "accepted":
-      return "Offer accepted. Complete registration to finalize enrollment.";
-    case "waitlisted":
-      return "On the waitlist. You will be notified if a seat becomes available.";
-    case "registered":
-      return "Fully registered and enrolled.";
-    case "declined":
-      return "This application has been declined.";
-    case "expired":
-      return "The offer for this application has expired.";
-    case "withdrawn":
-      return "This application has been withdrawn.";
-    default:
-      return "";
-  }
+/**
+ * Statuses with a parent-language one-liner in translations.ts
+ * (statusMsg.*). Unknown/future statuses render no message rather than a
+ * wrong one.
+ */
+const STATUS_MSG_KEYS = [
+  "draft", "submitted", "needs_info", "verified", "lottery_assigned",
+  "offered", "accepted", "waitlisted", "registered", "placement_review",
+  "enrolled", "declined", "expired", "withdrawn",
+] as const;
+
+function statusMessageKey(status: string): TranslationKey | null {
+  return (STATUS_MSG_KEYS as readonly string[]).includes(status)
+    ? (`statusMsg.${status}` as TranslationKey)
+    : null;
 }
 
 function formatDate(dateStr: string | null) {
@@ -90,7 +77,8 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
           {applications.map((app) => {
             const cfg = getStatusConfig(app.status);
             const statusLabel = getFamilyStatusLabel(app.status, locale);
-            const statusMessage = getStatusMessage(app.status);
+            const statusMsgKey = statusMessageKey(app.status);
+            const statusMessage = statusMsgKey ? t(statusMsgKey) : "";
             const isDraft = app.status === "draft";
             const needsAction =
               app.status === "needs_info" ||

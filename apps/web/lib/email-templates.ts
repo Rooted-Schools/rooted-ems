@@ -633,11 +633,11 @@ export function eventReminder({
 }): EmailTemplate {
   const openingEn =
     urgency === "day_before"
-      ? `Just a friendly reminder — ${eventTitle} at ${campusName} is tomorrow!`
+      ? `A friendly reminder: ${eventTitle} at ${campusName} is tomorrow!`
       : `${eventTitle} at ${campusName} is starting soon!`;
   const openingEs =
     urgency === "day_before"
-      ? `Un recordatorio amistoso — ${eventTitle} en ${campusName} es mañana!`
+      ? `Un recordatorio amistoso: ¡${eventTitle} en ${campusName} es mañana!`
       : `${eventTitle} en ${campusName} está por comenzar!`;
   const { html, text } = renderEmail(
     {
@@ -647,7 +647,7 @@ export function eventReminder({
         `When: ${whenText}${location ? `\nWhere: ${location}` : ""}`,
         "We're looking forward to meeting you. If your plans change, just reply to this email.",
       ],
-      closing: `See you soon! — the ${campusName} Team`,
+      closing: `See you soon! The ${campusName} Team`,
     },
     {
       greeting: guardianFirstName ? `Hola ${guardianFirstName},` : "Hola,",
@@ -656,7 +656,7 @@ export function eventReminder({
         `Cuándo: ${whenText}${location ? `\nDónde: ${location}` : ""}`,
         "Esperamos conocerle. Si sus planes cambian, simplemente responda a este correo.",
       ],
-      closing: `¡Nos vemos pronto! — el Equipo de ${campusName}`,
+      closing: `¡Nos vemos pronto! El Equipo de ${campusName}`,
     }
   );
   return {
@@ -689,19 +689,19 @@ export function eventFollowupAttended({
       greeting: guardianFirstName ? `Hi ${guardianFirstName},` : "Hello,",
       paragraphs: [
         `It was great to meet you at ${eventTitle}! Thank you for taking the time to visit ${campusName}.`,
-        "If you're ready to take the next step, applying takes about five minutes on your phone — there's no fee, and it doesn't commit you to anything.",
+        "If you're ready to take the next step, applying takes about five minutes on your phone. There's no fee, and it doesn't commit you to anything.",
       ],
       cta: { label: "Start your application", url: `${APP_URL}/login` },
-      closing: `We'd love to welcome your family. — the ${campusName} Team`,
+      closing: `We'd love to welcome your family. The ${campusName} Team`,
     },
     {
       greeting: guardianFirstName ? `Hola ${guardianFirstName},` : "Hola,",
       paragraphs: [
         `¡Fue un gusto conocerle en ${eventTitle}! Gracias por tomarse el tiempo de visitar ${campusName}.`,
-        "Si está listo(a) para el siguiente paso, la solicitud toma unos cinco minutos desde su teléfono — no tiene costo, y no le compromete a nada.",
+        "Si está listo(a) para el siguiente paso, la solicitud toma unos cinco minutos desde su teléfono. No tiene costo y no le compromete a nada.",
       ],
       cta: { label: "Iniciar su solicitud", url: `${APP_URL}/login` },
-      closing: `Nos encantaría darle la bienvenida a su familia. — el Equipo de ${campusName}`,
+      closing: `Nos encantaría darle la bienvenida a su familia. El Equipo de ${campusName}`,
     }
   );
   return {
@@ -730,8 +730,8 @@ export function eventFollowupNoShow({
   nextEvent?: { title: string; whenText: string; url: string };
 }): EmailTemplate {
   const nextParagraphEn = nextEvent
-    ? `We'd love to see you at our next one — ${nextEvent.title} on ${nextEvent.whenText}. It's easy to register, and takes less than a minute.`
-    : "We'd still love to connect — reach out anytime and we'll find a time that works, or you can start an application whenever you're ready.";
+    ? `We'd love to see you at our next one: ${nextEvent.title} on ${nextEvent.whenText}. Registering takes less than a minute.`
+    : "We'd still love to connect. Reach out anytime and we'll find a time that works, or start an application whenever you're ready.";
   const nextParagraphEs = nextEvent
     ? `Nos encantaría verle en nuestro próximo evento — ${nextEvent.title} el ${nextEvent.whenText}. Es fácil registrarse y toma menos de un minuto.`
     : "Nos encantaría conectar con usted — contáctenos cuando guste y buscaremos un horario que funcione, o puede iniciar una solicitud cuando esté listo(a).";
