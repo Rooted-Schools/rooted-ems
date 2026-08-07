@@ -79,7 +79,11 @@ export default async function FamilyRegistrationPage() {
       enrollment_window:enrollment_window_id (school_year_id, school_year:school_year_id (name))
     `)
     .in("guardian_id", guardianIds)
-    .in("status", ["accepted", "registered"])
+    // placement_review and enrolled belong here too: the packet advances the
+    // application past "registered" the moment staff finish verifying it, and
+    // without those two statuses this page went blank for exactly the families
+    // who had just completed everything.
+    .in("status", ["accepted", "registered", "placement_review", "enrolled"])
     .order("updated_at", { ascending: false });
 
   if (!acceptedApps || acceptedApps.length === 0) {

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { createLeadFromInquiry } from "@/lib/mutations";
 
@@ -10,8 +11,11 @@ import { createLeadFromInquiry } from "@/lib/mutations";
  * can POST a normalized JSON body here; the lead lands in the pipeline with
  * source=ad and the full response engine fires — same as a website inquiry.
  *
- * Auth: a shared secret in the `?token=` query param, matched against
- * LEAD_WEBHOOK_SECRET (fail-closed without it). Meta's subscription
+ * Auth: a shared secret matched against LEAD_WEBHOOK_SECRET (fail-closed
+ * without it), sent either as `Authorization: Bearer <secret>` (preferred —
+ * a query param lands in access logs, proxy caches, and referrers) or as the
+ * legacy `?token=` query param, still accepted so already-configured relays
+ * keep working. Comparison is constant-time. Meta's subscription
  * verification handshake (GET with hub.challenge) is answered below.
  *
  * Campus resolution: the ad's hidden `campus` field carries a short_code
@@ -26,6 +30,46 @@ import { createLeadFromInquiry } from "@/lib/mutations";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Constant-time secret comparison. A plain `===` on a shared secret leaks its
+ * length and its matching prefix through response timing, which is enough to
+ * recover it one byte at a time. The length guard is separate because
+ * timingSafeEqual throws on mismatched buffers.
+ */
+function secretMatches(candidate: string | null, secret: string): boolean {
+  if (!candidate) return false;
+  const a = Buffer.from(candidate, "utf8");
+  const b = Buffer.from(secret, "utf8");
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+/**
+ * Pull the shared secret from `Authorization: Bearer <secret>`, falling back
+ * to the legacy `?token=` query param. Returns whether the request is
+ * authorized and which transport it used, so the query-param path can be
+ * flagged for migration.
+ */
+function readWebhookSecret(
+  request: NextRequest,
+  secret: string
+): { authorized: boolean; viaQueryParam: boolean } {
+  const header = request.headers.get("authorization");
+  if (header) {
+    const match = /^Bearer\s+(.+)$/i.exec(header.trim());
+    if (match && secretMatches(match[1], secret)) {
+      return { authorized: true, viaQueryParam: false };
+    }
+  }
+
+  const queryToken = request.nextUrl.searchParams.get("token");
+  if (queryToken) {
+    return { authorized: secretMatches(queryToken, secret), viaQueryParam: true };
+  }
+
+  return { authorized: false, viaQueryParam: false };
+}
+
 // Meta subscription verification (one-time, when you connect the webhook).
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -33,7 +77,7 @@ export async function GET(request: NextRequest) {
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
   const secret = process.env.LEAD_WEBHOOK_SECRET;
-  if (secret && mode === "subscribe" && token === secret && challenge) {
+  if (secret && mode === "subscribe" && secretMatches(token, secret) && challenge) {
     return new Response(challenge, { status: 200 });
   }
   return NextResponse.json({ error: "Verification failed" }, { status: 403 });
@@ -55,8 +99,15 @@ interface NormalizedLead {
 export async function POST(request: NextRequest) {
   const secret = process.env.LEAD_WEBHOOK_SECRET;
   if (!secret) return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
-  if (request.nextUrl.searchParams.get("token") !== secret) {
+
+  const auth = readWebhookSecret(request, secret);
+  if (!auth.authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (auth.viaQueryParam) {
+    console.warn(
+      "[webhooks/leads] Deprecated: secret sent as the ?token= query param. Move the relay to an Authorization: Bearer header — query strings are logged by proxies and CDNs."
+    );
   }
 
   let body: NormalizedLead;

@@ -290,19 +290,21 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
           <LanguageToggle />
         </div>
 
-        {referrerName && (
-          <div className="rounded-xl border border-rooted-green/30 bg-rooted-green/5 px-4 py-3 mb-3 text-center">
-            <p className="text-sm text-ink flex items-center justify-center gap-1.5">
-              <IconSprout size={16} className="text-rooted-green shrink-0" />
-              <span>
-                <span className="font-semibold">{referrerName}</span>{" "}
-                {locale === "es"
-                  ? "cree que su familia sería ideal para Rooted. ¡Cuéntenos sobre usted!"
-                  : "thinks your family would be a great fit for Rooted. Tell us about yourself!"}
-              </span>
-            </p>
-          </div>
-        )}
+        {referrerName && (() => {
+          const [before, after] = t("inquiry.referrerBanner").split("{name}");
+          return (
+            <div className="rounded-xl border border-rooted-green/30 bg-rooted-green/5 px-4 py-3 mb-3 text-center">
+              <p className="text-sm text-ink flex items-center justify-center gap-1.5">
+                <IconSprout size={16} className="text-rooted-green shrink-0" />
+                <span>
+                  {before}
+                  <span className="font-semibold">{referrerName}</span>
+                  {after}
+                </span>
+              </p>
+            </div>
+          );
+        })()}
         <Card>
           <CardHeader>
             <CardTitle className="text-xl">{t("inquiry.title")}</CardTitle>

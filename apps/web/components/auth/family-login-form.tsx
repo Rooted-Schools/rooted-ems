@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { createBrowserClient } from "@rooted-ems/database";
@@ -36,8 +36,11 @@ export function FamilyLoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   const otpClientRef = useRef(createOtpClient());
+  const ssrClient = useMemo(() => createBrowserClient(), []);
   const campusParam = searchParams.get("campus");
 
   // Surface auth callback errors (e.g. magic link failures)
@@ -115,7 +118,6 @@ export function FamilyLoginForm() {
       }
 
       if (data.session) {
-        const ssrClient = createBrowserClient();
         const { error: sessionError } = await ssrClient.auth.setSession({
           access_token: data.session.access_token,
           refresh_token: data.session.refresh_token,
@@ -138,6 +140,26 @@ export function FamilyLoginForm() {
       setError(t("login.errVerify"));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    if (!value) {
+      setError(t("login.resetEmailRequired"));
+      return;
+    }
+    setResetLoading(true);
+    setError(null);
+    setResetSent(false);
+    try {
+      await ssrClient.auth.resetPasswordForEmail(value, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      });
+      setResetSent(true);
+    } catch {
+      setError(t("login.errGeneric"));
+    } finally {
+      setResetLoading(false);
     }
   }
 
@@ -234,6 +256,11 @@ export function FamilyLoginForm() {
                 {error}
               </p>
             )}
+            {resetSent && (
+              <p className="text-sm text-rooted-green" role="status">
+                {t("login.resetSent")}
+              </p>
+            )}
 
             <button
               type="submit"
@@ -245,6 +272,15 @@ export function FamilyLoginForm() {
                 : cooldown > 0
                   ? `${t("login.wait")} ${cooldown}s`
                   : t("login.sendCode")}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={resetLoading}
+              className="w-full text-xs text-stone hover:text-ink disabled:opacity-50"
+            >
+              {t("login.forgotPassword")}
             </button>
           </form>
         ) : (

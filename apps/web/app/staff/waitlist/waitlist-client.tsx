@@ -8,6 +8,14 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconClipboardList } from "@/components/ui/icons";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -45,6 +53,15 @@ export function WaitlistClient({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Promote dialog state — mirrors the pattern in app/staff/offers/offers-client.tsx
+  const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
+  const [promotePositionId, setPromotePositionId] = useState<string | null>(null);
+  const [promoteExpiresIn, setPromoteExpiresIn] = useState("14");
+
+  // Remove confirmation dialog state
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [removePositionId, setRemovePositionId] = useState<string | null>(null);
+
   // Auto-clear success/error messages after 5 seconds
   useEffect(() => {
     if (!success && !error) return;
@@ -52,12 +69,20 @@ export function WaitlistClient({
     return () => clearTimeout(timer);
   }, [success, error]);
 
-  async function handlePromote(positionId: string) {
-    setLoading(positionId);
+  function handlePromote(positionId: string) {
+    setPromotePositionId(positionId);
+    setPromoteExpiresIn("14");
+    setPromoteDialogOpen(true);
+  }
+
+  async function doPromote() {
+    if (!promotePositionId) return;
+    setPromoteDialogOpen(false);
+    setLoading(promotePositionId);
     setError(null);
     setSuccess(null);
-    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-    const result = await staffPromoteFromWaitlist(positionId, staffUserId, expiresAt);
+    const expiresAt = new Date(Date.now() + parseInt(promoteExpiresIn, 10) * 24 * 60 * 60 * 1000).toISOString();
+    const result = await staffPromoteFromWaitlist(promotePositionId, staffUserId, expiresAt);
     if (result.error) {
       setError(result.error);
     } else {
@@ -65,14 +90,21 @@ export function WaitlistClient({
       router.refresh();
     }
     setLoading(null);
+    setPromotePositionId(null);
   }
 
-  async function handleRemove(positionId: string) {
-    if (!confirm("Are you sure you want to remove this student from the waitlist?")) return;
-    setLoading(positionId);
+  function handleRemove(positionId: string) {
+    setRemovePositionId(positionId);
+    setRemoveDialogOpen(true);
+  }
+
+  async function doRemove() {
+    if (!removePositionId) return;
+    setRemoveDialogOpen(false);
+    setLoading(removePositionId);
     setError(null);
     setSuccess(null);
-    const result = await staffRemoveFromWaitlist(positionId, "Removed by staff.");
+    const result = await staffRemoveFromWaitlist(removePositionId, "Removed by staff.");
     if (result.error) {
       setError(result.error);
     } else {
@@ -80,6 +112,7 @@ export function WaitlistClient({
       router.refresh();
     }
     setLoading(null);
+    setRemovePositionId(null);
   }
 
   return (
@@ -207,6 +240,95 @@ export function WaitlistClient({
           </CardContent>
         </Card>
       )}
+
+      {/* ─── Promote from Waitlist Dialog ─── */}
+      <Dialog open={promoteDialogOpen} onOpenChange={setPromoteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Promote from Waitlist</DialogTitle>
+            <DialogDescription>
+              This will send a seat offer to this student. Choose how long the family has to respond. Other students&apos; waitlist positions are unaffected.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {promotePositionId && (() => {
+              const entry = entries.find((e) => e.id === promotePositionId);
+              if (!entry) return null;
+              const expDate = new Date();
+              expDate.setDate(expDate.getDate() + parseInt(promoteExpiresIn, 10));
+              return (
+                <>
+                  <div className="rounded-lg bg-rooted-gray-light p-3 text-sm">
+                    <p className="font-medium text-ink">{entry.student_name}</p>
+                    <p className="text-stone">
+                      {entry.campus_name} · Grade {entry.grade} · Waitlist #{entry.position}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-ink/70 mb-1">
+                      Response Deadline
+                    </label>
+                    <select
+                      value={promoteExpiresIn}
+                      onChange={(e) => setPromoteExpiresIn(e.target.value)}
+                      className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                    >
+                      <option value="7">7 days</option>
+                      <option value="10">10 days</option>
+                      <option value="14">14 days</option>
+                      <option value="21">21 days</option>
+                      <option value="30">30 days</option>
+                    </select>
+                    <p className="text-xs text-stone mt-1">
+                      Offer will expire on {expDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                    </p>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPromoteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={doPromote} className="bg-rooted-green hover:bg-rooted-green/90 text-white">
+              Send Offer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Remove from Waitlist Confirmation ─── */}
+      <Dialog open={removeDialogOpen} onOpenChange={setRemoveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove from Waitlist</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove this student from the waitlist? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {removePositionId && (() => {
+            const entry = entries.find((e) => e.id === removePositionId);
+            if (!entry) return null;
+            return (
+              <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm">
+                <p className="font-medium text-ink">{entry.student_name}</p>
+                <p className="text-stone">
+                  {entry.campus_name} · Grade {entry.grade} · Waitlist #{entry.position}
+                </p>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={doRemove}>
+              Remove Student
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

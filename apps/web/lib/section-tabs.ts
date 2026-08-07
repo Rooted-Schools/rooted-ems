@@ -12,7 +12,7 @@ export const SEATS_LOTTERY_TABS: SectionTab[] = [
 ];
 
 export const INSIGHTS_TABS: SectionTab[] = [
-  { label: "Reports", href: "/staff/reports" },
+  { label: "Insights", href: "/staff/reports" },
   { label: "Equity", href: "/staff/equity" },
   { label: "Audit Trail", href: "/staff/audit" },
 ];

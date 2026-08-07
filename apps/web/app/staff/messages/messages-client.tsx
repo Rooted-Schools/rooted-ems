@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,12 @@ export function StaffMessagesClient({ messages }: StaffMessagesClientProps) {
           <p className="text-sm text-stone mt-1">
             Updates on family activity — applications, document uploads, registrations, and offer responses.
           </p>
+          <Link
+            href="/staff/communications"
+            className="inline-block text-xs text-stone hover:text-ink mt-1.5"
+          >
+            Outbound communications &rarr;
+          </Link>
         </div>
         {unreadCount > 0 && (
           <Button

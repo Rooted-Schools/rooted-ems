@@ -16,7 +16,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import { IconFileText, IconAlertTriangle, IconInfo, IconX } from "@/components/ui/icons";
-import { uploadFile, getSignedUrl, formatFileSize, validateFile } from "@/lib/storage/upload";
+import { uploadFile, getSignedUrl, formatFileSize, validateFile, formatFileValidationError } from "@/lib/storage/upload";
 import { compressImageFile } from "@/lib/storage/compress-image";
 import { familyCreateDocumentRecord } from "@/app/family/applications/actions";
 import { useLocale } from "@/lib/i18n/locale-context";
@@ -367,7 +367,7 @@ function UploadDialog({
   onUploadComplete: (message: string) => void;
   onError: (message: string) => void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedApp, setSelectedApp] = useState(initialAppId ?? applications[0]?.id ?? "");
   const [docType, setDocType] = useState(initialDocType ?? "birth_certificate");
@@ -438,7 +438,7 @@ function UploadDialog({
         const { file: maybeCompressed, wasCompressed } = await compressImageFile(original);
         const error = validateFile(maybeCompressed);
         if (error) {
-          errors.push(`${original.name}: ${error}`);
+          errors.push(`${original.name}: ${formatFileValidationError(error, locale)}`);
           continue;
         }
         processed.push({ file: maybeCompressed, wasCompressed });

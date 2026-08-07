@@ -565,6 +565,45 @@ export async function updateApplication(
   return { data: null, error: null };
 }
 
+// ─── Family Ownership Gate ─────────────────────────────
+
+/**
+ * Confirm the authenticated caller is the guardian on this application.
+ *
+ * Same walk submitApplication and withdrawApplication already do
+ * (application → guardian → user_id), lifted out so every family-initiated
+ * entry point can share one gate. The family accept/decline/respond actions
+ * in app/family/applications/actions.ts had no ownership check at all — any
+ * signed-in family could act on any application id — and this is what they
+ * call now.
+ *
+ * Returns the caller's auth user id, or a plain error string a server action
+ * can hand straight back to the client.
+ */
+export async function requireApplicationOwner(
+  applicationId: string
+): Promise<{ userId: string; error: null } | { userId: null; error: string }> {
+  const authClient = await createServerClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+  if (!user) return { userId: null, error: "Not authenticated" };
+
+  const serviceClient = createServiceRoleClient();
+  const { data: appCheck } = await serviceClient
+    .from("application")
+    .select("id, guardian:guardian_id (user_id)")
+    .eq("id", applicationId)
+    .single();
+
+  const appGuardian = appCheck?.guardian as unknown as { user_id: string } | null;
+  if (!appGuardian || appGuardian.user_id !== user.id) {
+    return { userId: null, error: "Not authorized" };
+  }
+
+  return { userId: user.id, error: null };
+}
+
 // ─── Submit Application ────────────────────────────────
 
 /**
@@ -592,16 +631,40 @@ export async function submitApplication(
 
   const supabase = serviceClient;
 
-  // Verify application is draft and belongs to user
+  // Verify application is draft and belongs to user. The window join carries
+  // the enrollment deadline — a draft left open in a browser tab must not
+  // become a submission after the window closes.
   const { data: app } = await supabase
     .from("application")
-    .select("id, status")
+    .select("id, status, enrollment_window:enrollment_window_id (status, close_date)")
     .eq("id", applicationId)
     .single();
 
   if (!app) return { data: null, error: "Application not found" };
   if (app.status !== "draft") {
     return { data: null, error: "Only draft applications can be submitted" };
+  }
+
+  // ── Enrollment window gate ────────────────────────────────────────────────
+  // Fail closed. enrollment_window_id is NOT NULL on application, so a missing
+  // window row means the lookup failed, not that submission is permitted —
+  // and admitting an application outside its window is an authorizer-facing
+  // record we cannot quietly create.
+  const window = app.enrollment_window as unknown as
+    | { status?: string; close_date?: string }
+    | null;
+  if (!window?.status || !window.close_date) {
+    console.error("[submitApplication] enrollment window not resolved", { applicationId });
+    return {
+      data: null,
+      error: "We could not confirm this campus's enrollment window. Please contact the enrollment team.",
+    };
+  }
+  if (window.status !== "open") {
+    return { data: null, error: "Enrollment for this campus is not open right now, so this application cannot be submitted." };
+  }
+  if (new Date(window.close_date).getTime() < Date.now()) {
+    return { data: null, error: "The enrollment deadline for this campus has passed, so this application can no longer be submitted." };
   }
 
   const now = new Date().toISOString();
@@ -975,6 +1038,63 @@ export async function updateApplicationStatus(
   } = await authClient.auth.getUser();
   if (!user) return { data: null, error: "Not authenticated" };
 
+  // "Staff only" was documentation, not a check — any authenticated user could
+  // drive any application to any state the machine happened to allow. The
+  // family paths that used to route through here now call
+  // familyUpdateApplicationStatus, which proves ownership first.
+  const { data: profile } = await createServiceRoleClient()
+    .from("user_profile")
+    .select("is_staff")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.is_staff !== true) {
+    return { data: null, error: "Not authorized" };
+  }
+
+  return applyApplicationStatusChange(applicationId, newStatus, user.id, reason);
+}
+
+/**
+ * Statuses a family may drive on their own application. Everything else —
+ * verified, waitlisted, offered, registered — is a staff decision.
+ *   accepted  / declined  → responding to a seat offer with no offer record
+ *   submitted             → replying to a needs_info request
+ */
+const FAMILY_ALLOWED_STATUSES = new Set(["accepted", "declined", "submitted"]);
+
+/**
+ * Family-side counterpart to updateApplicationStatus: same state machine,
+ * audit trail, and notifications, but gated on the caller actually owning the
+ * application and restricted to the handful of statuses a family is entitled
+ * to set.
+ */
+export async function familyUpdateApplicationStatus(
+  applicationId: string,
+  newStatus: string,
+  reason?: string
+): Promise<MutationResult> {
+  const owner = await requireApplicationOwner(applicationId);
+  if (owner.userId === null) return { data: null, error: owner.error };
+
+  if (!FAMILY_ALLOWED_STATUSES.has(newStatus)) {
+    return { data: null, error: "Not authorized" };
+  }
+
+  return applyApplicationStatusChange(applicationId, newStatus, owner.userId, reason);
+}
+
+/**
+ * Shared body of the two status mutations above. Assumes the caller has
+ * already been authorized — it does no auth of its own, which is why it is
+ * not exported.
+ */
+async function applyApplicationStatusChange(
+  applicationId: string,
+  newStatus: string,
+  actorId: string,
+  reason?: string
+): Promise<MutationResult> {
   const supabase = createServiceRoleClient();
 
   const { data: app } = await supabase
@@ -1005,7 +1125,7 @@ export async function updateApplicationStatus(
   };
 
   if (newStatus === "verified" || newStatus === "needs_info") {
-    updates.reviewed_by = user.id;
+    updates.reviewed_by = actorId;
     updates.reviewed_at = now;
     if (reason) updates.review_notes = reason;
   }
@@ -1016,7 +1136,7 @@ export async function updateApplicationStatus(
     .eq("id", applicationId);
 
   if (error) {
-    console.error("[updateApplicationStatus]", error.message);
+    console.error("[applyApplicationStatusChange]", error.message);
     return { data: null, error: "Failed to update status" };
   }
 
@@ -1027,7 +1147,7 @@ export async function updateApplicationStatus(
     table_name: "application",
     record_id: applicationId,
     action: AuditAction.StatusChange,
-    actor_id: user.id,
+    actor_id: actorId,
     campus_id: app.campus_id as string ?? null,
     old_data: { status: app.status },
     new_data: { status: newStatus },

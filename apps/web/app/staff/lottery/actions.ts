@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireStaffSession } from "@/lib/auth/get-session";
+import { requireMinRole } from "@/lib/auth/get-session";
 import {
   createLotteryRun,
   runLotteryPreview,
@@ -13,10 +13,18 @@ import {
   type CreateLotteryRunInput,
 } from "@/lib/mutations";
 
+/**
+ * Lottery actions decide who gets a seat, so they carry the same gate as the
+ * lottery pages: enrollment_manager. The "who ran this" ids used to arrive as
+ * arguments — a client could sign someone else's name to a finalized lottery.
+ * They come from the session now; the parameters stay in the signatures for
+ * the existing callers and are ignored.
+ */
+
 // ─── Create Draft Lottery Run ─────────────────────────
 
 export async function staffCreateLotteryRun(input: CreateLotteryRunInput) {
-  await requireStaffSession();
+  await requireMinRole("enrollment_manager");
   const result = await createLotteryRun(input);
 
   if (!result.error) {
@@ -30,7 +38,7 @@ export async function staffCreateLotteryRun(input: CreateLotteryRunInput) {
 // ─── Simulate (read-only what-if) ─────────────────────
 
 export async function staffSimulateLottery(runId: string, seatsOverride?: number) {
-  await requireStaffSession();
+  await requireMinRole("enrollment_manager");
   // Read-only — no revalidation needed, nothing changes.
   return simulateLotteryRun(runId, seatsOverride);
 }
@@ -38,7 +46,7 @@ export async function staffSimulateLottery(runId: string, seatsOverride?: number
 // ─── Run Preview ──────────────────────────────────────
 
 export async function staffRunLotteryPreview(runId: string) {
-  await requireStaffSession();
+  await requireMinRole("enrollment_manager");
   const result = await runLotteryPreview(runId);
 
   if (!result.error) {
@@ -51,9 +59,9 @@ export async function staffRunLotteryPreview(runId: string) {
 
 // ─── Finalize as Official ─────────────────────────────
 
-export async function staffFinalizeLottery(runId: string, executedBy: string) {
-  await requireStaffSession();
-  const result = await finalizeLotteryRun(runId, executedBy);
+export async function staffFinalizeLottery(runId: string, _executedBy?: string) {
+  const session = await requireMinRole("enrollment_manager");
+  const result = await finalizeLotteryRun(runId, session.user_id);
 
   if (!result.error) {
     revalidatePath("/staff/lottery");
@@ -68,7 +76,7 @@ export async function staffFinalizeLottery(runId: string, executedBy: string) {
 // ─── Archive Lottery Run ──────────────────────────────
 
 export async function staffArchiveLottery(runId: string) {
-  await requireStaffSession();
+  await requireMinRole("enrollment_manager");
   const result = await archiveLotteryRun(runId);
 
   if (!result.error) {
@@ -84,10 +92,10 @@ export async function staffArchiveLottery(runId: string) {
 export async function staffSendLotteryOffers(
   runId: string,
   expiresAt: string,
-  offeredBy: string
+  _offeredBy?: string
 ) {
-  await requireStaffSession();
-  const result = await sendOffersFromLottery(runId, expiresAt, offeredBy);
+  const session = await requireMinRole("enrollment_manager");
+  const result = await sendOffersFromLottery(runId, expiresAt, session.user_id);
 
   if (!result.error) {
     revalidatePath("/staff/lottery");
@@ -103,9 +111,9 @@ export async function staffSendLotteryOffers(
 
 // ─── Complete Lottery Results (Waitlist Non-Selected) ─
 
-export async function staffCompleteLotteryResults(runId: string, actorId: string) {
-  await requireStaffSession();
-  const result = await completeLotteryResults(runId, actorId);
+export async function staffCompleteLotteryResults(runId: string, _actorId?: string) {
+  const session = await requireMinRole("enrollment_manager");
+  const result = await completeLotteryResults(runId, session.user_id);
 
   if (!result.error) {
     revalidatePath("/staff/lottery");

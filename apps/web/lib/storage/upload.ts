@@ -4,6 +4,7 @@
  */
 
 import { createBrowserClient } from "@rooted-ems/database";
+import { tx, type Locale } from "@/lib/i18n/translations";
 
 const BUCKET = "documents";
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -23,17 +24,42 @@ export interface UploadResult {
   error: string | null;
 }
 
+/** Structured validation failure — code + params, no baked-in English string.
+ *  Display sites map this to a bilingual message via docs.fileTooLarge /
+ *  docs.fileTypeUnsupported (see lib/i18n/translations.ts). */
+export type FileValidationError =
+  | { code: "too_large"; maxMb: number; actualSize: string }
+  | { code: "unsupported_type"; fileType: string };
+
 /**
- * Validate a file before upload.
+ * Validate a file before upload. Returns a structured error (code + params)
+ * rather than a hardcoded English string — callers translate for display via
+ * formatFileValidationError() or their own t() mapping.
  */
-export function validateFile(file: File): string | null {
+export function validateFile(file: File): FileValidationError | null {
   if (file.size > MAX_FILE_SIZE) {
-    return `File is too large (${formatFileSize(file.size)}). Maximum size is 10MB.`;
+    return { code: "too_large", maxMb: MAX_FILE_SIZE / (1024 * 1024), actualSize: formatFileSize(file.size) };
   }
   if (!ALLOWED_TYPES.includes(file.type)) {
-    return `File type "${file.type || "unknown"}" is not supported. Please upload a PDF or image file (JPEG, PNG).`;
+    return { code: "unsupported_type", fileType: file.type || "unknown" };
   }
   return null;
+}
+
+/**
+ * Render a FileValidationError as a display string. Defaults to English for
+ * internal/non-locale-aware callers (e.g. uploadFile() below); UI call sites
+ * that have a locale from useLocale() should prefer translating the code
+ * themselves with docs.fileTooLarge / docs.fileTypeUnsupported so wording
+ * stays consistent with the rest of the page.
+ */
+export function formatFileValidationError(error: FileValidationError, locale: Locale = "en"): string {
+  if (error.code === "too_large") {
+    return tx("docs.fileTooLarge", locale)
+      .replace("{maxMb}", String(error.maxMb))
+      .replace("{size}", error.actualSize);
+  }
+  return tx("docs.fileTypeUnsupported", locale).replace("{type}", error.fileType);
 }
 
 /**
@@ -50,7 +76,7 @@ export async function uploadFile(
       fileName: file.name,
       fileSize: file.size,
       mimeType: file.type,
-      error: validationError,
+      error: formatFileValidationError(validationError),
     };
   }
 

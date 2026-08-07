@@ -1,4 +1,4 @@
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
 import { notifyFamilyOfOffer, notifyWaitlistMovement } from "@/lib/notify";
@@ -80,13 +80,24 @@ export async function addToWaitlist(
 /**
  * Promote a student from the waitlist — removes them and creates an offer.
  * This is the most common (and most consequential) waitlist action.
+ *
+ * Service role, not the user-scoped client: the auto-promotion path is the
+ * expire-offers cron (app/api/cron/expire-offers/route.ts), which carries no
+ * session cookies. Under RLS a user-scoped client sees zero rows there, so
+ * every automatic promotion silently found "no waitlist position" and did
+ * nothing. Callers are already gated — staff actions behind
+ * requireStaffSession, the cron behind CRON_SECRET.
+ *
+ * `offeredBy` is a user id written to offer.offered_by (a UUID column).
+ * Callers with no real user behind them (the cron) must pass null; a
+ * sentinel string like "system" is not a UUID and fails the insert.
  */
 export async function promoteFromWaitlist(
   waitlistPositionId: string,
-  offeredBy: string,
+  offeredBy: string | null,
   expiresAt: string
 ): Promise<MutationResult<{ offer_id: string }>> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // Get the waitlist position with related data
   const { data: position, error: fetchError } = await supabase
@@ -145,7 +156,7 @@ export async function promoteFromWaitlist(
       status: "pending",
       offered_at: new Date().toISOString(),
       expires_at: expiresAt,
-      offered_by: offeredBy,
+      offered_by: offeredBy ?? null,
     })
     .select("id")
     .single();
@@ -165,7 +176,7 @@ export async function promoteFromWaitlist(
     table_name: "waitlist_position",
     record_id: waitlistPositionId,
     action: AuditAction.StatusChange,
-    actor_id: offeredBy,
+    actor_id: offeredBy ?? null,
     campus_id: wl.campus_id,
     old_data: { status: "active" },
     new_data: { removal_reason: "promoted" },

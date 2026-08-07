@@ -56,7 +56,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
         <div>
           <h1 className="text-2xl font-bold text-ink">{t("nav.messages")}</h1>
           <p className="text-sm text-stone-text mt-1">
-            Notifications and updates about your enrollment applications.
+            {t("msgs.subtitle")}
           </p>
         </div>
         {unreadCount > 0 && (
@@ -116,7 +116,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
             <EmptyState
               icon={<IconMail size={40} />}
               title={t("msgs.noMessages")}
-              description="You will receive notifications here when there are updates to your enrollment applications — like status changes, document requests, or seat offers."
+              description={t("msgs.emptyDetail")}
             />
           </CardContent>
         </Card>
@@ -138,7 +138,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
                   {filter === "unread" ? t("msgs.unreadMessages") : t("msgs.allMessages")}
                 </CardTitle>
                 <CardDescription>
-                  {displayed.length} message{displayed.length !== 1 ? "s" : ""}
+                  {t("msgs.messageCount").replace("{n}", String(displayed.length))}
                   {filter === "unread" && (
                     <button
                       onClick={() => setFilter("all")}
@@ -150,7 +150,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
                 </CardDescription>
               </div>
               {filter === "all" && unreadCount > 0 && (
-                <Badge variant="warning">{unreadCount} unread</Badge>
+                <Badge variant="warning">{t("msgs.unreadBadge").replace("{n}", String(unreadCount))}</Badge>
               )}
             </div>
           </CardHeader>
@@ -213,7 +213,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
                             if (!msg.is_read) handleMarkRead(msg.id);
                           }}
                         >
-                          View Details &rarr;
+                          {t("msgs.viewDetails")} &rarr;
                         </a>
                       )}
                       {!msg.is_read && (

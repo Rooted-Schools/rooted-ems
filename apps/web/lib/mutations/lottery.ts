@@ -1,7 +1,7 @@
 import { createServerClient } from "@rooted-ems/database/server";
 import { generateLotterySeed, runDeterministicLottery } from "@rooted-ems/utils";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
-import { notifyFamilyApplicationWaitlisted } from "@/lib/notify";
+import { notifyFamilyApplicationWaitlisted, notifyFamilyOfOffer } from "@/lib/notify";
 import { ensureWaitlist, addToWaitlist } from "./waitlist";
 import type { MutationResult } from "./applications";
 
@@ -699,10 +699,11 @@ export async function sendOffersFromLottery(
     return { data: null, error: "Can only send offers from an official lottery run." };
   }
 
-  // Get selected entries (those who won the lottery)
+  // Get selected entries (those who won the lottery). The student join gives
+  // the winner notification a real name rather than "your student".
   const { data: selectedEntries, error: entriesError } = await supabase
     .from("lottery_entry")
-    .select("id, application_id")
+    .select("id, application_id, application:application_id (student:student_id (first_name, last_name))")
     .eq("lottery_run_id", runId)
     .eq("is_selected", true);
 
@@ -714,8 +715,9 @@ export async function sendOffersFromLottery(
   const now = new Date().toISOString();
 
   for (const entry of selectedEntries) {
-    const appId = (entry as Record<string, string>).application_id;
-    const entryId = (entry as Record<string, string>).id;
+    const entryRow = entry as unknown as Record<string, unknown>;
+    const appId = entryRow.application_id as string;
+    const entryId = entryRow.id as string;
 
     // Check if offer already exists for this application
     const { data: existingOffer } = await supabase
@@ -728,7 +730,7 @@ export async function sendOffersFromLottery(
     if (existingOffer && existingOffer.length > 0) continue; // Skip if already offered
 
     // Create offer
-    const { error: offerError } = await supabase
+    const { data: newOffer, error: offerError } = await supabase
       .from("offer")
       .insert({
         application_id: appId,
@@ -739,10 +741,12 @@ export async function sendOffersFromLottery(
         offered_at: now,
         expires_at: expiresAt,
         offered_by: offeredBy,
-      });
+      })
+      .select("id")
+      .single();
 
-    if (offerError) {
-      console.error(`[sendOffersFromLottery] offer for ${appId}`, offerError.message);
+    if (offerError || !newOffer) {
+      console.error(`[sendOffersFromLottery] offer for ${appId}`, offerError?.message);
       continue;
     }
 
@@ -751,6 +755,26 @@ export async function sendOffersFromLottery(
       .from("application")
       .update({ status: "offered", updated_at: now })
       .eq("id", appId);
+
+    // Tell the family they won. Without this the seat offer exists only in
+    // the staff console — the losing families are notified by
+    // completeLotteryResults, so the winners must hear too. Never-throw per
+    // offer: a notification failure must not skip the remaining winners or
+    // undo the offer that was just written.
+    const app = entryRow.application as
+      | { student?: { first_name?: string; last_name?: string } | null }
+      | null;
+    const studentName = app?.student
+      ? [app.student.first_name, app.student.last_name].filter(Boolean).join(" ") || undefined
+      : undefined;
+
+    await notifyFamilyOfOffer({
+      applicationId: appId,
+      offerId: newOffer.id as string,
+      expiresAt,
+      campusId: run.campus_id as string,
+      studentName,
+    }).catch((err) => console.error(`[sendOffersFromLottery] notify ${appId}`, err));
 
     offersCreated++;
   }

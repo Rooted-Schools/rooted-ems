@@ -98,6 +98,7 @@ export function StaffLotteryDetailClient({
   const [offerExpiresIn, setOfferExpiresIn] = useState("14");
   const [simulation, setSimulation] = useState<LotterySimulation | null>(null);
   const [completeResultsDialogOpen, setCompleteResultsDialogOpen] = useState(false);
+  const [rerunPreviewDialogOpen, setRerunPreviewDialogOpen] = useState(false);
 
   /* ─── Action Handlers ─── */
 
@@ -219,11 +220,22 @@ export function StaffLotteryDetailClient({
     });
   }
 
+  function handleReRunPreviewClick() {
+    setRerunPreviewDialogOpen(true);
+  }
+
+  function doReRunPreview() {
+    setRerunPreviewDialogOpen(false);
+    handleRunPreview();
+  }
+
   function handleActionClick(label: string) {
     switch (label) {
       case "Run Preview":
-      case "Re-run Preview":
         handleRunPreview();
+        break;
+      case "Re-run Preview":
+        handleReRunPreviewClick();
         break;
       case "Finalize as Official":
         handleFinalize();
@@ -281,7 +293,7 @@ export function StaffLotteryDetailClient({
             <Button variant="outline" onClick={handleSimulate} disabled={isPending}>
               {isPending ? "Working..." : "Simulate"}
             </Button>
-            <Button variant="outline" onClick={() => handleActionClick("Re-run Preview")} disabled={isPending}>
+            <Button variant="outline" onClick={handleReRunPreviewClick} disabled={isPending}>
               {isPending ? "Running..." : "Re-run Preview"}
             </Button>
             <Button onClick={() => handleActionClick("Finalize as Official")} disabled={isPending}>
@@ -578,6 +590,28 @@ export function StaffLotteryDetailClient({
         <span>Updated: {formatDate(run.updatedAt)}</span>
       </div>
 
+      {/* ─── Re-run Preview Confirmation Dialog ─── */}
+      <Dialog open={rerunPreviewDialogOpen} onOpenChange={setRerunPreviewDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Re-run Preview</DialogTitle>
+            <DialogDescription>
+              This generates a new random draw and replaces the current preview results. Families shown as Offered may change.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm space-y-1">
+            <p className="font-medium text-ink">{run.name}</p>
+            <p className="text-stone">{run.campus} &middot; {run.grade}</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRerunPreviewDialogOpen(false)}>Cancel</Button>
+            <Button onClick={doReRunPreview} className="bg-rooted-green hover:bg-rooted-green/90 text-white">
+              Re-run Preview
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ─── Finalize Confirmation Dialog ─── */}
       <Dialog open={finalizeDialogOpen} onOpenChange={setFinalizeDialogOpen}>
         <DialogContent>
@@ -660,6 +694,9 @@ export function StaffLotteryDetailClient({
               <p className="text-stone">{run.campus} &middot; {run.grade}</p>
               <p className="text-emerald-700 font-medium">{offeredCount} offer{offeredCount !== 1 ? "s" : ""} will be sent</p>
             </div>
+            <p className="text-xs text-stone">
+              Families will be notified immediately by email and text (where opted in).
+            </p>
             <div>
               <label className="block text-sm font-medium text-ink/70 mb-1">Response Deadline</label>
               <select

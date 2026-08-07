@@ -20,9 +20,16 @@
  *
  *   If audit reliability becomes critical, switch to a background queue.
  *   For now, best-effort inline logging is the right tradeoff.
+ *
+ * CLIENT: service role, deliberately. The anon/cookie client carries no
+ * session in a cron or webhook context, so the INSERT policy rejected the
+ * write and the event vanished — silently, because this function never
+ * throws. Cron-driven deletions are exactly the actions the trail exists for.
+ * actor_id is always supplied by the caller, so nothing about who acted is
+ * inferred from the client.
  */
 
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { AuditAction } from "@rooted-ems/types";
 
 // Re-export AuditAction for convenience — callers import from here
@@ -68,7 +75,7 @@ export interface AuditEventPayload {
  */
 export async function logAuditEvent(payload: AuditEventPayload): Promise<void> {
   try {
-    const supabase = await createServerClient();
+    const supabase = createServiceRoleClient();
 
     const { error } = await supabase.from("audit_event").insert({
       table_name: payload.table_name,

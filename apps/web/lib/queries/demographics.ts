@@ -1,4 +1,5 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
+import { SUPPRESSION_THRESHOLD } from "./equity-funnel";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -18,6 +19,8 @@ export interface SubgroupFunnelRow {
   accept_rate_pct: number;
   /** true when offer_rate_pct is 10+ points below overall offer rate */
   is_flagged: boolean;
+  /** true when applied < SUPPRESSION_THRESHOLD — rates are not shown, never flagged */
+  is_suppressed: boolean;
 }
 
 export interface GradeDistributionRow {
@@ -45,6 +48,8 @@ export interface RaceEthnicityRow {
   accepted: number;
   accept_rate_pct: number;
   is_flagged: boolean;
+  /** true when applied < SUPPRESSION_THRESHOLD — rates are not shown, never flagged */
+  is_suppressed: boolean;
 }
 
 export interface DemographicBreakdowns {
@@ -168,10 +173,16 @@ export async function getDemographicBreakdowns(
     const applied = subset.length;
     const offered = subset.filter((a) => OFFERED_STATUSES.has(a.status as string)).length;
     const accepted = subset.filter((a) => ACCEPTED_STATUSES.has(a.status as string)).length;
-    const offer_rate_pct = pct(offered, applied);
-    const accept_rate_pct = pct(accepted, offered);
+    // Small cells are both a privacy exposure and statistically meaningless —
+    // same rule as the Conversion by Group table above (SUPPRESSION_THRESHOLD).
+    const is_suppressed = applied < SUPPRESSION_THRESHOLD;
+    const offer_rate_pct = is_suppressed ? 0 : pct(offered, applied);
+    const accept_rate_pct = is_suppressed ? 0 : pct(accepted, offered);
     const is_flagged =
-      label !== "Overall" && overall_offer_rate - offer_rate_pct > 10 && applied > 0;
+      !is_suppressed &&
+      label !== "Overall" &&
+      overall_offer_rate - offer_rate_pct > 10 &&
+      applied > 0;
 
     return {
       label,
@@ -181,6 +192,7 @@ export async function getDemographicBreakdowns(
       accepted,
       accept_rate_pct,
       is_flagged,
+      is_suppressed,
     };
   });
 
@@ -207,8 +219,9 @@ export async function getDemographicBreakdowns(
 
   const race_ethnicity: RaceEthnicityRow[] = Object.entries(raceCounts)
     .map(([group, counts]) => {
-      const offer_rate_pct = pct(counts.offered, counts.applied);
-      const accept_rate_pct = pct(counts.accepted, counts.offered);
+      const is_suppressed = counts.applied < SUPPRESSION_THRESHOLD;
+      const offer_rate_pct = is_suppressed ? 0 : pct(counts.offered, counts.applied);
+      const accept_rate_pct = is_suppressed ? 0 : pct(counts.accepted, counts.offered);
       return {
         group,
         applied: counts.applied,
@@ -216,7 +229,8 @@ export async function getDemographicBreakdowns(
         offer_rate_pct,
         accepted: counts.accepted,
         accept_rate_pct,
-        is_flagged: overall_offer_rate - offer_rate_pct > 10 && counts.applied > 0,
+        is_flagged: !is_suppressed && overall_offer_rate - offer_rate_pct > 10 && counts.applied > 0,
+        is_suppressed,
       };
     })
     .sort((a, b) => b.applied - a.applied);

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
-import { notifyFamilyStudentEnrolled, notifyFamilyReenrollmentPulse } from "@/lib/notify";
+import { notifyFamilyReenrollmentOffer, notifyFamilyReenrollmentPulse } from "@/lib/notify";
 import { createNote } from "@/lib/mutations";
 import { REENROLLMENT_PULSE_THROTTLE_DAYS } from "@/lib/queries/reenrollment";
 
@@ -167,11 +167,21 @@ export async function staffInitiateReenrollment(
 
   const newEnrollmentId = (newEnrollment as { id: string }).id;
 
-  // 5. Notify the family — non-blocking
-  notifyFamilyStudentEnrolled({
+  // 5. Notify the family — non-blocking.
+  // The new application sits at "offered": nothing is settled until the
+  // family accepts or declines at /family/reenrollment, so this must not be
+  // the "officially enrolled" message (which is what it used to send).
+  const { data: yearRow } = await supabase
+    .from("school_year")
+    .select("name")
+    .eq("id", newSchoolYearId)
+    .single();
+
+  notifyFamilyReenrollmentOffer({
     applicationId,
     studentName,
     campusId: row.campus_id,
+    nextSchoolYearName: (yearRow as { name?: string } | null)?.name ?? undefined,
   }).catch(() => {});
 
   revalidatePath("/staff/enrollment");

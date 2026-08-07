@@ -389,6 +389,13 @@ export async function getFamilyJourneyCards(): Promise<FamilyJourneyCard[]> {
 
 /**
  * Fetch notifications for a family user.
+ *
+ * @deprecated Nothing calls this — the family portal reads notifications
+ * through getFamilyMessages, which returns the link and takes an explicit
+ * NotificationContext. Prefer that. Kept (and now context-filtered) rather
+ * than deleted because it is re-exported from lib/queries/index.ts; it had no
+ * context filter at all, so a dual-role user's staff notifications would have
+ * surfaced in the family portal the moment anything did call it.
  */
 export async function getFamilyNotifications(
   userId: string,
@@ -396,10 +403,13 @@ export async function getFamilyNotifications(
 ): Promise<FamilyNotification[]> {
   const supabase = createServiceRoleClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("notification")
     .select("id, title, body, created_at, read_at, is_read")
-    .eq("user_id", userId)
+    .eq("user_id", userId);
+  query = applyContextFilter(query, "family");
+
+  const { data, error } = await query
     .order("created_at", { ascending: false })
     .limit(limit);
 

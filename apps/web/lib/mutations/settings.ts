@@ -1,5 +1,5 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
-import { requireStaffSession } from "@/lib/auth/get-session";
+import { requireMinRole } from "@/lib/auth/get-session";
 import type { MutationResult } from "./applications";
 
 // ─── Enrollment Window Mutations ────────────────────────
@@ -17,7 +17,7 @@ export interface CreateEnrollmentWindowInput {
 export async function createEnrollmentWindow(
   input: CreateEnrollmentWindowInput
 ): Promise<MutationResult<{ id: string }>> {
-  await requireStaffSession();
+  await requireMinRole("enrollment_manager");
   try {
     const supabase = createServiceRoleClient();
 
@@ -46,7 +46,7 @@ export async function updateEnrollmentWindowStatus(
   windowId: string,
   status: "draft" | "open" | "closed" | "archived"
 ): Promise<MutationResult> {
-  await requireStaffSession();
+  await requireMinRole("enrollment_manager");
   try {
     const supabase = createServiceRoleClient();
 
@@ -68,6 +68,11 @@ export interface AssignStaffRoleInput {
   user_email: string;
   campus_id: string;
   role: "system_admin" | "enrollment_manager" | "enrollment_staff" | "compliance_auditor";
+  /**
+   * The system_admin performing the grant. Server actions overwrite this with
+   * the session user id before calling — a client-supplied value here is never
+   * trusted, it would let a caller forge the audit trail on a privilege grant.
+   */
   assigned_by: string;
 }
 
@@ -79,7 +84,7 @@ export interface AssignStaffRoleInput {
 export async function assignStaffRole(
   input: AssignStaffRoleInput
 ): Promise<MutationResult<{ id: string; invited: boolean }>> {
-  await requireStaffSession();
+  await requireMinRole("system_admin");
   try {
     const supabase = createServiceRoleClient();
 
@@ -144,7 +149,7 @@ export async function editStaffRole(
   roleId: string,
   updates: { role?: string; campus_id?: string }
 ): Promise<MutationResult> {
-  await requireStaffSession();
+  await requireMinRole("system_admin");
   try {
     const supabase = createServiceRoleClient();
 
@@ -161,7 +166,7 @@ export async function editStaffRole(
 }
 
 export async function removeStaffRole(roleId: string): Promise<MutationResult> {
-  await requireStaffSession();
+  await requireMinRole("system_admin");
   try {
     const supabase = createServiceRoleClient();
 
@@ -206,7 +211,7 @@ export async function updatePacketRequirement(
   requirementId: string,
   updates: { is_active?: boolean; is_required?: boolean }
 ): Promise<MutationResult> {
-  await requireStaffSession();
+  await requireMinRole("enrollment_manager");
   try {
     const supabase = createServiceRoleClient();
 
@@ -229,7 +234,7 @@ export async function bulkUpdatePacketRequirements(
   requirementIds: string[],
   updates: { is_active?: boolean; is_required?: boolean }
 ): Promise<MutationResult> {
-  await requireStaffSession();
+  await requireMinRole("enrollment_manager");
   try {
     const supabase = createServiceRoleClient();
 

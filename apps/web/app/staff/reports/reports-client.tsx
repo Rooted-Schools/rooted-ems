@@ -191,7 +191,7 @@ export function ReportsClient({ data }: { data: ReportData }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-ink">Reports</h1>
+          <h1 className="text-2xl font-bold text-ink">Insights</h1>
           <p className="text-sm text-stone mt-1">
             Analytics, compliance exports, and audit trail.
           </p>

@@ -57,6 +57,12 @@ const guardRow = (ownerUserId: string) => ({
   error: null,
 });
 
+/** An enrollment window that is open and not yet past its deadline. */
+const OPEN_WINDOW = {
+  status: "open",
+  close_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+};
+
 beforeEach(() => {
   supabaseMock.reset();
   vi.clearAllMocks();
@@ -89,7 +95,7 @@ describe("submitApplication", () => {
     supabaseMock.queueResult(
       "application",
       guardRow(OWNER.id),
-      { data: { id: APP_ID, status: "draft" }, error: null }, // status fetch
+      { data: { id: APP_ID, status: "draft", enrollment_window: OPEN_WINDOW }, error: null }, // status + window fetch
       { data: null, error: null } // update result
     );
 
@@ -114,6 +120,51 @@ describe("submitApplication", () => {
     const result = await submitApplication(APP_ID);
 
     expect(result.error).toBe("Only draft applications can be submitted");
+    expect(supabaseMock.writes()).toHaveLength(0);
+  });
+
+  it("refuses to submit once the enrollment window has closed (no write)", async () => {
+    supabaseMock.setUser(OWNER);
+    supabaseMock.queueResult(
+      "application",
+      guardRow(OWNER.id),
+      {
+        data: {
+          id: APP_ID,
+          status: "draft",
+          enrollment_window: { status: "closed", close_date: OPEN_WINDOW.close_date },
+        },
+        error: null,
+      }
+    );
+
+    const result = await submitApplication(APP_ID);
+
+    expect(result.error).toMatch(/not open/i);
+    expect(supabaseMock.writes()).toHaveLength(0);
+  });
+
+  it("refuses to submit after the window's deadline has passed (no write)", async () => {
+    supabaseMock.setUser(OWNER);
+    supabaseMock.queueResult(
+      "application",
+      guardRow(OWNER.id),
+      {
+        data: {
+          id: APP_ID,
+          status: "draft",
+          enrollment_window: {
+            status: "open",
+            close_date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+          },
+        },
+        error: null,
+      }
+    );
+
+    const result = await submitApplication(APP_ID);
+
+    expect(result.error).toMatch(/deadline/i);
     expect(supabaseMock.writes()).toHaveLength(0);
   });
 });

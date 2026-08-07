@@ -59,16 +59,25 @@ function twiml(): Response {
  */
 let warnedNoBaseUrl = false;
 
+/**
+ * Same production default lib/notify.ts:27 uses. An empty base produced a
+ * relative signing URL that could never match what Twilio signed, so an unset
+ * NEXT_PUBLIC_APP_URL rejected every legitimate delivery. Falling back to the
+ * real production host makes the common deployment work; the warning below
+ * still fires so a genuinely different host gets configured rather than
+ * silently mis-signing.
+ */
+const DEFAULT_APP_URL = "https://enroll.rootedschool.org";
+
 function publicUrl(request: NextRequest): string {
-  const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
-  if (!base && !warnedNoBaseUrl) {
-    // Without it every signature check fails. Fail-closed is correct, but a
-    // silent 403 storm is not diagnosable — say why, once.
+  const configured = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+  if (!configured && !warnedNoBaseUrl) {
     warnedNoBaseUrl = true;
     console.error(
-      "[twilio webhook] NEXT_PUBLIC_APP_URL is not set — the signed URL cannot be reconstructed, so every delivery will be rejected."
+      `[twilio webhook] NEXT_PUBLIC_APP_URL is not set — falling back to ${DEFAULT_APP_URL} to reconstruct the signed URL. Deliveries will be rejected if the webhook was configured against a different host.`
     );
   }
+  const base = configured || DEFAULT_APP_URL;
   const { pathname, search } = request.nextUrl;
   return `${base}${pathname}${search}`;
 }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn, displayClass } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
-import { IconPhone } from "@/components/ui/icons";
+import { IconPhone, IconInfo, IconX } from "@/components/ui/icons";
 import { textExpiringOffers, sendRegistrationNudges, releaseSeats, markRegistrationContacted } from "./actions";
 import { registrationNudgeSubject, registrationNudgeBody, registrationNudgeSms } from "@/lib/nudge-copy";
 import type { RegistrationCompletionStats, CallEscalationRow } from "@/lib/queries/melt";
@@ -50,6 +50,8 @@ interface TodayClientProps {
   registrationCompletion: RegistrationCompletionStats;
   callEscalationQueue: CallEscalationRow[];
   callEscalationAvailable: boolean;
+  /** True when the user landed here via requireMinRole/requireCMOAccess bouncing them off a page they don't have access to. */
+  denied?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -527,9 +529,11 @@ export function TodayClient({
   registrationCompletion,
   callEscalationQueue: initialCallEscalationQueue,
   callEscalationAvailable,
+  denied = false,
 }: TodayClientProps) {
   const [rows, setRows] = useState(initialRows);
   const [callQueue, setCallQueue] = useState(initialCallEscalationQueue);
+  const [deniedVisible, setDeniedVisible] = useState(denied);
 
   function dropRow(key: ExceptionRow["key"]) {
     setRows((prev) => prev.filter((r) => r.key !== key));
@@ -559,6 +563,26 @@ export function TodayClient({
           New application
         </Link>
       </div>
+
+      {/* Denied-access banner — shown after requireMinRole/requireCMOAccess
+          bounces the user off a page their role doesn't cover. Quiet and
+          dismissible; explains, doesn't scold. */}
+      {deniedVisible && (
+        <div className="flex items-start gap-2.5 rounded-[6px] border border-line bg-sunken p-3 text-sm text-ink/70">
+          <IconInfo size={16} className="shrink-0 mt-0.5 text-stone" aria-hidden="true" />
+          <p className="flex-1">
+            That page needs manager access. Ask your administrator if you need it.
+          </p>
+          <button
+            type="button"
+            onClick={() => setDeniedVisible(false)}
+            aria-label="Dismiss"
+            className="inline-flex h-9 min-h-[44px] w-9 shrink-0 items-center justify-center rounded-[6px] text-stone hover:bg-white hover:text-ink"
+          >
+            <IconX size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Greeting */}
       <div>

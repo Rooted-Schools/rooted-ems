@@ -13,6 +13,8 @@ export interface RsvpSubmission {
   email: string;
   phone: string;
   party_size: number;
+  /** TCPA opt-in checkbox on the RSVP form. */
+  sms_consent?: boolean;
   website: string; // honeypot
 }
 
@@ -29,5 +31,6 @@ export async function submitRsvp(input: RsvpSubmission) {
     email: input.email?.slice(0, 200) || undefined,
     phone: input.phone?.slice(0, 30) || undefined,
     party_size: Number(input.party_size) || 1,
+    sms_consent: input.sms_consent === true,
   });
 }

@@ -13,7 +13,11 @@ import {
   type UpdateApplicationInput,
 } from "@/lib/mutations";
 import { createFamilyResponse } from "@/lib/mutations/notes";
-import { updateApplicationStatus, createEnrollment, initializeRegistrationPacket } from "@/lib/mutations";
+import { createEnrollment, initializeRegistrationPacket } from "@/lib/mutations";
+import {
+  familyUpdateApplicationStatus,
+  requireApplicationOwner,
+} from "@/lib/mutations/applications";
 import { notifyStaffOfFamilyResponse, notifyOnApplicationSubmit } from "@/lib/notify";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { requireSession } from "@/lib/auth/get-session";
@@ -152,6 +156,14 @@ export async function familyCreateDocumentRecord(input: {
 /** Fallback accept when no offer record exists — transitions status and creates enrollment. */
 export async function familyAcceptDirect(applicationId: string) {
   await requireSession();
+
+  // requireSession only proves someone is signed in. Accepting a seat, and
+  // the enrollment record it creates, must be provably this family's own
+  // application — otherwise any signed-in guardian could accept on behalf of
+  // any applicant whose id they knew.
+  const owner = await requireApplicationOwner(applicationId);
+  if (owner.error) return { data: null, error: owner.error };
+
   const supabase = createServiceRoleClient();
 
   // Fetch the application to get student/campus/grade/school_year
@@ -161,7 +173,7 @@ export async function familyAcceptDirect(applicationId: string) {
     .eq("id", applicationId)
     .single();
 
-  const result = await updateApplicationStatus(applicationId, "accepted");
+  const result = await familyUpdateApplicationStatus(applicationId, "accepted");
   if (result.error) return result;
 
   // Create enrollment record
@@ -193,7 +205,9 @@ export async function familyAcceptDirect(applicationId: string) {
 
 export async function familyDeclineDirect(applicationId: string) {
   await requireSession();
-  const result = await updateApplicationStatus(applicationId, "declined");
+  // Ownership is proven inside familyUpdateApplicationStatus — declining is
+  // terminal, so acting on someone else's application would be unrecoverable.
+  const result = await familyUpdateApplicationStatus(applicationId, "declined");
   if (!result.error) {
     revalidatePath("/family/applications");
     revalidatePath(`/family/applications/${applicationId}`);
@@ -204,11 +218,17 @@ export async function familyDeclineDirect(applicationId: string) {
 
 export async function familySubmitResponse(applicationId: string, message: string) {
   await requireSession();
+
+  // Prove ownership before writing a note onto the application — the note is
+  // visible to staff and attributed to this family, so it must be theirs.
+  const owner = await requireApplicationOwner(applicationId);
+  if (owner.error) return { data: null, error: owner.error };
+
   const result = await createFamilyResponse(applicationId, message);
   if (!result.error) {
     // Move status back to submitted so staff can see the family responded
     // and so the "needs info" form disappears for the family
-    await updateApplicationStatus(
+    await familyUpdateApplicationStatus(
       applicationId,
       "submitted",
       "Family responded to information request"
