@@ -29,7 +29,7 @@ export default async function RecruitmentAnalyticsPage({
   const scopedCampusIds = accessibleIds.length > 0 ? accessibleIds : undefined;
 
   const supabase = await createServerClient();
-  const [funnel, speedToContact, gradeFunnel, { data: campusRows }] = await Promise.all([
+  const [funnel, speedToContactResult, gradeFunnel, { data: campusRows }] = await Promise.all([
     getRecruitmentFunnel(activeCampus),
     getSpeedToFirstContactByCampus(scopedCampusIds),
     getGradeFunnelTable(scopedCampusIds),
@@ -45,7 +45,8 @@ export default async function RecruitmentAnalyticsPage({
   return (
     <FunnelDashboardClient
       funnel={funnel}
-      speedToContact={speedToContact}
+      speedToContact={speedToContactResult.rows}
+      speedToContactTruncated={speedToContactResult.truncated}
       gradeFunnel={gradeFunnel}
       campuses={campuses}
       activeCampusId={activeCampus ?? "all"}

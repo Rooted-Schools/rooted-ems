@@ -1,11 +1,22 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireStaffSession } from "@/lib/auth/get-session";
+import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { notifyFamilyStudentEnrolled, notifyFamilyReenrollmentPulse } from "@/lib/notify";
 import { createNote } from "@/lib/mutations";
 import { REENROLLMENT_PULSE_THROTTLE_DAYS } from "@/lib/queries/reenrollment";
+
+/**
+ * True when Postgres says the column itself is absent (42703), i.e. migration
+ * 00038_reenrollment_pulse.sql has not been applied to this database yet.
+ * Mirrors the same helper in app/api/cron/event-followups/route.ts.
+ */
+function isMissingColumn(error: { message?: string; code?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === "42703") return true;
+  return /column .* does not exist/i.test(error.message ?? "");
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -324,7 +335,8 @@ interface PulseResult {
  * honest reenrollment_pulse_sent_at timestamp on the enrollment row.
  */
 export async function staffSendReenrollmentPulse(enrollmentId: string): Promise<PulseResult> {
-  await requireStaffSession();
+  const session = await requireStaffSession();
+  const accessibleIds = getAccessibleCampusIds(session);
   const supabase = createServiceRoleClient();
 
   const { data: enrollment, error: fetchErr } = await supabase
@@ -342,7 +354,21 @@ export async function staffSendReenrollmentPulse(enrollmentId: string): Promise<
     .single();
 
   if (fetchErr || !enrollment) {
-    return { data: null, error: fetchErr?.message ?? "Enrollment not found." };
+    // reenrollment_pulse_sent_at ships in migration 00038, which is applied by
+    // hand. Until it lands, say so plainly rather than surfacing a raw
+    // Postgres error to staff — and never send, because without the column
+    // there is no throttle marker and every click would re-text the family.
+    if (isMissingColumn(fetchErr)) {
+      console.warn(
+        "[staffSendReenrollmentPulse] enrollment.reenrollment_pulse_sent_at not present — migration 00038_reenrollment_pulse.sql has not been applied."
+      );
+      return {
+        data: null,
+        error: "The re-enrollment pulse isn't available yet — this database is still missing migration 00038.",
+      };
+    }
+    console.error("[staffSendReenrollmentPulse] fetch", fetchErr?.message);
+    return { data: null, error: "Enrollment not found." };
   }
 
   const row = enrollment as unknown as {
@@ -352,6 +378,13 @@ export async function staffSendReenrollmentPulse(enrollmentId: string): Promise<
     reenrollment_pulse_sent_at: string | null;
     student: { first_name: string; last_name: string } | null;
   };
+
+  // Campus scope: the service-role client bypasses RLS, so the campus check
+  // that RLS would have applied has to happen here. An empty accessibleIds
+  // means CMO-level access to every campus (see getAccessibleCampusIds).
+  if (accessibleIds.length > 0 && !accessibleIds.includes(row.campus_id)) {
+    return { data: null, error: "Not authorized for this campus." };
+  }
 
   if (row.status !== "active") {
     return { data: null, error: "This enrollment is no longer active." };
@@ -404,7 +437,13 @@ export async function staffSendReenrollmentPulse(enrollmentId: string): Promise<
     .eq("id", enrollmentId);
 
   if (stampErr) {
-    return { data: null, error: stampErr.message };
+    // The family has already been contacted at this point. Say exactly that,
+    // so nobody re-clicks and texts them twice chasing a "failed" send.
+    console.error("[staffSendReenrollmentPulse] stamp", stampErr.message);
+    return {
+      data: null,
+      error: "The pulse was sent, but we could not record it — do not resend; the family has already been contacted.",
+    };
   }
 
   revalidatePath("/staff/enrollment");
@@ -419,13 +458,40 @@ export async function staffSendReenrollmentPulse(enrollmentId: string): Promise<
  * call, in person). Stored as an internal note on the enrollment, same
  * pattern as application notes (lib/mutations/notes.ts) — cheap, no new
  * table, visible to any staff who open the note history for this entity.
+ *
+ * The campus is resolved from the enrollment row, never taken from the
+ * caller: this runs on the service-role client, so a client-supplied
+ * campus_id would let a note be filed against a campus the staff member
+ * cannot see. The second parameter is kept only for call-site compatibility
+ * and is deliberately ignored.
  */
 export async function staffMarkReenrollmentContacted(
   enrollmentId: string,
-  campusId: string,
+  _campusId: string,
   note?: string
 ): Promise<PulseResult> {
-  await requireStaffSession();
+  const session = await requireStaffSession();
+  const accessibleIds = getAccessibleCampusIds(session);
+  const supabase = createServiceRoleClient();
+
+  const { data: enrollment, error: fetchErr } = await supabase
+    .from("enrollment")
+    .select("id, campus_id")
+    .eq("id", enrollmentId)
+    .maybeSingle();
+
+  if (fetchErr) {
+    console.error("[staffMarkReenrollmentContacted] fetch", fetchErr.message);
+    return { data: null, error: "Could not load that enrollment." };
+  }
+  if (!enrollment) {
+    return { data: null, error: "Enrollment not found." };
+  }
+
+  const campusId = (enrollment as { campus_id: string | null }).campus_id;
+  if (!campusId || (accessibleIds.length > 0 && !accessibleIds.includes(campusId))) {
+    return { data: null, error: "Not authorized for this campus." };
+  }
 
   const result = await createNote({
     entity_type: "enrollment",

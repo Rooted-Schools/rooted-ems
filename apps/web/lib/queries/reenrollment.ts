@@ -20,6 +20,22 @@ import { createServiceRoleClient } from "@rooted-ems/database/server";
 
 export const REENROLLMENT_PULSE_THROTTLE_DAYS = 7;
 
+/** True when the error says a named column is absent — migration not yet applied, not a missing row. */
+function isMissingColumn(error: { message?: string; code?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === "42703") return true;
+  return /column .* does not exist/i.test(error.message ?? "");
+}
+
+const warnedMissingReenrollmentColumns = new Set<string>();
+function warnMissingReenrollmentColumns(logTag: string): void {
+  if (warnedMissingReenrollmentColumns.has(logTag)) return;
+  warnedMissingReenrollmentColumns.add(logTag);
+  console.warn(
+    `[${logTag}] enrollment.reenrollment_intent (or a sibling column) not present — migration 00038_reenrollment_pulse.sql has not been applied. Re-enrollment tracking is hidden until it runs.`
+  );
+}
+
 // ─── Shared: current + next school year ───────────────────────────────────
 
 interface SchoolYearRef {
@@ -83,27 +99,38 @@ export interface ReenrollmentPulseCandidate {
   intentSetAt: string | null;
 }
 
+export interface ReenrollmentPulseCandidatesResult {
+  /** False when the reenrollment_intent columns (migration 00038) have not been applied yet. */
+  available: boolean;
+  candidates: ReenrollmentPulseCandidate[];
+}
+
 /**
  * Active, current-school-year enrollments for this guardian's students that
  * are eligible for the one-tap intent pulse. Excludes any student who
  * already has a formal re-enrollment seat offer pending (source =
  * 'reenrollment', status = 'offered') — that flow already asks the
  * accept/decline question and takes precedence over the earlier pulse.
+ *
+ * Families never see migration language: when 00038 hasn't been applied yet
+ * this just returns an empty candidate list (available: false is for the
+ * caller's own bookkeeping only) and the pulse section stays hidden, same as
+ * a genuinely empty result.
  */
 export async function getFamilyReenrollmentPulseCandidates(
   userId: string
-): Promise<ReenrollmentPulseCandidate[]> {
+): Promise<ReenrollmentPulseCandidatesResult> {
   const supabase = createServiceRoleClient();
 
   const { data: guardians } = await supabase
     .from("guardian")
     .select("id")
     .eq("user_id", userId);
-  if (!guardians || guardians.length === 0) return [];
+  if (!guardians || guardians.length === 0) return { available: true, candidates: [] };
   const guardianIds = (guardians as Array<{ id: string }>).map((g) => g.id);
 
   const { current } = await resolveTransitionYears();
-  if (!current) return [];
+  if (!current) return { available: true, candidates: [] };
 
   const { data, error } = await supabase
     .from("enrollment")
@@ -124,12 +151,16 @@ export async function getFamilyReenrollmentPulseCandidates(
     .in("application.guardian_id", guardianIds);
 
   if (error) {
+    if (isMissingColumn(error)) {
+      warnMissingReenrollmentColumns("getFamilyReenrollmentPulseCandidates");
+      return { available: false, candidates: [] };
+    }
     console.error("[getFamilyReenrollmentPulseCandidates]", error.message);
-    return [];
+    return { available: true, candidates: [] };
   }
 
   const rows = data ?? [];
-  if (rows.length === 0) return [];
+  if (rows.length === 0) return { available: true, candidates: [] };
 
   // Exclude students who already have a pending formal re-enrollment offer —
   // they see that in the offers list above and shouldn't also see the pulse.
@@ -145,7 +176,7 @@ export async function getFamilyReenrollmentPulseCandidates(
     (offeredApps ?? []).map((r: Record<string, unknown>) => r.student_id as string)
   );
 
-  return rows
+  const candidates = rows
     .filter((row: Record<string, unknown>) => !alreadyOfferedStudentIds.has(row.student_id as string))
     .map((row: Record<string, unknown>) => {
       const student = row.student as Record<string, string> | null;
@@ -161,6 +192,8 @@ export async function getFamilyReenrollmentPulseCandidates(
         intentSetAt: (row.reenrollment_intent_at as string | null) ?? null,
       };
     });
+
+  return { available: true, candidates };
 }
 
 // ─── Staff: network-wide pulse stats ───────────────────────────────────────
@@ -174,6 +207,8 @@ export interface ReenrollmentStats {
   respondedDeciding: number;
   respondedNo: number;
   noResponse: number;
+  /** False when enrollment.reenrollment_intent (migration 00038) has not been applied yet. */
+  available: boolean;
 }
 
 const EMPTY_STATS: ReenrollmentStats = {
@@ -184,6 +219,7 @@ const EMPTY_STATS: ReenrollmentStats = {
   respondedDeciding: 0,
   respondedNo: 0,
   noResponse: 0,
+  available: true,
 };
 
 /** Real counts, honest denominators — no invented rates when there's no data yet. */
@@ -201,6 +237,15 @@ export async function getReenrollmentStats(campusIds?: string[]): Promise<Reenro
 
   const { data, error } = await query;
   if (error) {
+    if (isMissingColumn(error)) {
+      warnMissingReenrollmentColumns("getReenrollmentStats");
+      return {
+        ...EMPTY_STATS,
+        schoolYearName: current.name,
+        nextSchoolYearName: next?.name ?? null,
+        available: false,
+      };
+    }
     console.error("[getReenrollmentStats]", error.message);
     return { ...EMPTY_STATS, schoolYearName: current.name, nextSchoolYearName: next?.name ?? null };
   }
@@ -223,6 +268,7 @@ export async function getReenrollmentStats(campusIds?: string[]): Promise<Reenro
     respondedDeciding,
     respondedNo,
     noResponse: rows.length - respondedYes - respondedDeciding - respondedNo,
+    available: true,
   };
 }
 
@@ -241,12 +287,18 @@ export interface ReenrollmentFollowUpRow {
   canPulse: boolean;
 }
 
+export interface ReenrollmentFollowUpQueueResult {
+  /** False when enrollment.reenrollment_intent / reenrollment_pulse_sent_at (migration 00038) has not been applied yet. */
+  available: boolean;
+  rows: ReenrollmentFollowUpRow[];
+}
+
 export async function getReenrollmentFollowUpQueue(
   campusIds?: string[]
-): Promise<ReenrollmentFollowUpRow[]> {
+): Promise<ReenrollmentFollowUpQueueResult> {
   const supabase = createServiceRoleClient();
   const { current } = await resolveTransitionYears();
-  if (!current) return [];
+  if (!current) return { available: true, rows: [] };
 
   let query = supabase
     .from("enrollment")
@@ -269,14 +321,18 @@ export async function getReenrollmentFollowUpQueue(
 
   const { data, error } = await query;
   if (error) {
+    if (isMissingColumn(error)) {
+      warnMissingReenrollmentColumns("getReenrollmentFollowUpQueue");
+      return { available: false, rows: [] };
+    }
     console.error("[getReenrollmentFollowUpQueue]", error.message);
-    return [];
+    return { available: true, rows: [] };
   }
 
   const throttleMs = REENROLLMENT_PULSE_THROTTLE_DAYS * 24 * 60 * 60 * 1000;
   const now = Date.now();
 
-  return (data ?? []).map((row: Record<string, unknown>) => {
+  const rows = (data ?? []).map((row: Record<string, unknown>) => {
     const student = row.student as Record<string, string> | null;
     const campus = row.campus as Record<string, string> | null;
     const gradeLevel = row.grade_level as Record<string, string> | null;
@@ -297,4 +353,6 @@ export async function getReenrollmentFollowUpQueue(
       canPulse,
     };
   });
+
+  return { available: true, rows };
 }

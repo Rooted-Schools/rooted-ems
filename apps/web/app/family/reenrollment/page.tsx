@@ -89,10 +89,14 @@ export default async function FamilyReenrollmentPage() {
   const locale = await getLocale();
   const t = (key: Parameters<typeof tx>[0]) => tx(key, locale);
 
-  const [offers, pulseCandidates] = await Promise.all([
+  const [offers, pulseResult] = await Promise.all([
     getPendingReenrollmentOffers(session.user_id),
     getFamilyReenrollmentPulseCandidates(session.user_id),
   ]);
+  // available is only for the caller's own bookkeeping — families never see
+  // migration language, an unavailable pulse just hides the section like a
+  // genuinely empty one (see lib/queries/reenrollment.ts doc comment).
+  const pulseCandidates = pulseResult.candidates;
 
   const hasNothing = offers.length === 0 && pulseCandidates.length === 0;
 

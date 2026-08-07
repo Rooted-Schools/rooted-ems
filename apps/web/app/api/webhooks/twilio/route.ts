@@ -37,7 +37,8 @@
 
 import { type NextRequest } from "next/server";
 import { handleInboundSms } from "@/lib/inbound-sms";
-import { isSmsConfigured, verifyTwilioSignature } from "@/lib/sms";
+import { isSmsConfigured } from "@/lib/sms";
+import { verifyTwilioSignature } from "@/lib/twilio-signature";
 
 export const dynamic = "force-dynamic";
 

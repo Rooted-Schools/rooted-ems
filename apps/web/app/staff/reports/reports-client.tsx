@@ -358,7 +358,14 @@ export function ReportsClient({ data }: { data: ReportData }) {
           </div>
         </CardHeader>
         <CardContent>
-          {reenroll.eligible === 0 ? (
+          {!reenroll.available ? (
+            <div className="text-center py-4">
+              <p className="text-sm text-stone">—</p>
+              <p className="text-xs text-stone mt-1">
+                Re-enrollment tracking activates after database migration 00038 is applied.
+              </p>
+            </div>
+          ) : reenroll.eligible === 0 ? (
             <p className="text-sm text-stone text-center py-4">No re-enrollment season data yet.</p>
           ) : (
             <div className="space-y-3">

@@ -46,7 +46,8 @@ export default async function AuditTrailPage({
   const supabase = createServiceRoleClient();
   const accessibleCampusIds = getAccessibleCampusIds(session);
 
-  const page = parseInt(searchParams.page ?? "1", 10);
+  const parsedPage = Number.parseInt(searchParams.page ?? "1", 10);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
   const pageSize = 50;
   const offset = (page - 1) * pageSize;
 

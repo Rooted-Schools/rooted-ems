@@ -613,8 +613,11 @@ export function eventRsvpConfirmation({
 /**
  * Pre-event reminder — sent twice per RSVP by app/api/cron/event-followups:
  * once around 24h before starts_at ("day_before"), once around 2h before
- * ("starting_soon"). Same template, tone shifts with urgency so the second
- * text doesn't just repeat the first.
+ * ("starting_soon"). Urgency is derived from actual hours-until-event at
+ * send time, not from which cron pass fired it, so a "day_before" reminder
+ * that fires late (say, 10 hours out because the cron only runs daily)
+ * never falsely claims "tomorrow" — it falls back to the neutral
+ * "coming_soon" copy, which just states the real date/time.
  */
 export function eventReminder({
   guardianFirstName,
@@ -629,16 +632,20 @@ export function eventReminder({
   eventTitle: string;
   whenText: string;
   location?: string;
-  urgency: "day_before" | "starting_soon";
+  urgency: "day_before" | "starting_soon" | "coming_soon";
 }): EmailTemplate {
   const openingEn =
     urgency === "day_before"
       ? `A friendly reminder: ${eventTitle} at ${campusName} is tomorrow!`
-      : `${eventTitle} at ${campusName} is starting soon!`;
+      : urgency === "starting_soon"
+        ? `${eventTitle} at ${campusName} is starting soon!`
+        : `A friendly reminder: ${eventTitle} at ${campusName} is coming up soon, on ${whenText}!`;
   const openingEs =
     urgency === "day_before"
       ? `Un recordatorio amistoso: ¡${eventTitle} en ${campusName} es mañana!`
-      : `${eventTitle} en ${campusName} está por comenzar!`;
+      : urgency === "starting_soon"
+        ? `${eventTitle} en ${campusName} está por comenzar!`
+        : `Un recordatorio amistoso: ¡${eventTitle} en ${campusName} se acerca pronto, el ${whenText}!`;
   const { html, text } = renderEmail(
     {
       greeting: guardianFirstName ? `Hi ${guardianFirstName},` : "Hello,",
@@ -659,14 +666,13 @@ export function eventReminder({
       closing: `¡Nos vemos pronto! El Equipo de ${campusName}`,
     }
   );
-  return {
-    subject:
-      urgency === "day_before"
-        ? `Tomorrow: ${eventTitle} / Mañana`
-        : `Starting soon: ${eventTitle} / Comienza pronto`,
-    html,
-    text,
-  };
+  const subject =
+    urgency === "day_before"
+      ? `Tomorrow: ${eventTitle} / Mañana`
+      : urgency === "starting_soon"
+        ? `Starting soon: ${eventTitle} / Comienza pronto`
+        : `Coming up soon: ${eventTitle} / Se acerca pronto`;
+  return { subject, html, text };
 }
 
 /**

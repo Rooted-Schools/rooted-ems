@@ -12,7 +12,8 @@
 -- registration_packet.last_nudged_at (00027) — at-most-once-per-window sends.
 
 ALTER TABLE enrollment
-  ADD COLUMN reenrollment_intent TEXT,
+  ADD COLUMN reenrollment_intent TEXT
+    CHECK (reenrollment_intent IN ('yes', 'undecided', 'no')),
   ADD COLUMN reenrollment_intent_at TIMESTAMPTZ,
   ADD COLUMN reenrollment_pulse_sent_at TIMESTAMPTZ;
 

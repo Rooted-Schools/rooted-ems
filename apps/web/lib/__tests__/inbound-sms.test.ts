@@ -121,7 +121,8 @@ vi.mock("@/lib/mutations/communications", () => ({
 }));
 
 import { handleInboundSms, classifyInboundBody, phoneVariants } from "@/lib/inbound-sms";
-import { verifyTwilioSignature, phoneDigits10 } from "@/lib/sms";
+import { phoneDigits10 } from "@/lib/sms";
+import { verifyTwilioSignature } from "@/lib/twilio-signature";
 
 const MISSING_TABLE = { message: 'relation "public.inbound_sms" does not exist', code: "42P01" };
 

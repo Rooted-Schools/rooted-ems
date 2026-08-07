@@ -279,7 +279,18 @@ export async function familySetReenrollmentIntent(
     .eq("id", enrollmentId);
 
   if (updateErr) {
-    return { data: null, error: updateErr.message };
+    // reenrollment_intent ships in migration 00038, applied by hand. Until it
+    // lands, this update fails with 42703. Never hand a family a raw Postgres
+    // string: it is internal detail, English-only, and tells them nothing they
+    // can act on. Bilingual "EN / ES" slash form, matching the server-side
+    // convention in app/(public)/inquire/actions.ts where there is no locale
+    // context to switch on.
+    console.error("[familySetReenrollmentIntent]", updateErr.message, { enrollmentId });
+    return {
+      data: null,
+      error:
+        "We could not save your answer right now. Please try again, or contact your school's enrollment office. / No pudimos guardar su respuesta en este momento. Intente de nuevo o comuníquese con la oficina de inscripciones de su escuela.",
+    };
   }
 
   revalidatePath("/family/reenrollment");

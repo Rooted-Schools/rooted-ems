@@ -23,6 +23,7 @@ import {
 interface FunnelDashboardProps {
   funnel: RecruitmentFunnel;
   speedToContact: SpeedToContactRow[];
+  speedToContactTruncated: boolean;
   gradeFunnel: GradeFunnelTable;
   campuses: { id: string; name: string }[];
   activeCampusId: string;
@@ -61,7 +62,7 @@ function Bar({ pct, color = "bg-rooted-green" }: { pct: number; color?: string }
   );
 }
 
-export function FunnelDashboardClient({ funnel, speedToContact, gradeFunnel, campuses, activeCampusId }: FunnelDashboardProps) {
+export function FunnelDashboardClient({ funnel, speedToContact, speedToContactTruncated, gradeFunnel, campuses, activeCampusId }: FunnelDashboardProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [spendOpen, setSpendOpen] = useState(false);
@@ -377,6 +378,11 @@ export function FunnelDashboardClient({ funnel, speedToContact, gradeFunnel, cam
               ))}
             </div>
           )}
+          {speedToContactTruncated && (
+            <p className="text-xs text-warn-text mt-2">
+              Showing first 20,000 rows; figures may be incomplete.
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -407,7 +413,7 @@ export function FunnelDashboardClient({ funnel, speedToContact, gradeFunnel, cam
                     <TableHead className="text-right">Seats</TableHead>
                     <TableHead className="text-right">Leads held</TableHead>
                     <TableHead className="text-right">Applications</TableHead>
-                    <TableHead className="text-right">Leads needed</TableHead>
+                    <TableHead className="text-right">Applicants needed</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -421,15 +427,20 @@ export function FunnelDashboardClient({ funnel, speedToContact, gradeFunnel, cam
                       <TableCell className="text-right text-sm tabular-nums">{row.leads_held}</TableCell>
                       <TableCell className="text-right text-sm tabular-nums">{row.applications_submitted}</TableCell>
                       <TableCell className="text-right text-sm tabular-nums">
-                        {row.leads_needed ?? "—"}
+                        {row.applicants_needed ?? "—"}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-              {gradeFunnel.has_missing_leads_needed && (
+              {gradeFunnel.has_missing_applicants_needed && (
                 <p className="text-xs text-stone mt-2">
-                  Leads-needed guidance appears after the first completed enrollment cycle.
+                  Applicants-needed guidance appears after the first completed enrollment cycle.
+                </p>
+              )}
+              {gradeFunnel.truncated && (
+                <p className="text-xs text-warn-text mt-2">
+                  Showing first 20,000 rows; figures may be incomplete.
                 </p>
               )}
             </div>

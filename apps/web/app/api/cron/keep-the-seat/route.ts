@@ -32,6 +32,22 @@ import { notifyFamilyKeepTheSeat } from "@/lib/notify";
 
 const SEND_DELAY_DAYS = 2;
 
+/** True when the error says a named column is absent — migration not yet applied, not a missing row. */
+function isMissingColumn(error: { message?: string; code?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === "42703") return true;
+  return /column .* does not exist/i.test(error.message ?? "");
+}
+
+let warnedMissingKeepTheSeatColumn = false;
+function warnMissingKeepTheSeatColumn(): void {
+  if (warnedMissingKeepTheSeatColumn) return;
+  warnedMissingKeepTheSeatColumn = true;
+  console.warn(
+    "[cron/keep-the-seat] registration_packet.keep_the_seat_sent_at not present — migration 00036_registration_outreach.sql has not been applied. Skipping this run."
+  );
+}
+
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   const secret = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
@@ -69,6 +85,10 @@ export async function GET(request: NextRequest) {
     .is("keep_the_seat_sent_at" as never, null);
 
   if (fetchErr) {
+    if (isMissingColumn(fetchErr)) {
+      warnMissingKeepTheSeatColumn();
+      return NextResponse.json({ skipped: "migration 00036 not applied" }, { status: 200 });
+    }
     console.error("[cron/keep-the-seat] fetch", fetchErr.message);
     return NextResponse.json({ error: "Failed to fetch completed packets." }, { status: 500 });
   }

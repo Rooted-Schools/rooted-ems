@@ -48,6 +48,7 @@ interface TodayClientProps {
   seatProgress: SeatProgressGroup[];
   registrationCompletion: RegistrationCompletionStats;
   callEscalationQueue: CallEscalationRow[];
+  callEscalationAvailable: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -378,10 +379,24 @@ function CallQueueRowCard({
 function CallEscalationSection({
   rows,
   onContacted,
+  available,
 }: {
   rows: CallEscalationRow[];
   onContacted: (packetId: string) => void;
+  available: boolean;
 }) {
+  if (!available) {
+    return (
+      <div className="rounded-[10px] border border-line bg-white p-4 sm:p-[18px]">
+        <div className="mb-1 flex items-center gap-2">
+          <IconPhone size={16} className="text-stone" />
+          <h2 className={cn("text-sm font-semibold text-ink", displayClass)}>Needs a phone call</h2>
+        </div>
+        <p className="text-sm text-stone">Call list activates after database migration 00036 is applied.</p>
+      </div>
+    );
+  }
+
   if (rows.length === 0) return null;
 
   return (
@@ -443,6 +458,7 @@ export function TodayClient({
   seatProgress,
   registrationCompletion,
   callEscalationQueue: initialCallEscalationQueue,
+  callEscalationAvailable,
 }: TodayClientProps) {
   const [rows, setRows] = useState(initialRows);
   const [callQueue, setCallQueue] = useState(initialCallEscalationQueue);
@@ -512,7 +528,7 @@ export function TodayClient({
       )}
 
       {/* Needs a phone call — registration melt escalation */}
-      <CallEscalationSection rows={callQueue} onContacted={dropCallQueueRow} />
+      <CallEscalationSection rows={callQueue} onContacted={dropCallQueueRow} available={callEscalationAvailable} />
 
       {/* Per-grade seat progress */}
       {seatProgress.length > 0 && (

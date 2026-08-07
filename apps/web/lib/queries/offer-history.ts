@@ -69,7 +69,14 @@ export async function getOfferAcceptHistory(campusIds: string[]): Promise<OfferA
     }
 
     const { data, error } = await query;
-    if (error || !data) break;
+    if (error) {
+      // A partial page here would silently understate resolved/accepted
+      // counts, which the Seats over-offer guidance treats as real history —
+      // return no history rather than let it reason from a truncated sample.
+      console.error("[getOfferAcceptHistory] offer", error.message);
+      return {};
+    }
+    if (!data) break;
 
     for (const raw of data as Record<string, unknown>[]) {
       const campusId = raw.campus_id as string | null;

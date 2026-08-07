@@ -16,6 +16,22 @@
 
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 
+/** True when the error says a named column is absent — migration not yet applied, not a missing row. */
+function isMissingColumn(error: { message?: string; code?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === "42703") return true;
+  return /column .* does not exist/i.test(error.message ?? "");
+}
+
+let warnedMissingCallEscalationColumns = false;
+function warnMissingCallEscalationColumns(): void {
+  if (warnedMissingCallEscalationColumns) return;
+  warnedMissingCallEscalationColumns = true;
+  console.warn(
+    "[getCallEscalationQueue] registration_packet.contacted_at not present — migration 00036_registration_outreach.sql has not been applied. Call escalation queue is hidden until it runs."
+  );
+}
+
 // ─── Headline completion stat ─────────────────────────────────────────────
 
 export interface RegistrationCompletionStats {
@@ -106,6 +122,12 @@ export interface CallEscalationRow {
   outstanding_item_names: string[];
 }
 
+export interface CallEscalationResult {
+  /** False when registration_packet.contacted_at (migration 00036) has not been applied yet. */
+  available: boolean;
+  rows: CallEscalationRow[];
+}
+
 const CALL_ESCALATION_DAYS = 7;
 
 function prettifyItemType(itemType: string): string {
@@ -134,7 +156,7 @@ function prettifyItemType(itemType: string): string {
 export async function getCallEscalationQueue(
   campusIds?: string[],
   days: number = CALL_ESCALATION_DAYS
-): Promise<CallEscalationRow[]> {
+): Promise<CallEscalationResult> {
   const supabase = createServiceRoleClient();
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
@@ -166,12 +188,16 @@ export async function getCallEscalationQueue(
   const { data, error } = await query;
 
   if (error) {
+    if (isMissingColumn(error)) {
+      warnMissingCallEscalationColumns();
+      return { available: false, rows: [] };
+    }
     console.error("[getCallEscalationQueue] packets", error.message);
-    return [];
+    return { available: true, rows: [] };
   }
 
   const packets = (data ?? []) as Array<Record<string, unknown>>;
-  if (packets.length === 0) return [];
+  if (packets.length === 0) return { available: true, rows: [] };
 
   const enrollmentIds = packets
     .map((row) => (row.enrollment as Record<string, unknown> | null)?.id as string)
@@ -218,5 +244,5 @@ export async function getCallEscalationQueue(
     };
   });
 
-  return rows;
+  return { available: true, rows };
 }

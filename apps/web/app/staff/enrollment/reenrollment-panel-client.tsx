@@ -15,7 +15,16 @@ import {
 } from "@/components/ui/table";
 import { IconHeartPulse, IconMail, IconPenLine, IconClock } from "@/components/ui/icons";
 import { staffSendReenrollmentPulse, staffMarkReenrollmentContacted } from "./re-enrollment-actions";
-import { REENROLLMENT_PULSE_THROTTLE_DAYS } from "@/lib/queries/reenrollment";
+
+/**
+ * Display copy only — mirrors REENROLLMENT_PULSE_THROTTLE_DAYS in
+ * lib/queries/reenrollment.ts, which stays the single source of truth for the
+ * actual throttle (enforced server-side in staffSendReenrollmentPulse and
+ * reflected per row as `canPulse`). Deliberately re-declared rather than
+ * imported: lib/queries/reenrollment.ts imports the Supabase server client,
+ * which pulls `next/headers`, and that must never enter a client bundle.
+ */
+const PULSE_THROTTLE_DAYS_LABEL = 7;
 
 export interface ReenrollmentStatsProps {
   schoolYearName: string | null;
@@ -25,6 +34,8 @@ export interface ReenrollmentStatsProps {
   respondedDeciding: number;
   respondedNo: number;
   noResponse: number;
+  /** False when migration 00038 has not been applied yet — panel shows a migration note instead of zeroed stats. */
+  available: boolean;
 }
 
 export interface ReenrollmentFollowUpRowProps {
@@ -121,6 +132,24 @@ export function ReenrollmentPanel({
       setNotice(`Marked ${row.studentName} as contacted.`);
       router.refresh();
     }
+  }
+
+  if (!stats.available) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Re-enrollment</CardTitle>
+          <CardDescription>Spring intent-to-return campaign for continuing students.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <EmptyState
+            icon={<IconHeartPulse size={40} />}
+            title="Re-enrollment tracking not yet active"
+            description="Re-enrollment tracking activates after database migration 00038 is applied."
+          />
+        </CardContent>
+      </Card>
+    );
   }
 
   if (!stats.schoolYearName) {
@@ -252,7 +281,7 @@ export function ReenrollmentPanel({
                                 onClick={() => handleSendPulse(row)}
                                 title={
                                   !row.canPulse
-                                    ? `Already pulsed within the last ${REENROLLMENT_PULSE_THROTTLE_DAYS} days`
+                                    ? `Already pulsed within the last ${PULSE_THROTTLE_DAYS_LABEL} days`
                                     : undefined
                                 }
                               >

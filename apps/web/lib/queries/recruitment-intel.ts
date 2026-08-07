@@ -12,10 +12,13 @@ import { createServerClient } from "@rooted-ems/database/server";
  *    the same as reaching the family.
  *  - Leads with no contact activity are reported as their own honest count,
  *    never folded into a median that would understate real response time.
- *  - "Leads needed" per grade is only computed when a genuinely completed
- *    school year exists with real lead→enrolled conversion data for that
- *    exact campus+grade. No industry-average or assumed rate is ever used;
- *    absent real history, the column renders "—".
+ *  - "Applicants needed" per grade is only computed when a genuinely
+ *    completed school year exists with real data for that exact
+ *    campus+grade. The conversion rate underneath it is applicant→enrolled
+ *    (leads that became an application, then enrolled) — NOT lead→enrolled;
+ *    a raw lead who never applied contributes to neither side of the ratio.
+ *    No industry-average or assumed rate is ever used; absent real history,
+ *    the column renders "—".
  */
 
 const PAGE = 1000;
@@ -30,7 +33,11 @@ const ENROLLED_STATUSES = ["registered", "enrolled"];
 
 function median(sorted: number[]): number | null {
   if (sorted.length === 0) return null;
-  return sorted[Math.floor(sorted.length / 2)];
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+  return sorted[mid];
 }
 
 // ─── Speed to first contact, per campus ─────────────────
@@ -52,9 +59,15 @@ export interface SpeedToContactRow {
  * contact type and breaks results out per campus so a slow campus can't hide
  * behind a fast one in the network average.
  */
+export interface SpeedToContactResult {
+  rows: SpeedToContactRow[];
+  /** True if the leads or activity paging hit MAX_ROWS and stopped short of the true total. */
+  truncated: boolean;
+}
+
 export async function getSpeedToFirstContactByCampus(
   campusIds?: string[]
-): Promise<SpeedToContactRow[]> {
+): Promise<SpeedToContactResult> {
   const supabase = await createServerClient();
 
   let campusQuery = supabase.from("campus").select("id, name").order("name");
@@ -62,10 +75,12 @@ export async function getSpeedToFirstContactByCampus(
   const { data: campusRows, error: campusError } = await campusQuery;
   if (campusError) {
     console.error("[getSpeedToFirstContactByCampus] campus", campusError.message);
-    return [];
+    return { rows: [], truncated: false };
   }
   const campuses = (campusRows ?? []) as { id: string; name: string }[];
-  if (campuses.length === 0) return [];
+  if (campuses.length === 0) return { rows: [], truncated: false };
+
+  let truncated = false;
 
   // 1) Page all leads in scope: id, campus_id, created_at.
   const leads: { id: string; campus_id: string; created_at: string }[] = [];
@@ -83,6 +98,10 @@ export async function getSpeedToFirstContactByCampus(
     }
     leads.push(...((data ?? []) as { id: string; campus_id: string; created_at: string }[]));
     if (!data || data.length < PAGE) break;
+    if (offset + PAGE >= MAX_ROWS) {
+      console.error("[getSpeedToFirstContactByCampus] leads truncated at MAX_ROWS", MAX_ROWS);
+      truncated = true;
+    }
   }
 
   // 2) Page all contact-type activities in scope, earliest first, and keep
@@ -105,6 +124,10 @@ export async function getSpeedToFirstContactByCampus(
       }
     }
     if (!data || data.length < PAGE) break;
+    if (offset + PAGE >= MAX_ROWS) {
+      console.error("[getSpeedToFirstContactByCampus] activity truncated at MAX_ROWS", MAX_ROWS);
+      truncated = true;
+    }
   }
 
   const leadsByCampus = new Map<string, typeof leads>();
@@ -114,7 +137,7 @@ export async function getSpeedToFirstContactByCampus(
     leadsByCampus.set(lead.campus_id, list);
   }
 
-  return campuses.map((campus) => {
+  const rows = campuses.map((campus) => {
     const campusLeads = leadsByCampus.get(campus.id) ?? [];
     const hours: number[] = [];
     let neverContacted = 0;
@@ -138,6 +161,8 @@ export async function getSpeedToFirstContactByCampus(
       never_contacted: neverContacted,
     };
   });
+
+  return { rows, truncated };
 }
 
 // ─── Funnel arithmetic per campus + grade ───────────────
@@ -166,22 +191,29 @@ export interface GradeFunnelRow {
   leads_held: number;
   /** Applications this school year, campus+grade, status != draft. */
   applications_submitted: number;
-  /** Only set when a completed historical cycle has real lead→enrolled data for this exact campus+grade. */
-  leads_needed: number | null;
+  /**
+   * Only set when a completed historical cycle has real applicant→enrolled
+   * data for this exact campus+grade. This is APPLICANTS needed, not leads —
+   * the underlying rate is enrolled ÷ (leads that became applications), so
+   * sizing outreach off raw lead volume against this number would overshoot.
+   */
+  applicants_needed: number | null;
 }
 
 export interface GradeFunnelTable {
   school_year_name: string | null;
   rows: GradeFunnelRow[];
-  /** True if any row lacks leads_needed — drives the footnote. */
-  has_missing_leads_needed: boolean;
+  /** True if any row lacks applicants_needed — drives the footnote. */
+  has_missing_applicants_needed: boolean;
+  /** True if the leads or applications paging hit MAX_ROWS and stopped short of the true total. */
+  truncated: boolean;
 }
 
 /**
  * Per-campus, per-grade seat/lead/application arithmetic for the current
- * school year. "Leads needed" is left null (rendered "—" by the caller)
- * unless a real completed enrollment cycle exists to derive a conversion
- * rate from — see the module doc comment.
+ * school year. "Applicants needed" is left null (rendered "—" by the
+ * caller) unless a real completed enrollment cycle exists to derive an
+ * applicant→enrolled conversion rate from — see the module doc comment.
  */
 export async function getGradeFunnelTable(campusIds?: string[]): Promise<GradeFunnelTable> {
   const supabase = await createServerClient();
@@ -193,7 +225,7 @@ export async function getGradeFunnelTable(campusIds?: string[]): Promise<GradeFu
     .maybeSingle();
   if (yearError) console.error("[getGradeFunnelTable] school_year", yearError.message);
   if (!currentYear) {
-    return { school_year_name: null, rows: [], has_missing_leads_needed: false };
+    return { school_year_name: null, rows: [], has_missing_applicants_needed: false, truncated: false };
   }
   const currentYearId = currentYear.id as string;
 
@@ -202,11 +234,11 @@ export async function getGradeFunnelTable(campusIds?: string[]): Promise<GradeFu
   const { data: campusRows, error: campusError } = await campusQuery;
   if (campusError) {
     console.error("[getGradeFunnelTable] campus", campusError.message);
-    return { school_year_name: currentYear.name as string, rows: [], has_missing_leads_needed: false };
+    return { school_year_name: currentYear.name as string, rows: [], has_missing_applicants_needed: false, truncated: false };
   }
   const campuses = (campusRows ?? []) as { id: string; name: string }[];
   if (campuses.length === 0) {
-    return { school_year_name: currentYear.name as string, rows: [], has_missing_leads_needed: false };
+    return { school_year_name: currentYear.name as string, rows: [], has_missing_applicants_needed: false, truncated: false };
   }
   const campusIdSet = new Set(campuses.map((c) => c.id));
   const campusNameById = new Map(campuses.map((c) => [c.id, c.name]));
@@ -230,6 +262,7 @@ export async function getGradeFunnelTable(campusIds?: string[]): Promise<GradeFu
   // 2) Leads held: all-time count per campus+entry_grade (leads carry no
   // school-year field, so this is a standing pipeline count, not year-scoped).
   const leadsByKey = new Map<string, number>();
+  let truncated = false;
   for (let offset = 0; offset < MAX_ROWS; offset += PAGE) {
     let q = supabase
       .from("lead")
@@ -247,6 +280,10 @@ export async function getGradeFunnelTable(campusIds?: string[]): Promise<GradeFu
       leadsByKey.set(key, (leadsByKey.get(key) ?? 0) + 1);
     }
     if (!data || data.length < PAGE) break;
+    if (offset + PAGE >= MAX_ROWS) {
+      console.error("[getGradeFunnelTable] leads truncated at MAX_ROWS", MAX_ROWS);
+      truncated = true;
+    }
   }
 
   // 3) Applications submitted this school year, campus+grade, status != draft.
@@ -270,11 +307,15 @@ export async function getGradeFunnelTable(campusIds?: string[]): Promise<GradeFu
       appsByKey.set(key, (appsByKey.get(key) ?? 0) + 1);
     }
     if (!data || data.length < PAGE) break;
+    if (offset + PAGE >= MAX_ROWS) {
+      console.error("[getGradeFunnelTable] application truncated at MAX_ROWS", MAX_ROWS);
+      truncated = true;
+    }
   }
 
-  // 4) Leads needed — only from a genuinely completed prior school year with
+  // 4) Applicants needed — only from a genuinely completed prior school year with
   // real lead→enrolled conversion data for the exact campus+grade.
-  const leadsNeededByKey = new Map<string, number>();
+  const applicantsNeededByKey = new Map<string, number>();
   const { data: historicalYear, error: historicalError } = await supabase
     .from("school_year")
     .select("id")
@@ -346,7 +387,7 @@ export async function getGradeFunnelTable(campusIds?: string[]): Promise<GradeFu
       const rate = rec.enrolled / rec.leads;
       const seats = seatsByKey.get(key);
       if (seats == null || seats <= 0) continue; // no current-year seat target to size against
-      leadsNeededByKey.set(key, Math.ceil(seats / rate));
+      applicantsNeededByKey.set(key, Math.ceil(seats / rate));
     }
   }
 
@@ -371,7 +412,7 @@ export async function getGradeFunnelTable(campusIds?: string[]): Promise<GradeFu
       total_seats: seatsByKey.has(key) ? (seatsByKey.get(key) as number) : null,
       leads_held: leadsByKey.get(key) ?? 0,
       applications_submitted: appsByKey.get(key) ?? 0,
-      leads_needed: leadsNeededByKey.get(key) ?? null,
+      applicants_needed: applicantsNeededByKey.get(key) ?? null,
     });
   }
 
@@ -384,6 +425,7 @@ export async function getGradeFunnelTable(campusIds?: string[]): Promise<GradeFu
   return {
     school_year_name: currentYear.name as string,
     rows,
-    has_missing_leads_needed: rows.some((r) => r.leads_needed === null),
+    has_missing_applicants_needed: rows.some((r) => r.applicants_needed === null),
+    truncated,
   };
 }

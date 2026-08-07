@@ -42,6 +42,7 @@ export interface ReportData {
     respondedDeciding: number;
     respondedNo: number;
     noResponse: number;
+    available: boolean;
   };
 }
 

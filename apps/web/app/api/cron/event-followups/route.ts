@@ -233,25 +233,35 @@ async function runReminders(
       const firstName = row.guardian_name?.trim().split(/\s+/)[0] || undefined;
       const when = whenText(event.starts_at);
 
+      // Urgency reflects actual time remaining at send, not which cron pass
+      // (24h vs 2h window query) picked up the row — a daily-only cron
+      // schedule (see module doc comment) can easily fire the "24h" pass
+      // with only a handful of hours left, and claiming "tomorrow" then
+      // would be a lie. <=3h: starting soon. 18-26h: genuinely tomorrow.
+      // Anything in between: neutral, state the real date/time.
+      const hoursUntil = (new Date(event.starts_at).getTime() - new Date().getTime()) / (60 * 60 * 1000);
+      const urgency: "starting_soon" | "day_before" | "coming_soon" =
+        hoursUntil <= 3 ? "starting_soon" : hoursUntil >= 18 && hoursUntil <= 26 ? "day_before" : "coming_soon";
+
       const template = emailTemplates.eventReminder({
         guardianFirstName: firstName,
         campusName,
         eventTitle: event.title,
         whenText: when,
         location: event.location ?? undefined,
-        urgency: kind === "24h" ? "day_before" : "starting_soon",
+        urgency,
       });
+
+      const smsBody =
+        urgency === "day_before"
+          ? `Rooted Schools: Reminder — ${event.title} at ${campusName} is tomorrow, ${when}${event.location ? ` at ${event.location}` : ""}. See you there!\nRecordatorio — ${event.title} en ${campusName} es mañana. ¡Nos vemos!`
+          : urgency === "starting_soon"
+            ? `Rooted Schools: ${event.title} at ${campusName} is starting soon (${when})${event.location ? ` — ${event.location}` : ""}. See you shortly!\n${event.title} en ${campusName} comienza pronto. ¡Nos vemos!`
+            : `Rooted Schools: Reminder — ${event.title} at ${campusName} is coming up soon, ${when}${event.location ? ` at ${event.location}` : ""}. See you there!\nRecordatorio — ${event.title} en ${campusName} se acerca pronto, ${when}. ¡Nos vemos!`;
 
       await Promise.all([
         emailFamily(row.email, template, campusEmail, "cron/event-followups reminder"),
-        smsFamily(
-          row.phone,
-          row.lead?.sms_consent === true,
-          kind === "24h"
-            ? `Rooted Schools: Reminder — ${event.title} at ${campusName} is tomorrow, ${when}${event.location ? ` at ${event.location}` : ""}. See you there!\nRecordatorio — ${event.title} en ${campusName} es mañana. ¡Nos vemos!`
-            : `Rooted Schools: ${event.title} at ${campusName} is starting soon (${when})${event.location ? ` — ${event.location}` : ""}. See you shortly!\n${event.title} en ${campusName} comienza pronto. ¡Nos vemos!`,
-          "cron/event-followups reminder"
-        ),
+        smsFamily(row.phone, row.lead?.sms_consent === true, smsBody, "cron/event-followups reminder"),
       ]);
 
       sent++;

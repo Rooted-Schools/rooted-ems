@@ -50,7 +50,7 @@ export default async function StaffTodayPage({
     duplicateSuspects,
     deadlines,
     registrationCompletion,
-    callEscalationQueue,
+    callEscalation,
   ] = await Promise.all([
     supabase.from("user_profile").select("first_name, full_name").eq("id", session.user_id).maybeSingle(),
     supabase.from("school_year").select("id, name").eq("is_current", true).maybeSingle(),
@@ -251,7 +251,8 @@ export default async function StaffTodayPage({
       timeCriticalCount={timeCriticalCount}
       seatProgress={seatProgress}
       registrationCompletion={registrationCompletion}
-      callEscalationQueue={callEscalationQueue}
+      callEscalationQueue={callEscalation.rows}
+      callEscalationAvailable={callEscalation.available}
     />
   );
 }

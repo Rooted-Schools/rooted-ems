@@ -17,7 +17,7 @@ export default async function StaffEnrollmentPage({
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
 
-  const [{ enrollments, stats }, reenrollmentStats, reenrollmentFollowUpQueue] = await Promise.all([
+  const [{ enrollments, stats }, reenrollmentStats, reenrollmentFollowUp] = await Promise.all([
     getStaffEnrollments(scopedCampusIds),
     getReenrollmentStats(scopedCampusIds),
     getReenrollmentFollowUpQueue(scopedCampusIds),
@@ -27,7 +27,7 @@ export default async function StaffEnrollmentPage({
     <div className="space-y-8">
       <ReenrollmentPanel
         stats={reenrollmentStats}
-        followUpQueue={reenrollmentFollowUpQueue}
+        followUpQueue={reenrollmentFollowUp.rows}
       />
       <EnrollmentClient
         enrollments={enrollments}
