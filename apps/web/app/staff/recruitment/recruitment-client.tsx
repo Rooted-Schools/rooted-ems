@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/table";
 import type { CampaignRow, JourneyStat, LeadPipelineSummary, LeadRow } from "@/lib/queries/leads";
 import { formatRelativeTime } from "@/lib/queries/utils";
-import { IconCalendar, IconBarChart, IconLink, IconRefreshCw, IconMail, IconPhone, IconSprout } from "@/components/ui/icons";
+import { IconCalendar, IconBarChart, IconLink, IconRefreshCw, IconMail, IconPhone, IconSprout, IconAlertTriangle } from "@/components/ui/icons";
 import { staffCancelCampaign, staffCreateLead, staffSyncLeadSheets } from "./actions";
 import { CampaignDialog } from "./campaign-dialog";
 import { ShareDialog } from "./share-dialog";
@@ -61,6 +61,24 @@ export const PATHWAY_LABELS: Record<string, string> = {
 };
 
 const GRADE_OPTIONS = ["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
+
+/** Honest elapsed-time label for the queue clock: "3h since inquiry" / "2d since inquiry". */
+function timeSinceInquiry(createdAt: string): string {
+  const hours = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60);
+  if (hours < 1) return "<1h since inquiry";
+  if (hours < 24) return `${Math.floor(hours)}h since inquiry`;
+  return `${Math.floor(hours / 24)}d since inquiry`;
+}
+
+/** Past the 24h speed-to-lead standard with no real contact logged yet. lead.last_contact_at
+ *  is only ever stamped alongside a call/sms/email lead_activity row (see
+ *  lib/mutations/leads.ts CONTACT_ACTIVITY_TYPES and the cron send paths) — never by a note,
+ *  so its absence is a faithful proxy for "no contact-type activity yet." */
+function pastContactStandard(lead: LeadRow): boolean {
+  if (lead.last_contact_at) return false;
+  const hours = (Date.now() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60);
+  return hours > 24;
+}
 
 /* ─── Component ─── */
 
@@ -241,11 +259,18 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
                       )}
                     </p>
                     <p className="text-xs text-stone truncate">
-                      {lead.campus_name} · {SOURCE_LABELS[lead.source] ?? lead.source}
+                      {lead.campus_name} · {SOURCE_LABELS[lead.source] ?? lead.source} · {timeSinceInquiry(lead.created_at)}
                       {lead.next_follow_up_at && ` · due ${formatRelativeTime(lead.next_follow_up_at)}`}
                     </p>
                   </div>
-                  <Badge variant={cfg.variant} className="shrink-0">{cfg.label}</Badge>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                    {pastContactStandard(lead) && (
+                      <span className="inline-flex items-center gap-1 rounded-[6px] border border-warn/30 bg-warn/10 px-1.5 py-0.5 text-[10px] font-medium text-warn-text whitespace-nowrap">
+                        <IconAlertTriangle size={11} /> past 24h standard
+                      </span>
+                    )}
+                  </div>
                 </Link>
               );
             })}

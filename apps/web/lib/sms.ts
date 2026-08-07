@@ -14,6 +14,8 @@
  * gate lives in lib/notify.ts where guardian records are resolved.
  */
 
+import crypto from "node:crypto";
+
 const SEND_TIMEOUT_MS = 10_000;
 
 let warnedNotConfigured = false;
@@ -67,6 +69,72 @@ export function normalizePhone(raw: string): string | null {
   if (bare.length === 10) return `+1${bare}`;
   if (bare.length === 11 && bare.startsWith("1")) return `+${bare}`;
   return null;
+}
+
+/**
+ * The last 10 digits of a phone number, or null when there aren't 10.
+ *
+ * Inbound Twilio numbers always arrive in E.164 ("+15555550100"), but the
+ * same number may be stored on a guardian or lead row in whatever format the
+ * family typed it: "(555) 555-0100", "555-555-0100", "1 555 555 0100". The
+ * last 10 digits are the stable identity across all of those, so inbound
+ * matching compares on this and nothing else.
+ *
+ * Caveat, stated rather than hidden: for a non-US number this drops the
+ * country code, so two numbers from different countries sharing a 10-digit
+ * tail would compare equal. Both sides of the comparison use the same rule,
+ * and all three campuses are US schools, so this is the right trade today.
+ */
+export function phoneDigits10(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const digits = raw.replace(/\D/g, "");
+  return digits.length >= 10 ? digits.slice(-10) : null;
+}
+
+/**
+ * Verify Twilio's `X-Twilio-Signature` on an inbound webhook request.
+ *
+ * Twilio's scheme, exactly as documented: take the full URL Twilio was
+ * configured to call (including any query string), append every POST
+ * parameter as `key + value` in ascending key order, HMAC-SHA1 the result
+ * with the account's auth token, and base64 the digest.
+ *
+ * Two things matter for correctness. The URL must be the PUBLIC one Twilio
+ * dialed, not whatever host header reached the process behind a proxy — the
+ * caller builds it from NEXT_PUBLIC_APP_URL. And the comparison is
+ * timing-safe, because this signature is the only thing standing between the
+ * webhook and anyone who can guess the path.
+ *
+ * Returns false rather than throwing on any malformed input: an unparseable
+ * signature is a failed signature.
+ */
+export function verifyTwilioSignature({
+  url,
+  params,
+  signature,
+  authToken,
+}: {
+  url: string;
+  params: Record<string, string>;
+  signature: string;
+  authToken: string;
+}): boolean {
+  try {
+    if (!signature || !authToken) return false;
+
+    const payload = Object.keys(params)
+      .sort()
+      .reduce((acc, key) => acc + key + params[key], url);
+
+    const expected = crypto.createHmac("sha1", authToken).update(payload, "utf8").digest("base64");
+
+    const provided = Buffer.from(signature, "utf8");
+    const computed = Buffer.from(expected, "utf8");
+    if (provided.length !== computed.length) return false;
+    return crypto.timingSafeEqual(provided, computed);
+  } catch {
+    return false;
+  }
 }
 
 /**

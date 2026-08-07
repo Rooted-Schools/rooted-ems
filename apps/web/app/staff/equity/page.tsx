@@ -2,6 +2,7 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 import { getDemographicBreakdowns, getCampuses } from "@/lib/queries";
+import { getEquityFunnelConversion } from "@/lib/queries/equity-funnel";
 import { EquityClient } from "./equity-client";
 import {
   requireMinRole,
@@ -20,9 +21,15 @@ export default async function EquityPage({
   const accessibleIds = getAccessibleCampusIds(session);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
 
-  const [data, allCampuses] = await Promise.all([
+  // Conversion-by-group reads the same campus scope the page is already showing:
+  // the selected campus when one is chosen, otherwise every campus this user
+  // can see.
+  const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
+
+  const [data, allCampuses, conversion] = await Promise.all([
     getDemographicBreakdowns(activeCampus),
     getCampuses(),
+    getEquityFunnelConversion(scopedCampusIds),
   ]);
 
   // Filter campuses to only those accessible to this user
@@ -39,6 +46,7 @@ export default async function EquityPage({
       />
       <EquityClient
         data={data}
+        conversion={conversion}
         campuses={campuses}
         initialCampus={searchParams?.campus ?? "all"}
       />
