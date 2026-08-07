@@ -28,10 +28,10 @@ function statusMessageKey(status: string): TranslationKey | null {
     : null;
 }
 
-function formatDate(dateStr: string | null) {
+function formatDate(dateStr: string | null, locale: "en" | "es" = "en") {
   if (!dateStr) return null;
   const d = dateStr.includes("T") ? new Date(dateStr) : new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", {
+  return d.toLocaleDateString(locale === "es" ? "es-US" : "en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -52,7 +52,7 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
         <div>
           <h1 className="text-2xl font-bold text-ink">{t("apps.heading")}</h1>
           <p className="text-sm text-stone-text mt-1">
-            Track the status of your children&apos;s enrollment applications.
+            {t("apps.subheading")}
           </p>
         </div>
         {/* Outline, not solid — this competes with a draft's "Continue" button
@@ -123,10 +123,10 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
                       </p>
                       <p className="text-sm text-ink/70">
                         {isDraft
-                          ? "Complete and submit your application before the enrollment window closes."
+                          ? t("apps.action.draft")
                           : app.status === "needs_info"
-                            ? "Additional information or documents have been requested."
-                            : "Please respond to the enrollment offer before the deadline."}
+                            ? t("apps.action.needs_info")
+                            : t("apps.action.offered")}
                       </p>
                     </div>
                   )}
@@ -134,9 +134,9 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
                   <div className="flex items-center justify-between pt-2 border-t border-rooted-gray">
                     <div className="flex gap-4 text-xs text-stone-text">
                       {app.submitted_at && (
-                        <span>{t("apps.submitted")}: {formatDate(app.submitted_at)}</span>
+                        <span>{t("apps.submitted")}: {formatDate(app.submitted_at, locale)}</span>
                       )}
-                      <span>{t("apps.lastUpdated")}: {formatDate(app.updated_at)}</span>
+                      <span>{t("apps.lastUpdated")}: {formatDate(app.updated_at, locale)}</span>
                     </div>
                     <div className="flex gap-2">
                       {isDraft ? (

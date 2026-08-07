@@ -307,6 +307,12 @@ const dict = {
   "apps.lastUpdated":       { en: "Last updated",           es: "Última actualización" },
   "apps.continueApp":       { en: "Continue Application",   es: "Continuar Solicitud" },
   "apps.actionNeeded":      { en: "Action needed",           es: "Acción requerida" },
+  "apps.subheading":        { en: "Track the status of your children's enrollment applications.", es: "Siga el estado de las solicitudes de inscripción de sus hijos." },
+
+  // ─── Action-needed one-liners (applications list cards) ───────────────────
+  "apps.action.draft":      { en: "Complete and submit your application before the enrollment window closes.", es: "Complete y envíe su solicitud antes de que cierre el período de inscripción." },
+  "apps.action.needs_info": { en: "Additional information or documents have been requested.", es: "Se ha solicitado información o documentos adicionales." },
+  "apps.action.offered":    { en: "Please respond to the enrollment offer before the deadline.", es: "Por favor responda a la oferta de inscripción antes de la fecha límite." },
 
   // ─── Common ───────────────────────────────────────────────────────────────
   "common.backToDashboard": { en: "Back to Dashboard", es: "Volver al Panel" },
@@ -524,6 +530,7 @@ const dict = {
   "apps.detail.timelineTitle":  { en: "Application Timeline", es: "Cronología de la Solicitud" },
   "apps.detail.timelineDesc":   { en: "Track the progress of this application.", es: "Siga el progreso de esta solicitud." },
   "apps.detail.noActivity":     { en: "No activity recorded yet — updates will appear here as your application moves through review.", es: "Aún no hay actividad registrada — las actualizaciones aparecerán aquí a medida que su solicitud avance en la revisión." },
+  "apps.detail.applicationId":  { en: "ID:", es: "ID:" },
 
   // ─── Camera-first capture (UX Phase 5A) ───────────────────────────────────
   "docs.captureHint":         { en: "Lay the document flat, fill the frame, and avoid glare.", es: "Coloque el documento en una superficie plana, llene el encuadre y evite el brillo." },

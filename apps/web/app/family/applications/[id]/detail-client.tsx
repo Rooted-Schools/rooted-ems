@@ -590,7 +590,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                         <Badge variant={dcfg.variant}>{t(dcfg.labelKey)}</Badge>
                         {doc.status === "rejected" && (
                           <Link href="/family/documents">
-                            <Button size="sm">Re-upload</Button>
+                            <Button size="sm">{t("docs.reupload")}</Button>
                           </Link>
                         )}
                         <Button
@@ -683,7 +683,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
           <span>{t("apps.detail.submittedOn")} {formatDate(detail.submitted_at, locale)}</span>
         )}
         <span>{t("apps.detail.lastUpdated")} {formatDate(detail.updated_at, locale)}</span>
-        <span>ID: {detail.id}</span>
+        <span>{t("apps.detail.applicationId")} {detail.id}</span>
       </div>
 
       {/* Decline Offer Dialog */}
