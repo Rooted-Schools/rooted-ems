@@ -300,6 +300,13 @@ export function EquityClient({
                   campus overall and neither figure is suppressed. The tag describes a
                   difference in rates. It does not establish a cause.
                 </p>
+                <p className="text-xs text-stone">
+                  This suppression rule applies to every table on this page — Conversion
+                  by Group, Equity Funnel by Subgroup, and Race / Ethnicity Breakdown all
+                  hide rates for groups with fewer than {conversion.suppression_threshold}{" "}
+                  applicants. In the tables below, &quot;—&quot; means no applicants in
+                  that group, not zero conversion.
+                </p>
               </div>
             </div>
           )}
@@ -312,7 +319,9 @@ export function EquityClient({
           <CardTitle className="text-base">Equity Funnel by Subgroup</CardTitle>
           <p className="text-xs text-stone mt-1">
             Rows highlighted in amber are 10+ points below the overall offer rate.
-            ELL and FRL data not yet collected — shown as 0 (placeholder).
+            Groups with fewer than {conversion.suppression_threshold} applicants show
+            suppressed rates. ELL and FRL data not yet collected — shown as 0 (placeholder).
+            &quot;—&quot; means no applicants in that group.
           </p>
         </CardHeader>
         <CardContent className="px-0 pb-0">
@@ -340,19 +349,29 @@ export function EquityClient({
                     <TableCell className="text-right text-stone">{row.applied}</TableCell>
                     <TableCell className="text-right text-stone">{row.offered}</TableCell>
                     <TableCell className="text-right">
-                      <span
-                        className={
-                          row.is_flagged
-                            ? "font-semibold text-amber-700"
-                            : "text-stone"
-                        }
-                      >
-                        {row.applied > 0 ? `${row.offer_rate_pct}%` : "—"}
-                      </span>
+                      {row.is_suppressed ? (
+                        <span className="text-stone">n &lt; {conversion.suppression_threshold} — suppressed</span>
+                      ) : (
+                        <span
+                          className={
+                            row.is_flagged
+                              ? "font-semibold text-amber-700"
+                              : "text-stone"
+                          }
+                        >
+                          {row.applied > 0 ? `${row.offer_rate_pct}%` : "—"}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right text-stone">{row.accepted}</TableCell>
                     <TableCell className="text-right text-stone">
-                      {row.offered > 0 ? `${row.accept_rate_pct}%` : "—"}
+                      {row.is_suppressed ? (
+                        <span>n &lt; {conversion.suppression_threshold} — suppressed</span>
+                      ) : row.offered > 0 ? (
+                        `${row.accept_rate_pct}%`
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -368,7 +387,9 @@ export function EquityClient({
           <CardTitle className="text-base">Race / Ethnicity Breakdown</CardTitle>
           <p className="text-xs text-stone mt-1">
             Applicant pool composition and offer equity by race/ethnicity. Students may appear in
-            multiple groups if they selected more than one.
+            multiple groups if they selected more than one. Groups with fewer than{" "}
+            {conversion.suppression_threshold} applicants show suppressed rates. &quot;—&quot;
+            means no applicants in that group.
           </p>
         </CardHeader>
         <CardContent className="px-0 pb-0">
@@ -396,13 +417,23 @@ export function EquityClient({
                     <TableCell className="text-right text-stone">{row.applied}</TableCell>
                     <TableCell className="text-right text-stone">{row.offered}</TableCell>
                     <TableCell className="text-right">
-                      <span className={row.is_flagged ? "font-semibold text-amber-700" : "text-stone"}>
-                        {row.applied > 0 ? `${row.offer_rate_pct}%` : "—"}
-                      </span>
+                      {row.is_suppressed ? (
+                        <span className="text-stone">n &lt; {conversion.suppression_threshold} — suppressed</span>
+                      ) : (
+                        <span className={row.is_flagged ? "font-semibold text-amber-700" : "text-stone"}>
+                          {row.applied > 0 ? `${row.offer_rate_pct}%` : "—"}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right text-stone">{row.accepted}</TableCell>
                     <TableCell className="text-right text-stone">
-                      {row.offered > 0 ? `${row.accept_rate_pct}%` : "—"}
+                      {row.is_suppressed ? (
+                        <span>n &lt; {conversion.suppression_threshold} — suppressed</span>
+                      ) : row.offered > 0 ? (
+                        `${row.accept_rate_pct}%`
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

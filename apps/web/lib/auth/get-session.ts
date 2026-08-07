@@ -198,7 +198,9 @@ export function hasMinRole(session: AuthSession, minRole: string): boolean {
 export async function requireMinRole(minRole: string): Promise<AuthSession> {
   const session = await requireStaffSession();
   if (!hasMinRole(session, minRole)) {
-    redirect("/staff/today"); // Authenticated but insufficient role
+    // Authenticated but insufficient role — ?denied=1 drives a quiet banner
+    // on the Today page so the user gets an explanation, not a silent bounce.
+    redirect("/staff/today?denied=1");
   }
   return session;
 }
@@ -209,7 +211,7 @@ export async function requireMinRole(minRole: string): Promise<AuthSession> {
 export async function requireCMOAccess(): Promise<AuthSession> {
   const session = await requireStaffSession();
   if (!isCMOAdmin(session)) {
-    redirect("/staff/today"); // Authenticated but insufficient role
+    redirect("/staff/today?denied=1"); // Authenticated but insufficient role
   }
   return session;
 }

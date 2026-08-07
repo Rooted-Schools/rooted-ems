@@ -31,7 +31,7 @@ function prettify(itemType: string): string {
 export default async function StaffTodayPage({
   searchParams,
 }: {
-  searchParams: { campus?: string };
+  searchParams: { campus?: string; denied?: string };
 }) {
   const session = await requireStaffSession();
   const accessibleIds = getAccessibleCampusIds(session);
@@ -253,6 +253,7 @@ export default async function StaffTodayPage({
       registrationCompletion={registrationCompletion}
       callEscalationQueue={callEscalation.rows}
       callEscalationAvailable={callEscalation.available}
+      denied={searchParams?.denied === "1"}
     />
   );
 }

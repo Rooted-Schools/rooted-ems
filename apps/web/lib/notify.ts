@@ -852,6 +852,69 @@ export async function notifyFamilyReenrollmentPulse({
   ]);
 }
 
+/**
+ * Staff initiated re-enrollment for next year: a new application sits at
+ * "offered" and the family accepts or declines at /family/reenrollment.
+ *
+ * This used to reuse notifyFamilyStudentEnrolled, which told the family their
+ * student was "officially enrolled" — the opposite of the truth, since the
+ * whole point is that nothing is settled until they answer.
+ *
+ * Email reuses reenrollmentPulse: it is the only existing template that lands
+ * on /family/reenrollment and speaks about next year. offerExtended would fit
+ * the "respond to your offer" framing but is built around a deadline, and the
+ * re-enrollment path has no expiry date to state — inventing one is not an
+ * option. Never throws.
+ */
+export async function notifyFamilyReenrollmentOffer({
+  applicationId,
+  studentName,
+  campusId,
+  nextSchoolYearName,
+}: {
+  applicationId: string;
+  studentName?: string;
+  campusId?: string;
+  nextSchoolYearName?: string;
+}): Promise<void> {
+  const contact = await getGuardianContact(applicationId);
+  const { userId, email } = contact;
+  if (!userId && !email && !contact.phone) return;
+  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const studentFirstName = firstNameOf(studentName);
+  const yearEn = nextSchoolYearName ? ` for ${nextSchoolYearName}` : " for next year";
+  const yearEs = nextSchoolYearName ? ` para ${nextSchoolYearName}` : " para el próximo año";
+  await Promise.all([
+    userId
+      ? notify({
+          userId,
+          subject: `A seat is reserved${studentName ? ` for ${studentName}` : ""} at ${campusName}`,
+          body: `We've held ${
+            studentName ?? "your student"
+          }'s seat at ${campusName}${yearEn}. Confirm or decline it in your family portal so we know how to plan.`,
+          link: `/family/reenrollment`,
+          campusId,
+          logTag: "notifyFamilyReenrollmentOffer",
+        })
+      : Promise.resolve(),
+    emailGuardian(
+      email,
+      emailTemplates.reenrollmentPulse({ studentFirstName, campusName, nextSchoolYearName }),
+      "notifyFamilyReenrollmentOffer",
+      campusEmail
+    ),
+    smsGuardian(
+      contact,
+      `Rooted Schools: We've held ${
+        studentFirstName ?? "your student"
+      }'s seat at ${campusName}${yearEn}. Confirm or decline: ${APP_LINK}/family/reenrollment\nHemos reservado el cupo de ${
+        studentFirstName ?? "su estudiante"
+      } en ${campusName}${yearEs}. Confirme o rechace: ${APP_LINK}/family/reenrollment`,
+      "notifyFamilyReenrollmentOffer"
+    ),
+  ]);
+}
+
 // ─── Lead (CRM) notifications ─────────────────────────────────────────────────
 
 interface LeadContact {

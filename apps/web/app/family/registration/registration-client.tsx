@@ -23,7 +23,7 @@ import { getPolicyText } from "./policy-content";
 import { SignaturePad } from "@/components/ui/signature-pad";
 import { useLocale } from "@/lib/i18n/locale-context";
 import { type TranslationKey } from "@/lib/i18n/translations";
-import { uploadFile, validateFile, formatFileSize } from "@/lib/storage/upload";
+import { uploadFile, validateFile, formatFileSize, formatFileValidationError, type FileValidationError } from "@/lib/storage/upload";
 import { compressImageFile } from "@/lib/storage/compress-image";
 import { familyCreateDocumentRecord } from "@/app/family/applications/actions";
 import {
@@ -130,363 +130,347 @@ const ITEM_TO_CATEGORY: Record<string, string> = {
   before_after_care: "services",
 };
 
-/* ─── Completion modes per item type ─── */
+/* ─── Completion modes per item type ───
+ * All family-visible strings (titles, descriptions, field labels,
+ * placeholders, select options, upload examples) live in translations.ts
+ * under the reg.item.* namespace — see ITEM_COMPLETION_CONFIG below, which
+ * stores only TranslationKeys, never hardcoded English. Select option
+ * *values* stay as stable English slugs (they're the persisted form_data
+ * values staff read back) — only the displayed label is translated. */
+
+type FieldOption = { value: string; labelKey: TranslationKey };
 
 type FieldDef = {
   key: string;
-  label: string;
+  labelKey: TranslationKey;
   type: "text" | "tel" | "email" | "select" | "textarea" | "checkbox" | "date" | "phone";
-  placeholder?: string;
-  options?: string[];
+  placeholderKey?: TranslationKey;
+  options?: FieldOption[];
   required?: boolean;
 };
 
 type CompletionConfig =
-  | { mode: "form"; title: string; description: string; fields: FieldDef[] }
-  | { mode: "acknowledge"; title: string; description: string }
-  | { mode: "upload"; title: string; description: string; examples: string[] };
+  | { mode: "form"; titleKey: TranslationKey; descKey: TranslationKey; fields: FieldDef[] }
+  | { mode: "acknowledge"; titleKey: TranslationKey; descKey: TranslationKey }
+  | { mode: "upload"; titleKey: TranslationKey; descKey: TranslationKey; exampleKeys: TranslationKey[] };
 
 const ITEM_COMPLETION_CONFIG: Record<string, CompletionConfig> = {
   // ─── Data Entry Forms ───
   emergency_contact: {
     mode: "form",
-    title: "Emergency Contact Information",
-    description: "Provide emergency contact details for your child.",
+    titleKey: "reg.item.emergency_contact.title",
+    descKey: "reg.item.emergency_contact.desc",
     fields: [
-      { key: "contact_name", label: "Contact Name", type: "text", placeholder: "Full name", required: true },
-      { key: "relationship", label: "Relationship", type: "select", options: ["Parent", "Grandparent", "Aunt/Uncle", "Sibling", "Family Friend", "Other"], required: true },
-      { key: "phone", label: "Phone Number", type: "tel", placeholder: "(555) 555-5555", required: true },
-      { key: "alt_phone", label: "Alternate Phone", type: "tel", placeholder: "(555) 555-5555" },
+      { key: "contact_name", labelKey: "reg.item.emergency_contact.field.contact_name.label", type: "text", placeholderKey: "reg.item.emergency_contact.field.contact_name.placeholder", required: true },
+      {
+        key: "relationship",
+        labelKey: "reg.item.emergency_contact.field.relationship.label",
+        type: "select",
+        required: true,
+        options: [
+          { value: "Parent", labelKey: "reg.item.emergency_contact.field.relationship.opt.parent" },
+          { value: "Grandparent", labelKey: "reg.item.emergency_contact.field.relationship.opt.grandparent" },
+          { value: "Aunt/Uncle", labelKey: "reg.item.emergency_contact.field.relationship.opt.aunt_uncle" },
+          { value: "Sibling", labelKey: "reg.item.emergency_contact.field.relationship.opt.sibling" },
+          { value: "Family Friend", labelKey: "reg.item.emergency_contact.field.relationship.opt.family_friend" },
+          { value: "Other", labelKey: "reg.item.emergency_contact.field.relationship.opt.other" },
+        ],
+      },
+      { key: "phone", labelKey: "reg.item.emergency_contact.field.phone.label", type: "tel", placeholderKey: "reg.item.emergency_contact.field.phone.placeholder", required: true },
+      { key: "alt_phone", labelKey: "reg.item.emergency_contact.field.alt_phone.label", type: "tel", placeholderKey: "reg.item.emergency_contact.field.alt_phone.placeholder" },
     ],
   },
   medical_info: {
     mode: "form",
-    title: "Medical Information",
-    description: "Provide your child's medical information so the school can respond in an emergency.",
+    titleKey: "reg.item.medical_info.title",
+    descKey: "reg.item.medical_info.desc",
     fields: [
-      { key: "physician_name", label: "Physician Name", type: "text", placeholder: "Dr. Smith", required: true },
-      { key: "physician_phone", label: "Physician Phone", type: "tel", placeholder: "(555) 555-5555", required: true },
-      { key: "insurance_provider", label: "Insurance Provider", type: "text", placeholder: "e.g. Blue Cross" },
-      { key: "policy_number", label: "Policy Number", type: "text", placeholder: "Policy or member ID" },
-      { key: "allergies", label: "Allergies", type: "textarea", placeholder: "List any known allergies (or write None)" },
-      { key: "conditions", label: "Medical Conditions", type: "textarea", placeholder: "List any conditions or special needs (or write None)" },
+      { key: "physician_name", labelKey: "reg.item.medical_info.field.physician_name.label", type: "text", placeholderKey: "reg.item.medical_info.field.physician_name.placeholder", required: true },
+      { key: "physician_phone", labelKey: "reg.item.medical_info.field.physician_phone.label", type: "tel", placeholderKey: "reg.item.medical_info.field.physician_phone.placeholder", required: true },
+      { key: "insurance_provider", labelKey: "reg.item.medical_info.field.insurance_provider.label", type: "text", placeholderKey: "reg.item.medical_info.field.insurance_provider.placeholder" },
+      { key: "policy_number", labelKey: "reg.item.medical_info.field.policy_number.label", type: "text", placeholderKey: "reg.item.medical_info.field.policy_number.placeholder" },
+      { key: "allergies", labelKey: "reg.item.medical_info.field.allergies.label", type: "textarea", placeholderKey: "reg.item.medical_info.field.allergies.placeholder" },
+      { key: "conditions", labelKey: "reg.item.medical_info.field.conditions.label", type: "textarea", placeholderKey: "reg.item.medical_info.field.conditions.placeholder" },
     ],
   },
   medication_auth: {
     mode: "form",
-    title: "Medication Authorization",
-    description: "Authorize the school to administer medication if needed.",
+    titleKey: "reg.item.medication_auth.title",
+    descKey: "reg.item.medication_auth.desc",
     fields: [
-      { key: "medication_name", label: "Medication Name", type: "text", placeholder: "Name of medication", required: true },
-      { key: "dosage", label: "Dosage", type: "text", placeholder: "e.g. 10mg", required: true },
-      { key: "frequency", label: "Frequency", type: "text", placeholder: "e.g. Once daily at noon", required: true },
-      { key: "reason", label: "Reason", type: "text", placeholder: "Condition being treated" },
-      { key: "authorize", label: "I authorize the school to administer this medication", type: "checkbox", required: true },
+      { key: "medication_name", labelKey: "reg.item.medication_auth.field.medication_name.label", type: "text", placeholderKey: "reg.item.medication_auth.field.medication_name.placeholder", required: true },
+      { key: "dosage", labelKey: "reg.item.medication_auth.field.dosage.label", type: "text", placeholderKey: "reg.item.medication_auth.field.dosage.placeholder", required: true },
+      { key: "frequency", labelKey: "reg.item.medication_auth.field.frequency.label", type: "text", placeholderKey: "reg.item.medication_auth.field.frequency.placeholder", required: true },
+      { key: "reason", labelKey: "reg.item.medication_auth.field.reason.label", type: "text", placeholderKey: "reg.item.medication_auth.field.reason.placeholder" },
+      { key: "authorize", labelKey: "reg.item.medication_auth.field.authorize.label", type: "checkbox", required: true },
     ],
   },
   food_allergy_plan: {
     mode: "form",
-    title: "Food Allergy Action Plan",
-    description: "Provide details about your child's food allergies so the school can keep them safe.",
+    titleKey: "reg.item.food_allergy_plan.title",
+    descKey: "reg.item.food_allergy_plan.desc",
     fields: [
-      { key: "allergens", label: "Allergens", type: "textarea", placeholder: "List specific food allergens (e.g. peanuts, dairy)", required: true },
-      { key: "severity", label: "Severity", type: "select", options: ["Mild", "Moderate", "Severe / Anaphylaxis"], required: true },
-      { key: "symptoms", label: "Symptoms", type: "textarea", placeholder: "Describe typical reaction symptoms" },
-      { key: "treatment", label: "Treatment Plan", type: "textarea", placeholder: "e.g. EpiPen, Benadryl — include instructions", required: true },
-      { key: "epipen_onsite", label: "EpiPen will be kept on-site", type: "checkbox" },
+      { key: "allergens", labelKey: "reg.item.food_allergy_plan.field.allergens.label", type: "textarea", placeholderKey: "reg.item.food_allergy_plan.field.allergens.placeholder", required: true },
+      {
+        key: "severity",
+        labelKey: "reg.item.food_allergy_plan.field.severity.label",
+        type: "select",
+        required: true,
+        options: [
+          { value: "Mild", labelKey: "reg.item.food_allergy_plan.field.severity.opt.mild" },
+          { value: "Moderate", labelKey: "reg.item.food_allergy_plan.field.severity.opt.moderate" },
+          { value: "Severe / Anaphylaxis", labelKey: "reg.item.food_allergy_plan.field.severity.opt.severe" },
+        ],
+      },
+      { key: "symptoms", labelKey: "reg.item.food_allergy_plan.field.symptoms.label", type: "textarea", placeholderKey: "reg.item.food_allergy_plan.field.symptoms.placeholder" },
+      { key: "treatment", labelKey: "reg.item.food_allergy_plan.field.treatment.label", type: "textarea", placeholderKey: "reg.item.food_allergy_plan.field.treatment.placeholder", required: true },
+      { key: "epipen_onsite", labelKey: "reg.item.food_allergy_plan.field.epipen_onsite.label", type: "checkbox" },
     ],
   },
   pickup_auth: {
     mode: "form",
-    title: "Authorized Pickup Contacts",
-    description: "List all people authorized to pick up your child from school besides guardians on file.",
+    titleKey: "reg.item.pickup_auth.title",
+    descKey: "reg.item.pickup_auth.desc",
     fields: [
-      { key: "contact1_name", label: "Authorized Person #1", type: "text", placeholder: "Full name", required: true },
-      { key: "contact1_relationship", label: "Relationship", type: "text", placeholder: "e.g. Grandmother" },
-      { key: "contact1_phone", label: "Phone", type: "tel", placeholder: "(555) 555-5555", required: true },
-      { key: "contact2_name", label: "Authorized Person #2", type: "text", placeholder: "Full name" },
-      { key: "contact2_relationship", label: "Relationship", type: "text", placeholder: "e.g. Neighbor" },
-      { key: "contact2_phone", label: "Phone", type: "tel", placeholder: "(555) 555-5555" },
+      { key: "contact1_name", labelKey: "reg.item.pickup_auth.field.contact1_name.label", type: "text", placeholderKey: "reg.item.pickup_auth.field.contact1_name.placeholder", required: true },
+      { key: "contact1_relationship", labelKey: "reg.item.pickup_auth.field.contact1_relationship.label", type: "text", placeholderKey: "reg.item.pickup_auth.field.contact1_relationship.placeholder" },
+      { key: "contact1_phone", labelKey: "reg.item.pickup_auth.field.contact1_phone.label", type: "tel", placeholderKey: "reg.item.pickup_auth.field.contact1_phone.placeholder", required: true },
+      { key: "contact2_name", labelKey: "reg.item.pickup_auth.field.contact2_name.label", type: "text", placeholderKey: "reg.item.pickup_auth.field.contact2_name.placeholder" },
+      { key: "contact2_relationship", labelKey: "reg.item.pickup_auth.field.contact2_relationship.label", type: "text", placeholderKey: "reg.item.pickup_auth.field.contact2_relationship.placeholder" },
+      { key: "contact2_phone", labelKey: "reg.item.pickup_auth.field.contact2_phone.label", type: "tel", placeholderKey: "reg.item.pickup_auth.field.contact2_phone.placeholder" },
     ],
   },
   home_language_survey: {
     mode: "form",
-    title: "Home Language Survey",
-    description: "Federal law requires schools to identify students who may need English language support.",
+    titleKey: "reg.item.home_language_survey.title",
+    descKey: "reg.item.home_language_survey.desc",
     fields: [
-      { key: "home_language", label: "Language most often spoken at home", type: "text", placeholder: "e.g. English, Spanish", required: true },
-      { key: "student_first_language", label: "Language student learned first", type: "text", placeholder: "e.g. English", required: true },
-      { key: "student_school_language", label: "Language student uses most at school", type: "text", placeholder: "e.g. English", required: true },
-      { key: "other_languages", label: "Other languages spoken in the home", type: "text", placeholder: "e.g. None" },
+      { key: "home_language", labelKey: "reg.item.home_language_survey.field.home_language.label", type: "text", placeholderKey: "reg.item.home_language_survey.field.home_language.placeholder", required: true },
+      { key: "student_first_language", labelKey: "reg.item.home_language_survey.field.student_first_language.label", type: "text", placeholderKey: "reg.item.home_language_survey.field.student_first_language.placeholder", required: true },
+      { key: "student_school_language", labelKey: "reg.item.home_language_survey.field.student_school_language.label", type: "text", placeholderKey: "reg.item.home_language_survey.field.student_school_language.placeholder", required: true },
+      { key: "other_languages", labelKey: "reg.item.home_language_survey.field.other_languages.label", type: "text", placeholderKey: "reg.item.home_language_survey.field.other_languages.placeholder" },
     ],
   },
   transport: {
     mode: "form",
-    title: "Transportation Preferences",
-    description: "How will your child get to and from school?",
+    titleKey: "reg.item.transport.title",
+    descKey: "reg.item.transport.desc",
     fields: [
-      { key: "arrival_mode", label: "Arrival Method", type: "select", options: ["Parent Drop-off", "School Bus", "Public Transit", "Walk/Bike", "Carpool", "Other"], required: true },
-      { key: "departure_mode", label: "Departure Method", type: "select", options: ["Parent Pick-up", "School Bus", "Public Transit", "Walk/Bike", "Carpool", "After-School Program", "Other"], required: true },
-      { key: "notes", label: "Additional Notes", type: "textarea", placeholder: "Any special transportation arrangements" },
+      {
+        key: "arrival_mode",
+        labelKey: "reg.item.transport.field.arrival_mode.label",
+        type: "select",
+        required: true,
+        options: [
+          { value: "Parent Drop-off", labelKey: "reg.item.transport.field.arrival_mode.opt.parent_dropoff" },
+          { value: "School Bus", labelKey: "reg.item.transport.field.arrival_mode.opt.school_bus" },
+          { value: "Public Transit", labelKey: "reg.item.transport.field.arrival_mode.opt.public_transit" },
+          { value: "Walk/Bike", labelKey: "reg.item.transport.field.arrival_mode.opt.walk_bike" },
+          { value: "Carpool", labelKey: "reg.item.transport.field.arrival_mode.opt.carpool" },
+          { value: "Other", labelKey: "reg.item.transport.field.arrival_mode.opt.other" },
+        ],
+      },
+      {
+        key: "departure_mode",
+        labelKey: "reg.item.transport.field.departure_mode.label",
+        type: "select",
+        required: true,
+        options: [
+          { value: "Parent Pick-up", labelKey: "reg.item.transport.field.departure_mode.opt.parent_pickup" },
+          { value: "School Bus", labelKey: "reg.item.transport.field.departure_mode.opt.school_bus" },
+          { value: "Public Transit", labelKey: "reg.item.transport.field.departure_mode.opt.public_transit" },
+          { value: "Walk/Bike", labelKey: "reg.item.transport.field.departure_mode.opt.walk_bike" },
+          { value: "Carpool", labelKey: "reg.item.transport.field.departure_mode.opt.carpool" },
+          { value: "After-School Program", labelKey: "reg.item.transport.field.departure_mode.opt.after_school_program" },
+          { value: "Other", labelKey: "reg.item.transport.field.departure_mode.opt.other" },
+        ],
+      },
+      { key: "notes", labelKey: "reg.item.transport.field.notes.label", type: "textarea", placeholderKey: "reg.item.transport.field.notes.placeholder" },
     ],
   },
   before_after_care: {
     mode: "form",
-    title: "Before & After School Care",
-    description: "Indicate if your child needs before or after school care.",
+    titleKey: "reg.item.before_after_care.title",
+    descKey: "reg.item.before_after_care.desc",
     fields: [
-      { key: "before_care", label: "Needs before-school care", type: "checkbox" },
-      { key: "after_care", label: "Needs after-school care", type: "checkbox" },
-      { key: "days_needed", label: "Days Needed", type: "select", options: ["Monday-Friday", "Select Days Only"], required: true },
-      { key: "notes", label: "Additional Notes", type: "textarea", placeholder: "Any specific schedule needs" },
+      { key: "before_care", labelKey: "reg.item.before_after_care.field.before_care.label", type: "checkbox" },
+      { key: "after_care", labelKey: "reg.item.before_after_care.field.after_care.label", type: "checkbox" },
+      {
+        key: "days_needed",
+        labelKey: "reg.item.before_after_care.field.days_needed.label",
+        type: "select",
+        required: true,
+        options: [
+          { value: "Monday-Friday", labelKey: "reg.item.before_after_care.field.days_needed.opt.mon_fri" },
+          { value: "Select Days Only", labelKey: "reg.item.before_after_care.field.days_needed.opt.select_days" },
+        ],
+      },
+      { key: "notes", labelKey: "reg.item.before_after_care.field.notes.label", type: "textarea", placeholderKey: "reg.item.before_after_care.field.notes.placeholder" },
     ],
   },
   frl_app: {
     mode: "form",
-    title: "Free/Reduced Lunch Application",
-    description: "Provide household information for the National School Lunch Program.",
+    titleKey: "reg.item.frl_app.title",
+    descKey: "reg.item.frl_app.desc",
     fields: [
-      { key: "household_size", label: "Household Size", type: "text", placeholder: "Number of people in household", required: true },
-      { key: "annual_income", label: "Annual Household Income", type: "text", placeholder: "e.g. $35,000", required: true },
-      { key: "snap_tanf", label: "Household receives SNAP, TANF, or FDPIR benefits", type: "checkbox" },
-      { key: "foster_child", label: "Student is a foster child", type: "checkbox" },
+      { key: "household_size", labelKey: "reg.item.frl_app.field.household_size.label", type: "text", placeholderKey: "reg.item.frl_app.field.household_size.placeholder", required: true },
+      { key: "annual_income", labelKey: "reg.item.frl_app.field.annual_income.label", type: "text", placeholderKey: "reg.item.frl_app.field.annual_income.placeholder", required: true },
+      { key: "snap_tanf", labelKey: "reg.item.frl_app.field.snap_tanf.label", type: "checkbox" },
+      { key: "foster_child", labelKey: "reg.item.frl_app.field.foster_child.label", type: "checkbox" },
     ],
   },
   military_family: {
     mode: "form",
-    title: "Military Family Information",
-    description: "If applicable, provide details about military family status.",
+    titleKey: "reg.item.military_family.title",
+    descKey: "reg.item.military_family.desc",
     fields: [
-      { key: "branch", label: "Branch of Service", type: "select", options: ["Army", "Navy", "Air Force", "Marines", "Coast Guard", "Space Force", "National Guard"], required: true },
-      { key: "status", label: "Service Status", type: "select", options: ["Active Duty", "Reserve", "Veteran", "Retired"], required: true },
-      { key: "deployment_notes", label: "Deployment / Special Circumstances", type: "textarea", placeholder: "Any relevant information" },
+      {
+        key: "branch",
+        labelKey: "reg.item.military_family.field.branch.label",
+        type: "select",
+        required: true,
+        options: [
+          { value: "Army", labelKey: "reg.item.military_family.field.branch.opt.army" },
+          { value: "Navy", labelKey: "reg.item.military_family.field.branch.opt.navy" },
+          { value: "Air Force", labelKey: "reg.item.military_family.field.branch.opt.air_force" },
+          { value: "Marines", labelKey: "reg.item.military_family.field.branch.opt.marines" },
+          { value: "Coast Guard", labelKey: "reg.item.military_family.field.branch.opt.coast_guard" },
+          { value: "Space Force", labelKey: "reg.item.military_family.field.branch.opt.space_force" },
+          { value: "National Guard", labelKey: "reg.item.military_family.field.branch.opt.national_guard" },
+        ],
+      },
+      {
+        key: "status",
+        labelKey: "reg.item.military_family.field.status.label",
+        type: "select",
+        required: true,
+        options: [
+          { value: "Active Duty", labelKey: "reg.item.military_family.field.status.opt.active_duty" },
+          { value: "Reserve", labelKey: "reg.item.military_family.field.status.opt.reserve" },
+          { value: "Veteran", labelKey: "reg.item.military_family.field.status.opt.veteran" },
+          { value: "Retired", labelKey: "reg.item.military_family.field.status.opt.retired" },
+        ],
+      },
+      { key: "deployment_notes", labelKey: "reg.item.military_family.field.deployment_notes.label", type: "textarea", placeholderKey: "reg.item.military_family.field.deployment_notes.placeholder" },
     ],
   },
 
   // ─── Policy Acknowledgments ───
-  income_verification: {
-    mode: "acknowledge",
-    title: "Income Verification Acknowledgment",
-    description: "I acknowledge that the income information provided is true and accurate. I understand the school may request supporting documentation.",
-  },
-  tech_policy: {
-    mode: "acknowledge",
-    title: "Technology Acceptable Use Policy",
-    description: "I have read and agree to the school's technology acceptable use policy. I understand the rules for using school-provided devices and internet access.",
-  },
-  handbook_ack: {
-    mode: "acknowledge",
-    title: "Student & Family Handbook",
-    description: "I have read and understand the Student & Family Handbook, including attendance policies, academic expectations, and behavioral guidelines.",
-  },
-  discipline_policy: {
-    mode: "acknowledge",
-    title: "Discipline Policy",
-    description: "I have read and understand the school's discipline policy, including the progressive discipline framework and due process procedures.",
-  },
-  media_release: {
-    mode: "acknowledge",
-    title: "Media / Photo Release",
-    description: "I grant permission for my child's name, image, and/or work to be used in school publications, website, and promotional materials.",
-  },
-  field_trip: {
-    mode: "acknowledge",
-    title: "Field Trip Permission",
-    description: "I grant blanket permission for my child to participate in school-sponsored field trips during the school year. I understand I will be notified before each trip.",
-  },
-  internet_safety: {
-    mode: "acknowledge",
-    title: "Internet Safety Agreement",
-    description: "I have reviewed the internet safety guidelines with my child and understand the expectations for safe and responsible online behavior at school.",
-  },
-  anti_bullying: {
-    mode: "acknowledge",
-    title: "Anti-Bullying Policy",
-    description: "I have read the school's anti-bullying policy and understand the reporting procedures. I will encourage my child to report any bullying incidents.",
-  },
-  uniform_policy: {
-    mode: "acknowledge",
-    title: "Uniform Policy",
-    description: "I have read and understand the school's uniform/dress code policy and agree to ensure my child arrives at school in compliance.",
-  },
-  ferpa_consent: {
-    mode: "acknowledge",
-    title: "FERPA Consent",
-    description: "I have read the Family Educational Rights and Privacy Act (FERPA) notice and understand my rights regarding my child's educational records.",
-  },
+  income_verification: { mode: "acknowledge", titleKey: "reg.item.income_verification.title", descKey: "reg.item.income_verification.desc" },
+  tech_policy: { mode: "acknowledge", titleKey: "reg.item.tech_policy.title", descKey: "reg.item.tech_policy.desc" },
+  handbook_ack: { mode: "acknowledge", titleKey: "reg.item.handbook_ack.title", descKey: "reg.item.handbook_ack.desc" },
+  discipline_policy: { mode: "acknowledge", titleKey: "reg.item.discipline_policy.title", descKey: "reg.item.discipline_policy.desc" },
+  media_release: { mode: "acknowledge", titleKey: "reg.item.media_release.title", descKey: "reg.item.media_release.desc" },
+  field_trip: { mode: "acknowledge", titleKey: "reg.item.field_trip.title", descKey: "reg.item.field_trip.desc" },
+  internet_safety: { mode: "acknowledge", titleKey: "reg.item.internet_safety.title", descKey: "reg.item.internet_safety.desc" },
+  anti_bullying: { mode: "acknowledge", titleKey: "reg.item.anti_bullying.title", descKey: "reg.item.anti_bullying.desc" },
+  uniform_policy: { mode: "acknowledge", titleKey: "reg.item.uniform_policy.title", descKey: "reg.item.uniform_policy.desc" },
+  ferpa_consent: { mode: "acknowledge", titleKey: "reg.item.ferpa_consent.title", descKey: "reg.item.ferpa_consent.desc" },
 
   // ─── Document Uploads ───
   immunization_records: {
     mode: "upload",
-    title: "Immunization Records",
-    description: "Upload your child's current immunization records.",
-    examples: [
-      "Immunization card from your doctor or health department",
-      "Official vaccination record from a previous school",
-      "Letter from a physician listing all vaccines received",
-    ],
+    titleKey: "reg.item.immunization_records.title",
+    descKey: "reg.item.immunization_records.desc",
+    exampleKeys: ["reg.item.immunization_records.example.1", "reg.item.immunization_records.example.2", "reg.item.immunization_records.example.3"],
   },
   proof_of_residency: {
     mode: "upload",
-    title: "Proof of Residency",
-    description: "Upload a document showing your current home address.",
-    examples: [
-      "Utility bill (gas, water, electric, internet) — must be recent",
-      "Current lease or rental agreement",
-      "Mortgage statement or property tax bill",
-      "Official government mail or bank statement with your address",
-    ],
+    titleKey: "reg.item.proof_of_residency.title",
+    descKey: "reg.item.proof_of_residency.desc",
+    exampleKeys: ["reg.item.proof_of_residency.example.1", "reg.item.proof_of_residency.example.2", "reg.item.proof_of_residency.example.3", "reg.item.proof_of_residency.example.4"],
   },
   proof_of_age: {
     mode: "upload",
-    title: "Proof of Age / Birth Certificate",
-    description: "Upload your child's birth certificate or other official proof of age.",
-    examples: [
-      "Birth certificate (original or certified copy)",
-      "U.S. passport or passport card",
-      "Hospital birth record",
-      "Baptism certificate or religious record showing date of birth",
-    ],
+    titleKey: "reg.item.proof_of_age.title",
+    descKey: "reg.item.proof_of_age.desc",
+    exampleKeys: ["reg.item.proof_of_age.example.1", "reg.item.proof_of_age.example.2", "reg.item.proof_of_age.example.3", "reg.item.proof_of_age.example.4"],
   },
   parent_id: {
     mode: "upload",
-    title: "Parent/Guardian ID",
-    description: "Upload a government-issued photo ID for the enrolling parent or guardian.",
-    examples: [
-      "Driver's license or state-issued ID card",
-      "U.S. passport or passport card",
-      "Military ID",
-      "Permanent Resident Card (Green Card)",
-    ],
+    titleKey: "reg.item.parent_id.title",
+    descKey: "reg.item.parent_id.desc",
+    exampleKeys: ["reg.item.parent_id.example.1", "reg.item.parent_id.example.2", "reg.item.parent_id.example.3", "reg.item.parent_id.example.4"],
   },
   custody_docs: {
     mode: "upload",
-    title: "Custody Documentation",
-    description: "Upload legal documentation establishing custody or guardianship.",
-    examples: [
-      "Court-issued custody order or parenting plan",
-      "Adoption decree",
-      "Guardianship papers",
-      "Divorce decree with custody provisions",
-    ],
+    titleKey: "reg.item.custody_docs.title",
+    descKey: "reg.item.custody_docs.desc",
+    exampleKeys: ["reg.item.custody_docs.example.1", "reg.item.custody_docs.example.2", "reg.item.custody_docs.example.3", "reg.item.custody_docs.example.4"],
   },
   student_photo: {
     mode: "upload",
-    title: "Student Photo",
-    description: "Upload a recent, clear photo of your child.",
-    examples: [
-      "School photo from this year or last year",
-      "Clear smartphone photo — face visible, plain background preferred",
-      "Portrait-style photo (shoulders up)",
-    ],
+    titleKey: "reg.item.student_photo.title",
+    descKey: "reg.item.student_photo.desc",
+    exampleKeys: ["reg.item.student_photo.example.1", "reg.item.student_photo.example.2", "reg.item.student_photo.example.3"],
   },
   sports_physical: {
     mode: "upload",
-    title: "Sports Physical",
-    description: "Upload a completed sports physical form signed by your child's doctor.",
-    examples: [
-      "Pre-participation physical exam (PPE) form signed by a physician",
-      "School sports physical form completed at a clinic or doctor's office",
-      "Must be dated within the last 12 months",
-    ],
+    titleKey: "reg.item.sports_physical.title",
+    descKey: "reg.item.sports_physical.desc",
+    exampleKeys: ["reg.item.sports_physical.example.1", "reg.item.sports_physical.example.2", "reg.item.sports_physical.example.3"],
   },
   previous_school_records: {
     mode: "upload",
-    title: "Previous School Records",
-    description: "Upload records from your child's most recent school.",
-    examples: [
-      "Most recent report card or progress report",
-      "Official transcripts",
-      "Letter from the previous school confirming enrollment and grades",
-      "Standardized test score reports",
-    ],
+    titleKey: "reg.item.previous_school_records.title",
+    descKey: "reg.item.previous_school_records.desc",
+    exampleKeys: ["reg.item.previous_school_records.example.1", "reg.item.previous_school_records.example.2", "reg.item.previous_school_records.example.3", "reg.item.previous_school_records.example.4"],
   },
   iep_records: {
     mode: "upload",
-    title: "IEP Records",
-    description: "Upload your child's current Individualized Education Program (IEP).",
-    examples: [
-      "Current IEP document signed by the school team",
-      "Must include goals, services, and accommodations pages",
-      "Most recent annual review or re-evaluation report",
-    ],
+    titleKey: "reg.item.iep_records.title",
+    descKey: "reg.item.iep_records.desc",
+    exampleKeys: ["reg.item.iep_records.example.1", "reg.item.iep_records.example.2", "reg.item.iep_records.example.3"],
   },
   "504_plan": {
     mode: "upload",
-    title: "504 Plan",
-    description: "Upload your child's current 504 accommodation plan.",
-    examples: [
-      "Current 504 Plan document with accommodation details",
-      "Eligibility determination letter from the previous school",
-      "Supporting documentation (doctor's note, evaluation) if plan is being established",
-    ],
+    titleKey: "reg.item.504_plan.title",
+    descKey: "reg.item.504_plan.desc",
+    exampleKeys: ["reg.item.504_plan.example.1", "reg.item.504_plan.example.2", "reg.item.504_plan.example.3"],
   },
   mckinney_vento: {
     mode: "upload",
-    title: "McKinney-Vento Questionnaire",
-    description: "Upload the completed McKinney-Vento Housing Questionnaire.",
-    examples: [
-      "Completed questionnaire form (available from the school office or enrollment team)",
-      "Contact us if you need a copy of this form — we'll send one to you",
-    ],
+    titleKey: "reg.item.mckinney_vento.title",
+    descKey: "reg.item.mckinney_vento.desc",
+    exampleKeys: ["reg.item.mckinney_vento.example.1", "reg.item.mckinney_vento.example.2"],
   },
   lthc_form: {
     mode: "upload",
-    title: "Licensed Treatment Health Certificate",
-    description: "Upload the completed LTHC form signed by your child's healthcare provider.",
-    examples: [
-      "LTHC form completed and signed by your child's physician",
-      "Available from the school office if you need a blank copy",
-      "Must include diagnosis, treatment plan, and provider signature",
-    ],
+    titleKey: "reg.item.lthc_form.title",
+    descKey: "reg.item.lthc_form.desc",
+    exampleKeys: ["reg.item.lthc_form.example.1", "reg.item.lthc_form.example.2", "reg.item.lthc_form.example.3"],
   },
   sc_health_exam: {
     mode: "upload",
-    title: "SC Health Examination",
-    description: "Upload the South Carolina health examination form.",
-    examples: [
-      "SC DHEC Health Examination form (DHEC Form 1148) completed by a physician",
-      "Must be signed by a licensed healthcare provider",
-      "Required for all students entering SC schools for the first time",
-    ],
+    titleKey: "reg.item.sc_health_exam.title",
+    descKey: "reg.item.sc_health_exam.desc",
+    exampleKeys: ["reg.item.sc_health_exam.example.1", "reg.item.sc_health_exam.example.2", "reg.item.sc_health_exam.example.3"],
   },
   sc_dental_screen: {
     mode: "upload",
-    title: "SC Dental Screening",
-    description: "Upload the South Carolina dental screening certificate.",
-    examples: [
-      "Dental screening certificate completed by a licensed dentist or dental hygienist",
-      "Required within 12 months of school entry",
-      "Contact the school office if you need help accessing dental screening services",
-    ],
+    titleKey: "reg.item.sc_dental_screen.title",
+    descKey: "reg.item.sc_dental_screen.desc",
+    exampleKeys: ["reg.item.sc_dental_screen.example.1", "reg.item.sc_dental_screen.example.2", "reg.item.sc_dental_screen.example.3"],
   },
   oh_custody_affidavit: {
     mode: "upload",
-    title: "Ohio Custody Affidavit",
-    description: "Upload the completed Ohio Affidavit of Custody if applicable.",
-    examples: [
-      "Ohio Affidavit of Custody form (available from the school office)",
-      "Must be signed and notarized",
-      "Required when a non-parent guardian is enrolling a student",
-    ],
+    titleKey: "reg.item.oh_custody_affidavit.title",
+    descKey: "reg.item.oh_custody_affidavit.desc",
+    exampleKeys: ["reg.item.oh_custody_affidavit.example.1", "reg.item.oh_custody_affidavit.example.2", "reg.item.oh_custody_affidavit.example.3"],
   },
   wa_health_exam: {
     mode: "upload",
-    title: "WA Health Examination",
-    description: "Upload the Washington state health examination form.",
-    examples: [
-      "Washington State health exam form completed by your child's physician",
-      "Certificate of Immunization Status (CIS) if not submitted separately",
-      "Must be signed by a licensed healthcare provider",
-    ],
+    titleKey: "reg.item.wa_health_exam.title",
+    descKey: "reg.item.wa_health_exam.desc",
+    exampleKeys: ["reg.item.wa_health_exam.example.1", "reg.item.wa_health_exam.example.2", "reg.item.wa_health_exam.example.3"],
   },
 };
 
 function getCompletionConfig(itemType: string): CompletionConfig {
   return ITEM_COMPLETION_CONFIG[itemType] ?? {
     mode: "acknowledge",
-    title: "Complete Item",
-    description: "Confirm that you have completed this registration requirement.",
+    titleKey: "reg.item.fallback.title",
+    descKey: "reg.item.fallback.desc",
   };
 }
 
@@ -514,7 +498,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
   const [uploadSelectedFile, setUploadSelectedFile] = useState<File | null>(null);
   const [uploadWasCompressed, setUploadWasCompressed] = useState(false);
   const [uploadCompressing, setUploadCompressing] = useState(false);
-  const [uploadValidationError, setUploadValidationError] = useState<string | null>(null);
+  const [uploadValidationError, setUploadValidationError] = useState<FileValidationError | null>(null);
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
 
   if (enrollments.length === 0) {
@@ -1079,8 +1063,8 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
           <Dialog open={completionOpen} onOpenChange={setCompletionOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{config.title}</DialogTitle>
-                <DialogDescription>{config.description}</DialogDescription>
+                <DialogTitle>{t(config.titleKey)}</DialogTitle>
+                <DialogDescription>{t(config.descKey)}</DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4 py-4">
@@ -1093,7 +1077,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                 {config.mode === "form" && config.fields.map((field) => (
                   <div key={field.key}>
                     <label className="block text-sm font-medium text-ink/70 mb-1">
-                      {field.label}
+                      {t(field.labelKey)}
                       {field.required && <span className="text-red-500 ml-0.5">*</span>}
                     </label>
                     {field.type === "select" && field.options ? (
@@ -1106,7 +1090,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                       >
                         <option value="">{t("common.select")}</option>
                         {field.options.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
+                          <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
                         ))}
                       </select>
                     ) : field.type === "textarea" ? (
@@ -1115,7 +1099,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                         onChange={(e) =>
                           setCompletionForm((prev) => ({ ...prev, [field.key]: e.target.value }))
                         }
-                        placeholder={field.placeholder}
+                        placeholder={field.placeholderKey ? t(field.placeholderKey) : undefined}
                         rows={3}
                         className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                       />
@@ -1126,7 +1110,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                         onChange={(e) =>
                           setCompletionForm((prev) => ({ ...prev, [field.key]: e.target.value }))
                         }
-                        placeholder={field.placeholder}
+                        placeholder={field.placeholderKey ? t(field.placeholderKey) : undefined}
                       />
                     )}
                   </div>
@@ -1174,14 +1158,14 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
 
                 {config.mode === "upload" && (
                   <div className="space-y-3">
-                    {config.examples.length > 0 && (
+                    {config.exampleKeys.length > 0 && (
                       <div className="rounded-lg bg-blue-50 border border-blue-100 px-4 py-3">
                         <p className="text-xs font-semibold text-blue-800 mb-1.5">{t("reg.upload.whatToUpload")}</p>
                         <ul className="space-y-1">
-                          {config.examples.map((ex) => (
-                            <li key={ex} className="flex items-start gap-2 text-xs text-blue-700">
+                          {config.exampleKeys.map((exKey) => (
+                            <li key={exKey} className="flex items-start gap-2 text-xs text-blue-700">
                               <span className="mt-0.5 shrink-0">•</span>
-                              <span>{ex}</span>
+                              <span>{t(exKey)}</span>
                             </li>
                           ))}
                         </ul>
@@ -1261,7 +1245,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                       <span>{t("docs.captureHint")}</span>
                     </p>
                     {uploadValidationError && (
-                      <p className="text-xs text-red-600">{uploadValidationError}</p>
+                      <p className="text-xs text-red-600">{formatFileValidationError(uploadValidationError, locale)}</p>
                     )}
                   </div>
                 )}

@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { ReportsClient } from "./reports-client";
-import { requireStaffSession, hasMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { requireMinRole, hasMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 import { SectionTabs } from "@/components/layout/section-tabs";
 import { INSIGHTS_TABS } from "@/lib/section-tabs";
 import { getReenrollmentStats } from "@/lib/queries/reenrollment";
@@ -51,7 +51,9 @@ export default async function StaffReportsPage({
 }: {
   searchParams: { campus?: string };
 }) {
-  const session = await requireStaffSession();
+  // Race/ethnicity breakdowns and a named enrollment roster — manager gate,
+  // not the is_staff floor a compliance auditor also clears.
+  const session = await requireMinRole("enrollment_manager");
   const accessibleIds = getAccessibleCampusIds(session);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;

@@ -90,9 +90,11 @@ export async function GET(request: NextRequest) {
         Date.now() + 7 * 24 * 60 * 60 * 1000
       ).toISOString();
 
+      // offered_by is a UUID column: an auto-promotion has no real user
+      // behind it, so it stays null rather than carrying a sentinel string.
       const promoteResult = await promoteFromWaitlist(
         nextPosition.id as string,
-        "system", // offered_by: system auto-promote
+        null,
         sevenDays
       );
 

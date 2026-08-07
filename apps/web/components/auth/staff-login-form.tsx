@@ -17,6 +17,7 @@ export function StaffLoginForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetSent, setResetSent] = useState(false);
   const searchParams = useSearchParams();
 
   // Email/password state
@@ -53,6 +54,26 @@ export function StaffLoginForm() {
       }
     } catch {
       setError("Something went wrong. Please try again.");
+      setLoading(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    if (!email) {
+      setError("Enter your email above first, then click \"Forgot password?\"");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setResetSent(false);
+    try {
+      await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      });
+      setResetSent(true);
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
       setLoading(false);
     }
   }
@@ -104,6 +125,11 @@ export function StaffLoginForm() {
             {error}
           </p>
         )}
+        {resetSent && (
+          <p className="text-sm text-rooted-green text-center mb-4" role="status">
+            If an account exists for {email}, a password reset link has been sent.
+          </p>
+        )}
 
         <form onSubmit={handleEmailLogin} className="space-y-3">
           <div>
@@ -121,9 +147,19 @@ export function StaffLoginForm() {
             />
           </div>
           <div>
-            <label htmlFor="staff-password" className="block text-sm font-medium text-ink/70 mb-1">
-              Password
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="staff-password" className="block text-sm font-medium text-ink/70">
+                Password
+              </label>
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={loading}
+                className="text-xs text-rooted-green hover:underline disabled:opacity-50"
+              >
+                Forgot password?
+              </button>
+            </div>
             <input
               id="staff-password"
               type="password"

@@ -37,6 +37,17 @@ export interface CreateLeadInput {
   referred_by_lead_id?: string;
 }
 
+/**
+ * Escape the LIKE wildcards (`%`, `_`) and the escape character itself before
+ * an address goes into an `ilike` filter. An email is matched as a literal
+ * here, not as a pattern — without this, a submission of `%@%` matches every
+ * open lead at the campus and the "same family" checks below latch onto a
+ * stranger's record.
+ */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
+}
+
 // ─── Public inquiry (response engine entry point) ──────
 
 /**
@@ -50,7 +61,7 @@ export interface CreateLeadInput {
  */
 export async function createLeadFromInquiry(
   input: CreateLeadInput
-): Promise<MutationResult<{ id: string }>> {
+): Promise<MutationResult<{ id: string; deduped: boolean }>> {
   const supabase = createServiceRoleClient();
 
   // These surface directly on the public bilingual inquiry form, which has
@@ -75,13 +86,14 @@ export async function createLeadFromInquiry(
   if (input.email) {
     const { data: existing } = await supabase
       .from("lead")
-      .select("id")
+      .select("id, first_name, last_name")
       .eq("campus_id", input.campus_id)
-      .ilike("email", input.email.trim())
+      .ilike("email", escapeLike(input.email.trim()))
       .is("application_id", null)
       .neq("stage", "closed")
       .limit(1);
-    const existingId = (existing?.[0] as Record<string, string> | undefined)?.id;
+    const existingRow = existing?.[0] as Record<string, string> | undefined;
+    const existingId = existingRow?.id;
     if (existingId) {
       await supabase.from("lead_activity").insert({
         lead_id: existingId,
@@ -92,7 +104,21 @@ export async function createLeadFromInquiry(
         .from("lead")
         .update({ next_follow_up_at: new Date().toISOString() })
         .eq("id", existingId);
-      return { data: { id: existingId }, error: null };
+
+      // A family filling the form a second time is the strongest interest
+      // signal in the funnel, and until now it landed silently on a timeline
+      // nobody was watching. Route it to campus staff like a first inquiry.
+      await notifyStaffNewLead({
+        campusId: input.campus_id,
+        leadId: existingId,
+        leadName:
+          `${existingRow?.first_name ?? input.first_name.trim()} ${existingRow?.last_name ?? input.last_name.trim()}`.trim(),
+        source: "repeat_inquiry",
+      }).catch((err) =>
+        console.error("[createLeadFromInquiry] repeat-inquiry notify failed", err)
+      );
+
+      return { data: { id: existingId, deduped: true }, error: null };
     }
   }
 
@@ -176,7 +202,7 @@ export async function createLeadFromInquiry(
     }),
   ]).catch((err) => console.error("[createLeadFromInquiry] notify failed", err));
 
-  return { data: { id: lead.id }, error: null };
+  return { data: { id: lead.id, deduped: false }, error: null };
 }
 
 // ─── Public inquiry, Step 2 (optional "tell us more") ──
@@ -544,7 +570,7 @@ export async function stitchLeadToApplication(
       .from("lead")
       .select("id")
       .eq("campus_id", campusId)
-      .ilike("email", guardianEmail)
+      .ilike("email", escapeLike(guardianEmail))
       .is("application_id", null)
       .neq("stage", "closed")
       .limit(1);

@@ -85,6 +85,15 @@ export async function submitInquiry(input: InquirySubmission) {
 
   if (result.error || !result.data) return { data: null, error: result.error };
 
+  // Only a lead this submission actually created earns a Step 2 token. On the
+  // soft-dedupe path the id belongs to a lead that already existed, and handing
+  // its token back would let anyone who guesses a family's email and campus
+  // edit that family's record. The form treats a missing token as "no Step 2"
+  // and still shows the thank-you.
+  if (result.data.deduped) {
+    return { data: { id: result.data.id, token: null }, error: null };
+  }
+
   return {
     data: { id: result.data.id, token: signInquiryLeadToken(result.data.id) },
     error: null,

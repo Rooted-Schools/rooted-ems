@@ -153,6 +153,7 @@ export async function sendRegistrationNudges(enrollmentIds: string[]): Promise<S
   }
 
   let count = 0;
+  const nudgedEnrollmentIds: string[] = [];
   await Promise.all(
     scoped.map(async (row: Record<string, unknown>) => {
       const enrollment = row.enrollment as unknown as Record<string, unknown>;
@@ -161,6 +162,7 @@ export async function sendRegistrationNudges(enrollmentIds: string[]): Promise<S
       const missingNames = missingByEnrollment.get(enrollmentId) ?? [];
       if (missingNames.length === 0) return; // nothing outstanding — nothing to nudge about
       count += 1;
+      nudgedEnrollmentIds.push(enrollmentId);
       await notifyFamilyRegistrationNudge({
         applicationId: enrollment.application_id as string,
         studentName: student ? `${student.first_name} ${student.last_name}` : undefined,
@@ -169,6 +171,28 @@ export async function sendRegistrationNudges(enrollmentIds: string[]): Promise<S
       }).catch((err) => console.error("[sendRegistrationNudges] notify failed", err));
     })
   );
+
+  // Record that these families were nudged, on the same column the nudge cron
+  // throttles against (migration 00036_registration_outreach.sql). Without the
+  // stamp the "Nudged today" state vanished on the next page load and the cron
+  // was free to send a second nudge the same day.
+  if (nudgedEnrollmentIds.length > 0) {
+    const { error: stampError } = await supabase
+      .from("registration_packet")
+      // last_nudged_at is from migration 00036 and isn't in the generated DB types yet.
+      .update({ last_nudged_at: new Date().toISOString() } as never)
+      .in("enrollment_id", nudgedEnrollmentIds);
+
+    if (stampError) {
+      console.error("[sendRegistrationNudges] stamp", stampError.message);
+      // The nudges did go out — say so, but don't claim the queue will clear.
+      return {
+        ok: true,
+        count,
+        error: "Nudges sent, but the queue may not update until next refresh.",
+      };
+    }
+  }
 
   revalidatePath("/staff/today");
   revalidatePath("/staff/dashboard");
@@ -265,8 +289,10 @@ export interface MarkContactedResult {
  *      exact column getCallEscalationQueue checks to decide whether a row
  *      belongs in the queue — stamping it removes this family from the list
  *      for the same 7 days a fresh call earns them.
- * Deliberately does NOT touch last_nudged_at — that column is reserved for
- * the automated nudge cron (see migration 00036_registration_outreach.sql).
+ * Deliberately does NOT touch last_nudged_at — a phone call is not a nudge,
+ * and stamping it here would suppress the automated nudge this family may
+ * still need (see migration 00036_registration_outreach.sql). sendRegistrationNudges
+ * above owns that column alongside the nudge cron.
  */
 export async function markRegistrationContacted(enrollmentId: string): Promise<MarkContactedResult> {
   const session = await requireStaffSession();

@@ -54,7 +54,16 @@
  *     → withdrawn
  *
  *   registered
+ *     → placement_review    (staff verified every registration item)
  *     → withdrawn           (family or staff records withdrawal from enrolled status)
+ *
+ *   placement_review
+ *     → enrolled            (academic audit complete — the student has a seat)
+ *     → registered          (undo — audit sent the packet back for more work)
+ *     → withdrawn
+ *
+ *   enrolled
+ *     → withdrawn           (student leaves after enrollment is final)
  *
  *   declined  → (terminal — no further transitions)
  *   expired   → (terminal — no further transitions)
@@ -74,6 +83,8 @@ export type ApplicationStatusValue =
   | "accepted"
   | "waitlisted"
   | "registered"
+  | "placement_review"
+  | "enrolled"
   | "declined"
   | "expired"
   | "withdrawn";
@@ -99,7 +110,9 @@ const VALID_TRANSITIONS: Record<ApplicationStatusValue, ApplicationStatusValue[]
   offered: ["accepted", "declined", "expired", "withdrawn"],
   accepted: ["registered", "withdrawn"],
   waitlisted: ["offered", "withdrawn"],
-  registered: ["withdrawn"],
+  registered: ["placement_review", "withdrawn"],
+  placement_review: ["enrolled", "withdrawn", "registered"],
+  enrolled: ["withdrawn"],
   // Terminal states — once here, the record does not move
   declined: [],
   expired: [],

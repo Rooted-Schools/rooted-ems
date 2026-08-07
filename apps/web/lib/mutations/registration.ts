@@ -1,6 +1,11 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
-import { notifyFamilyRegistrationReady, notifyFamilyRegistrationSubmitted, notifyStaffRegistrationSubmitted } from "@/lib/notify";
+import {
+  notifyFamilyRegistrationComplete,
+  notifyFamilyRegistrationReady,
+  notifyFamilyRegistrationSubmitted,
+  notifyStaffRegistrationSubmitted,
+} from "@/lib/notify";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -34,6 +39,11 @@ export async function initializeRegistrationPacket(
     .single();
 
   if (existing) {
+    // A packet already exists — most often a re-enrolling family whose packet
+    // was created on an earlier pass. Returning silently meant nobody ever
+    // told them it was waiting, so the "ready to complete" notification fires
+    // on this path too. Never-throw, same as the create path below.
+    await notifyPacketReady(supabase, input);
     return { data: { packet_id: existing.id, items_created: 0 }, error: null };
   }
 
@@ -87,19 +97,30 @@ export async function initializeRegistrationPacket(
   }
 
   // Notify family that their registration packet is ready to complete
+  await notifyPacketReady(supabase, input);
+
+  return { data: { packet_id: packet.id, items_created: itemsCreated }, error: null };
+}
+
+/**
+ * Tell the family their registration packet is waiting. Shared by both
+ * initializeRegistrationPacket paths (fresh packet and already-exists) so a
+ * re-enrolling family hears about it either way. Never throws.
+ */
+async function notifyPacketReady(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  input: InitializePacketInput
+): Promise<void> {
   const { data: enrollmentRow } = await supabase
     .from("enrollment")
     .select("application_id")
     .eq("id", input.enrollment_id)
     .single();
-  if (enrollmentRow?.application_id) {
-    notifyFamilyRegistrationReady({
-      applicationId: enrollmentRow.application_id as string,
-      campusId: input.campus_id,
-    }).catch(() => {});
-  }
-
-  return { data: { packet_id: packet.id, items_created: itemsCreated }, error: null };
+  if (!enrollmentRow?.application_id) return;
+  notifyFamilyRegistrationReady({
+    applicationId: enrollmentRow.application_id as string,
+    campusId: input.campus_id,
+  }).catch(() => {});
 }
 
 /**
@@ -369,30 +390,97 @@ export async function verifyRegistrationItem(
     .single();
 
   if (item) {
-    // Packet is complete when NO items remain in "submitted" state
-    // (pending = optional items never touched — those don't block completion)
-    const { data: stillSubmitted } = await supabase
-      .from("registration_item")
-      .select("id")
-      .eq("enrollment_id", item.enrollment_id)
-      .eq("status", "submitted");
-
-    if (!stillSubmitted || stillSubmitted.length === 0) {
-      // Mark packet complete
-      await supabase
-        .from("registration_packet")
-        .update({
-          status: "complete",
-          verified_at: new Date().toISOString(),
-        })
-        .eq("enrollment_id", item.enrollment_id);
-
-      // Move application to placement_review — next step is academic audit
-      await advanceApplicationAfterPacketComplete(item.enrollment_id, supabase);
-    }
+    await finalizePacketIfComplete(item.enrollment_id as string, supabase);
   }
 
   return { data: null, error: null };
+}
+
+/**
+ * Flip a packet to "complete" — but only when it genuinely is.
+ *
+ * Two conditions, both required:
+ *   1. Nothing is still awaiting staff review (status "submitted").
+ *   2. No *required* item is still untouched (status "pending").
+ *
+ * Condition 2 is the fix: the old check looked at "submitted" alone, so a
+ * required item the family never opened counted as done and the packet — and
+ * with it the application — advanced on the strength of paperwork nobody
+ * filled in. Optional pending items still don't block; staff waive those
+ * deliberately through skipRegistrationItem.
+ *
+ * The flip is guarded on status != "complete" so a second verification on an
+ * already-complete packet doesn't re-notify the family. Never throws.
+ */
+async function finalizePacketIfComplete(
+  enrollmentId: string,
+  supabase: ReturnType<typeof createServiceRoleClient>
+): Promise<void> {
+  const { data: stillSubmitted } = await supabase
+    .from("registration_item")
+    .select("id")
+    .eq("enrollment_id", enrollmentId)
+    .eq("status", "submitted");
+
+  if (stillSubmitted && stillSubmitted.length > 0) return;
+
+  const { data: enrollment } = await supabase
+    .from("enrollment")
+    .select("campus_id, school_year_id, student:student_id (first_name, last_name)")
+    .eq("id", enrollmentId)
+    .single();
+
+  if (!enrollment) return;
+
+  const { data: requiredReqs } = await supabase
+    .from("packet_requirement")
+    .select("item_type")
+    .eq("campus_id", enrollment.campus_id as string)
+    .eq("school_year_id", enrollment.school_year_id as string)
+    .eq("is_required", true)
+    .eq("is_active", true);
+
+  const requiredTypes = (requiredReqs ?? []).map(
+    (r: Record<string, string>) => r.item_type
+  );
+
+  if (requiredTypes.length > 0) {
+    const { data: pendingRequired } = await supabase
+      .from("registration_item")
+      .select("id")
+      .eq("enrollment_id", enrollmentId)
+      .eq("status", "pending")
+      .in("item_type", requiredTypes);
+
+    if (pendingRequired && pendingRequired.length > 0) return;
+  }
+
+  const { data: flipped } = await supabase
+    .from("registration_packet")
+    .update({ status: "complete", verified_at: new Date().toISOString() })
+    .eq("enrollment_id", enrollmentId)
+    .neq("status", "complete")
+    .select("id");
+
+  // Move application to placement_review — next step is academic audit
+  await advanceApplicationAfterPacketComplete(enrollmentId, supabase);
+
+  // Only the run that actually flipped the packet tells the family, so a
+  // repeat verification pass can't send "enrollment complete" twice.
+  if (!flipped || flipped.length === 0) return;
+
+  const student = enrollment.student as unknown as
+    | { first_name?: string; last_name?: string }
+    | null;
+  const studentName = student
+    ? [student.first_name, student.last_name].filter(Boolean).join(" ") || undefined
+    : undefined;
+
+  notifyFamilyRegistrationComplete({
+    enrollmentId,
+    studentName,
+    campusId: (enrollment.campus_id as string) ?? undefined,
+  }).catch((err) => console.error("[finalizePacketIfComplete] notify failed", err));
 }
 
 /**
@@ -486,20 +574,7 @@ export async function skipRegistrationItem(
 
   // Run the same completion check — skipping may complete the packet
   const enrollmentId = (existing as Record<string, unknown>).enrollment_id as string;
-  const { data: stillSubmitted } = await supabase
-    .from("registration_item")
-    .select("id")
-    .eq("enrollment_id", enrollmentId)
-    .eq("status", "submitted");
-
-  if (!stillSubmitted || stillSubmitted.length === 0) {
-    await supabase
-      .from("registration_packet")
-      .update({ status: "complete", verified_at: new Date().toISOString() })
-      .eq("enrollment_id", enrollmentId);
-
-    await advanceApplicationAfterPacketComplete(enrollmentId, supabase);
-  }
+  await finalizePacketIfComplete(enrollmentId, supabase);
 
   return { data: null, error: null };
 }

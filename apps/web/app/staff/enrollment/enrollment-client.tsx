@@ -10,6 +10,14 @@ import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconGraduationCap } from "@/components/ui/icons";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -63,6 +71,8 @@ export function EnrollmentClient({
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sisInput, setSisInput] = useState<Record<string, string>>({});
+  const [withdrawTarget, setWithdrawTarget] = useState<EnrollmentRow | null>(null);
+  const [activateTarget, setActivateTarget] = useState<EnrollmentRow | null>(null);
 
   // Auto-clear error messages after 5 seconds
   useEffect(() => {
@@ -82,8 +92,10 @@ export function EnrollmentClient({
     setLoading(null);
   }
 
-  async function handleWithdraw(enrollmentId: string) {
-    if (!confirm("Are you sure you want to withdraw this enrollment?")) return;
+  async function doWithdraw() {
+    if (!withdrawTarget) return;
+    const enrollmentId = withdrawTarget.id;
+    setWithdrawTarget(null);
     setLoading(enrollmentId);
     setError(null);
     const result = await staffWithdrawEnrollment(enrollmentId, "Withdrawn by staff.");
@@ -92,8 +104,10 @@ export function EnrollmentClient({
     setLoading(null);
   }
 
-  async function handleActivate(enrollmentId: string, applicationId?: string | null) {
-    if (!confirm("Activate this enrollment? This will also notify the family.")) return;
+  async function doActivate() {
+    if (!activateTarget) return;
+    const { id: enrollmentId, application_id: applicationId } = activateTarget;
+    setActivateTarget(null);
     setLoading(enrollmentId);
     setError(null);
     const result = await staffActivateEnrollment(enrollmentId, applicationId);
@@ -281,7 +295,7 @@ export function EnrollmentClient({
                               size="sm"
                               className="bg-rooted-green text-white hover:bg-rooted-green/90"
                               disabled={isLoading}
-                              onClick={() => handleActivate(enrollment.id, enrollment.application_id)}
+                              onClick={() => setActivateTarget(enrollment)}
                             >
                               Activate
                             </Button>
@@ -291,7 +305,7 @@ export function EnrollmentClient({
                               variant="outline"
                               size="sm"
                               disabled={isLoading}
-                              onClick={() => handleWithdraw(enrollment.id)}
+                              onClick={() => setWithdrawTarget(enrollment)}
                             >
                               Withdraw
                             </Button>
@@ -306,6 +320,48 @@ export function EnrollmentClient({
           </CardContent>
         </Card>
       )}
+
+      {/* ─── Withdraw Enrollment Confirmation ─── */}
+      <Dialog open={!!withdrawTarget} onOpenChange={(open) => !open && setWithdrawTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Withdraw Enrollment</DialogTitle>
+            <DialogDescription>
+              This removes {withdrawTarget?.student_name ?? "this student"} from active enrollment. The family will not be
+              notified automatically.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWithdrawTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={doWithdraw}>
+              Withdraw Enrollment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Activate Enrollment Confirmation ─── */}
+      <Dialog open={!!activateTarget} onOpenChange={(open) => !open && setActivateTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Activate Enrollment</DialogTitle>
+            <DialogDescription>
+              This will also notify the family that {activateTarget?.student_name ?? "this student"}&apos;s enrollment is
+              active.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActivateTarget(null)}>
+              Cancel
+            </Button>
+            <Button onClick={doActivate} className="bg-rooted-green hover:bg-rooted-green/90 text-white">
+              Activate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

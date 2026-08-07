@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireStaffSession } from "@/lib/auth/get-session";
+import { requireMinRole } from "@/lib/auth/get-session";
 import {
   sendOffer,
   acceptOffer,
@@ -14,20 +14,29 @@ import {
   removeFromWaitlist,
 } from "@/lib/mutations";
 
+/**
+ * Offer and waitlist actions move seats, so they carry the same gate as the
+ * page that renders them: enrollment_manager. They previously accepted the
+ * acting user's id as an argument — the client could name anyone as the
+ * person who made or revoked an offer, which is exactly the field an audit
+ * reads. The session is the only source for that now; the parameters stay in
+ * the signatures for the existing callers and are ignored.
+ */
+
 export async function staffSendOffer(
   applicationId: string,
   campusId: string,
   gradeLevelId: string,
   expiresAt: string,
-  offeredBy: string
+  _offeredBy?: string
 ) {
-  await requireStaffSession();
+  const session = await requireMinRole("enrollment_manager");
   const result = await sendOffer({
     application_id: applicationId,
     campus_id: campusId,
     grade_level_id: gradeLevelId,
     expires_at: expiresAt,
-    offered_by: offeredBy,
+    offered_by: session.user_id,
   });
 
   if (!result.error) {
@@ -42,11 +51,11 @@ export async function staffSendOffer(
 
 export async function staffRevokeOffer(
   offerId: string,
-  revokedBy: string,
+  _revokedBy: string | undefined,
   reason?: string
 ) {
-  await requireStaffSession();
-  const result = await revokeOffer(offerId, revokedBy, reason);
+  const session = await requireMinRole("enrollment_manager");
+  const result = await revokeOffer(offerId, session.user_id, reason);
 
   if (!result.error) {
     revalidatePath("/staff/offers");
@@ -60,7 +69,7 @@ export async function staffRevokeOffer(
 }
 
 export async function staffExpireOffer(offerId: string) {
-  await requireStaffSession();
+  await requireMinRole("enrollment_manager");
   const result = await expireOffer(offerId);
 
   if (!result.error) {
@@ -78,7 +87,7 @@ export async function staffAcceptOfferOnBehalf(
   offerId: string,
   guardianId: string
 ) {
-  await requireStaffSession();
+  await requireMinRole("enrollment_manager");
   const result = await acceptOffer(offerId, guardianId);
 
   if (!result.error) {
@@ -94,7 +103,7 @@ export async function staffAcceptOfferOnBehalf(
 }
 
 export async function staffDeclineOfferOnBehalf(offerId: string) {
-  await requireStaffSession();
+  await requireMinRole("enrollment_manager");
   const result = await declineOffer(offerId);
 
   if (!result.error) {
@@ -116,7 +125,7 @@ export async function staffConvertToEnrollment(
   schoolYearId: string,
   applicationId: string
 ) {
-  await requireStaffSession();
+  await requireMinRole("enrollment_manager");
   const result = await createEnrollment({
     student_id: studentId,
     campus_id: campusId,
@@ -148,11 +157,11 @@ export async function staffConvertToEnrollment(
 
 export async function staffPromoteFromWaitlist(
   waitlistPositionId: string,
-  offeredBy: string,
+  _offeredBy: string | undefined,
   expiresAt: string
 ) {
-  await requireStaffSession();
-  const result = await promoteFromWaitlist(waitlistPositionId, offeredBy, expiresAt);
+  const session = await requireMinRole("enrollment_manager");
+  const result = await promoteFromWaitlist(waitlistPositionId, session.user_id, expiresAt);
 
   if (!result.error) {
     revalidatePath("/staff/offers");
@@ -170,7 +179,7 @@ export async function staffRemoveFromWaitlist(
   waitlistPositionId: string,
   reason: string
 ) {
-  await requireStaffSession();
+  await requireMinRole("enrollment_manager");
   const result = await removeFromWaitlist(waitlistPositionId, reason);
 
   if (!result.error) {

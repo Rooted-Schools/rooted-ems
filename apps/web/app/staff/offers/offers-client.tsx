@@ -143,23 +143,34 @@ export function OffersClient({
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [removePositionId, setRemovePositionId] = useState<string | null>(null);
 
-  async function handleRevoke(offerId: string) {
-    setLoading(offerId);
-    setError(null);
-    setSuccess(null);
-    const result = await staffRevokeOffer(offerId, staffUserId, "Revoked by staff.");
-    if (result.error) setError(result.error);
-    else { setSuccess("Offer revoked."); router.refresh(); }
-    setLoading(null);
+  // Revoke/Expire confirmation dialog state — neither notifies the family
+  // automatically, so both go through a confirm step that says so plainly.
+  const [offerActionDialog, setOfferActionDialog] = useState<{ offerId: string; kind: "revoke" | "expire" } | null>(null);
+
+  function handleRevoke(offerId: string) {
+    setOfferActionDialog({ offerId, kind: "revoke" });
   }
 
-  async function handleExpire(offerId: string) {
+  function handleExpire(offerId: string) {
+    setOfferActionDialog({ offerId, kind: "expire" });
+  }
+
+  async function doOfferAction() {
+    if (!offerActionDialog) return;
+    const { offerId, kind } = offerActionDialog;
+    setOfferActionDialog(null);
     setLoading(offerId);
     setError(null);
     setSuccess(null);
-    const result = await staffExpireOffer(offerId);
+    const result =
+      kind === "revoke"
+        ? await staffRevokeOffer(offerId, staffUserId, "Revoked by staff.")
+        : await staffExpireOffer(offerId);
     if (result.error) setError(result.error);
-    else { setSuccess("Offer expired."); router.refresh(); }
+    else {
+      setSuccess(kind === "revoke" ? "Offer revoked." : "Offer expired.");
+      router.refresh();
+    }
     setLoading(null);
   }
 
@@ -741,6 +752,40 @@ export function OffersClient({
             </Button>
             <Button variant="destructive" onClick={doRemove}>
               Remove Student
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Revoke / Expire Offer Confirmation ─── */}
+      <Dialog open={!!offerActionDialog} onOpenChange={(open) => !open && setOfferActionDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{offerActionDialog?.kind === "revoke" ? "Revoke Offer" : "Expire Offer"}</DialogTitle>
+            <DialogDescription>
+              {offerActionDialog?.kind === "revoke"
+                ? "This immediately withdraws the seat offer. The family will not be automatically notified."
+                : "This marks the offer as expired and returns the seat to the pool. The family will not be automatically notified."}
+            </DialogDescription>
+          </DialogHeader>
+          {offerActionDialog && (() => {
+            const offer = offers.find((o) => o.id === offerActionDialog.offerId);
+            if (!offer) return null;
+            return (
+              <div className="rounded-lg bg-rooted-gray-light p-3 text-sm">
+                <p className="font-medium text-ink">{offer.student_name}</p>
+                <p className="text-stone">
+                  {offer.campus_name} · Grade {offer.grade}
+                </p>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOfferActionDialog(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={doOfferAction}>
+              {offerActionDialog?.kind === "revoke" ? "Revoke Offer" : "Expire Offer"}
             </Button>
           </DialogFooter>
         </DialogContent>

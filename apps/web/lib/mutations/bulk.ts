@@ -1,5 +1,6 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { isValidTransition, type ApplicationStatusValue } from "@rooted-ems/utils";
+import type { AuthSession } from "@rooted-ems/types";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
 import { requireStaffSession } from "@/lib/auth/get-session";
 import { sendOffer } from "./offers";
@@ -25,6 +26,25 @@ export interface BulkItemResult {
  */
 export const MAX_BULK_ITEMS = 500;
 
+/** Message used for rows the caller selected but may not act on. */
+const OUT_OF_SCOPE = "Not on a campus you can access";
+
+/**
+ * Campus ids this staff user may act on. An empty list means an org-level
+ * admin with no per-campus rows — no restriction, same convention as
+ * getAccessibleCampusIds. Read straight off the session here so this module
+ * keeps a single dependency on the auth module (requireStaffSession).
+ */
+function accessibleCampusIds(session: AuthSession): string[] {
+  return Object.keys(session.campus_roles ?? {});
+}
+
+/** True when the row's campus is outside the user's access. */
+function isOutOfScope(accessible: string[], campusId: unknown): boolean {
+  if (accessible.length === 0) return false;
+  return typeof campusId !== "string" || !accessible.includes(campusId);
+}
+
 function dedupeAndValidateIds(applicationIds: string[]): string[] {
   const ids = [...new Set(applicationIds)].filter(
     (id) => typeof id === "string" && id.length > 0
@@ -44,6 +64,8 @@ function dedupeAndValidateIds(applicationIds: string[]): string[] {
  * Change the status of many applications at once. Staff only.
  *
  * Semantics (mirrors updateApplicationStatus, applied per item):
+ *   - Items outside the caller's campus access are SKIPPED and reported,
+ *     never written.
  *   - The state machine is validated per item — items whose current status
  *     cannot legally transition to `newStatus` are SKIPPED and reported,
  *     never forced.
@@ -61,6 +83,7 @@ export async function bulkChangeApplicationStatus(
   const session = await requireStaffSession();
   const ids = dedupeAndValidateIds(applicationIds);
   const supabase = createServiceRoleClient();
+  const accessible = accessibleCampusIds(session);
 
   const results: BulkItemResult[] = [];
 
@@ -74,6 +97,14 @@ export async function bulkChangeApplicationStatus(
 
       if (!app) {
         results.push({ id: applicationId, ok: false, error: "Application not found" });
+        continue;
+      }
+
+      // ── Campus scope — the id list is client-supplied ─────────────────────
+      // Nothing stopped a caller from posting ids belonging to another
+      // campus; the service-role client would happily update them.
+      if (isOutOfScope(accessible, app.campus_id)) {
+        results.push({ id: applicationId, ok: false, error: OUT_OF_SCOPE });
         continue;
       }
 
@@ -158,6 +189,7 @@ export async function bulkChangeApplicationStatus(
  * Send seat offers to many applications at once. Staff only.
  *
  * Per item:
+ *   - Items outside the caller's campus access are skipped and reported.
  *   - Fetches campus/grade server-side (never trusts client placement data).
  *   - Pre-checks for an existing pending offer and skips with a friendly
  *     message — the production unique index on pending offers would reject
@@ -179,6 +211,7 @@ export async function bulkSendOffers(
   }
 
   const supabase = createServiceRoleClient();
+  const accessible = accessibleCampusIds(session);
   const results: BulkItemResult[] = [];
 
   for (const applicationId of ids) {
@@ -191,6 +224,14 @@ export async function bulkSendOffers(
 
       if (!app) {
         results.push({ id: applicationId, ok: false, error: "Application not found" });
+        continue;
+      }
+
+      // ── Campus scope — the id list is client-supplied ─────────────────────
+      // A seat offer is the highest-consequence bulk action in the system;
+      // it must never fire on a campus this user does not administer.
+      if (isOutOfScope(accessible, app.campus_id)) {
+        results.push({ id: applicationId, ok: false, error: OUT_OF_SCOPE });
         continue;
       }
 

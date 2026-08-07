@@ -634,7 +634,8 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
             <DialogTitle>Withdraw Application</DialogTitle>
             <DialogDescription>
               Are you sure you want to withdraw {detail.student_name}&apos;s application? This action will remove the student from
-              the enrollment pipeline.
+              the enrollment pipeline. The family will not be notified automatically. Withdrawn is final — there is no action to
+              undo it; the family would need to submit a new application to re-apply.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -666,7 +667,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
           </DialogHeader>
           <div className="py-2 space-y-2">
             <label className="block text-sm font-medium text-ink/70">
-              Reason <span className="text-stone font-normal">(optional, internal)</span>
+              Reason <span className="text-stone font-normal">(optional — internal only, not shown to the family)</span>
             </label>
             <textarea
               value={rejectAppReason}

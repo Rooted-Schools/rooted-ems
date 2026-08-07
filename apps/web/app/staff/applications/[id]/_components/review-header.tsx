@@ -141,13 +141,13 @@ export function ReviewHeader({
           <div className="relative" ref={menuRef}>
             <button
               type="button"
-              aria-label="More actions"
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((v) => !v)}
-              className="inline-flex h-9 w-9 min-h-[44px] items-center justify-center rounded-[6px] border border-line bg-white text-stone hover:bg-sunken hover:text-ink"
+              className="inline-flex h-9 min-h-[44px] items-center justify-center gap-1.5 rounded-[6px] border border-line bg-white px-2.5 text-stone hover:bg-sunken hover:text-ink"
             >
               <IconMoreHorizontal size={18} aria-hidden="true" />
+              <span className="text-xs font-medium">More</span>
             </button>
             {menuOpen && (
               <div

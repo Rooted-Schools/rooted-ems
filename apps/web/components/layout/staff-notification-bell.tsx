@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { FamilyMessageRow } from "@/lib/queries";
-import { markStaffNotificationsRead } from "@/app/staff/messages/actions";
+import {
+  markAllStaffNotificationsRead,
+  markStaffNotificationsRead,
+} from "@/app/staff/messages/actions";
 
 interface StaffNotificationBellProps {
   unreadCount?: number;
@@ -49,11 +52,11 @@ export function StaffNotificationBell({
     };
   }, [open]);
 
-  const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
-
+  // Clears every unread staff notification, not just the ~10 in this preview
+  // — otherwise the badge keeps a count the user has no way to reach.
   function handleMarkAllRead() {
     startTransition(async () => {
-      await markStaffNotificationsRead(unreadIds);
+      await markAllStaffNotificationsRead();
       router.refresh();
     });
   }
@@ -111,7 +114,9 @@ export function StaffNotificationBell({
         >
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-stone/10">
             <span className="text-sm font-semibold text-ink">Notifications</span>
-            {unreadIds.length > 0 && (
+            {/* Driven by the badge count, not the preview: unread items past
+                the first ten still need a way to be cleared. */}
+            {unreadCount > 0 && (
               <button
                 type="button"
                 onClick={handleMarkAllRead}

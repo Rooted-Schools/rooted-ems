@@ -15,7 +15,8 @@ export function RsvpForm({ eventId, campusId, isFull }: { eventId: string; campu
   const [isPending, startTransition] = useTransition();
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ guardian_name: "", email: "", phone: "", party_size: "2", website: "" });
+  // sms_consent defaults to false — TCPA opt-in has to be an affirmative act.
+  const [form, setForm] = useState({ guardian_name: "", email: "", phone: "", party_size: "2", sms_consent: false, website: "" });
   const set = (p: Partial<typeof form>) => setForm((f) => ({ ...f, ...p }));
 
   if (isFull) {
@@ -91,6 +92,20 @@ export function RsvpForm({ eventId, campusId, isFull }: { eventId: string; campu
           </Select>
         </div>
       </div>
+      <label htmlFor="rsvp-sms-consent" className="flex items-start gap-2 text-sm text-ink/70">
+        <input
+          id="rsvp-sms-consent"
+          type="checkbox"
+          checked={form.sms_consent}
+          onChange={(e) => set({ sms_consent: e.target.checked })}
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-stone/40 text-rooted-green focus:ring-rooted-green"
+        />
+        <span>
+          {es
+            ? "Sí, envíenme recordatorios por mensaje de texto sobre este evento. Pueden aplicar tarifas de mensajes y datos. Responda STOP para cancelar."
+            : "Yes, text me reminders about this event. Message and data rates may apply. Reply STOP to opt out."}
+        </span>
+      </label>
       {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>}
       <Button type="submit" className="w-full" disabled={isPending}>
         {isPending ? (es ? "Registrando…" : "Registering…") : es ? "Registrarse" : "Register"}

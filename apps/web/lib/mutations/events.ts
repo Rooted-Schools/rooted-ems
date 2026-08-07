@@ -3,6 +3,7 @@ import type { MutationResult } from "./applications";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
 import { sendEmail } from "@/lib/email";
 import { eventRsvpConfirmation } from "@/lib/email-templates";
+import { phoneDigits10 } from "@/lib/sms";
 
 export const EVENT_TYPES = ["info_session", "open_house", "tour", "other"] as const;
 
@@ -297,6 +298,18 @@ export interface RsvpInput {
   phone?: string;
   party_size?: number;
   campus_id: string;
+  /** TCPA opt-in from the RSVP form's checkbox. Defaults to no consent. */
+  sms_consent?: boolean;
+}
+
+/**
+ * Escape LIKE metacharacters before they reach an .ilike() filter. PostgREST
+ * hands the pattern straight to SQL, so a "%" or "_" typed into a public form
+ * would match addresses the family never entered — and could link their RSVP
+ * to someone else's lead record.
+ */
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
 }
 
 /**
@@ -341,12 +354,14 @@ export async function rsvpToEvent(input: RsvpInput): Promise<MutationResult> {
   const firstName = nameParts[0] ?? input.guardian_name.trim();
   const lastName = nameParts.slice(1).join(" ") || "(no last name)";
 
+  const smsConsent = input.sms_consent === true;
+
   if (input.email) {
     const { data: existing } = await supabase
       .from("lead")
       .select("id")
       .eq("campus_id", event.campus_id)
-      .ilike("email", input.email.trim())
+      .ilike("email", escapeLikePattern(input.email.trim()))
       .limit(1);
     leadId = (existing?.[0] as Record<string, string> | undefined)?.id ?? null;
   }
@@ -359,6 +374,7 @@ export async function rsvpToEvent(input: RsvpInput): Promise<MutationResult> {
         last_name: lastName,
         email: input.email?.trim() || null,
         phone: input.phone?.trim() || null,
+        sms_consent: smsConsent,
         source: "event",
         source_detail: `RSVP: ${event.title}`,
         stage: "engaged", // an RSVP is a warmer signal than a raw inquiry
@@ -367,23 +383,53 @@ export async function rsvpToEvent(input: RsvpInput): Promise<MutationResult> {
       .select("id")
       .single();
     leadId = newLead?.id ?? null;
+  } else if (smsConsent) {
+    // Ticking the box on a returning family's RSVP is a fresh opt-in, so it
+    // upgrades their lead. Leaving it unticked is NOT treated as a revocation
+    // — consent is withdrawn by replying STOP (see lib/inbound-sms.ts), not by
+    // an unchecked box on a form they may not have read.
+    const { error: consentErr } = await supabase
+      .from("lead")
+      .update({ sms_consent: true })
+      .eq("id", leadId);
+    if (consentErr) console.error("[rsvpToEvent] sms consent", consentErr.message);
   }
 
-  // Idempotent RSVP row
-  const { error: rsvpErr } = await supabase
-    .from("event_rsvp")
-    .upsert(
-      {
-        event_id: input.event_id,
-        lead_id: leadId,
-        guardian_name: input.guardian_name.trim(),
-        email: input.email?.trim() || null,
-        phone: input.phone?.trim() || null,
-        party_size: Math.max(1, Math.min(input.party_size ?? 1, 20)),
-        status: "registered",
-      },
-      { onConflict: "event_id,email" }
-    );
+  // Idempotent RSVP row.
+  //
+  // The (event_id, email) unique index does not cover a phone-only RSVP:
+  // Postgres treats NULL emails as distinct, so the upsert has nothing to
+  // conflict on and every resubmission inserted another row — inflating the
+  // roster and the capacity count. Match those on the phone instead,
+  // comparing normalized digits because the column holds whatever the family
+  // typed.
+  let existingPhoneRsvpId: string | null = null;
+  const digits = input.email?.trim() ? null : phoneDigits10(input.phone);
+  if (digits) {
+    const { data: eventRsvps } = await supabase
+      .from("event_rsvp")
+      .select("id, phone")
+      .eq("event_id", input.event_id);
+    existingPhoneRsvpId =
+      ((eventRsvps ?? []) as Array<{ id: string; phone: string | null }>).find(
+        (row) => phoneDigits10(row.phone) === digits
+      )?.id ?? null;
+  }
+
+  const rsvpRow = {
+    event_id: input.event_id,
+    lead_id: leadId,
+    guardian_name: input.guardian_name.trim(),
+    email: input.email?.trim() || null,
+    phone: input.phone?.trim() || null,
+    party_size: Math.max(1, Math.min(input.party_size ?? 1, 20)),
+    status: "registered",
+  };
+
+  const { error: rsvpErr } = existingPhoneRsvpId
+    ? await supabase.from("event_rsvp").update(rsvpRow).eq("id", existingPhoneRsvpId)
+    : await supabase.from("event_rsvp").upsert(rsvpRow, { onConflict: "event_id,email" });
+
   if (rsvpErr) {
     console.error("[rsvpToEvent]", rsvpErr.message);
     return { data: null, error: "Something went wrong. Please try again." };

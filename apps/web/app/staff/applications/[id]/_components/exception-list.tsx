@@ -67,7 +67,7 @@ export function ExceptionList({ pendingDocs, rejectedDocs, isPending, onAccept, 
                   onClick={() => onAccept(doc.id)}
                   className="inline-flex min-h-[36px] items-center justify-center rounded-[6px] bg-deep-green px-3 text-xs font-medium text-white hover:bg-rooted-green-700 disabled:opacity-50"
                 >
-                  Accept
+                  Approve
                 </button>
                 <button
                   type="button"

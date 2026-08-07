@@ -76,7 +76,7 @@ export const NAV_SECTIONS: NavSection[] = [
         activePaths: ["/staff/seats", "/staff/offers", "/staff/waitlist"],
       },
       { label: "Recruitment", href: "/staff/recruitment", icon: "recruitment" },
-      { label: "Messages", href: "/staff/messages", icon: "messages", badgeKey: "messages" },
+      { label: "Notifications", href: "/staff/messages", icon: "messages", badgeKey: "messages" },
       {
         label: "Insights",
         href: "/staff/reports",

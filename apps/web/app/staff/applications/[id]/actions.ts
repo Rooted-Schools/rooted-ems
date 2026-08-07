@@ -5,8 +5,8 @@ import { updateApplicationStatus, withdrawApplication, createNote, reviewDocumen
 import { sendOffer } from "@/lib/mutations/offers";
 import { verifyRegistrationItem, skipRegistrationItem } from "@/lib/mutations/registration";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
-import { requireStaffSession } from "@/lib/auth/get-session";
-import { notifyFamilyStudentEnrolled, notifyFamilyNeedsInfo, notifyFamilyDocumentRejected } from "@/lib/notify";
+import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
+import { notifyFamilyStudentEnrolled, notifyFamilyDocumentRejected } from "@/lib/notify";
 
 // ─── Status Transition ─────────────────────────────────
 
@@ -23,28 +23,11 @@ export async function changeApplicationStatus(
     revalidatePath("/staff/applications");
     revalidatePath("/staff/dashboard");
     revalidatePath("/staff/today");
-
-    // When staff requests more info, notify the family — non-blocking so a
-    // notification failure never prevents the status transition from succeeding.
-    if (newStatus === "needs_info") {
-      const supabase = createServiceRoleClient();
-      supabase
-        .from("application")
-        .select("campus_id")
-        .eq("id", applicationId)
-        .single()
-        .then(({ data: app }) => {
-          notifyFamilyNeedsInfo({
-            applicationId,
-            applicationIdForLink: applicationId,
-            message: reason,
-            campusId: app?.campus_id ?? undefined,
-          }).catch((err) =>
-            console.error("[changeApplicationStatus] notifyFamilyNeedsInfo failed", err)
-          );
-        });
-    }
   }
+
+  // Family notifications (including needs_info) are sent by
+  // updateApplicationStatus itself — one send path, so a status change can
+  // never double-text a family.
 
   return result;
 }
@@ -137,20 +120,22 @@ export async function staffReviewDocument(
 
 // ─── Make Offer ────────────────────────────────────────
 
+/** `_offeredBy` is ignored — who made the offer comes from the session, not
+ *  from the caller. The parameter stays for the existing call site. */
 export async function staffMakeOffer(
   applicationId: string,
   campusId: string,
   gradeLevelId: string,
   expiresAt: string,
-  offeredBy: string
+  _offeredBy?: string
 ) {
-  await requireStaffSession();
+  const session = await requireStaffSession();
   const result = await sendOffer({
     application_id: applicationId,
     campus_id: campusId,
     grade_level_id: gradeLevelId,
     expires_at: expiresAt,
-    offered_by: offeredBy,
+    offered_by: session.user_id,
   });
 
   if (!result.error) {
@@ -330,14 +315,47 @@ export async function staffConfirmPacketComplete(applicationId: string) {
 
 // ─── Generate Signed URL (service-role, bypasses storage RLS) ──────────────
 
+/**
+ * Mint a short-lived link to a family's uploaded file.
+ *
+ * The path is never trusted on its own: it has to resolve to a real document
+ * row, and that document's application has to sit on a campus this staff user
+ * can access. Without both checks the action was a read-anything handle on the
+ * documents bucket for any staff account on any campus.
+ */
 export async function staffGetSignedUrl(
   storagePath: string
 ): Promise<{ url: string | null; error: string | null }> {
   if (!storagePath) return { url: null, error: "No file path provided." };
 
-  await requireStaffSession();
+  const session = await requireStaffSession();
 
   const supabase = createServiceRoleClient();
+
+  const { data: docRows } = await supabase
+    .from("document")
+    .select("id, application:application_id (campus_id)")
+    .eq("storage_path", storagePath)
+    .limit(1);
+
+  const docRow = (docRows?.[0] ?? null) as unknown as {
+    id: string;
+    application: { campus_id: string } | null;
+  } | null;
+
+  // Same message for "no such file" and "not your campus" — a staff user on
+  // another campus learns nothing about what exists here.
+  if (!docRow) return { url: null, error: "File not found." };
+
+  const accessibleCampusIds = getAccessibleCampusIds(session);
+  const docCampusId = docRow.application?.campus_id;
+  if (
+    accessibleCampusIds.length > 0 &&
+    (!docCampusId || !accessibleCampusIds.includes(docCampusId))
+  ) {
+    return { url: null, error: "File not found." };
+  }
+
   const { data, error } = await supabase.storage
     .from("documents")
     .createSignedUrl(storagePath, 3600); // 1-hour link

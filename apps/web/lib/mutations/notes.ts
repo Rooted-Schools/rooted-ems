@@ -49,6 +49,11 @@ export async function createNote(input: {
 /**
  * Save a family's text response to an info request.
  * Stored as a non-internal note so staff can see it.
+ *
+ * The application id comes from the client, so ownership is proved before the
+ * insert — same guardian check withdrawApplication applies. Without it, any
+ * signed-in family account could post a note onto any other family's
+ * application, where staff would read it as that family's own words.
  */
 export async function createFamilyResponse(
   applicationId: string,
@@ -59,6 +64,16 @@ export async function createFamilyResponse(
   if (!user) return { data: null, error: "Not authenticated" };
 
   const supabase = createServiceRoleClient();
+
+  const { data: appCheck } = await supabase
+    .from("application")
+    .select("id, guardian:guardian_id (user_id)")
+    .eq("id", applicationId)
+    .single();
+  const appGuardian = appCheck?.guardian as unknown as { user_id: string } | null;
+  if (!appGuardian || appGuardian.user_id !== user.id) {
+    return { data: null, error: "Not authorized" };
+  }
 
   const { data: note, error } = await supabase
     .from("note")

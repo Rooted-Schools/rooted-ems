@@ -149,9 +149,16 @@ export async function GET(request: NextRequest) {
   const now = new Date();
   const nowIso = now.toISOString();
 
+  // Order matters. The 2h window is a strict subset of the 24h window, so an
+  // event starting in 90 minutes qualifies for both passes. Running 2h first
+  // lets it claim those rows, and the 24h pass then starts its window at
+  // now + 2h so it can never pick the same event up in the same run and send
+  // a second, near-identical reminder minutes later.
+  const reminders2h = await runReminders(supabase, now, "2h");
+  const reminders24h = await runReminders(supabase, now, "24h");
   const results = {
-    reminders_24h: await runReminders(supabase, now, "24h"),
-    reminders_2h: await runReminders(supabase, now, "2h"),
+    reminders_24h: reminders24h,
+    reminders_2h: reminders2h,
     followups: await runFollowups(supabase, now),
   };
 
@@ -176,7 +183,14 @@ async function runReminders(
 ): Promise<{ checked: number; sent: number; errors: number }> {
   const column = kind === "24h" ? "reminded_24h_at" : "reminded_2h_at";
   const windowMs = kind === "24h" ? REMINDER_24H_WINDOW_MS : REMINDER_2H_WINDOW_MS;
-  const nowIso = now.toISOString();
+  // The 24h pass starts where the 2h pass ends. Without this floor the two
+  // windows overlap for everything inside two hours, and a single run would
+  // send both reminders to the same family. The 2h pass runs first (see GET),
+  // so anything in that band has already been claimed and answered.
+  const floorIso =
+    kind === "24h"
+      ? new Date(now.getTime() + REMINDER_2H_WINDOW_MS).toISOString()
+      : now.toISOString();
   const cutoffIso = new Date(now.getTime() + windowMs).toISOString();
 
   const { data, error } = await supabase
@@ -188,7 +202,7 @@ async function runReminders(
     )
     .neq("status", "cancelled")
     .is(column as never, null)
-    .gte("event.starts_at", nowIso)
+    .gt("event.starts_at", floorIso)
     .lte("event.starts_at", cutoffIso);
 
   if (error) {

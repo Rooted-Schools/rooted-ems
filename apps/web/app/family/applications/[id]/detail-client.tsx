@@ -17,7 +17,7 @@ import {
 import { useRef } from "react";
 import { getStatusConfig, getFamilyStatusLabel, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationDetail } from "@/lib/queries";
-import { uploadFile, getSignedUrl, validateFile, formatFileSize } from "@/lib/storage/upload";
+import { uploadFile, getSignedUrl, validateFile, formatFileSize, formatFileValidationError, type FileValidationError } from "@/lib/storage/upload";
 import { compressImageFile } from "@/lib/storage/compress-image";
 import { familyWithdrawApplication, familyAcceptOffer, familyDeclineOffer, familyAcceptDirect, familyDeclineDirect, familySubmitResponse, familyCreateDocumentRecord } from "../actions";
 import type { ReactNode } from "react";
@@ -112,7 +112,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
   const [responseFile, setResponseFile] = useState<File | null>(null);
   const [responseFileCompressed, setResponseFileCompressed] = useState(false);
   const [responseFileCompressing, setResponseFileCompressing] = useState(false);
-  const [fileError, setFileError] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<FileValidationError | null>(null);
   const [submittingResponse, setSubmittingResponse] = useState(false);
   const [inlineResponseFeedback, setInlineResponseFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -139,7 +139,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
     if (!storagePath) return;
     const { url, error } = await getSignedUrl(storagePath);
     if (error) {
-      setFeedback({ type: "error", message: `Could not open document: ${error}` });
+      setFeedback({ type: "error", message: `${t("docs.couldNotOpen")}: ${error}` });
       return;
     }
     if (url) window.open(url, "_blank");
@@ -398,7 +398,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                   <span>{t("docs.captureHint")}</span>
                 </p>
                 {responseFileCompressing && <p className="text-xs text-amber-700 mt-1">{t("common.loading")}</p>}
-                {fileError && <p className="text-xs text-red-600 mt-1">{fileError}</p>}
+                {fileError && <p className="text-xs text-red-600 mt-1">{formatFileValidationError(fileError, locale)}</p>}
                 {responseFile && !fileError && (
                   <p className="text-xs text-amber-700 mt-1">
                     {responseFile.name} ({formatFileSize(responseFile.size)}
@@ -599,7 +599,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                           onClick={() => handleViewDocument(doc.storage_path)}
                           disabled={!doc.storage_path}
                         >
-                          View
+                          {t("docs.view")}
                         </Button>
                       </div>
                     </div>

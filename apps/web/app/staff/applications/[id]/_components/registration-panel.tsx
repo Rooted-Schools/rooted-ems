@@ -26,6 +26,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import {
   staffVerifyRegistrationItem,
@@ -35,6 +43,7 @@ import {
   staffConfirmPacketComplete,
 } from "../actions";
 import type { ApplicationDetail, RegistrationPacketDetail } from "@/lib/queries";
+import type { RegistrationItemRow } from "@/lib/queries/staff";
 import { IconClipboardList, IconGraduationCap, IconRefreshCw, IconClock, IconCheckCircle } from "@/components/ui/icons";
 
 function formatDateTime(dateStr: string | null | undefined) {
@@ -227,9 +236,24 @@ export function RegistrationPanel({ detail, registrationPacket }: RegistrationPa
   const [auditGrade, setAuditGrade] = useState(detail.grade ?? "");
   const [auditNotes, setAuditNotes] = useState("");
   const [auditSupports, setAuditSupports] = useState<string[]>([]);
+  const [skipTarget, setSkipTarget] = useState<RegistrationItemRow | null>(null);
 
   function showFeedback(type: "success" | "error", message: string) {
     toast({ variant: type, title: message });
+  }
+
+  function doSkipItem() {
+    if (!skipTarget) return;
+    const item = skipTarget;
+    setSkipTarget(null);
+    startTransition(async () => {
+      const result = await staffSkipRegistrationItem(item.id, detail.id);
+      if (result.error) showFeedback("error", result.error);
+      else {
+        showFeedback("success", `${ITEM_TYPE_LABELS[item.item_type] ?? item.item_type} skipped`);
+        router.refresh();
+      }
+    });
   }
 
   const pCfg = packetStatusConfig[registrationPacket.packet_status] ?? packetStatusConfig.pending;
@@ -379,17 +403,7 @@ export function RegistrationPanel({ detail, registrationPacket }: RegistrationPa
                                 variant="outline"
                                 size="sm"
                                 disabled={isPending}
-                                onClick={() => {
-                                  if (!confirm(`Skip "${ITEM_TYPE_LABELS[item.item_type] ?? item.item_type}"? This waives the requirement and marks it as complete.`)) return;
-                                  startTransition(async () => {
-                                    const result = await staffSkipRegistrationItem(item.id, detail.id);
-                                    if (result.error) showFeedback("error", result.error);
-                                    else {
-                                      showFeedback("success", `${ITEM_TYPE_LABELS[item.item_type] ?? item.item_type} skipped`);
-                                      router.refresh();
-                                    }
-                                  });
-                                }}
+                                onClick={() => setSkipTarget(item)}
                               >
                                 Skip
                               </Button>
@@ -504,6 +518,27 @@ export function RegistrationPanel({ detail, registrationPacket }: RegistrationPa
           )}
         </Card>
       )}
+
+      {/* ─── Skip Item Confirmation ─── */}
+      <Dialog open={!!skipTarget} onOpenChange={(open) => !open && setSkipTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Skip Requirement</DialogTitle>
+            <DialogDescription>
+              This waives &quot;{skipTarget ? ITEM_TYPE_LABELS[skipTarget.item_type] ?? skipTarget.item_type : ""}&quot; and marks
+              it as complete without the family submitting it. The family will not be notified.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSkipTarget(null)}>
+              Cancel
+            </Button>
+            <Button onClick={doSkipItem} disabled={isPending}>
+              Skip Requirement
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

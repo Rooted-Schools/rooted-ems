@@ -344,32 +344,38 @@ async function processInboundSms({
   // number is not routed to anyone, because guessing a campus would put one
   // school's family in another school's queue.
   let notified = false;
-  if (campusId) {
-    const subject =
-      intent === "stop"
-        ? `Text opt-out from ${who}`
-        : intent === "start"
-          ? `Text opt-in from ${who}`
-          : `Text reply from ${who}`;
 
-    const preview = body.trim().slice(0, 160);
-    const notificationBody =
-      intent === "stop"
-        ? `${who} replied "${preview}" and has been opted out of text messages. Reach them by phone or email instead.`
-        : intent === "start"
-          ? `${who} replied "${preview}" and is opted back in to text messages.`
-          : preview || "(empty message)";
+  const subject =
+    intent === "stop"
+      ? `Text opt-out from ${who}`
+      : intent === "start"
+        ? `Text opt-in from ${who}`
+        : `Text reply from ${who}`;
 
-    const link =
-      matched === "lead" && lead
-        ? `/staff/recruitment/${lead.id}`
-        : applicationId
-          ? `/staff/applications/${applicationId}`
-          : null;
+  const preview = body.trim().slice(0, 160);
+  const notificationBody =
+    intent === "stop"
+      ? `${who} replied "${preview}" and has been opted out of text messages. Reach them by phone or email instead.`
+      : intent === "start"
+        ? `${who} replied "${preview}" and is opted back in to text messages.`
+        : preview || "(empty message)";
 
-    if (link) {
-      notified = await notifyCampusStaff({ supabase, campusId, subject, body: notificationBody, link });
-    }
+  const link =
+    matched === "lead" && lead
+      ? `/staff/recruitment/${lead.id}`
+      : applicationId
+        ? `/staff/applications/${applicationId}`
+        : null;
+
+  if (campusId && link) {
+    notified = await notifyCampusStaff({ supabase, campusId, subject, body: notificationBody, link });
+  } else if (guardian) {
+    // A guardian we know, but with no application (and so no campus) to scope
+    // the notification to. The campus path above has no audience for them, and
+    // dropping the text on the floor was the outcome — a family who replied to
+    // one of our own messages heard nothing back. Route it to the network
+    // admins instead, who can see every campus.
+    notified = await notifySystemAdmins({ supabase, subject, body: notificationBody });
   } else if (matched === "none") {
     // Deliberately silent beyond the log above: there is no campus to scope a
     // notification to, and no staff surface exists for an unknown number.
@@ -533,6 +539,57 @@ async function notifyCampusStaff({
   });
   if (result.error) {
     console.error("[handleInboundSms] notification failed", result.error, { campusId });
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Last-resort audience for a text we can identify but cannot scope to a
+ * campus: every system_admin, deduped across the campuses they hold the role
+ * on. No campusId is passed — the notification genuinely belongs to no single
+ * campus, and claiming one would be a guess. Links to /staff/messages, which
+ * is the only staff surface that always exists for this case.
+ */
+async function notifySystemAdmins({
+  supabase,
+  subject,
+  body,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any;
+  subject: string;
+  body: string;
+}): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("user_campus_role")
+    .select("user_id")
+    .eq("role", "system_admin");
+
+  if (error) {
+    console.error("[handleInboundSms] system_admin lookup failed", error.message);
+    return false;
+  }
+
+  const unique = Array.from(
+    new Set(
+      ((data ?? []) as Array<{ user_id: string }>).map((row) => row.user_id).filter(Boolean)
+    )
+  );
+  if (unique.length === 0) {
+    console.warn("[handleInboundSms] no system_admin users — reply not routed");
+    return false;
+  }
+
+  const result = await sendNotification({
+    recipientUserIds: unique,
+    channel: "in_app",
+    subject,
+    body,
+    link: "/staff/messages",
+  });
+  if (result.error) {
+    console.error("[handleInboundSms] system_admin notification failed", result.error);
     return false;
   }
   return true;
