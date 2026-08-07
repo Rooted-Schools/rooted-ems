@@ -120,6 +120,13 @@ export interface CallEscalationRow {
   campus_name: string;
   days_stalled: number;
   outstanding_item_names: string[];
+  /**
+   * When the automated nudge last went out, null if never. Shown on the card
+   * so staff know the nudge history — a recent nudge does NOT remove the row:
+   * this queue exists because nudges stopped working, so the call is still
+   * owed until someone logs it via Mark contacted.
+   */
+  last_nudged_at: string | null;
 }
 
 export interface CallEscalationResult {
@@ -147,11 +154,14 @@ function prettifyItemType(itemType: string): string {
  *     whenever a registration_item under it changes (see
  *     lib/mutations/registration.ts), the same proxy getStalledRegistrations
  *     uses for "last touched"
- *   - last_nudged_at is null or older than `days` — the automated nudge
- *     cron already had its shot and it didn't work
  *   - contacted_at is null or older than `days` — staff haven't already
  *     logged a call inside the window (see markContacted in
  *     app/staff/today/actions.ts)
+ *
+ * Deliberately NOT a criterion: last_nudged_at. Sending another automated
+ * nudge must not clear a family off the call list — the row only leaves when
+ * a human logs contact (or the packet moves). The nudge timestamp is
+ * returned for display instead.
  */
 export async function getCallEscalationQueue(
   campusIds?: string[],
@@ -177,7 +187,6 @@ export async function getCallEscalationQueue(
     .in("status", ["pending", "in_progress"])
     .lt("created_at", cutoff)
     .lte("updated_at", cutoff)
-    .or(`last_nudged_at.is.null,last_nudged_at.lt.${cutoff}`)
     .or(`contacted_at.is.null,contacted_at.lt.${cutoff}`)
     .order("created_at", { ascending: true });
 
@@ -241,6 +250,7 @@ export async function getCallEscalationQueue(
       campus_name: campus?.name ?? "",
       days_stalled: daysStalled,
       outstanding_item_names: outstandingByEnrollment.get(enrollmentId) ?? [],
+      last_nudged_at: (row.last_nudged_at as string | null) ?? null,
     };
   });
 

@@ -19,6 +19,7 @@ import { sendSms, SMS_NOT_CONFIGURED } from "@/lib/sms";
 import * as emailTemplates from "@/lib/email-templates";
 import type { EmailTemplate } from "@/lib/email-templates";
 import { recordWaitlistPositionHistory } from "@/lib/mutations/waitlist-history";
+import { registrationNudgeSubject, registrationNudgeBody, registrationNudgeSms } from "@/lib/nudge-copy";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -714,12 +715,14 @@ export async function notifyFamilyRegistrationNudge({
   const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
   const studentFirstName = firstNameOf(studentName);
   const count = missingNames.length;
+  // Copy lives in lib/nudge-copy.ts (pure module) so the staff preview on
+  // /staff/today shows exactly what is sent here.
   await Promise.all([
     userId
       ? notify({
           userId,
-          subject: `Almost done — ${count} registration item${count === 1 ? "" : "s"} left`,
-          body: `${studentName ? `${studentName}'s` : "Your student's"} registration at ${campusName} is waiting on: ${missingNames.slice(0, 4).join(", ")}${count > 4 ? "…" : ""}. Finish these to secure the seat.`,
+          subject: registrationNudgeSubject(count),
+          body: registrationNudgeBody({ studentName, campusName, missingNames }),
           link: `/family/registration`,
           campusId,
           logTag: "notifyFamilyRegistrationNudge",
@@ -733,7 +736,7 @@ export async function notifyFamilyRegistrationNudge({
     ),
     smsGuardian(
       contact,
-      `Rooted Schools: ${count} registration item${count === 1 ? "" : "s"} still needed for ${studentFirstName ?? "your student"} at ${campusName}. Finish here: ${APP_LINK}/family/registration\nAún faltan pasos de inscripción. Complételos en el enlace.`,
+      registrationNudgeSms({ studentFirstName, campusName, count }),
       "notifyFamilyRegistrationNudge"
     ),
   ]);

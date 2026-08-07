@@ -7,6 +7,7 @@ import { cn, displayClass } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
 import { IconPhone } from "@/components/ui/icons";
 import { textExpiringOffers, sendRegistrationNudges, releaseSeats, markRegistrationContacted } from "./actions";
+import { registrationNudgeSubject, registrationNudgeBody, registrationNudgeSms } from "@/lib/nudge-copy";
 import type { RegistrationCompletionStats, CallEscalationRow } from "@/lib/queries/melt";
 
 /* ------------------------------------------------------------------ */
@@ -287,6 +288,14 @@ function RegistrationCompletionStrip({ stat }: { stat: RegistrationCompletionSta
 /*  Call escalation queue — "Needs a phone call"                       */
 /* ------------------------------------------------------------------ */
 
+/** Relative "Nudged today / 2 days ago" label from a real timestamp. */
+function nudgedAgoLabel(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
+  if (days <= 0) return "Nudged today";
+  if (days === 1) return "Nudged yesterday";
+  return `Nudged ${days} days ago`;
+}
+
 function CallQueueRowCard({
   row,
   onContacted,
@@ -297,6 +306,13 @@ function CallQueueRowCard({
   const { toast } = useToast();
   const [isContacting, startContacting] = useTransition();
   const [isNudging, startNudging] = useTransition();
+  // Persistent confirmation: survives past the toast so staff coming back to
+  // the tab still see the nudge went out. Seeded from the real timestamp.
+  const [nudgedAtIso, setNudgedAtIso] = useState<string | null>(row.last_nudged_at);
+  const [showPreview, setShowPreview] = useState(false);
+
+  const nudgedToday =
+    nudgedAtIso !== null && Date.now() - new Date(nudgedAtIso).getTime() < 24 * 60 * 60 * 1000;
 
   function handleMarkContacted() {
     startContacting(async () => {
@@ -308,7 +324,7 @@ function CallQueueRowCard({
       toast({
         variant: "success",
         title: `Logged a call to ${row.guardian_name}`,
-        description: "Off the call list for a week, or until they nudge again.",
+        description: "Noted with your name and removed from the call list for 7 days.",
       });
       onContacted();
     });
@@ -321,57 +337,109 @@ function CallQueueRowCard({
         toast({ variant: "error", title: "Could not send nudge", description: result.error ?? "Please try again." });
         return;
       }
-      toast({
-        variant: result.count > 0 ? "success" : "info",
-        title: result.count > 0 ? `Nudged ${row.guardian_name}` : "Nothing left to nudge",
-        description:
-          result.count > 0
-            ? "Email and text (where opted in) sent with what's still missing."
-            : "No outstanding items were found for this family.",
-      });
+      if (result.count > 0) {
+        setNudgedAtIso(new Date().toISOString());
+        toast({
+          variant: "success",
+          title: `Nudge sent to ${row.guardian_name}`,
+          description:
+            "In-app message and email sent, plus a text if they opted in. It names their exact missing items. They stay on your call list until you log a call.",
+        });
+      } else {
+        toast({
+          variant: "info",
+          title: "Nothing left to nudge",
+          description: "No outstanding items were found for this family.",
+        });
+      }
     });
   }
 
   const shown = row.outstanding_item_names.slice(0, 3);
   const more = row.outstanding_item_names.length - shown.length;
+  const count = row.outstanding_item_names.length;
+  const studentFirstName = row.student_name.split(/\s+/)[0] || undefined;
 
   return (
-    <div className="flex flex-wrap items-start gap-4 rounded-[6px] border border-line bg-white p-4">
-      <div className="min-w-0 flex-1 basis-64">
-        <p className="text-[15px] font-medium text-ink">{row.student_name}</p>
-        <p className="mt-0.5 text-sm text-stone">
-          {row.guardian_name}
-          {row.guardian_phone ? (
-            <>
-              {" "}
-              &middot;{" "}
-              <a href={`tel:${row.guardian_phone}`} className="text-rooted-green hover:text-deep-green">
-                {row.guardian_phone}
-              </a>
-            </>
-          ) : (
-            <> &middot; No phone on file</>
-          )}
-        </p>
-        <p className="mt-1 text-xs text-stone">
-          Stalled {row.days_stalled} day{row.days_stalled === 1 ? "" : "s"}
-          {row.outstanding_item_names.length > 0 && (
-            <>
-              {" "}
-              &middot; {row.outstanding_item_names.length} outstanding: {shown.join(", ")}
-              {more > 0 ? `, +${more} more` : ""}
-            </>
-          )}
-        </p>
+    <div className="rounded-[6px] border border-line bg-white p-4">
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="min-w-0 flex-1 basis-64">
+          <p className="text-[15px] font-medium text-ink">
+            {row.student_name}
+            {nudgedAtIso && (
+              <span className="ml-2 inline-flex items-center rounded-[6px] bg-sunken px-1.5 py-0.5 text-[11px] font-medium text-ink/70">
+                {nudgedAgoLabel(nudgedAtIso)}
+              </span>
+            )}
+          </p>
+          <p className="mt-0.5 text-sm text-stone">
+            {row.guardian_name}
+            {row.guardian_phone ? (
+              <>
+                {" "}
+                &middot;{" "}
+                <a href={`tel:${row.guardian_phone}`} className="text-rooted-green hover:text-deep-green">
+                  {row.guardian_phone}
+                </a>
+              </>
+            ) : (
+              <> &middot; No phone on file</>
+            )}
+          </p>
+          <p className="mt-1 text-xs text-stone">
+            Stalled {row.days_stalled} day{row.days_stalled === 1 ? "" : "s"}
+            {count > 0 && (
+              <>
+                {" "}
+                &middot; {count} outstanding: {shown.join(", ")}
+                {more > 0 ? `, +${more} more` : ""}
+              </>
+            )}
+            {" "}&middot;{" "}
+            <button
+              type="button"
+              onClick={() => setShowPreview((v) => !v)}
+              className="text-rooted-green underline decoration-dotted underline-offset-2 hover:text-deep-green"
+            >
+              {showPreview ? "Hide nudge message" : "What does the nudge say?"}
+            </button>
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <ActionButton style="outline" disabled={isNudging || nudgedToday} onClick={handleSendNudge}>
+            {isNudging ? "Sending…" : nudgedToday ? "Nudged today" : "Send nudge"}
+          </ActionButton>
+          <ActionButton style="solid-green" disabled={isContacting} onClick={handleMarkContacted}>
+            {isContacting ? "Logging…" : "Mark contacted"}
+          </ActionButton>
+        </div>
       </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <ActionButton style="outline" disabled={isNudging} onClick={handleSendNudge}>
-          {isNudging ? "Sending…" : "Send nudge"}
-        </ActionButton>
-        <ActionButton style="solid-green" disabled={isContacting} onClick={handleMarkContacted}>
-          {isContacting ? "Logging…" : "Mark contacted"}
-        </ActionButton>
-      </div>
+      {showPreview && (
+        <div className="mt-3 rounded-[6px] border border-line bg-sunken/60 p-3 text-xs text-ink/80">
+          <p className="font-semibold uppercase tracking-wide text-[10px] text-stone-text">
+            What this family receives
+          </p>
+          <p className="mt-1.5">
+            <span className="font-medium">In-app + email:</span>{" "}
+            &ldquo;{registrationNudgeSubject(count)}&rdquo; &mdash;{" "}
+            {registrationNudgeBody({
+              studentName: row.student_name,
+              campusName: row.campus_name || "their school",
+              missingNames: row.outstanding_item_names,
+            })}{" "}
+            The email lists the same items with a button to finish registration, in English and Spanish.
+          </p>
+          <p className="mt-1.5">
+            <span className="font-medium">Text (only if they opted in):</span>{" "}
+            &ldquo;{registrationNudgeSms({
+              studentFirstName,
+              campusName: row.campus_name || "their school",
+              count,
+            }).split("\n")[0]}&rdquo;{" "}
+            plus the same line in Spanish.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

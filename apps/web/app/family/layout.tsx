@@ -1,4 +1,5 @@
-import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
+import { createServerClient } from "@rooted-ems/database/server";
+import { getUnreadNotificationCount } from "@/lib/queries";
 import { FamilyHeader } from "@/components/layout/family-header";
 import { FamilyTabBar } from "@/components/layout/family-tabbar";
 import { LocaleProvider } from "@/lib/i18n/locale-context";
@@ -26,15 +27,9 @@ export default async function FamilyLayout({
   }
 
   // Unread message count powers the Messages badge in both the desktop
-  // header nav and the phone bottom tab bar.
-  const db = createServiceRoleClient();
-  const { count } = await db
-    .from("notification")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", user.id)
-    .eq("is_read", false);
-
-  const unreadCount = count ?? 0;
+  // header nav and the phone bottom tab bar. Family context only, so a
+  // dual-role user's staff-console notifications don't inflate this badge.
+  const unreadCount = await getUnreadNotificationCount(user.id, "family");
   const cookieStore = await cookies();
   const initialLocale = (cookieStore.get("NEXT_LOCALE")?.value as Locale | undefined) ?? "en";
 

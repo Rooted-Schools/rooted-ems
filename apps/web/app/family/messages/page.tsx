@@ -13,7 +13,9 @@ export default async function FamilyMessagesPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const messages = await getFamilyMessages(user.id);
+  // Family context: staff-console notifications stay out of the family
+  // portal for dual-role users (staff who are also guardians).
+  const messages = await getFamilyMessages(user.id, 50, "family");
 
   return <MessagesClient messages={messages} />;
 }

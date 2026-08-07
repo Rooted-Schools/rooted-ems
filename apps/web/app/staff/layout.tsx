@@ -5,13 +5,13 @@ import { requireStaffSession, getAccessibleCampusIds, getHighestRole } from "@/l
 import {
   getCampuses,
   getFamilyMessages,
+  getUnreadNotificationCount,
   getExpiringOffers,
   getStaffPendingDocuments,
   getStalledRegistrations,
   getReleasableSeats,
   getDuplicateSuspects,
 } from "@/lib/queries";
-import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { ToastProvider } from "@/components/ui/toast";
 
 export const metadata = {
@@ -38,9 +38,8 @@ export default async function StaffLayout({
   // These reuse the exact same queries the Today page itself calls, so the
   // badge is never a fabricated number; if any query is slow to add later,
   // the badge can simply be left undefined (it already no-ops when unset).
-  const db = createServiceRoleClient();
   const [
-    unreadResult,
+    unreadNotificationCount,
     recentNotifications,
     expiringOffers,
     { rows: pendingDocuments },
@@ -48,19 +47,16 @@ export default async function StaffLayout({
     releasableSeatGroups,
     duplicateSuspects,
   ] = await Promise.all([
-    db
-      .from("notification")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", session.user_id)
-      .eq("is_read", false),
-    getFamilyMessages(session.user_id, 10),
+    // Staff context only: a dual-role user (staff who is also a guardian on
+    // an application) must not get family-portal links in the staff bell.
+    getUnreadNotificationCount(session.user_id, "staff"),
+    getFamilyMessages(session.user_id, 10, "staff"),
     getExpiringOffers(120, scopedCampusIds),
     getStaffPendingDocuments(scopedCampusIds),
     getStalledRegistrations(5, scopedCampusIds),
     getReleasableSeats(scopedCampusIds),
     getDuplicateSuspects(scopedCampusIds),
   ]);
-  const unreadNotificationCount = (unreadResult as { count: number | null }).count ?? 0;
 
   const todayCount =
     expiringOffers.length +
