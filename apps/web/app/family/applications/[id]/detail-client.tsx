@@ -15,13 +15,14 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useRef } from "react";
-import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
+import { getStatusConfig, getFamilyStatusLabel, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationDetail } from "@/lib/queries";
 import { uploadFile, getSignedUrl, validateFile, formatFileSize } from "@/lib/storage/upload";
 import { compressImageFile } from "@/lib/storage/compress-image";
 import { familyWithdrawApplication, familyAcceptOffer, familyDeclineOffer, familyAcceptDirect, familyDeclineDirect, familySubmitResponse, familyCreateDocumentRecord } from "../actions";
 import type { ReactNode } from "react";
 import { useLocale } from "@/lib/i18n/locale-context";
+import type { TranslationKey } from "@/lib/i18n/translations";
 import {
   IconPenLine,
   IconMail,
@@ -34,56 +35,61 @@ import {
   IconBan,
   IconFileText,
   IconCalendar,
+  IconClock,
   IconInfo,
 } from "@/components/ui/icons";
 
 /* ─── Status guide — what happens at each stage ─── */
-function getStatusExplanation(status: string): { title: string; explanation: string; icon: ReactNode } {
-  switch (status) {
-    case "draft":
-      return { title: "Draft", explanation: "Your application has been started but not yet submitted. Complete all required fields and documents, then submit before the enrollment window closes.", icon: <IconPenLine size={24} /> };
-    case "submitted":
-      return { title: "Under Review", explanation: "Your application has been received and is being reviewed by our enrollment team. We may contact you if we need any additional information.", icon: <IconMail size={24} /> };
-    case "needs_info":
-      return { title: "Information Needed", explanation: "We need additional information or documents to continue processing your application. Please check your email or upload the requested items.", icon: <IconAlertTriangle size={24} /> };
-    case "verified":
-      return { title: "Verified", explanation: "All information and documents have been verified. Your application will be included in the upcoming enrollment lottery.", icon: <IconCheckCircle size={24} /> };
-    case "lottery_assigned":
-      return { title: "In Lottery", explanation: "Your application has been entered into the enrollment lottery. Results will be shared once the lottery is run.", icon: <IconTicket size={24} /> };
-    case "offered":
-      return { title: "Seat Offered!", explanation: "Congratulations! A seat has been offered to your student. Please respond before the deadline below to secure your spot.", icon: <IconBell size={24} /> };
-    case "accepted":
-      return { title: "Offer Accepted", explanation: "You have accepted the enrollment offer. Complete the registration process to finalize your student's enrollment.", icon: <IconCheckCircle size={24} /> };
-    case "waitlisted":
-      return { title: "Waitlisted", explanation: "Your student is on the waitlist. We will notify you if a seat becomes available.", icon: <IconClipboardList size={24} /> };
-    case "registered":
-      return { title: "Registered", explanation: "Your student is fully enrolled and registered. Welcome to the rootedschools family!", icon: <IconGraduationCap size={24} /> };
-    case "withdrawn":
-      return { title: "Withdrawn", explanation: "This application has been withdrawn.", icon: <IconBan size={24} /> };
-    default:
-      return { title: status, explanation: "", icon: <IconFileText size={24} /> };
-  }
-}
-
-const docStatusConfig: Record<string, { label: string; variant: "success" | "warning" | "destructive" }> = {
-  pending: { label: "Pending Review", variant: "warning" },
-  verified: { label: "Verified", variant: "success" },
-  rejected: { label: "Needs Re-upload", variant: "destructive" },
+/**
+ * Icon + parent-language explanation for the status banner. Titles come from
+ * getFamilyStatusLabel; explanations from the bilingual statusExplain.* keys.
+ * Unknown/future statuses fall back to a neutral icon and no explanation
+ * rather than a wrong one.
+ */
+const STATUS_EXPLAIN_ICONS: Record<string, ReactNode> = {
+  draft: <IconPenLine size={24} />,
+  submitted: <IconMail size={24} />,
+  needs_info: <IconAlertTriangle size={24} />,
+  verified: <IconCheckCircle size={24} />,
+  lottery_assigned: <IconTicket size={24} />,
+  offered: <IconBell size={24} />,
+  accepted: <IconCheckCircle size={24} />,
+  waitlisted: <IconClipboardList size={24} />,
+  registered: <IconGraduationCap size={24} />,
+  placement_review: <IconCheckCircle size={24} />,
+  enrolled: <IconGraduationCap size={24} />,
+  declined: <IconBan size={24} />,
+  expired: <IconClock size={24} />,
+  withdrawn: <IconBan size={24} />,
 };
 
-function formatDate(dateStr: string | null) {
+function statusExplainKey(status: string): TranslationKey | null {
+  return status in STATUS_EXPLAIN_ICONS
+    ? (`statusExplain.${status}` as TranslationKey)
+    : null;
+}
+
+// Labels come from the existing docs.status.* / common.verified translation
+// keys (same wording used on /family/documents) rather than hardcoded
+// English strings, so this stays bilingual for parents.
+const docStatusConfig: Record<string, { labelKey: TranslationKey; variant: "success" | "warning" | "destructive" }> = {
+  pending: { labelKey: "docs.status.pending", variant: "warning" },
+  verified: { labelKey: "common.verified", variant: "success" },
+  rejected: { labelKey: "docs.status.rejected", variant: "destructive" },
+};
+
+function formatDate(dateStr: string | null, locale: "en" | "es" = "en") {
   if (!dateStr) return "—";
-  return new Date(dateStr + (dateStr.includes("T") ? "" : "T00:00:00")).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return new Date(dateStr + (dateStr.includes("T") ? "" : "T00:00:00")).toLocaleDateString(
+    locale === "es" ? "es-US" : "en-US",
+    { month: "short", day: "numeric", year: "numeric" }
+  );
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between py-2 border-b border-rooted-gray last:border-0">
-      <span className="text-sm text-stone">{label}</span>
+      <span className="text-sm text-stone-text">{label}</span>
       <span className="text-sm font-medium text-ink text-right">{value}</span>
     </div>
   );
@@ -97,9 +103,7 @@ interface FamilyApplicationDetailClientProps {
 
 export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetailClientProps) {
   const router = useRouter();
-  // Only used for the Phase 5A capture-hint string below — the rest of this
-  // component's copy predates the i18n system and is out of scope here.
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [showDeclineDialog, setShowDeclineDialog] = useState(false);
@@ -114,7 +118,13 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const statusCfg = getStatusConfig(detail.status);
-  const statusExplanation = getStatusExplanation(detail.status);
+  const statusLabel = getFamilyStatusLabel(detail.status, locale);
+  const explainKey = statusExplainKey(detail.status);
+  const statusExplanation = {
+    title: statusLabel,
+    explanation: explainKey ? t(explainKey) : "",
+    icon: STATUS_EXPLAIN_ICONS[detail.status] ?? <IconFileText size={24} />,
+  };
   const isDraft = detail.status === "draft";
   const isOffered = detail.status === "offered";
   const offerExpired = (() => {
@@ -254,9 +264,9 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-ink">{detail.student_name}</h1>
-            <Badge variant={statusCfg.variant}>{statusCfg.label}</Badge>
+            <Badge variant={statusCfg.variant}>{statusLabel}</Badge>
           </div>
-          <p className="text-sm text-stone mt-1">
+          <p className="text-sm text-stone-text mt-1">
             {getGradeLabel(detail.grade)} &middot; {detail.campus_name} &middot; {detail.enrollment_window_name}
           </p>
         </div>
@@ -431,9 +441,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                     {isExpired ? "Offer Expired" : "You Have a Seat Offer!"}
                   </p>
                   <p className="text-sm text-ink/60 mt-0.5">
-                    {isExpired
-                      ? "This offer has expired. Please contact the enrollment office if you have questions."
-                      : "A seat has been offered to your student. Accept below to secure your spot."}
+                    {isExpired ? t("offers.bannerExpired") : t("offers.bannerActive")}
                   </p>
                   {!isExpired && (
                     <div className={`inline-flex items-center gap-2 mt-2 px-3 py-1.5 rounded-full text-sm font-semibold ${
@@ -443,12 +451,12 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                     }`}>
                       <span aria-hidden="true">{isUrgent ? <IconAlertTriangle size={14} /> : <IconCalendar size={14} />}</span>
                       {daysLeft === 1
-                        ? "Expires tomorrow!"
+                        ? t("offers.expiresTomorrow")
                         : daysLeft === 0
-                          ? "Expires today!"
-                          : `${daysLeft} days to respond`}
+                          ? t("offers.expiresTodayBang")
+                          : `${daysLeft} ${t("offers.daysToRespond")}`}
                       <span className="text-xs font-normal opacity-70">
-                        (by {formatDate(detail.offer_expires_at)})
+                        ({t("apps.detail.respondBy")} {formatDate(detail.offer_expires_at, locale)})
                       </span>
                     </div>
                   )}
@@ -544,9 +552,9 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
             if (visibleDocs.length === 0) {
               return (
                 <div className="text-center py-6">
-                  <p className="text-sm text-stone">No documents uploaded yet.</p>
+                  <p className="text-sm text-stone-text">{t("apps.detail.noDocs")}</p>
                   <Link href="/family/documents" className="text-xs text-rooted-green hover:underline mt-1 inline-block">
-                    Go to Documents page to upload →
+                    {t("apps.detail.goToDocuments")}
                   </Link>
                 </div>
               );
@@ -567,8 +575,8 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                           <p className="text-sm font-medium text-ink truncate">
                             {doc.file_name}
                           </p>
-                          <p className="text-xs text-stone">
-                            Uploaded {formatDate(doc.created_at)}
+                          <p className="text-xs text-stone-text">
+                            {t("apps.detail.uploaded")} {formatDate(doc.created_at, locale)}
                           </p>
                           {doc.status === "rejected" && doc.rejection_reason && (
                             <p className="text-xs text-red-600 mt-0.5 font-medium flex items-start gap-1">
@@ -579,10 +587,10 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <Badge variant={dcfg.variant}>{dcfg.label}</Badge>
+                        <Badge variant={dcfg.variant}>{t(dcfg.labelKey)}</Badge>
                         {doc.status === "rejected" && (
                           <Link href="/family/documents">
-                            <Button size="sm">Re-upload</Button>
+                            <Button size="sm">{t("docs.reupload")}</Button>
                           </Link>
                         )}
                         <Button
@@ -606,15 +614,15 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
       {/* Timeline */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Application Timeline</CardTitle>
+          <CardTitle className="text-base">{t("apps.detail.timelineTitle")}</CardTitle>
           <CardDescription>
-            Track the progress of this application.
+            {t("apps.detail.timelineDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {detail.timeline.length === 0 ? (
-            <p className="text-center text-stone py-6 text-sm">
-              No activity recorded yet.
+            <p className="text-center text-stone-text py-6 text-sm max-w-sm mx-auto">
+              {t("apps.detail.noActivity")}
             </p>
           ) : (
             <div className="relative">
@@ -622,6 +630,8 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
               <div className="space-y-5">
                 {detail.timeline.map((entry, idx) => {
                   const toCfg = getStatusConfig(entry.to_status);
+                  const toLabel = getFamilyStatusLabel(entry.to_status, locale);
+                  const fromLabel = entry.from_status ? getFamilyStatusLabel(entry.from_status, locale) : null;
                   return (
                     <div key={entry.id} className="relative flex gap-4 pl-0">
                       <div
@@ -637,25 +647,25 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                       </div>
                       <div className="flex-1 -mt-0.5">
                         <div className="flex items-center gap-2">
-                          {entry.from_status && (
+                          {fromLabel && (
                             <>
                               <Badge variant="secondary" className="text-xs">
-                                {getStatusConfig(entry.from_status).label}
+                                {fromLabel}
                               </Badge>
                               <span className="text-stone text-xs">→</span>
                             </>
                           )}
                           <Badge variant={toCfg.variant} className="text-xs">
-                            {toCfg.label}
+                            {toLabel}
                           </Badge>
                         </div>
                         {entry.reason && (
-                          <p className="text-sm text-stone mt-0.5">
+                          <p className="text-sm text-stone-text mt-0.5">
                             {entry.reason}
                           </p>
                         )}
-                        <p className="text-xs text-stone mt-1">
-                          {formatDate(entry.created_at)}
+                        <p className="text-xs text-stone-text mt-1">
+                          {formatDate(entry.created_at, locale)}
                         </p>
                       </div>
                     </div>
@@ -668,10 +678,12 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
       </Card>
 
       {/* Dates footer */}
-      <div className="flex gap-6 text-xs text-stone pb-4">
-        {detail.submitted_at && <span>Submitted: {formatDate(detail.submitted_at)}</span>}
-        <span>Last Updated: {formatDate(detail.updated_at)}</span>
-        <span>Application ID: {detail.id}</span>
+      <div className="flex gap-6 text-xs text-stone-text pb-4">
+        {detail.submitted_at && (
+          <span>{t("apps.detail.submittedOn")} {formatDate(detail.submitted_at, locale)}</span>
+        )}
+        <span>{t("apps.detail.lastUpdated")} {formatDate(detail.updated_at, locale)}</span>
+        <span>{t("apps.detail.applicationId")} {detail.id}</span>
       </div>
 
       {/* Decline Offer Dialog */}

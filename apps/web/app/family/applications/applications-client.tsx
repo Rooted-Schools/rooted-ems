@@ -6,45 +6,32 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconFileText } from "@/components/ui/icons";
 import Link from "next/link";
-import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
+import { getStatusConfig, getFamilyStatusLabel, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationRow } from "@/lib/queries";
 import { useLocale } from "@/lib/i18n/locale-context";
+import type { TranslationKey } from "@/lib/i18n/translations";
 
-function getStatusMessage(status: string): string {
-  switch (status) {
-    case "draft":
-      return "Application started but not yet submitted.";
-    case "submitted":
-      return "Application received and under review.";
-    case "needs_info":
-      return "Additional information or documents are required.";
-    case "verified":
-      return "All information verified. Awaiting lottery.";
-    case "lottery_assigned":
-      return "Entered into the enrollment lottery.";
-    case "offered":
-      return "Congratulations! A seat has been offered.";
-    case "accepted":
-      return "Offer accepted. Complete registration to finalize enrollment.";
-    case "waitlisted":
-      return "On the waitlist. You will be notified if a seat becomes available.";
-    case "registered":
-      return "Fully registered and enrolled.";
-    case "declined":
-      return "This application has been declined.";
-    case "expired":
-      return "The offer for this application has expired.";
-    case "withdrawn":
-      return "This application has been withdrawn.";
-    default:
-      return "";
-  }
+/**
+ * Statuses with a parent-language one-liner in translations.ts
+ * (statusMsg.*). Unknown/future statuses render no message rather than a
+ * wrong one.
+ */
+const STATUS_MSG_KEYS = [
+  "draft", "submitted", "needs_info", "verified", "lottery_assigned",
+  "offered", "accepted", "waitlisted", "registered", "placement_review",
+  "enrolled", "declined", "expired", "withdrawn",
+] as const;
+
+function statusMessageKey(status: string): TranslationKey | null {
+  return (STATUS_MSG_KEYS as readonly string[]).includes(status)
+    ? (`statusMsg.${status}` as TranslationKey)
+    : null;
 }
 
-function formatDate(dateStr: string | null) {
+function formatDate(dateStr: string | null, locale: "en" | "es" = "en") {
   if (!dateStr) return null;
   const d = dateStr.includes("T") ? new Date(dateStr) : new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", {
+  return d.toLocaleDateString(locale === "es" ? "es-US" : "en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -56,7 +43,7 @@ interface FamilyApplicationsClientProps {
 }
 
 export function FamilyApplicationsClient({ applications }: FamilyApplicationsClientProps) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const hasApplications = applications.length > 0;
 
   return (
@@ -64,12 +51,14 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-ink">{t("apps.heading")}</h1>
-          <p className="text-sm text-stone mt-1">
-            Track the status of your children&apos;s enrollment applications.
+          <p className="text-sm text-stone-text mt-1">
+            {t("apps.subheading")}
           </p>
         </div>
+        {/* Outline, not solid — this competes with a draft's "Continue" button
+            or the empty-state's own primary CTA. One solid action per screen. */}
         <Link href="/family/applications/new">
-          <Button>{t("dashboard.startNewApplication")}</Button>
+          <Button variant="outline">{t("dashboard.startNewApplication")}</Button>
         </Link>
       </div>
 
@@ -77,7 +66,7 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
         <EmptyState
           icon={<IconFileText size={40} />}
           title={t("apps.noApplications")}
-          description="Start a new application to enroll your child at a rootedschool campus."
+          description={t("apps.noApplicationsDetail")}
         >
           <Link href="/family/applications/new">
             <Button>{t("apps.startApplication")}</Button>
@@ -87,7 +76,9 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
         <div className="space-y-4">
           {applications.map((app) => {
             const cfg = getStatusConfig(app.status);
-            const statusMessage = getStatusMessage(app.status);
+            const statusLabel = getFamilyStatusLabel(app.status, locale);
+            const statusMsgKey = statusMessageKey(app.status);
+            const statusMessage = statusMsgKey ? t(statusMsgKey) : "";
             const isDraft = app.status === "draft";
             const needsAction =
               app.status === "needs_info" ||
@@ -113,11 +104,11 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
                       <CardTitle className="text-base">
                         {app.student_name}
                       </CardTitle>
-                      <p className="text-sm text-stone">
+                      <p className="text-sm text-stone-text">
                         {getGradeLabel(app.grade)} &middot; {app.campus_name}
                       </p>
                     </div>
-                    <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                    <Badge variant={cfg.variant}>{statusLabel}</Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -132,20 +123,20 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
                       </p>
                       <p className="text-sm text-ink/70">
                         {isDraft
-                          ? "Complete and submit your application before the enrollment window closes."
+                          ? t("apps.action.draft")
                           : app.status === "needs_info"
-                            ? "Additional information or documents have been requested."
-                            : "Please respond to the enrollment offer before the deadline."}
+                            ? t("apps.action.needs_info")
+                            : t("apps.action.offered")}
                       </p>
                     </div>
                   )}
 
                   <div className="flex items-center justify-between pt-2 border-t border-rooted-gray">
-                    <div className="flex gap-4 text-xs text-stone">
+                    <div className="flex gap-4 text-xs text-stone-text">
                       {app.submitted_at && (
-                        <span>{t("apps.submitted")}: {formatDate(app.submitted_at)}</span>
+                        <span>{t("apps.submitted")}: {formatDate(app.submitted_at, locale)}</span>
                       )}
-                      <span>{t("apps.lastUpdated")}: {formatDate(app.updated_at)}</span>
+                      <span>{t("apps.lastUpdated")}: {formatDate(app.updated_at, locale)}</span>
                     </div>
                     <div className="flex gap-2">
                       {isDraft ? (

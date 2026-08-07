@@ -154,11 +154,23 @@ const ROLE_LEVEL: Record<string, number> = {
 };
 
 /**
+ * Returned by getHighestRole when the user holds no role this app knows how to
+ * rank — either no campus role rows at all, or only roles added to the
+ * staff_role enum without a level here. Level 0: below every gate.
+ *
+ * The rank must be opt-in. A role the app has never heard of (a future
+ * recruiter tier, say) must not inherit the compliance_auditor floor just by
+ * existing; adding it to ROLE_LEVEL is the deliberate act that grants access.
+ */
+export const NO_ROLE = "none";
+
+/**
  * Compute the user's highest role across all assigned campuses.
+ * Returns NO_ROLE when nothing rankable is assigned.
  */
 export function getHighestRole(session: AuthSession): string {
-  let best = "compliance_auditor";
-  let bestLevel = 1;
+  let best = NO_ROLE;
+  let bestLevel = 0;
   for (const roles of Object.values(session.campus_roles)) {
     for (const r of roles) {
       const lvl = ROLE_LEVEL[r as string] ?? 0;

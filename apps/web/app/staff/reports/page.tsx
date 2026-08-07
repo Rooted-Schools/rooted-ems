@@ -3,7 +3,10 @@ export const dynamic = "force-dynamic";
 
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { ReportsClient } from "./reports-client";
-import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { requireStaffSession, hasMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { SectionTabs } from "@/components/layout/section-tabs";
+import { INSIGHTS_TABS } from "@/lib/section-tabs";
+import { getReenrollmentStats } from "@/lib/queries/reenrollment";
 
 export interface ReportData {
   pipeline: { status: string; count: number }[];
@@ -31,6 +34,16 @@ export interface ReportData {
     created_at: string;
     details: string;
   }[];
+  reenrollment: {
+    schoolYearName: string | null;
+    nextSchoolYearName: string | null;
+    eligible: number;
+    respondedYes: number;
+    respondedDeciding: number;
+    respondedNo: number;
+    noResponse: number;
+    available: boolean;
+  };
 }
 
 export default async function StaffReportsPage({
@@ -85,6 +98,7 @@ export default async function StaffReportsPage({
     { data: capacityPlans },
     { data: enrollmentRows },
     { data: auditRows },
+    reenrollmentStats,
   ] = await Promise.all([
     appQuery,
     capacityQuery,
@@ -98,6 +112,7 @@ export default async function StaffReportsPage({
       if (hasCampusFilter) q = q.in("campus_id", scopedCampusIds);
       return q;
     })(),
+    getReenrollmentStats(hasCampusFilter ? scopedCampusIds : undefined),
   ]);
 
   // Pipeline counts
@@ -188,7 +203,21 @@ export default async function StaffReportsPage({
     capacity,
     enrollments,
     auditEvents,
+    reenrollment: reenrollmentStats,
   };
 
-  return <ReportsClient data={reportData} />;
+  const insightsTabs = hasMinRole(session, "enrollment_manager")
+    ? INSIGHTS_TABS
+    : INSIGHTS_TABS.filter((t) => t.href === "/staff/reports");
+
+  return (
+    <div className="space-y-6">
+      <SectionTabs
+        tabs={insightsTabs}
+        activeHref="/staff/reports"
+        campusParam={searchParams?.campus}
+      />
+      <ReportsClient data={reportData} />
+    </div>
+  );
 }

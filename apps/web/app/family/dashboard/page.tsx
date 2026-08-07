@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createServerClient } from "@rooted-ems/database/server";
 import { redirect } from "next/navigation";
 import { getFamilyJourneyCards, getRegistrationSummary, type FamilyJourneyCard, type RegistrationSummary } from "@/lib/queries";
-import { getStatusConfig } from "@/lib/application-helpers";
+import { getFamilyStatusLabel } from "@/lib/application-helpers";
 import { getLocale } from "@/lib/i18n/get-locale";
 import { tx } from "@/lib/i18n/translations";
 
@@ -218,7 +218,7 @@ export default async function FamilyDashboardPage() {
         <Card>
           <CardContent className="py-10 text-center space-y-3">
             <p className="text-ink font-medium">{t("dashboard.noApplications")}</p>
-            <p className="text-sm text-stone">{t("dashboard.startFirstApp")}</p>
+            <p className="text-sm text-stone-text">{t("dashboard.startFirstApp")}</p>
             <Link href="/family/applications/new" className="inline-block pt-2">
               <Button>{t("dashboard.startNewApplication")}</Button>
             </Link>
@@ -276,7 +276,7 @@ export default async function FamilyDashboardPage() {
       <div className="flex justify-end -mb-4">
         <Link
           href="/family/applications/new"
-          className="text-xs font-medium text-stone hover:text-rooted-green transition-colors"
+          className="text-xs font-medium text-stone-text hover:text-rooted-green transition-colors"
         >
           + {t("dashboard.startNewApplication")}
         </Link>
@@ -284,7 +284,7 @@ export default async function FamilyDashboardPage() {
 
       {/* ─── Eyebrow + task headline ─── */}
       <div>
-        <p className="font-display text-[11px] uppercase tracking-[0.12em] text-stone font-semibold">
+        <p className="font-display text-[11px] uppercase tracking-[0.12em] text-stone-text font-semibold">
           {eyebrow}
         </p>
         <h1 className="font-display text-[27px] md:text-[34px] font-extrabold uppercase tracking-wide text-ink leading-tight mt-1">
@@ -315,7 +315,7 @@ export default async function FamilyDashboardPage() {
                 {regSummary.outstanding.map((item) => (
                   <li key={item.name} className="border border-line rounded-lg px-3 py-2.5">
                     <p className="text-sm font-medium text-ink">{item.name}</p>
-                    {item.hint && <p className="text-xs text-stone mt-0.5">{item.hint}</p>}
+                    {item.hint && <p className="text-xs text-stone-text mt-0.5">{item.hint}</p>}
                   </li>
                 ))}
               </ul>
@@ -334,7 +334,7 @@ export default async function FamilyDashboardPage() {
           )}
 
           {isPrimaryAsk && (
-            <p className="text-xs text-stone text-center">{t("dashboard.takesTwoMinutes")}</p>
+            <p className="text-xs text-stone-text text-center">{t("dashboard.takesTwoMinutes")}</p>
           )}
 
           {primaryCard.registration_complete && (
@@ -362,7 +362,7 @@ export default async function FamilyDashboardPage() {
               size="md"
               ariaLabel={journeyAria}
             />
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-text">
               {primaryCard.submitted_at && (
                 <span>{t("dashboard.appliedOn").replace("{date}", shortDate(primaryCard.submitted_at))}</span>
               )}
@@ -370,6 +370,14 @@ export default async function FamilyDashboardPage() {
                 <span>{t("dashboard.updatedOn").replace("{date}", shortDate(primaryCard.updated_at))}</span>
               )}
             </div>
+            {journeyIndex === 0 && primaryCard.status !== "draft" && (
+              <Link
+                href="/how-the-lottery-works"
+                className="text-xs text-rooted-green hover:underline inline-block"
+              >
+                {t("lottery.inlineLink")}
+              </Link>
+            )}
           </div>
         ) : primaryCard.status === "waitlisted" ? (
           <div className="space-y-1">
@@ -409,10 +417,7 @@ export default async function FamilyDashboardPage() {
       {others.length > 0 && (
         <div className="space-y-0.5">
           {others.map((card) => {
-            const cfg = getStatusConfig(card.status);
-            const statusKey = `status.${card.status}` as Parameters<typeof tx>[0];
-            const localizedStatus = tx(statusKey, locale);
-            const statusLabel = localizedStatus === statusKey ? cfg.label : localizedStatus;
+            const statusLabel = getFamilyStatusLabel(card.status, locale);
 
             return (
               <div
@@ -454,7 +459,7 @@ export default async function FamilyDashboardPage() {
         <ol className="mt-3 space-y-2.5 text-sm text-ink/70">
           {[1, 2, 3, 4, 5].map((step) => (
             <li key={step} className="flex gap-2.5">
-              <span className="text-stone font-semibold shrink-0">{step}.</span>
+              <span className="text-stone-text font-semibold shrink-0">{step}.</span>
               <span>
                 <span className="text-ink font-medium">
                   {t(`dashboard.step${step}Title` as Parameters<typeof tx>[0])}
@@ -468,7 +473,7 @@ export default async function FamilyDashboardPage() {
       </details>
 
       {/* ─── Help line ─── */}
-      <p className="text-sm text-stone">
+      <p className="text-sm text-stone-text">
         {helpBefore}
         <Link href="/family/messages" className="text-rooted-green hover:underline">
           {helpLinkText}

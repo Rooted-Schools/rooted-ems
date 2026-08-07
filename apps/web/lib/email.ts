@@ -34,6 +34,15 @@ export interface SendEmailResult {
 }
 
 /**
+ * Whether Resend is configured in this environment. Mirrors isSmsConfigured()
+ * in lib/sms.ts so staff-facing surfaces can report the real delivery state of
+ * both channels instead of assuming either one is live.
+ */
+export function isEmailConfigured(): boolean {
+  return Boolean(process.env.RESEND_API_KEY);
+}
+
+/**
  * Send a single email. Resolves `{ ok: false, error }` on any failure —
  * never throws, never rejects.
  */

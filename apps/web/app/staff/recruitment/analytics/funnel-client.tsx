@@ -8,13 +8,31 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { RecruitmentFunnel } from "@/lib/queries";
+import type { GradeFunnelTable, SpeedToContactRow } from "@/lib/queries/recruitment-intel";
 import { SOURCE_LABELS, PATHWAY_LABELS } from "../recruitment-client";
 import { staffRecordSpend } from "./actions";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface FunnelDashboardProps {
   funnel: RecruitmentFunnel;
+  speedToContact: SpeedToContactRow[];
+  speedToContactTruncated: boolean;
+  gradeFunnel: GradeFunnelTable;
   campuses: { id: string; name: string }[];
   activeCampusId: string;
+}
+
+/** "3h" under a day, "2d" at/past a day — matches the queue-card format. */
+function formatHours(hours: number): string {
+  if (hours < 24) return `${Math.round(hours)}h`;
+  return `${Math.round(hours / 24)}d`;
 }
 
 function toCsv(headers: string[], rows: (string | number)[][]): string {
@@ -44,7 +62,7 @@ function Bar({ pct, color = "bg-rooted-green" }: { pct: number; color?: string }
   );
 }
 
-export function FunnelDashboardClient({ funnel, campuses, activeCampusId }: FunnelDashboardProps) {
+export function FunnelDashboardClient({ funnel, speedToContact, speedToContactTruncated, gradeFunnel, campuses, activeCampusId }: FunnelDashboardProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [spendOpen, setSpendOpen] = useState(false);
@@ -323,6 +341,111 @@ export function FunnelDashboardClient({ funnel, campuses, activeCampusId }: Funn
             </p>
           </CardContent>
         )}
+      </Card>
+
+      {/* Speed to first contact, per campus — call/sms/email, not notes */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Speed to first contact</CardTitle>
+          <CardDescription>
+            Median hours from inquiry to the first logged call, text, or email — by campus, so a slow campus
+            can&apos;t hide behind a fast one.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {speedToContact.length === 0 ? (
+            <p className="text-sm text-stone text-center py-4">No leads yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {speedToContact.map((row) => (
+                <div key={row.campus_id} className="flex flex-col gap-1 rounded-[6px] border border-line px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="text-sm font-medium text-ink">{row.campus_name}</span>
+                  {row.contacted_sample === 0 ? (
+                    <span className="text-xs text-stone">
+                      No contact activity logged yet.
+                      {row.never_contacted > 0 && ` (${row.never_contacted} lead${row.never_contacted === 1 ? "" : "s"} waiting.)`}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-ink/70">
+                      Median <span className="font-semibold text-ink">{formatHours(row.median_hours_to_first_contact as number)}</span>
+                      {" "}({row.contacted_sample} contacted)
+                      {row.never_contacted > 0 && (
+                        <span className="text-warn-text"> · {row.never_contacted} lead{row.never_contacted === 1 ? "" : "s"} never contacted</span>
+                      )}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {speedToContactTruncated && (
+            <p className="text-xs text-warn-text mt-2">
+              Showing first 20,000 rows; figures may be incomplete.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Funnel arithmetic per grade — seats, leads, applications, current school year */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Seats per grade</CardTitle>
+          <CardDescription>
+            {gradeFunnel.school_year_name
+              ? `Total seats, leads held, and applications submitted — ${gradeFunnel.school_year_name}.`
+              : "No current school year is configured, so seat targets can't be computed."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {gradeFunnel.rows.length === 0 ? (
+            <p className="text-sm text-stone text-center py-4">
+              {gradeFunnel.school_year_name
+                ? "No seats, leads, or applications recorded for this school year yet."
+                : "Set a current school year to see per-grade seat arithmetic."}
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Campus</TableHead>
+                    <TableHead>Grade</TableHead>
+                    <TableHead className="text-right">Seats</TableHead>
+                    <TableHead className="text-right">Leads held</TableHead>
+                    <TableHead className="text-right">Applications</TableHead>
+                    <TableHead className="text-right">Applicants needed</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {gradeFunnel.rows.map((row) => (
+                    <TableRow key={`${row.campus_id}-${row.grade}`}>
+                      <TableCell className="text-sm">{row.campus_name}</TableCell>
+                      <TableCell className="text-sm">{row.grade_label}</TableCell>
+                      <TableCell className="text-right text-sm tabular-nums">
+                        {row.total_seats ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-right text-sm tabular-nums">{row.leads_held}</TableCell>
+                      <TableCell className="text-right text-sm tabular-nums">{row.applications_submitted}</TableCell>
+                      <TableCell className="text-right text-sm tabular-nums">
+                        {row.applicants_needed ?? "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {gradeFunnel.has_missing_applicants_needed && (
+                <p className="text-xs text-stone mt-2">
+                  Applicants-needed guidance appears after the first completed enrollment cycle.
+                </p>
+              )}
+              {gradeFunnel.truncated && (
+                <p className="text-xs text-warn-text mt-2">
+                  Showing first 20,000 rows; figures may be incomplete.
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
       </Card>
 
       {/* Ad-spend entry (LG-2 cost tracking) */}

@@ -206,3 +206,96 @@ export async function familyDeclineReenrollment(
 
   return { data: null, error: null };
 }
+
+// ─── Intent-to-Return Pulse ────────────────────────────────────────────────
+
+const VALID_INTENTS = new Set(["yes", "undecided", "no"]);
+
+/**
+ * Family's one-tap answer to the spring intent-to-return pulse (see
+ * lib/queries/reenrollment.ts). This is intentionally lighter-weight than
+ * accept/decline above — it sets reenrollment_intent on the CURRENT active
+ * enrollment, ahead of any formal seat offer, and can be changed anytime
+ * before staff send one.
+ */
+export async function familySetReenrollmentIntent(
+  enrollmentId: string,
+  intent: "yes" | "undecided" | "no"
+): Promise<{ data: null; error: string | null }> {
+  if (!VALID_INTENTS.has(intent)) {
+    return { data: null, error: "Invalid response." };
+  }
+
+  const session = await requireSession();
+  const supabase = createServiceRoleClient();
+
+  // Verify ownership: enrollment -> application -> guardian must belong to this user
+  const { data: enrollment, error: enrollErr } = await supabase
+    .from("enrollment")
+    .select(
+      `
+      id,
+      status,
+      application:application_id (
+        guardian:guardian_id (user_id, household:household_id (user_id))
+      )
+    `
+    )
+    .eq("id", enrollmentId)
+    .single();
+
+  if (enrollErr || !enrollment) {
+    return { data: null, error: "Enrollment not found." };
+  }
+
+  const row = enrollment as unknown as {
+    id: string;
+    status: string;
+    application: {
+      guardian: {
+        user_id: string | null;
+        household: { user_id: string | null } | null;
+      } | null;
+    } | null;
+  };
+
+  const guardianUserId = row.application?.guardian?.user_id ?? null;
+  const householdUserId = row.application?.guardian?.household?.user_id ?? null;
+
+  if (guardianUserId !== session.user_id && householdUserId !== session.user_id) {
+    return { data: null, error: "Unauthorized." };
+  }
+
+  if (row.status !== "active") {
+    return { data: null, error: "This enrollment is no longer active." };
+  }
+
+  const { error: updateErr } = await supabase
+    .from("enrollment")
+    .update({
+      reenrollment_intent: intent,
+      reenrollment_intent_at: new Date().toISOString(),
+    })
+    .eq("id", enrollmentId);
+
+  if (updateErr) {
+    // reenrollment_intent ships in migration 00038, applied by hand. Until it
+    // lands, this update fails with 42703. Never hand a family a raw Postgres
+    // string: it is internal detail, English-only, and tells them nothing they
+    // can act on. Bilingual "EN / ES" slash form, matching the server-side
+    // convention in app/(public)/inquire/actions.ts where there is no locale
+    // context to switch on.
+    console.error("[familySetReenrollmentIntent]", updateErr.message, { enrollmentId });
+    return {
+      data: null,
+      error:
+        "We could not save your answer right now. Please try again, or contact your school's enrollment office. / No pudimos guardar su respuesta en este momento. Intente de nuevo o comuníquese con la oficina de inscripciones de su escuela.",
+    };
+  }
+
+  revalidatePath("/family/reenrollment");
+  revalidatePath("/staff/enrollment");
+  revalidatePath("/staff/reports");
+
+  return { data: null, error: null };
+}

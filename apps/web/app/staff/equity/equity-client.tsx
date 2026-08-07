@@ -16,15 +16,132 @@ import type {
   DemographicBreakdowns,
   CampusRow,
 } from "@/lib/queries";
+import type {
+  ConversionCell,
+  ConversionCut,
+  ConversionGroupRow,
+  EquityFunnelConversion,
+} from "@/lib/queries/equity-funnel";
+import { displayClass } from "@/lib/utils";
 
 interface EquityClientProps {
   data: DemographicBreakdowns;
+  conversion: EquityFunnelConversion;
   campuses: CampusRow[];
   initialCampus: string;
 }
 
+/**
+ * One conversion cell. Never prints a bare percentage: the denominator is
+ * always attached, and a group under the suppression threshold prints the
+ * suppression notice instead of a rate.
+ */
+function RateCell({ cell, threshold }: { cell: ConversionCell; threshold: number }) {
+  if (cell.denominator === 0) {
+    return <span className="text-stone">no applications</span>;
+  }
+  if (cell.suppressed) {
+    return <span className="text-stone">n &lt; {threshold} — suppressed</span>;
+  }
+  return (
+    <span className="inline-flex items-baseline gap-2">
+      <span
+        className={
+          cell.gap_flagged ? "font-semibold text-warn-text" : "font-medium text-ink"
+        }
+      >
+        {cell.rate_pct}%
+      </span>
+      <span className="text-xs text-stone">of {cell.denominator}</span>
+    </span>
+  );
+}
+
+function GapTag() {
+  return (
+    <span
+      className={`${displayClass} ml-2 rounded-[6px] border border-warn/50 bg-warn/10 px-1.5 py-0.5 text-[10px] text-warn-text`}
+    >
+      gap vs campus overall
+    </span>
+  );
+}
+
+function ConversionRow({
+  row,
+  threshold,
+  isBaseline = false,
+}: {
+  row: ConversionGroupRow;
+  threshold: number;
+  isBaseline?: boolean;
+}) {
+  const flagged =
+    row.application_to_offer.gap_flagged || row.offer_to_registration.gap_flagged;
+  return (
+    <TableRow className={flagged ? "bg-warn/5 border-l-2 border-l-warn" : ""}>
+      <TableCell className={isBaseline ? "font-semibold text-ink" : "font-medium text-ink"}>
+        {row.label}
+      </TableCell>
+      <TableCell className="text-right">
+        <RateCell cell={row.application_to_offer} threshold={threshold} />
+        {row.application_to_offer.gap_flagged && <GapTag />}
+      </TableCell>
+      <TableCell className="text-right">
+        <RateCell cell={row.offer_to_registration} threshold={threshold} />
+        {row.offer_to_registration.gap_flagged && <GapTag />}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function ConversionCutTable({
+  cut,
+  overall,
+  threshold,
+}: {
+  cut: ConversionCut;
+  overall: ConversionGroupRow;
+  threshold: number;
+}) {
+  return (
+    <div className="border-t border-line pt-4 first:border-t-0 first:pt-0">
+      <div className="px-6">
+        <h3 className={`${displayClass} text-xs text-ink`}>{cut.title}</h3>
+        <p className="text-xs text-stone mt-1">
+          Read from <span className="font-mono">{cut.source_note}</span>
+        </p>
+      </div>
+      {cut.unavailable_reason ? (
+        <p className="text-sm text-stone px-6 py-6">{cut.unavailable_reason}</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-sunken hover:bg-sunken">
+              <TableHead>Group</TableHead>
+              <TableHead className="text-right">Application to offer</TableHead>
+              <TableHead className="text-right">Offer to registration</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <ConversionRow row={overall} threshold={threshold} isBaseline />
+            {cut.rows.map((row) => (
+              <ConversionRow
+                key={`${cut.key}-${row.label}`}
+                row={row}
+                threshold={threshold}
+              />
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+}
+
 export function EquityClient({
   data,
+  conversion,
   campuses,
   initialCampus,
 }: EquityClientProps) {
@@ -133,6 +250,61 @@ export function EquityClient({
           </CardContent>
         </Card>
       </div>
+
+      {/* Conversion by Group — where the funnel converts differently */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Conversion by Group</CardTitle>
+          <p className="text-xs text-stone mt-1">
+            Where conversion differs across groups, not just who applies. Two stage
+            pairs, scoped to{" "}
+            {conversion.school_year_name
+              ? `the ${conversion.school_year_name} school year`
+              : "the current school year"}{" "}
+            and the campus selection above.
+          </p>
+        </CardHeader>
+        <CardContent className="px-0 pb-0">
+          {conversion.empty_reason ? (
+            <p className="text-sm text-stone px-6 py-8">{conversion.empty_reason}</p>
+          ) : (
+            <div className="space-y-4">
+              {conversion.cuts.map((cut) => (
+                <ConversionCutTable
+                  key={cut.key}
+                  cut={cut}
+                  overall={conversion.overall}
+                  threshold={conversion.suppression_threshold}
+                />
+              ))}
+              <div className="border-t border-line px-6 py-4 space-y-1">
+                <p className="text-xs text-stone">
+                  Basis: {conversion.total_applications} non-draft applications.
+                  Application to offer is the share of non-draft applications that
+                  reached offered or a later status. Offer to registration is the
+                  share of those that reached registered, placement review, or
+                  enrolled. Stage attainment is read from the application status
+                  history, so an application that was offered and later withdrew
+                  still counts in the offer denominator.
+                </p>
+                <p className="text-xs text-stone">
+                  Any group with fewer than {conversion.suppression_threshold}{" "}
+                  applications in the denominator shows &quot;n &lt;{" "}
+                  {conversion.suppression_threshold} — suppressed&quot; instead of a
+                  rate. Small cells are a privacy risk and are not statistically
+                  meaningful.
+                </p>
+                <p className="text-xs text-stone">
+                  A group is tagged &quot;gap vs campus overall&quot; when its rate is
+                  more than {conversion.gap_flag_points} percentage points below the
+                  campus overall and neither figure is suppressed. The tag describes a
+                  difference in rates. It does not establish a cause.
+                </p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Equity Funnel Table */}
       <Card>

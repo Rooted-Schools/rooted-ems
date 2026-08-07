@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth/get-session";
 import { createServerClient } from "@rooted-ems/database/server";
 import { getRecruitmentFunnel } from "@/lib/queries";
+import { getGradeFunnelTable, getSpeedToFirstContactByCampus } from "@/lib/queries/recruitment-intel";
 import { FunnelDashboardClient } from "./funnel-client";
 
 export default async function RecruitmentAnalyticsPage({
@@ -24,10 +25,14 @@ export default async function RecruitmentAnalyticsPage({
 
   const accessibleIds = getAccessibleCampusIds(session);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  // undefined = CMO-level admin with no explicit scoping (all campuses).
+  const scopedCampusIds = accessibleIds.length > 0 ? accessibleIds : undefined;
 
   const supabase = await createServerClient();
-  const [funnel, { data: campusRows }] = await Promise.all([
+  const [funnel, speedToContactResult, gradeFunnel, { data: campusRows }] = await Promise.all([
     getRecruitmentFunnel(activeCampus),
+    getSpeedToFirstContactByCampus(scopedCampusIds),
+    getGradeFunnelTable(scopedCampusIds),
     supabase.from("campus").select("id, name").order("name"),
   ]);
 
@@ -40,6 +45,9 @@ export default async function RecruitmentAnalyticsPage({
   return (
     <FunnelDashboardClient
       funnel={funnel}
+      speedToContact={speedToContactResult.rows}
+      speedToContactTruncated={speedToContactResult.truncated}
+      gradeFunnel={gradeFunnel}
       campuses={campuses}
       activeCampusId={activeCampus ?? "all"}
     />

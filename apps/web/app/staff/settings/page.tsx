@@ -5,6 +5,9 @@ import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { getStaffEnrollmentWindows, getStaffUsers, getCampuses, getStaffPacketRequirements } from "@/lib/queries";
 import { SettingsClient } from "./settings-client";
 import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { isSmsConfigured } from "@/lib/sms";
+import { isEmailConfigured } from "@/lib/email";
+import { ChannelStatus } from "./_components/channel-status";
 
 export default async function StaffSettingsPage({
   searchParams,
@@ -32,7 +35,12 @@ export default async function StaffSettingsPage({
     : allCampuses;
 
   return (
-    <SettingsClient
+    <div className="space-y-6">
+      <ChannelStatus
+        emailConfigured={isEmailConfigured()}
+        smsConfigured={isSmsConfigured()}
+      />
+      <SettingsClient
       campuses={campuses}
       windows={windows}
       users={users}
@@ -52,8 +60,9 @@ export default async function StaffSettingsPage({
       systemSettings={Object.fromEntries(
         (settings ?? []).map((s: Record<string, string>) => [s.key, s.value])
       )}
-      staffUserId={session.user_id}
-      activeCampusId={activeCampus ?? undefined}
-    />
+        staffUserId={session.user_id}
+        activeCampusId={activeCampus ?? undefined}
+      />
+    </div>
   );
 }

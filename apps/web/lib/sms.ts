@@ -14,9 +14,38 @@
  * gate lives in lib/notify.ts where guardian records are resolved.
  */
 
+// No Node built-ins in this module, on purpose. `isSmsConfigured()` below is
+// called from app/staff/settings/page.tsx, which runs on the edge runtime —
+// a top-level `crypto` import here fails that page's build. Twilio signature
+// verification therefore lives in lib/twilio-signature.ts, imported only by
+// the Node-runtime webhook route.
+
 const SEND_TIMEOUT_MS = 10_000;
 
 let warnedNotConfigured = false;
+
+/**
+ * The single sentinel every caller checks to tell "no provider configured"
+ * apart from a real send failure. Exported so nobody has to string-match a
+ * literal that could drift.
+ */
+export const SMS_NOT_CONFIGURED = "sms not configured";
+
+/**
+ * Whether Twilio credentials are present in this environment. The three vars
+ * are all-or-nothing: a partial set is treated as not configured, because a
+ * half-configured provider fails at send time instead of at boot.
+ *
+ * Callers use this to tell staff the truth ("SMS is not connected") rather
+ * than reporting a text that never left the process.
+ */
+export function isSmsConfigured(): boolean {
+  return Boolean(
+    process.env.TWILIO_ACCOUNT_SID &&
+      process.env.TWILIO_AUTH_TOKEN &&
+      process.env.TWILIO_FROM_NUMBER
+  );
+}
 
 export interface SendSmsInput {
   /** E.164 or US 10-digit; normalized best-effort before sending. */
@@ -47,6 +76,26 @@ export function normalizePhone(raw: string): string | null {
 }
 
 /**
+ * The last 10 digits of a phone number, or null when there aren't 10.
+ *
+ * Inbound Twilio numbers always arrive in E.164 ("+15555550100"), but the
+ * same number may be stored on a guardian or lead row in whatever format the
+ * family typed it: "(555) 555-0100", "555-555-0100", "1 555 555 0100". The
+ * last 10 digits are the stable identity across all of those, so inbound
+ * matching compares on this and nothing else.
+ *
+ * Caveat, stated rather than hidden: for a non-US number this drops the
+ * country code, so two numbers from different countries sharing a 10-digit
+ * tail would compare equal. Both sides of the comparison use the same rule,
+ * and all three campuses are US schools, so this is the right trade today.
+ */
+export function phoneDigits10(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const digits = raw.replace(/\D/g, "");
+  return digits.length >= 10 ? digits.slice(-10) : null;
+}
+
+/**
  * Send a single SMS. Resolves `{ ok: false, error }` on any failure —
  * never throws, never rejects.
  */
@@ -55,12 +104,14 @@ export async function sendSms({ to, body }: SendSmsInput): Promise<SendSmsResult
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   const fromNumber = process.env.TWILIO_FROM_NUMBER;
 
+  // Checked inline rather than via isSmsConfigured() so TypeScript narrows
+  // all three to string for the request below.
   if (!accountSid || !authToken || !fromNumber) {
     if (!warnedNotConfigured) {
       console.debug("[sendSms] TWILIO_* env vars not set — SMS delivery disabled");
       warnedNotConfigured = true;
     }
-    return { ok: false, error: "sms not configured" };
+    return { ok: false, error: SMS_NOT_CONFIGURED };
   }
 
   const normalized = normalizePhone(to);

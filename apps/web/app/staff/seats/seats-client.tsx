@@ -18,10 +18,44 @@ interface SeatRow {
   seats_registered: number;
   available: number;
   fill_pct: number;
+  /** Offers with a resolved outcome (accepted/declined/expired/revoked), all school years. */
+  offers_resolved: number;
+  /** Of those, the ones accepted. */
+  offers_accepted: number;
+  /** accepted / resolved, 0–1. Null when nothing has resolved. */
+  accept_rate: number | null;
 }
 
 interface SeatsClientProps {
   rows: SeatRow[];
+}
+
+/** Below this, the sample is too thin to divide by and we say so instead of guessing. */
+const MIN_RESOLVED_OFFERS = 10;
+
+type Guidance =
+  | { kind: "none" }
+  | { kind: "insufficient" }
+  | { kind: "no-accepts"; resolved: number }
+  | { kind: "suggest"; offers: number; ratePct: number; resolved: number };
+
+/**
+ * Display-only decision support. Nothing here writes, sends, or queues an offer.
+ * Every branch is driven by real resolved-offer counts; there is no fallback
+ * benchmark when a campus/grade has no history.
+ */
+function guidanceFor(row: SeatRow): Guidance {
+  if (row.available <= 0) return { kind: "none" };
+  if (row.offers_resolved < MIN_RESOLVED_OFFERS) return { kind: "insufficient" };
+  if (!row.accept_rate || row.accept_rate <= 0) {
+    return { kind: "no-accepts", resolved: row.offers_resolved };
+  }
+  return {
+    kind: "suggest",
+    offers: Math.max(row.available, Math.ceil(row.available / row.accept_rate)),
+    ratePct: Math.round(row.accept_rate * 100),
+    resolved: row.offers_resolved,
+  };
 }
 
 export function SeatsClient({ rows }: SeatsClientProps) {
@@ -79,6 +113,11 @@ export function SeatsClient({ rows }: SeatsClientProps) {
           {Object.keys(campusMap).length === 1
             ? `Capacity planning and seat availability for ${Object.keys(campusMap)[0]}`
             : "Capacity planning and real-time seat availability across your campuses"}
+        </p>
+        <p className="text-sm text-stone mt-2 border-l-2 border-line pl-3">
+          Offer guidance suggests sending more offers than you have open seats, sized to the share of
+          past offers this campus and grade actually accepted, because offering one seat per chair
+          reliably lands you under-enrolled.
         </p>
       </div>
 
@@ -222,6 +261,9 @@ export function SeatsClient({ rows }: SeatsClientProps) {
                       <th className="text-right py-2 text-xs font-medium text-stone">
                         Fill
                       </th>
+                      <th className="text-left py-2 pl-6 text-xs font-medium text-stone">
+                        Offer guidance
+                      </th>
                       <th className="text-right py-2 text-xs font-medium text-stone w-20">
                         Edit
                       </th>
@@ -300,7 +342,44 @@ export function SeatsClient({ rows }: SeatsClientProps) {
                             </span>
                           </div>
                         </td>
-                        <td className="py-2.5 text-right">
+                        <td className="py-2.5 pl-6 align-top">
+                          {(() => {
+                            const guidance = guidanceFor(row);
+                            if (guidance.kind === "none") {
+                              return (
+                                <span className="text-xs text-stone">
+                                  No open seats to offer against
+                                </span>
+                              );
+                            }
+                            if (guidance.kind === "insufficient") {
+                              return (
+                                <span className="text-xs text-stone">
+                                  No offer history yet — guidance available after this cycle.
+                                </span>
+                              );
+                            }
+                            if (guidance.kind === "no-accepts") {
+                              return (
+                                <span className="text-xs text-warn-text">
+                                  0 of {guidance.resolved} offers accepted so far — no guidance
+                                </span>
+                              );
+                            }
+                            return (
+                              <div className="leading-tight">
+                                <div className="text-sm font-medium text-ink">
+                                  Offer ~{guidance.offers}
+                                </div>
+                                <div className="text-xs text-stone">
+                                  {guidance.ratePct}% accept rate from {guidance.resolved} resolved{" "}
+                                  {guidance.resolved === 1 ? "offer" : "offers"}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </td>
+                        <td className="py-2.5 text-right align-top">
                           {editingId === row.id ? (
                             <div className="flex items-center justify-end gap-1">
                               <Button

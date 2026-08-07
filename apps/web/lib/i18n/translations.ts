@@ -25,18 +25,56 @@ const dict = {
   "nav.closeMenu":      { en: "Close menu",       es: "Cerrar menú" },
 
   // ─── Application Statuses ─────────────────────────────────────────────────
-  "status.draft":            { en: "Draft",              es: "Borrador" },
-  "status.submitted":        { en: "Submitted",          es: "Enviada" },
-  "status.needs_info":       { en: "Needs Info",         es: "Información Requerida" },
-  "status.verified":         { en: "Verified",           es: "Verificada" },
-  "status.lottery_assigned": { en: "Lottery Assigned",   es: "Sorteo Asignado" },
-  "status.offered":          { en: "Offered",            es: "Con Oferta" },
-  "status.accepted":         { en: "Accepted",           es: "Aceptada" },
-  "status.registered":       { en: "Registered",         es: "Registrado" },
-  "status.waitlisted":       { en: "Waitlisted",         es: "En Lista de Espera" },
-  "status.withdrawn":        { en: "Withdrawn",          es: "Retirada" },
-  "status.placement_review": { en: "Placement Review",   es: "Revisión de Ubicación" },
-  "status.enrolled":         { en: "Enrolled",           es: "Matriculado" },
+  // Plain-language, parent-facing wording — deliberately looser than the
+  // precise staff terms in lib/application-helpers.ts getStatusConfig().
+  // This is the single place family surfaces should read a status label from
+  // (see getFamilyStatusLabel); staff surfaces keep the precise labels.
+  "status.draft":            { en: "Draft",                        es: "Borrador" },
+  "status.submitted":        { en: "Submitted",                    es: "Enviada" },
+  "status.needs_info":       { en: "We need more info",            es: "Necesitamos más información" },
+  "status.verified":         { en: "Verified",                     es: "Verificada" },
+  "status.lottery_assigned": { en: "In the lottery",                es: "En el sorteo" },
+  "status.offered":          { en: "Offered a seat",                es: "Le ofrecimos un cupo" },
+  "status.accepted":         { en: "Offer accepted",                es: "Oferta aceptada" },
+  "status.registered":       { en: "Registration submitted",        es: "Registro enviado" },
+  "status.waitlisted":       { en: "On the waitlist",               es: "En lista de espera" },
+  "status.withdrawn":        { en: "Withdrawn",                     es: "Retirada" },
+  "status.placement_review": { en: "Almost done: final checks",    es: "Casi listo: últimas verificaciones" },
+  "status.enrolled":         { en: "Enrolled",                      es: "Matriculado" },
+  "status.declined":         { en: "Declined",                      es: "Rechazada" },
+  "status.expired":          { en: "Offer expired",                 es: "Oferta expirada" },
+
+  // ─── Status one-liners (applications list cards) ──────────────────────────
+  "statusMsg.draft":            { en: "You started this application. Finish and submit it when you're ready.", es: "Usted comenzó esta solicitud. Termínela y envíela cuando esté lista." },
+  "statusMsg.submitted":        { en: "We have your application. Our team is reviewing it now.", es: "Recibimos su solicitud. Nuestro equipo la está revisando." },
+  "statusMsg.needs_info":       { en: "We need one or two more things from you. Open the application to see what.", es: "Nos faltan una o dos cosas. Abra la solicitud para ver cuáles." },
+  "statusMsg.verified":         { en: "Everything checks out. Your application is ready for the lottery.", es: "Todo está en orden. Su solicitud está lista para el sorteo." },
+  "statusMsg.lottery_assigned": { en: "Your application is in the lottery. We'll share the result as soon as it's held.", es: "Su solicitud está en el sorteo. Le avisaremos el resultado apenas se realice." },
+  "statusMsg.offered":          { en: "Great news! A seat is waiting for your student. Please respond soon.", es: "¡Buenas noticias! Hay un cupo esperando a su estudiante. Responda pronto." },
+  "statusMsg.accepted":         { en: "You accepted the seat. Finish registration to make it official.", es: "Usted aceptó el cupo. Complete el registro para hacerlo oficial." },
+  "statusMsg.waitlisted":       { en: "You're on the waitlist. If a seat opens, we'll contact you right away.", es: "Está en la lista de espera. Si se abre un cupo, le contactaremos de inmediato." },
+  "statusMsg.registered":       { en: "Registration is done. Your student is set.", es: "El registro está completo. Su estudiante está listo." },
+  "statusMsg.placement_review": { en: "We're doing final checks. Nothing is needed from you right now.", es: "Estamos haciendo las últimas verificaciones. No necesita hacer nada por ahora." },
+  "statusMsg.enrolled":         { en: "Your student is enrolled. Welcome!", es: "Su estudiante está matriculado. ¡Bienvenidos!" },
+  "statusMsg.declined":         { en: "This application was declined. Contact your school with any questions.", es: "Esta solicitud fue rechazada. Contacte a su escuela si tiene preguntas." },
+  "statusMsg.expired":          { en: "This offer's deadline passed. Contact the school if you still want the seat.", es: "El plazo de esta oferta venció. Contacte a la escuela si aún desea el cupo." },
+  "statusMsg.withdrawn":        { en: "This application was withdrawn.", es: "Esta solicitud fue retirada." },
+
+  // ─── Status explanations (application detail page) ────────────────────────
+  "statusExplain.draft":            { en: "You started this application but haven't submitted it yet. Finish the remaining fields and submit before the enrollment window closes.", es: "Usted comenzó esta solicitud pero aún no la ha enviado. Complete los campos que faltan y envíela antes de que cierre el período de inscripción." },
+  "statusExplain.submitted":        { en: "We received your application and our enrollment team is reviewing it. We'll reach out if we need anything else.", es: "Recibimos su solicitud y nuestro equipo de inscripción la está revisando. Le contactaremos si necesitamos algo más." },
+  "statusExplain.needs_info":       { en: "We need a little more information to keep your application moving. Check the items below or your messages to see exactly what we need.", es: "Necesitamos un poco más de información para continuar con su solicitud. Revise los puntos abajo o sus mensajes para ver exactamente qué necesitamos." },
+  "statusExplain.verified":         { en: "Everything in your application checks out. It will be included in the upcoming enrollment lottery.", es: "Todo en su solicitud está en orden. Será incluida en el próximo sorteo de inscripción." },
+  "statusExplain.lottery_assigned": { en: "Your application is entered in the enrollment lottery. We'll share the result with you as soon as the lottery is held.", es: "Su solicitud está inscrita en el sorteo. Le compartiremos el resultado apenas se realice." },
+  "statusExplain.offered":          { en: "A seat is being held for your student. Respond before the deadline below to keep it.", es: "Hay un cupo reservado para su estudiante. Responda antes de la fecha límite indicada abajo para conservarlo." },
+  "statusExplain.accepted":         { en: "You accepted the seat. Complete registration to make your student's enrollment official.", es: "Usted aceptó el cupo. Complete el registro para que la matrícula de su estudiante sea oficial." },
+  "statusExplain.waitlisted":       { en: "Your student is on the waitlist. If a seat opens up, we'll contact you right away.", es: "Su estudiante está en la lista de espera. Si se abre un cupo, le contactaremos de inmediato." },
+  "statusExplain.registered":       { en: "Your student is registered. Welcome to the Rooted Schools family!", es: "Su estudiante está registrado. ¡Bienvenidos a la familia de Rooted Schools!" },
+  "statusExplain.placement_review": { en: "Our team is doing final checks on your student's placement. Nothing is needed from you right now.", es: "Nuestro equipo está haciendo las últimas verificaciones de la asignación de su estudiante. No necesita hacer nada por ahora." },
+  "statusExplain.enrolled":         { en: "Your student is officially enrolled. Watch your messages for orientation details and next steps.", es: "Su estudiante está oficialmente matriculado. Esté atento a sus mensajes para detalles de orientación y próximos pasos." },
+  "statusExplain.declined":         { en: "This application was declined. If you have questions, contact your school and we'll walk you through it.", es: "Esta solicitud fue rechazada. Si tiene preguntas, contacte a su escuela y le explicaremos todo." },
+  "statusExplain.expired":          { en: "This offer's deadline passed. Contact your school if you still want the seat; sometimes one is still available.", es: "El plazo de esta oferta venció. Contacte a su escuela si aún desea el cupo; a veces todavía hay disponibilidad." },
+  "statusExplain.withdrawn":        { en: "This application has been withdrawn. If that was a mistake, contact your school and we'll help.", es: "Esta solicitud fue retirada. Si fue un error, contacte a su escuela y le ayudaremos." },
 
   // ─── Dashboard ────────────────────────────────────────────────────────────
   "dashboard.welcomeBack":          { en: "Welcome back",                es: "Bienvenido/a de vuelta" },
@@ -122,6 +160,10 @@ const dict = {
   "offers.declineConfirm":   { en: "Are you sure you want to decline this offer? This action cannot be undone.", es: "¿Está seguro/a de que desea rechazar esta oferta? Esta acción no se puede deshacer." },
   "offers.accepting":        { en: "Accepting...",          es: "Aceptando..." },
   "offers.declining":        { en: "Declining...",          es: "Rechazando..." },
+  "offers.bannerExpired":    { en: "This offer has expired. Please contact the enrollment office if you have questions.", es: "Esta oferta ha vencido. Contacte a la oficina de inscripción si tiene preguntas." },
+  "offers.bannerActive":     { en: "A seat has been offered to your student. Accept below to secure your spot.", es: "Se le ha ofrecido un cupo a su estudiante. Acepte abajo para asegurar su lugar." },
+  "offers.expiresTomorrow":  { en: "Expires tomorrow!",     es: "¡Vence mañana!" },
+  "offers.expiresTodayBang": { en: "Expires today!",        es: "¡Vence hoy!" },
 
   // ─── Registration ─────────────────────────────────────────────────────────
   "reg.heading":              { en: "Registration Packet",           es: "Paquete de Registro" },
@@ -184,9 +226,11 @@ const dict = {
   "reg.upload.uploading":      { en: "Uploading...",        es: "Cargando..." },
 
   // ─── Re-enrollment ────────────────────────────────────────────────────────
-  "reenroll.heading":     { en: "Re-enrollment Offers",    es: "Ofertas de Re-matrícula" },
+  "reenroll.heading":     { en: "Re-enrollment",    es: "Re-matrícula" },
+  "reenroll.subtitle":    { en: "Review and respond to re-enrollment offers for the upcoming school year.", es: "Revise y responda a las ofertas de re-matrícula para el próximo año escolar." },
   "reenroll.noOffers":    { en: "No re-enrollment offers.", es: "Sin ofertas de re-matrícula." },
   "reenroll.noOffersDetail": { en: "Your school will send re-enrollment offers when seats are confirmed for the upcoming year.", es: "Su escuela enviará ofertas de re-matrícula cuando los cupos se confirmen para el próximo año." },
+  "reenroll.contactOffice":  { en: "If you believe you should see an offer here, please contact your school's enrollment office.", es: "Si cree que debería ver una oferta aquí, comuníquese con la oficina de inscripciones de su escuela." },
   "reenroll.accept":         { en: "Accept & Enroll",         es: "Aceptar y Matricularse" },
   "reenroll.acceptLabel":    { en: "Accept Re-enrollment",    es: "Aceptar Re-matrícula" },
   "reenroll.decline":        { en: "Decline",                 es: "Rechazar" },
@@ -194,6 +238,21 @@ const dict = {
   "reenroll.declining":      { en: "Declining...",            es: "Rechazando..." },
   "reenroll.acceptSuccess":  { en: "Re-enrollment accepted. Your registration packet will be ready shortly.", es: "Re-matrícula aceptada. Su paquete de registro estará listo en breve." },
   "reenroll.declineSuccess": { en: "You have declined this re-enrollment offer.", es: "Ha rechazado esta oferta de re-matrícula." },
+  "reenroll.offerBadge":     { en: "Offer Pending",           es: "Oferta Pendiente" },
+  "reenroll.offerBody":      { en: "Your school has reserved a seat for {student} in Grade {grade} for the {year} school year. Accept to secure their spot or decline if you will not be returning.", es: "Su escuela ha reservado un cupo para {student} en el Grado {grade} para el año escolar {year}. Acepte para asegurar su lugar o rechace si no regresará." },
+
+  // ─── Re-enrollment: intent pulse (one-tap "are you returning?") ───────────
+  "reenroll.pulseSectionHeading":  { en: "Let us know if you're returning", es: "Avísenos si regresará" },
+  "reenroll.pulseSectionSubtitle": { en: "A quick one-tap answer helps your school plan seats for next year.", es: "Una respuesta rápida de un toque ayuda a su escuela a planificar los cupos para el próximo año." },
+  "reenroll.pulseQuestion":        { en: "Is {student} returning for the {year} school year?", es: "¿{student} regresará para el año escolar {year}?" },
+  "reenroll.pulseYes":             { en: "Yes, {student} is returning", es: "Sí, {student} regresa" },
+  "reenroll.pulseDeciding":        { en: "We're still deciding",        es: "Aún estamos decidiendo" },
+  "reenroll.pulseNo":              { en: "Not returning",               es: "No regresa" },
+  "reenroll.pulseSaving":          { en: "Saving...",                   es: "Guardando..." },
+  "reenroll.pulseYesSaved":        { en: "Thanks! We've noted {student} is returning.", es: "¡Gracias! Hemos anotado que {student} regresa." },
+  "reenroll.pulseDecidingSaved":   { en: "Got it. We've noted you're still deciding.", es: "Entendido. Hemos anotado que aún está decidiendo." },
+  "reenroll.pulseNoSaved":         { en: "Thanks for letting us know. We've noted {student} is not returning.", es: "Gracias por avisarnos. Hemos anotado que {student} no regresa." },
+  "reenroll.pulseChangeAnswer":    { en: "Change your answer",          es: "Cambiar su respuesta" },
 
   // ─── Documents ───────────────────────────────────────────────────────────────
   "docs.upload":           { en: "Upload Document",      es: "Cargar Documento" },
@@ -237,6 +296,7 @@ const dict = {
   // ─── Applications ─────────────────────────────────────────────────────────
   "apps.heading":           { en: "My Applications",        es: "Mis Solicitudes" },
   "apps.noApplications":    { en: "No applications yet.",   es: "Aún no hay solicitudes." },
+  "apps.noApplicationsDetail": { en: "Start your first application here — it takes about 5 minutes, and you can save a draft and finish anytime.", es: "Inicie aquí su primera solicitud — toma unos 5 minutos, y puede guardar un borrador y terminar cuando quiera." },
   "apps.startApplication":  { en: "Start Application",      es: "Iniciar Solicitud" },
   "apps.viewDetails":       { en: "View Details",           es: "Ver Detalles" },
   "apps.campus":            { en: "Campus",                 es: "Escuela" },
@@ -247,6 +307,12 @@ const dict = {
   "apps.lastUpdated":       { en: "Last updated",           es: "Última actualización" },
   "apps.continueApp":       { en: "Continue Application",   es: "Continuar Solicitud" },
   "apps.actionNeeded":      { en: "Action needed",           es: "Acción requerida" },
+  "apps.subheading":        { en: "Track the status of your children's enrollment applications.", es: "Siga el estado de las solicitudes de inscripción de sus hijos." },
+
+  // ─── Action-needed one-liners (applications list cards) ───────────────────
+  "apps.action.draft":      { en: "Complete and submit your application before the enrollment window closes.", es: "Complete y envíe su solicitud antes de que cierre el período de inscripción." },
+  "apps.action.needs_info": { en: "Additional information or documents have been requested.", es: "Se ha solicitado información o documentos adicionales." },
+  "apps.action.offered":    { en: "Please respond to the enrollment offer before the deadline.", es: "Por favor responda a la oferta de inscripción antes de la fecha límite." },
 
   // ─── Common ───────────────────────────────────────────────────────────────
   "common.backToDashboard": { en: "Back to Dashboard", es: "Volver al Panel" },
@@ -454,6 +520,18 @@ const dict = {
   "docs.uploadSuccess":       { en: "uploaded successfully.", es: "se cargó correctamente." },
   "docs.uploadUnexpected":    { en: "An unexpected error occurred during upload.", es: "Ocurrió un error inesperado durante la carga." },
 
+  // ─── Application detail: per-application panels ───────────────────────────
+  "apps.detail.uploaded":       { en: "Uploaded", es: "Subido" },
+  "apps.detail.submittedOn":    { en: "Submitted:", es: "Enviada:" },
+  "apps.detail.lastUpdated":    { en: "Last updated:", es: "Última actualización:" },
+  "apps.detail.respondBy":      { en: "by", es: "antes del" },
+  "apps.detail.noDocs":         { en: "No documents uploaded yet.", es: "Aún no se han subido documentos." },
+  "apps.detail.goToDocuments":  { en: "Go to Documents page to upload →", es: "Ir a la página de Documentos para subir →" },
+  "apps.detail.timelineTitle":  { en: "Application Timeline", es: "Cronología de la Solicitud" },
+  "apps.detail.timelineDesc":   { en: "Track the progress of this application.", es: "Siga el progreso de esta solicitud." },
+  "apps.detail.noActivity":     { en: "No activity recorded yet — updates will appear here as your application moves through review.", es: "Aún no hay actividad registrada — las actualizaciones aparecerán aquí a medida que su solicitud avance en la revisión." },
+  "apps.detail.applicationId":  { en: "ID:", es: "ID:" },
+
   // ─── Camera-first capture (UX Phase 5A) ───────────────────────────────────
   "docs.captureHint":         { en: "Lay the document flat, fill the frame, and avoid glare.", es: "Coloque el documento en una superficie plana, llene el encuadre y evite el brillo." },
   "docs.compressed":          { en: "compressed",                      es: "comprimido" },
@@ -533,6 +611,12 @@ const dict = {
   "inquiry.thanksTitle":      { en: "Thank you — we'll be in touch!", es: "¡Gracias — estaremos en contacto!" },
   "inquiry.thanksBody":       { en: "Check your email or texts for a welcome note. A member of our enrollment team will reach out personally within a day. Ready now? You can start an application in just a few minutes.", es: "Revise su correo o mensajes de texto para ver nuestra nota de bienvenida. Un miembro de nuestro equipo se comunicará dentro de un día. ¿Listo/a ahora? Puede iniciar una solicitud en pocos minutos." },
   "inquiry.backHome":         { en: "Back to home",          es: "Volver al inicio" },
+  "inquiry.step1Hint":        { en: "Step 1 of 2. It takes about a minute.", es: "Paso 1 de 2. Toma alrededor de un minuto." },
+  "inquiry.optionalTag":      { en: "optional",              es: "opcional" },
+  "inquiry.detailsTitle":     { en: "Help us get to know you", es: "Ayúdenos a conocerle" },
+  "inquiry.detailsSubtitle":  { en: "Optional. A couple quick questions, about 30 seconds.", es: "Opcional. Un par de preguntas rápidas, unos 30 segundos." },
+  "inquiry.detailsSubmit":    { en: "Add details",           es: "Agregar detalles" },
+  "inquiry.skipForNow":       { en: "Skip for now",          es: "Omitir por ahora" },
   "public.ourSchools":       { en: "Our Schools",           es: "Nuestras Escuelas" },
   "public.schoolsLede":      { en: "operates career-connected schools across the country.", es: "opera escuelas conectadas con el mundo profesional en todo el país." },
   "public.clickToApply":     { en: "Click a campus to start your application.", es: "Haga clic en una escuela para iniciar su solicitud." },
@@ -628,6 +712,10 @@ const dict = {
   "lottery.startApplication": { en: "Start an application", es: "Iniciar una solicitud" },
   "lottery.learnLink":        { en: "Curious how enrollment works? Read about our lottery", es: "¿Curiosidad por saber cómo funciona la inscripción? Lea sobre nuestra lotería" },
   "public.howLotteryWorks":   { en: "How our lottery works", es: "Cómo funciona nuestra lotería" },
+  // Quiet inline link — placed wherever a family first meets the word
+  // "lottery" (dashboard journey, lottery result page, application form,
+  // sibling-priority note). Deliberately plain text, not a button.
+  "lottery.inlineLink":       { en: "How does the lottery work?", es: "¿Cómo funciona el sorteo?" },
 
   // ─── Family lottery result page ────────────────────────────────────────────
   "lotteryResult.badgeOffered":      { en: "Offered a seat",       es: "Le ofrecimos un cupo" },

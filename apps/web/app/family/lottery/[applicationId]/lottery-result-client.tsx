@@ -25,7 +25,7 @@ export function LotteryResultClient({ outcome }: Props) {
             <IconSearch size={40} />
           </div>
           <h1 className="text-xl font-bold text-ink">{t("lotteryResult.notFoundTitle")}</h1>
-          <p className="text-sm text-stone max-w-sm mx-auto">
+          <p className="text-sm text-stone-text max-w-sm mx-auto">
             {t("lotteryResult.notFoundBody")}
           </p>
           <Link href="/family/dashboard">
@@ -45,12 +45,17 @@ export function LotteryResultClient({ outcome }: Props) {
             <IconTicket size={40} />
           </div>
           <h1 className="text-xl font-bold text-ink">{t("lotteryResult.noResultYetTitle")}</h1>
-          <p className="text-sm text-stone max-w-sm mx-auto">
+          <p className="text-sm text-stone-text max-w-sm mx-auto">
             {t("lotteryResult.noResultYetBody")}
           </p>
-          <Link href="/family/dashboard">
-            <Button variant="outline">{t("common.backToDashboard")}</Button>
+          <Link href="/how-the-lottery-works" className="text-xs text-rooted-green hover:underline inline-block">
+            {t("lottery.inlineLink")}
           </Link>
+          <div>
+            <Link href="/family/dashboard">
+              <Button variant="outline">{t("common.backToDashboard")}</Button>
+            </Link>
+          </div>
         </CardContent>
       </Card>
     );
@@ -101,6 +106,11 @@ export function LotteryResultClient({ outcome }: Props) {
         <Badge variant={isSelected ? "success" : "warning"} className="text-sm">
           {isSelected ? t("lotteryResult.badgeOffered") : waitlistBadge}
         </Badge>
+        <div>
+          <Link href="/how-the-lottery-works" className="text-xs text-rooted-green hover:underline">
+            {t("lottery.inlineLink")}
+          </Link>
+        </div>
       </div>
 
       {/* ── Stats card ── */}
@@ -111,19 +121,19 @@ export function LotteryResultClient({ outcome }: Props) {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
             <div>
-              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">
+              <p className="text-stone-text text-xs uppercase tracking-wide mb-0.5">
                 {t("lotteryResult.applicantsFor").replace("{grade}", gradeLabel)}
               </p>
               <p className="font-medium text-ink">{totalApplicants}</p>
             </div>
             <div>
-              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">
+              <p className="text-stone-text text-xs uppercase tracking-wide mb-0.5">
                 {t("lotteryResult.seatsAvailable")}
               </p>
               <p className="font-medium text-ink">{totalSeats}</p>
             </div>
             <div>
-              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">
+              <p className="text-stone-text text-xs uppercase tracking-wide mb-0.5">
                 {t("lotteryResult.priorityGroup")}
               </p>
               <p className="font-medium text-ink">{tierLabel}</p>
@@ -222,19 +232,19 @@ export function LotteryResultClient({ outcome }: Props) {
           <p>{t("lotteryResult.verificationNote")}</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
             <div>
-              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">
+              <p className="text-stone-text text-xs uppercase tracking-wide mb-0.5">
                 {t("lotteryResult.runDate")}
               </p>
               <p className="font-medium text-ink">{runDate || "—"}</p>
             </div>
             <div>
-              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">
+              <p className="text-stone-text text-xs uppercase tracking-wide mb-0.5">
                 {t("lotteryResult.verificationId")}
               </p>
               <p className="font-medium text-ink font-mono">{seedFingerprint ?? "—"}</p>
             </div>
             <div>
-              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">
+              <p className="text-stone-text text-xs uppercase tracking-wide mb-0.5">
                 {t("lotteryResult.yourNumber").replace("{name}", name)}
               </p>
               <p className="font-medium text-ink font-mono">

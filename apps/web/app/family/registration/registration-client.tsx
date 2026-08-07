@@ -524,7 +524,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
           <IconClipboardList size={40} />
         </div>
         <h3 className="text-lg font-semibold text-ink mb-2">{t("reg.emptyTitle")}</h3>
-        <p className="text-stone text-sm">
+        <p className="text-stone-text text-sm">
           {t("reg.emptyBody")} <a href="/family/offers" className="text-rooted-green underline font-medium">{t("offers.heading")}</a> {t("reg.emptyBodyEnd")}
         </p>
       </div>
@@ -750,7 +750,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                 }`}
               >
                 {enr.student_name}
-                <span className={`text-xs ${idx === activeEnrollment ? "text-white/70" : "text-stone"}`}>
+                <span className={`text-xs ${idx === activeEnrollment ? "text-white/70" : "text-stone-text"}`}>
                   {enrCompletedCount}/{enrTotalItems}
                 </span>
               </button>
@@ -767,7 +767,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
               <p className="text-sm font-semibold text-ink">
                 {enrollment.student_name}
               </p>
-              <p className="text-xs text-stone">
+              <p className="text-xs text-stone-text">
                 {enrollment.campus_name} &middot; {t("apps.grade")} {enrollment.grade}{" "}
                 &middot; {enrollment.school_year}
               </p>
@@ -809,10 +809,10 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
             />
           </div>
           <div className="flex items-center justify-between mt-2">
-            <p className="text-xs text-stone">
+            <p className="text-xs text-stone-text">
               {completedCount} {t("reg.of")} {totalItems} {t("reg.itemsCompleted")}
               {totalRequired > 0 && totalRequired < totalItems && (
-                <span className="text-stone"> &middot; {totalRequired} {t("reg.requiredCount")}</span>
+                <span className="text-stone-text"> &middot; {totalRequired} {t("reg.requiredCount")}</span>
               )}
             </p>
             {!packetSubmitted && completedCount < totalItems && (
@@ -833,10 +833,10 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                     <span className="text-stone">
                       <CategoryIcon size={14} />
                     </span>
-                    <span className="text-[10px] text-stone">
+                    <span className="text-[10px] text-stone-text">
                       {t(`reg.cat.${catKey}` as TranslationKey)}
                     </span>
-                    <span className={`text-[10px] font-bold ${prog.done === prog.total ? "text-green-600" : "text-stone"}`}>
+                    <span className={`text-[10px] font-bold ${prog.done === prog.total ? "text-green-600" : "text-stone-text"}`}>
                       {prog.done}/{prog.total}
                     </span>
                   </div>
@@ -850,7 +850,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
       {/* Help section */}
       {!packetSubmitted && (
         <div className="text-center py-2">
-          <p className="text-xs text-stone">
+          <p className="text-xs text-stone-text">
             {t("reg.needHelp")}
           </p>
         </div>
@@ -860,10 +860,10 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
       {enrollment.requirements.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center">
-            <p className="text-stone">
+            <p className="text-stone-text">
               {t("reg.noRequirements")}
             </p>
-            <p className="text-xs text-stone mt-1">
+            <p className="text-xs text-stone-text mt-1">
               {t("reg.checkBackSoon")}
             </p>
           </CardContent>
@@ -886,7 +886,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                     </span>
                     <CardTitle className="text-sm">{t(`reg.cat.${catKey}` as TranslationKey)}</CardTitle>
                   </div>
-                  <span className={`text-xs font-semibold ${allDone ? "text-green-600" : "text-stone"}`}>
+                  <span className={`text-xs font-semibold ${allDone ? "text-green-600" : "text-stone-text"}`}>
                     {prog.done}/{prog.total} {t("common.complete")}
                   </span>
                 </div>
@@ -921,12 +921,12 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                             )}
                           </div>
                           {req.description && (
-                            <p className="text-xs text-stone mt-0.5 line-clamp-1">
+                            <p className="text-xs text-stone-text mt-0.5 line-clamp-1">
                               {req.description}
                             </p>
                           )}
                           {item?.signed_at && (
-                            <p className="text-[10px] text-stone mt-0.5">
+                            <p className="text-[10px] text-stone-text mt-0.5">
                               {t("reg.completedOn")}{" "}
                               {new Date(item.signed_at).toLocaleDateString(localeTag, {
                                 month: "short",
@@ -950,7 +950,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                           </Button>
                         )}
                         {status === "pending" && !item && (
-                          <Badge className="text-[10px] bg-rooted-gray text-stone">
+                          <Badge className="text-[10px] bg-rooted-gray text-stone-text">
                             {t("reg.awaitingSetup")}
                           </Badge>
                         )}
@@ -1221,14 +1221,14 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                         }}
                       />
                       {uploadCompressing ? (
-                        <p className="text-sm text-stone">{t("common.loading")}</p>
+                        <p className="text-sm text-stone-text">{t("common.loading")}</p>
                       ) : uploadSelectedFile ? (
                         <div className="space-y-1">
                           <div className="flex justify-center text-rooted-green">
                             <IconCheckCircle size={28} />
                           </div>
                           <p className="text-sm font-medium text-ink">{uploadSelectedFile.name}</p>
-                          <p className="text-xs text-stone">
+                          <p className="text-xs text-stone-text">
                             {formatFileSize(uploadSelectedFile.size)}
                             {uploadWasCompressed ? ` · ${t("docs.compressed")}` : ""}
                           </p>
@@ -1252,11 +1252,11 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                             <IconPaperclip size={28} />
                           </div>
                           <p className="text-sm font-medium text-ink">{t("reg.upload.clickToChoose")}</p>
-                          <p className="text-xs text-stone mt-1">{t("reg.upload.formats")}</p>
+                          <p className="text-xs text-stone-text mt-1">{t("reg.upload.formats")}</p>
                         </label>
                       )}
                     </div>
-                    <p className="flex items-start gap-1 text-xs text-stone">
+                    <p className="flex items-start gap-1 text-xs text-stone-text">
                       <IconInfo size={12} className="shrink-0 mt-0.5" aria-hidden="true" />
                       <span>{t("docs.captureHint")}</span>
                     </p>

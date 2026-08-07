@@ -55,7 +55,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-ink">{t("nav.messages")}</h1>
-          <p className="text-sm text-stone mt-1">
+          <p className="text-sm text-stone-text mt-1">
             Notifications and updates about your enrollment applications.
           </p>
         </div>
@@ -89,7 +89,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-amber-600">{unreadCount}</p>
-                  <p className="text-xs text-stone">{t("msgs.unread")}</p>
+                  <p className="text-xs text-stone-text">{t("msgs.unread")}</p>
                 </div>
               </div>
             </CardContent>
@@ -102,7 +102,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-ink/60">{readCount}</p>
-                  <p className="text-xs text-stone">{t("msgs.read")}</p>
+                  <p className="text-xs text-stone-text">{t("msgs.read")}</p>
                 </div>
               </div>
             </CardContent>
@@ -123,7 +123,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
       ) : displayed.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center">
-            <p className="text-sm text-stone">{t("msgs.allCaughtUp")}</p>
+            <p className="text-sm text-stone-text">{t("msgs.allCaughtUp")}</p>
             <Button variant="outline" size="sm" className="mt-3" onClick={() => setFilter("all")}>
               {t("msgs.showAll")}
             </Button>
@@ -194,12 +194,12 @@ export function MessagesClient({ messages }: MessagesClientProps) {
                           {msg.title}
                         </p>
                         {msg.body && (
-                          <p className="text-sm text-stone mt-0.5 line-clamp-2">
+                          <p className="text-sm text-stone-text mt-0.5 line-clamp-2">
                             {msg.body}
                           </p>
                         )}
                       </div>
-                      <span className="text-xs text-stone whitespace-nowrap mt-0.5 shrink-0">
+                      <span className="text-xs text-stone-text whitespace-nowrap mt-0.5 shrink-0">
                         {msg.time_ago}
                       </span>
                     </div>
@@ -220,7 +220,7 @@ export function MessagesClient({ messages }: MessagesClientProps) {
                         <button
                           onClick={() => handleMarkRead(msg.id)}
                           disabled={isPending}
-                          className="text-xs text-stone hover:text-ink/60 transition-colors"
+                          className="text-xs text-stone-text hover:text-ink/60 transition-colors"
                         >
                           {t("msgs.markRead")}
                         </button>

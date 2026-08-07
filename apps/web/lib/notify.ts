@@ -15,7 +15,7 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { sendNotification } from "@/lib/mutations";
 import { sendEmail } from "@/lib/email";
-import { sendSms } from "@/lib/sms";
+import { sendSms, SMS_NOT_CONFIGURED } from "@/lib/sms";
 import * as emailTemplates from "@/lib/email-templates";
 import type { EmailTemplate } from "@/lib/email-templates";
 import { recordWaitlistPositionHistory } from "@/lib/mutations/waitlist-history";
@@ -79,7 +79,7 @@ async function smsGuardian(
 ): Promise<void> {
   if (!contact.smsConsent || !contact.phone) return;
   const result = await sendSms({ to: contact.phone, body });
-  if (!result.ok && result.error !== "sms not configured") {
+  if (!result.ok && result.error !== SMS_NOT_CONFIGURED) {
     console.error(`[${logTag}] sms failed`, result.error);
   }
 }
@@ -464,7 +464,7 @@ export async function notifyFamilyOfOffer({
     userId
       ? notify({
           userId,
-          subject: studentName ? `🎉 Seat offer for ${studentName} at ${campusName}` : `🎉 You have a seat offer at ${campusName}`,
+          subject: studentName ? `Seat offer for ${studentName} at ${campusName}` : `You have a seat offer at ${campusName}`,
           body: `Congratulations! A seat has been offered${studentName ? ` for ${studentName}` : ""} at ${campusName}. Please respond by ${deadline} to secure your spot.`,
           link: `/family/offers/${offerId}`,
           campusId,
@@ -511,7 +511,7 @@ export async function notifyFamilyOfferExpiringSoon({
     userId
       ? notify({
           userId,
-          subject: `⏰ Your seat offer at ${campusName} expires soon`,
+          subject: `Your seat offer at ${campusName} expires soon`,
           body: `Your seat offer${studentName ? ` for ${studentName}` : ""} at ${campusName} expires on ${deadline}. Please respond before the deadline to keep your spot.`,
           link: `/family/offers/${offerId}`,
           campusId,
@@ -582,7 +582,7 @@ export async function notifyFamilyDocumentVerified({
   const readableType = documentType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   await notify({
     userId,
-    subject: `✅ ${readableType} verified`,
+    subject: `${readableType} verified`,
     body: `Your ${readableType} has been reviewed and verified by the enrollment team. You're all set on this one.`,
     link: `/family/documents`,
     campusId,
@@ -671,7 +671,7 @@ export async function notifyFamilyRegistrationComplete({
     userId
       ? notify({
           userId,
-          subject: `🎓 Enrollment complete${studentName ? ` for ${studentName}` : ""}!`,
+          subject: `Enrollment complete${studentName ? ` for ${studentName}` : ""}!`,
           body: `All registration items have been verified. ${studentName ? `${studentName} is` : "Your student is"} officially enrolled at ${campusName}. Welcome to the Rooted Schools family — we're proud to have you with us.`,
           link: `/family/registration`,
           campusId,
@@ -686,7 +686,7 @@ export async function notifyFamilyRegistrationComplete({
     ),
     smsGuardian(
       contact,
-      `Rooted Schools: 🎓 ${studentFirstName ?? "Your student"} is officially enrolled at ${campusName}! Welcome to the family.\n¡${studentFirstName ?? "Su estudiante"} está oficialmente inscrito/a en ${campusName}! Bienvenidos.`,
+      `Rooted Schools: ${studentFirstName ?? "Your student"} is officially enrolled at ${campusName}! Welcome to the family.\n¡${studentFirstName ?? "Su estudiante"} está oficialmente inscrito/a en ${campusName}! Bienvenidos.`,
       "notifyFamilyRegistrationComplete"
     ),
   ]);
@@ -735,6 +735,116 @@ export async function notifyFamilyRegistrationNudge({
       contact,
       `Rooted Schools: ${count} registration item${count === 1 ? "" : "s"} still needed for ${studentFirstName ?? "your student"} at ${campusName}. Finish here: ${APP_LINK}/family/registration\nAún faltan pasos de inscripción. Complételos en el enlace.`,
       "notifyFamilyRegistrationNudge"
+    ),
+  ]);
+}
+
+/**
+ * Registration is complete and the school year hasn't started yet — one warm
+ * "you're all set, here's what's next" touch during the summer melt window.
+ * Sent once per enrollment by the keep-the-seat cron, which owns the
+ * dedupe/throttle (registration_packet.keep_the_seat_sent_at from migration
+ * 00036), so this function just delivers on all channels, matching
+ * notifyFamilyRegistrationNudge's split of responsibility.
+ */
+export async function notifyFamilyKeepTheSeat({
+  enrollmentId,
+  studentName,
+  campusId,
+  startDate,
+}: {
+  enrollmentId: string;
+  studentName?: string;
+  campusId?: string;
+  /** ISO date string for the school year's first day, when known. */
+  startDate?: string;
+}): Promise<void> {
+  const contact = await getGuardianContactByEnrollment(enrollmentId);
+  const { userId, email } = contact;
+  if (!userId && !email) return;
+  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const studentFirstName = firstNameOf(studentName);
+  await Promise.all([
+    userId
+      ? notify({
+          userId,
+          subject: `You're all set at ${campusName}`,
+          body: `${
+            studentName ? `${studentName}'s` : "Your student's"
+          } registration is complete at ${campusName}. Watch your email and phone this summer for orientation details and what to bring.`,
+          link: `/family/registration`,
+          campusId,
+          logTag: "notifyFamilyKeepTheSeat",
+        })
+      : Promise.resolve(),
+    emailGuardian(
+      email,
+      emailTemplates.keepTheSeat({ studentFirstName, campusName, startDate }),
+      "notifyFamilyKeepTheSeat",
+      campusEmail
+    ),
+    smsGuardian(
+      contact,
+      `Rooted Schools: ${studentFirstName ?? "Your student"}'s seat at ${campusName} is all set! Watch for orientation details this summer.\n¡El cupo de ${
+        studentFirstName ?? "su estudiante"
+      } en ${campusName} está listo! Esté atento(a) a los detalles de orientación este verano.`,
+      "notifyFamilyKeepTheSeat"
+    ),
+  ]);
+}
+
+/**
+ * Spring re-enrollment intent pulse: staff-triggered only (no automated cron
+ * — spring timing is a human decision, per staffSendReenrollmentPulse in
+ * app/staff/enrollment/re-enrollment-actions.ts). Asks the family a one-tap
+ * question on their currently active enrollment — is your student coming
+ * back? — via in-app, bilingual email, and consented SMS.
+ */
+export async function notifyFamilyReenrollmentPulse({
+  enrollmentId,
+  studentName,
+  campusId,
+  nextSchoolYearName,
+}: {
+  enrollmentId: string;
+  studentName?: string;
+  campusId?: string;
+  nextSchoolYearName?: string;
+}): Promise<void> {
+  const contact = await getGuardianContactByEnrollment(enrollmentId);
+  const { userId, email } = contact;
+  if (!userId && !email && !contact.phone) return;
+  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const studentFirstName = firstNameOf(studentName);
+  await Promise.all([
+    userId
+      ? notify({
+          userId,
+          subject: `Is ${studentName ?? "your student"} returning to ${campusName}?`,
+          body: `We're planning seats${
+            nextSchoolYearName ? ` for ${nextSchoolYearName}` : " for next year"
+          } and want to hold ${
+            studentName ?? "your student"
+          }'s spot at ${campusName}. Tap here to let us know in one tap — yes, still deciding, or not returning.`,
+          link: `/family/reenrollment`,
+          campusId,
+          logTag: "notifyFamilyReenrollmentPulse",
+        })
+      : Promise.resolve(),
+    emailGuardian(
+      email,
+      emailTemplates.reenrollmentPulse({ studentFirstName, campusName, nextSchoolYearName }),
+      "notifyFamilyReenrollmentPulse",
+      campusEmail
+    ),
+    smsGuardian(
+      contact,
+      `Rooted Schools: Is ${studentFirstName ?? "your student"} coming back${
+        nextSchoolYearName ? ` for ${nextSchoolYearName}` : " next year"
+      }? One tap to let us know: ${APP_LINK}/family/reenrollment\n¿${
+        studentFirstName ?? "Su estudiante"
+      } regresará${nextSchoolYearName ? ` para ${nextSchoolYearName}` : " el próximo año"}? Responda con un toque: ${APP_LINK}/family/reenrollment`,
+      "notifyFamilyReenrollmentPulse"
     ),
   ]);
 }
@@ -1117,7 +1227,7 @@ export async function notifyFamilyStudentEnrolled({
   const grade = gradeLabel ? ` in ${gradeLabel}` : "";
   await notify({
     userId,
-    subject: `🎉 ${studentName ?? "Your student"} is officially enrolled at ${campusName}!`,
+    subject: `${studentName ?? "Your student"} is officially enrolled at ${campusName}!`,
     body: `Congratulations! ${studentName ?? "Your student"} is now fully enrolled${grade} at ${campusName}. At Rooted Schools, every student graduates with a career credential and a clear plan. We're excited to get started. Log in to your portal to view orientation details and next steps.`,
     link: `/family/applications/${applicationId}`,
     campusId,

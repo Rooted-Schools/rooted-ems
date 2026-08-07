@@ -153,6 +153,29 @@ export async function staffTogglePublish(eventId: string, isPublished: boolean) 
   return result;
 }
 
+/** One-tap check-in from the event detail roster. Not yet in the mutations
+ *  barrel (lib/mutations/index.ts is off-limits to this change), so pulled
+ *  directly from lib/mutations/events. */
+export async function staffCheckInRsvp(rsvpId: string, eventId: string, actorId: string) {
+  await requireStaffSession();
+  const { checkInRsvp } = await import("@/lib/mutations/events");
+  const result = await checkInRsvp(rsvpId, actorId);
+  if (!result.error) revalidatePath(`/staff/recruitment/events/${eventId}`);
+  return result;
+}
+
+/** Walk-in quick-add from the event detail check-in roster. */
+export async function staffAddWalkIn(
+  input: import("@/lib/mutations/events").WalkInInput,
+  actorId: string
+) {
+  await requireStaffSession();
+  const { addWalkInRsvp } = await import("@/lib/mutations/events");
+  const result = await addWalkInRsvp(input, actorId);
+  if (!result.error) revalidatePath(`/staff/recruitment/events/${input.event_id}`);
+  return result;
+}
+
 // ─── Campaigns ────────────────────────────────────────
 
 const AUDIENCE_STAGE_SETS: Record<string, string[]> = {

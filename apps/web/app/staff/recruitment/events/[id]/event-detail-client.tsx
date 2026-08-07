@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { IconCheckCircle } from "@/components/ui/icons";
 import type { EventDetail } from "@/lib/queries";
-import { staffSetRsvpStatus, staffTogglePublish } from "../../actions";
+import { staffAddWalkIn, staffCheckInRsvp, staffSetRsvpStatus, staffTogglePublish } from "../../actions";
 
 export function EventDetailClient({
   event,
@@ -22,6 +24,10 @@ export function EventDetailClient({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
+  const [walkInOpen, setWalkInOpen] = useState(false);
+  const [walkInName, setWalkInName] = useState("");
+  const [walkInPhone, setWalkInPhone] = useState("");
+  const [walkInError, setWalkInError] = useState<string | null>(null);
 
   if (!event) {
     return (
@@ -35,6 +41,35 @@ export function EventDetailClient({
   function setStatus(rsvpId: string, status: "registered" | "attended" | "no_show") {
     startTransition(async () => {
       await staffSetRsvpStatus(rsvpId, event!.id, status, staffUserId);
+      router.refresh();
+    });
+  }
+
+  function checkIn(rsvpId: string) {
+    startTransition(async () => {
+      await staffCheckInRsvp(rsvpId, event!.id, staffUserId);
+      router.refresh();
+    });
+  }
+
+  function addWalkIn() {
+    if (!walkInName.trim()) {
+      setWalkInError("Name is required.");
+      return;
+    }
+    setWalkInError(null);
+    startTransition(async () => {
+      const result = await staffAddWalkIn(
+        { event_id: event!.id, campus_id: event!.campus_id, guardian_name: walkInName.trim(), phone: walkInPhone.trim() || undefined },
+        staffUserId
+      );
+      if (result.error) {
+        setWalkInError(result.error);
+        return;
+      }
+      setWalkInName("");
+      setWalkInPhone("");
+      setWalkInOpen(false);
       router.refresh();
     });
   }
@@ -76,16 +111,21 @@ export function EventDetailClient({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: "Registered", value: active.length },
-          { label: "Total guests", value: totalGuests },
-          { label: "Attended", value: event.attended, accent: true },
-        ].map((s) => (
+      <div className={`grid gap-3 ${event.checkInAvailable ? "grid-cols-4" : "grid-cols-3"}`}>
+        {(
+          [
+            { label: "Registered", value: active.length, accent: false, suffix: event.capacity ? ` / ${event.capacity}` : "" },
+            { label: "Total guests", value: totalGuests, accent: false, suffix: "" },
+            ...(event.checkInAvailable
+              ? [{ label: "Checked in", value: event.checked_in, accent: true, suffix: ` / ${active.length}` }]
+              : []),
+            { label: "Attended", value: event.attended, accent: !event.checkInAvailable, suffix: "" },
+          ] as Array<{ label: string; value: number; accent: boolean; suffix: string }>
+        ).map((s) => (
           <Card key={s.label}>
             <CardContent className="py-4 text-center">
               <p className={`text-2xl font-bold ${s.accent ? "text-rooted-green" : "text-ink"}`}>{s.value}</p>
-              <p className="text-xs text-stone mt-0.5">{s.label}{s.label === "Registered" && event.capacity ? ` / ${event.capacity}` : ""}</p>
+              <p className="text-xs text-stone mt-0.5">{s.label}{s.suffix}</p>
             </CardContent>
           </Card>
         ))}
@@ -93,10 +133,45 @@ export function EventDetailClient({
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Roster</CardTitle>
-          <CardDescription>Mark attendance on the day — attendees are nudged forward to “engaged” automatically.</CardDescription>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <CardTitle className="text-base">
+                {event.checkInAvailable ? "Check-in roster" : "Roster"}
+              </CardTitle>
+              <CardDescription>
+                {event.checkInAvailable
+                  ? "Tap Check in as families arrive — attendees are nudged forward to “engaged” automatically."
+                  : "Mark attendance on the day — attendees are nudged forward to “engaged” automatically."}
+              </CardDescription>
+            </div>
+            <Button variant="outline" onClick={() => setWalkInOpen((v) => !v)} className="shrink-0">
+              {walkInOpen ? "Cancel" : "+ Walk-in"}
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {walkInOpen && (
+            <div className="rounded-md border border-stone/20 bg-sunken/40 p-3 space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2">
+                <div>
+                  <label htmlFor="walkin-name" className="block text-xs font-medium text-ink/70 mb-1">Name *</label>
+                  <Input id="walkin-name" value={walkInName} onChange={(e) => setWalkInName(e.target.value)} placeholder="Family name" />
+                </div>
+                <div>
+                  <label htmlFor="walkin-phone" className="block text-xs font-medium text-ink/70 mb-1">Phone (optional)</label>
+                  <Input id="walkin-phone" type="tel" value={walkInPhone} onChange={(e) => setWalkInPhone(e.target.value)} placeholder="(555) 555-0100" />
+                </div>
+                <div className="flex items-end">
+                  <Button onClick={addWalkIn} disabled={isPending} className="w-full sm:w-auto">
+                    Add &amp; check in
+                  </Button>
+                </div>
+              </div>
+              {walkInError && <p className="text-xs text-red-600">{walkInError}</p>}
+              <p className="text-xs text-stone">Creates a lead (source: event) and marks them checked in right away.</p>
+            </div>
+          )}
+
           {event.rsvps.length === 0 ? (
             <p className="text-sm text-stone text-center py-6">No RSVPs yet. Share the public link to start collecting registrations.</p>
           ) : (
@@ -106,6 +181,7 @@ export function EventDetailClient({
                   <TableHead>Family</TableHead>
                   <TableHead className="hidden sm:table-cell">Contact</TableHead>
                   <TableHead className="text-center">Party</TableHead>
+                  {event.checkInAvailable && <TableHead className="text-center">Check-in</TableHead>}
                   <TableHead className="text-right">Attendance</TableHead>
                 </TableRow>
               </TableHeader>
@@ -125,6 +201,25 @@ export function EventDetailClient({
                       {r.email ?? r.phone ?? "—"}
                     </TableCell>
                     <TableCell className="text-center text-sm">{r.party_size}</TableCell>
+                    {event.checkInAvailable && (
+                      <TableCell className="text-center">
+                        {r.checked_in_at ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-rooted-green">
+                            <IconCheckCircle size={16} />
+                            {new Date(r.checked_in_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => checkIn(r.id)}
+                            disabled={isPending || r.status === "cancelled"}
+                            className="text-xs px-2 py-1.5 min-h-[32px] rounded border border-stone/30 text-ink/70 hover:border-rooted-green hover:text-rooted-green transition-colors disabled:opacity-40"
+                          >
+                            Check in
+                          </button>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell className="text-right">
                       <div className="inline-flex gap-1">
                         <button

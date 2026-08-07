@@ -2,9 +2,11 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 import { createServiceRoleClient } from "@rooted-ems/database/server";
-import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { requireMinRole, getAccessibleCampusIds } from "@/lib/auth/get-session";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { SectionTabs } from "@/components/layout/section-tabs";
+import { INSIGHTS_TABS } from "@/lib/section-tabs";
 
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   create: { label: "Created", color: "bg-green-100 text-green-800" },
@@ -35,11 +37,17 @@ export default async function AuditTrailPage({
 }: {
   searchParams: { campus?: string; table?: string; action?: string; page?: string };
 }) {
-  const session = await requireStaffSession();
+  // This page reads audit_event through the service-role client, which bypasses
+  // RLS — so the audit_select policy (system_admin, or enrollment_manager on the
+  // campus) is not a backstop here and has to be enforced in the route. Audit
+  // rows carry old_data/new_data blobs of applications and documents, i.e.
+  // student PII, so the gate matches the policy rather than merely is_staff.
+  const session = await requireMinRole("enrollment_manager");
   const supabase = createServiceRoleClient();
   const accessibleCampusIds = getAccessibleCampusIds(session);
 
-  const page = parseInt(searchParams.page ?? "1", 10);
+  const parsedPage = Number.parseInt(searchParams.page ?? "1", 10);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
   const pageSize = 50;
   const offset = (page - 1) * pageSize;
 
@@ -63,10 +71,13 @@ export default async function AuditTrailPage({
 
   if (validCampus) {
     query = query.eq("campus_id", validCampus);
-  } else if (accessibleCampusIds.length > 0 && accessibleCampusIds.length < 3) {
-    // Non-CMO staff: scope to their accessible campuses only
+  } else if (accessibleCampusIds.length > 0) {
+    // Scope to the campuses this manager actually holds a role on. This used
+    // to skip the filter for anyone with 3+ campuses, which silently turned
+    // "assigned to all three live campuses" into org-wide audit access.
     query = query.in("campus_id", accessibleCampusIds);
   }
+  // No campus rows at all = org-wide admin (see resolveActiveCampus): no filter.
   if (searchParams.table) {
     query = query.eq("table_name", searchParams.table);
   }
@@ -82,6 +93,11 @@ export default async function AuditTrailPage({
 
   return (
     <div className="space-y-6">
+      <SectionTabs
+        tabs={INSIGHTS_TABS}
+        activeHref="/staff/audit"
+        campusParam={searchParams.campus}
+      />
       <div>
         <h1 className="text-2xl font-bold text-ink">Audit Trail</h1>
         <p className="text-sm text-stone mt-1">
