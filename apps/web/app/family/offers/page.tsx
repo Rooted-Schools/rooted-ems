@@ -28,7 +28,7 @@ export default async function FamilyOffersPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold text-ink">{t("offers.heading")}</h1>
-        <p className="text-sm text-stone mt-1">
+        <p className="text-sm text-stone-text mt-1">
           {t("offers.subtitle")}
         </p>
       </div>
@@ -39,8 +39,11 @@ export default async function FamilyOffersPage() {
             <div className="flex justify-center text-stone">
               <IconMail size={32} />
             </div>
-            <p className="text-sm text-stone">
-              {t("offers.noPending")}
+            <p className="text-sm font-medium text-ink">
+              {t("offers.noOffers")}
+            </p>
+            <p className="text-sm text-stone-text max-w-sm mx-auto">
+              {t("offers.noOffersDetail")}
             </p>
             <Link href="/family/dashboard">
               <Button variant="outline">{t("common.backToDashboard")}</Button>
@@ -58,7 +61,7 @@ export default async function FamilyOffersPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1 min-w-0">
                     <p className="font-semibold text-ink">{offer.student_name}</p>
-                    <p className="text-sm text-stone">
+                    <p className="text-sm text-stone-text">
                       {offer.grade} · {offer.campus_name}
                     </p>
                     <div className="flex items-center gap-2 pt-1">

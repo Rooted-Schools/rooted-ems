@@ -33,7 +33,7 @@ export default async function PublicEventPage({ params }: { params: { id: string
             </span>
             <h1 className="text-xl font-bold text-ink mt-2">{event.title}</h1>
             <p className="text-sm text-ink/80 mt-1">{formatEventWhen(event.starts_at, event.ends_at, es)}</p>
-            <p className="text-xs text-stone mt-0.5">
+            <p className="text-xs text-stone-text mt-0.5">
               {event.campus_name}{event.location ? ` · ${event.location}` : ""}
             </p>
             {event.description && (

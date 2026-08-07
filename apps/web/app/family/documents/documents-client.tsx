@@ -127,6 +127,14 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
     );
   }), [documents]);
 
+  // When a document needs re-upload, that per-row action is the one primary
+  // task on the page — the header's generic upload button steps back to
+  // outline so there's exactly one solid call-to-action at a time.
+  const hasRejectedDoc = useMemo(
+    () => visibleDocuments.some((d) => d.status === "rejected"),
+    [visibleDocuments]
+  );
+
   // Item 18: group docs by student name for multi-student households
   const studentNames = useMemo(
     () => [...new Set(visibleDocuments.map((d) => d.student_name))].sort(),
@@ -164,11 +172,12 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-ink">{t("nav.documents")}</h1>
-          <p className="text-sm text-stone mt-1">
+          <p className="text-sm text-stone-text mt-1">
             {t("docs.subtitle")}
           </p>
         </div>
         <Button
+          variant={hasRejectedDoc ? "outline" : "default"}
           onClick={() => setShowUpload(true)}
           disabled={applications.length === 0}
         >
@@ -241,7 +250,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
               {studentNames.map((studentName) => (
                 <div key={studentName}>
                   {studentNames.length > 1 && (
-                    <p className="text-xs font-semibold text-stone uppercase tracking-wide mb-2">
+                    <p className="text-xs font-semibold text-stone-text uppercase tracking-wide mb-2">
                       {studentName}
                     </p>
                   )}
@@ -260,7 +269,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
                             <span className="shrink-0 text-stone" aria-hidden="true"><IconFileText size={18} /></span>
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-ink truncate">{doc.file_name}</p>
-                              <p className="text-xs text-stone">
+                              <p className="text-xs text-stone-text">
                                 {formatDocType(doc.document_type, t)}
                                 {sizeStr && <> &middot; {sizeStr}</>}
                                 {" "}&middot; {t("docs.uploadedOn")} {formatDate(doc.created_at, localeTag)}
@@ -577,12 +586,12 @@ function UploadDialog({
               onChange={handleFileSelect}
               className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 file:mr-3 file:px-3 file:py-1 file:rounded file:border-0 file:bg-rooted-green/10 file:text-rooted-green file:font-medium file:text-sm file:cursor-pointer disabled:opacity-60"
             />
-            <p className="flex items-start gap-1 text-xs text-stone mt-1.5">
+            <p className="flex items-start gap-1 text-xs text-stone-text mt-1.5">
               <IconInfo size={12} className="shrink-0 mt-0.5" aria-hidden="true" />
               <span>{t("docs.captureHint")}</span>
             </p>
             {compressing && (
-              <p className="text-xs text-stone mt-1">{t("common.loading")}</p>
+              <p className="text-xs text-stone-text mt-1">{t("common.loading")}</p>
             )}
             {validationError && (
               <p className="text-xs text-red-600 mt-1">{validationError}</p>

@@ -53,7 +53,7 @@ export function ReenrollmentActions({ applicationId }: ReenrollmentActionsProps)
   if (done === "declined") {
     return (
       <div className="bg-stone/10 border border-stone/20 rounded-lg px-4 py-3">
-        <p className="text-sm text-stone">
+        <p className="text-sm text-stone-text">
           {t("reenroll.declineSuccess")}
         </p>
       </div>

@@ -1,7 +1,13 @@
 import type { BadgeProps } from "@/components/ui/badge";
+import { tx, type Locale, type TranslationKey } from "@/lib/i18n/translations";
 
 /**
- * Maps application status enum values to display labels and badge variants
+ * Maps application status enum values to display labels and badge variants.
+ *
+ * These are the PRECISE, staff-facing labels — use them as-is on staff
+ * surfaces. Family surfaces should not read `.label` directly; use
+ * `getFamilyStatusLabel()` below instead, which renders the parent-language
+ * wording from lib/i18n/translations.ts.
  */
 export const APPLICATION_STATUS_CONFIG: Record<
   string,
@@ -30,6 +36,20 @@ export function getStatusConfig(status: string) {
       variant: "outline" as const,
     }
   );
+}
+
+/**
+ * Family-facing, plain-language status label (EN+ES). This is the single
+ * source of truth for how a parent reads an application/offer status —
+ * e.g. `lottery_assigned` renders as "In the lottery" / "En el sorteo"
+ * instead of the precise staff term "Lottery Assigned". Falls back to the
+ * staff label (English only) for any status without a `status.*` key in
+ * translations.ts, so nothing ever renders blank.
+ */
+export function getFamilyStatusLabel(status: string, locale: Locale): string {
+  const key = `status.${status}` as TranslationKey;
+  const localized = tx(key, locale);
+  return localized === key ? getStatusConfig(status).label : localized;
 }
 
 /**

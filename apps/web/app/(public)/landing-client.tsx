@@ -172,7 +172,7 @@ function LandingContent({ schools }: LandingClientProps) {
           <h2 className="text-2xl font-bold text-ink text-center mb-3">
             {t("public.ourSchools")}
           </h2>
-          <p className="text-stone text-center mb-10 max-w-xl mx-auto">
+          <p className="text-stone-text text-center mb-10 max-w-xl mx-auto">
             <span className="font-bold">rooted</span>schools {t("public.schoolsLede")}{" "}
             {anyOpen ? t("public.clickToApply") : t("public.checkBackSoon")}
           </p>
@@ -198,8 +198,8 @@ function LandingContent({ schools }: LandingClientProps) {
                       />
                     </div>
                   </div>
-                  <p className="text-sm text-stone">{school.location}</p>
-                  <p className="text-xs text-stone/70 mt-1">
+                  <p className="text-sm text-stone-text">{school.location}</p>
+                  <p className="text-xs text-stone-text/70 mt-1">
                     {t("public.grades")} {school.gradesRange}
                   </p>
 
@@ -214,7 +214,7 @@ function LandingContent({ schools }: LandingClientProps) {
                   ) : (
                     <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rooted-gray border border-rooted-gray-dark">
                       <span className="w-2 h-2 rounded-full bg-stone" />
-                      <span className="text-xs font-medium text-stone">
+                      <span className="text-xs font-medium text-stone-text">
                         {t("public.enrollmentClosed")}
                       </span>
                     </div>
@@ -222,7 +222,7 @@ function LandingContent({ schools }: LandingClientProps) {
 
                   {/* Close date info */}
                   {school.isOpen && school.closeDate && (
-                    <p className="text-[11px] text-stone mt-1.5">
+                    <p className="text-[11px] text-stone-text mt-1.5">
                       {t("public.closes")} {formatCloseDate(school.closeDate, locale)}
                       {school.daysRemaining !== null && school.daysRemaining <= 14 && (
                         <span className="text-amber-600 font-semibold">
@@ -266,7 +266,7 @@ function LandingContent({ schools }: LandingClientProps) {
                 <p className="text-sm font-semibold text-ink">
                   {s.title}
                 </p>
-                <p className="text-xs text-stone mt-1">{s.desc}</p>
+                <p className="text-xs text-stone-text mt-1">{s.desc}</p>
               </div>
             ))}
           </div>

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconFileText } from "@/components/ui/icons";
 import Link from "next/link";
-import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
+import { getStatusConfig, getFamilyStatusLabel, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationRow } from "@/lib/queries";
 import { useLocale } from "@/lib/i18n/locale-context";
 
@@ -56,7 +56,7 @@ interface FamilyApplicationsClientProps {
 }
 
 export function FamilyApplicationsClient({ applications }: FamilyApplicationsClientProps) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const hasApplications = applications.length > 0;
 
   return (
@@ -64,12 +64,14 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-ink">{t("apps.heading")}</h1>
-          <p className="text-sm text-stone mt-1">
+          <p className="text-sm text-stone-text mt-1">
             Track the status of your children&apos;s enrollment applications.
           </p>
         </div>
+        {/* Outline, not solid — this competes with a draft's "Continue" button
+            or the empty-state's own primary CTA. One solid action per screen. */}
         <Link href="/family/applications/new">
-          <Button>{t("dashboard.startNewApplication")}</Button>
+          <Button variant="outline">{t("dashboard.startNewApplication")}</Button>
         </Link>
       </div>
 
@@ -77,7 +79,7 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
         <EmptyState
           icon={<IconFileText size={40} />}
           title={t("apps.noApplications")}
-          description="Start a new application to enroll your child at a rootedschool campus."
+          description={t("apps.noApplicationsDetail")}
         >
           <Link href="/family/applications/new">
             <Button>{t("apps.startApplication")}</Button>
@@ -87,6 +89,7 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
         <div className="space-y-4">
           {applications.map((app) => {
             const cfg = getStatusConfig(app.status);
+            const statusLabel = getFamilyStatusLabel(app.status, locale);
             const statusMessage = getStatusMessage(app.status);
             const isDraft = app.status === "draft";
             const needsAction =
@@ -113,11 +116,11 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
                       <CardTitle className="text-base">
                         {app.student_name}
                       </CardTitle>
-                      <p className="text-sm text-stone">
+                      <p className="text-sm text-stone-text">
                         {getGradeLabel(app.grade)} &middot; {app.campus_name}
                       </p>
                     </div>
-                    <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                    <Badge variant={cfg.variant}>{statusLabel}</Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -141,7 +144,7 @@ export function FamilyApplicationsClient({ applications }: FamilyApplicationsCli
                   )}
 
                   <div className="flex items-center justify-between pt-2 border-t border-rooted-gray">
-                    <div className="flex gap-4 text-xs text-stone">
+                    <div className="flex gap-4 text-xs text-stone-text">
                       {app.submitted_at && (
                         <span>{t("apps.submitted")}: {formatDate(app.submitted_at)}</span>
                       )}

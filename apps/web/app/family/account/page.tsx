@@ -31,13 +31,13 @@ export default async function FamilyAccountPage() {
         <Card>
           <CardContent className="p-6 space-y-4">
             <div className="flex items-center justify-between gap-4">
-              <span className="text-sm text-stone">{t("account.email")}</span>
+              <span className="text-sm text-stone-text">{t("account.email")}</span>
               <span className="text-sm text-ink font-medium truncate">
                 {user.email ?? t("account.notProvided")}
               </span>
             </div>
             <div className="flex items-center justify-between gap-4">
-              <span className="text-sm text-stone">{t("account.phone")}</span>
+              <span className="text-sm text-stone-text">{t("account.phone")}</span>
               <span className="text-sm text-ink font-medium truncate">
                 {user.phone ?? t("account.notProvided")}
               </span>

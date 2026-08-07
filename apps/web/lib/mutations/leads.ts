@@ -53,11 +53,20 @@ export async function createLeadFromInquiry(
 ): Promise<MutationResult<{ id: string }>> {
   const supabase = createServiceRoleClient();
 
+  // These surface directly on the public bilingual inquiry form, which has
+  // no server-side locale context here — match the "EN / ES" slash format
+  // already used for the rate-limit message in the calling server action.
   if (!input.first_name?.trim() || !input.last_name?.trim() || !input.campus_id) {
-    return { data: null, error: "Name and campus are required." };
+    return {
+      data: null,
+      error: "Please enter your name and choose a school. / Por favor ingrese su nombre y elija una escuela.",
+    };
   }
   if (!input.email?.trim() && !input.phone?.trim()) {
-    return { data: null, error: "An email or phone number is required so we can reach you." };
+    return {
+      data: null,
+      error: "Please share an email or phone number so we can reach you. / Por favor comparta un correo o teléfono para poder contactarle.",
+    };
   }
 
   // Soft dedupe: an open lead with the same email at the same campus gets a

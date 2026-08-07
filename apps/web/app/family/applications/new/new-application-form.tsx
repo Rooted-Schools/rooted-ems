@@ -156,7 +156,7 @@ function StepIndicator({
                       ? "bg-rooted-green text-white"
                       : isCurrent
                         ? "border-2 border-rooted-green text-rooted-green"
-                        : "border border-stone/30 text-stone"
+                        : "border border-stone/30 text-stone-text"
                   }
                 `}
               >
@@ -180,7 +180,7 @@ function StepIndicator({
               </div>
               <span
                 className={`text-xs hidden sm:inline ${
-                  isCurrent ? "font-semibold text-ink" : "text-stone"
+                  isCurrent ? "font-semibold text-ink" : "text-stone-text"
                 }`}
               >
                 {t(step.labelKey)}
@@ -474,12 +474,12 @@ export function NewApplicationForm({
       <div>
         <Link
           href="/family/applications"
-          className="text-sm text-stone hover:text-ink/70 transition-colors"
+          className="text-sm text-stone-text hover:text-ink/70 transition-colors"
         >
           &larr; {t("appForm.backToApplications")}
         </Link>
         <h1 className="text-2xl font-bold text-ink mt-2">{t("appForm.title")}</h1>
-        <p className="text-sm text-stone mt-1">
+        <p className="text-sm text-stone-text mt-1">
           {t("appForm.subtitle")}
         </p>
       </div>
@@ -586,11 +586,18 @@ export function NewApplicationForm({
               />
               <label htmlFor="has-sibling" className="text-sm text-ink/70">
                 {t("appForm.siblingLabel")}
-                <span className="block text-xs text-stone mt-0.5">
+                <span className="block text-xs text-stone-text mt-0.5">
                   {t("appForm.siblingNote")}
                 </span>
               </label>
             </div>
+            <Link
+              href="/how-the-lottery-works"
+              target="_blank"
+              className="text-xs text-rooted-green hover:underline inline-block"
+            >
+              {t("lottery.inlineLink")}
+            </Link>
           </CardContent>
         </Card>
       )}
@@ -741,12 +748,12 @@ export function NewApplicationForm({
               />
               <label htmlFor="sms-consent" className="text-sm text-ink/80">
                 {t("appForm.smsConsent")}
-                <span className="block text-xs text-stone mt-0.5">
+                <span className="block text-xs text-stone-text mt-0.5">
                   {t("appForm.smsConsentHint")}
                 </span>
               </label>
             </div>
-            <p className="text-xs text-stone">
+            <p className="text-xs text-stone-text">
               {t("appForm.regNote")}
             </p>
           </CardContent>
@@ -761,6 +768,13 @@ export function NewApplicationForm({
             <CardDescription>
               {t("appForm.reviewDesc")}
             </CardDescription>
+            <Link
+              href="/how-the-lottery-works"
+              target="_blank"
+              className="text-xs text-rooted-green hover:underline inline-block"
+            >
+              {t("lottery.inlineLink")}
+            </Link>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="space-y-4">
@@ -784,7 +798,7 @@ export function NewApplicationForm({
 
             <hr className="border-stone/20" />
 
-            <p className="text-sm text-stone mb-3">{t("appForm.readSign")}</p>
+            <p className="text-sm text-stone-text mb-3">{t("appForm.readSign")}</p>
             <div className="space-y-3">
               <div className="flex items-start gap-2">
                 <input
@@ -822,7 +836,7 @@ export function NewApplicationForm({
                 placeholder={t("appForm.fullNamePlaceholder")}
               />
             </Field>
-            <p className="text-xs text-stone">
+            <p className="text-xs text-stone-text">
               {t("appForm.eSignNote")}{" "}
               {new Date().toLocaleDateString(locale === "es" ? "es-US" : "en-US")}
             </p>
@@ -879,7 +893,7 @@ function ReviewSection({
 }) {
   return (
     <div>
-      <p className="text-xs font-semibold text-stone uppercase tracking-wider mb-2">{title}</p>
+      <p className="text-xs font-semibold text-stone-text uppercase tracking-wider mb-2">{title}</p>
       <div className="space-y-1">{children}</div>
     </div>
   );
@@ -888,7 +902,7 @@ function ReviewSection({
 function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex gap-2 text-sm">
-      <span className="text-stone w-32 shrink-0">{label}</span>
+      <span className="text-stone-text w-32 shrink-0">{label}</span>
       <span className="text-ink">{value}</span>
     </div>
   );

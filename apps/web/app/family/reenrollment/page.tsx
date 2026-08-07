@@ -100,14 +100,14 @@ export default async function FamilyReenrollmentPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-ink">{t("reenroll.heading")}</h1>
-        <p className="text-sm text-stone mt-1">{t("reenroll.subtitle")}</p>
+        <p className="text-sm text-stone-text mt-1">{t("reenroll.subtitle")}</p>
       </div>
 
       {hasNothing && (
         <Card>
           <CardContent className="py-10 text-center">
-            <p className="text-stone">{t("reenroll.noOffers")}</p>
-            <p className="text-xs text-stone/70 mt-2">{t("reenroll.contactOffice")}</p>
+            <p className="text-stone-text">{t("reenroll.noOffers")}</p>
+            <p className="text-xs text-stone-text/70 mt-2">{t("reenroll.contactOffice")}</p>
           </CardContent>
         </Card>
       )}
@@ -118,7 +118,7 @@ export default async function FamilyReenrollmentPage() {
             <h2 className="text-base font-semibold text-ink">
               {t("reenroll.pulseSectionHeading")}
             </h2>
-            <p className="text-sm text-stone">{t("reenroll.pulseSectionSubtitle")}</p>
+            <p className="text-sm text-stone-text">{t("reenroll.pulseSectionSubtitle")}</p>
           </div>
           <div className="space-y-4">
             {pulseCandidates.map((candidate) => (
@@ -160,7 +160,7 @@ export default async function FamilyReenrollmentPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-stone mb-4">
+                <p className="text-sm text-stone-text mb-4">
                   {t("reenroll.offerBody")
                     .replace("{student}", offer.studentName)
                     .replace("{grade}", offer.grade)

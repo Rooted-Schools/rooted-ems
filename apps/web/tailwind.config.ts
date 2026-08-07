@@ -34,6 +34,11 @@ const config: Config = {
         ink: "#111111",
         "warm-white": "#FAF9F7",
         stone: "#A8A29E",
+        /* Accessible stone: 5.23:1 against warm-white (#FAF9F7) — passes WCAG
+         * AA for normal text. Use for essential small text on family/public
+         * surfaces (deadlines, helper text, labels, empty-state copy). The
+         * base `stone` token (#A8A29E, ~2.4:1) stays for decorative/staff use. */
+        "stone-text": "#6E6862",
         /* ── UX handoff palette additions — surfaces + semantic ── */
         sunken: "#F2EEE5",             // table headers, chrome, progress track
         line: "#E9E6DE",               // hairlines

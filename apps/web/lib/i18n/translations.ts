@@ -25,18 +25,24 @@ const dict = {
   "nav.closeMenu":      { en: "Close menu",       es: "Cerrar menú" },
 
   // ─── Application Statuses ─────────────────────────────────────────────────
-  "status.draft":            { en: "Draft",              es: "Borrador" },
-  "status.submitted":        { en: "Submitted",          es: "Enviada" },
-  "status.needs_info":       { en: "Needs Info",         es: "Información Requerida" },
-  "status.verified":         { en: "Verified",           es: "Verificada" },
-  "status.lottery_assigned": { en: "Lottery Assigned",   es: "Sorteo Asignado" },
-  "status.offered":          { en: "Offered",            es: "Con Oferta" },
-  "status.accepted":         { en: "Accepted",           es: "Aceptada" },
-  "status.registered":       { en: "Registered",         es: "Registrado" },
-  "status.waitlisted":       { en: "Waitlisted",         es: "En Lista de Espera" },
-  "status.withdrawn":        { en: "Withdrawn",          es: "Retirada" },
-  "status.placement_review": { en: "Placement Review",   es: "Revisión de Ubicación" },
-  "status.enrolled":         { en: "Enrolled",           es: "Matriculado" },
+  // Plain-language, parent-facing wording — deliberately looser than the
+  // precise staff terms in lib/application-helpers.ts getStatusConfig().
+  // This is the single place family surfaces should read a status label from
+  // (see getFamilyStatusLabel); staff surfaces keep the precise labels.
+  "status.draft":            { en: "Draft",                        es: "Borrador" },
+  "status.submitted":        { en: "Submitted",                    es: "Enviada" },
+  "status.needs_info":       { en: "We need more info",            es: "Necesitamos más información" },
+  "status.verified":         { en: "Verified",                     es: "Verificada" },
+  "status.lottery_assigned": { en: "In the lottery",                es: "En el sorteo" },
+  "status.offered":          { en: "Offered a seat",                es: "Le ofrecimos un cupo" },
+  "status.accepted":         { en: "Offer accepted",                es: "Oferta aceptada" },
+  "status.registered":       { en: "Registration submitted",        es: "Registro enviado" },
+  "status.waitlisted":       { en: "On the waitlist",               es: "En lista de espera" },
+  "status.withdrawn":        { en: "Withdrawn",                     es: "Retirada" },
+  "status.placement_review": { en: "Almost done — final checks",    es: "Casi listo — últimas verificaciones" },
+  "status.enrolled":         { en: "Enrolled",                      es: "Matriculado" },
+  "status.declined":         { en: "Declined",                      es: "Rechazada" },
+  "status.expired":          { en: "Offer expired",                 es: "Oferta expirada" },
 
   // ─── Dashboard ────────────────────────────────────────────────────────────
   "dashboard.welcomeBack":          { en: "Welcome back",                es: "Bienvenido/a de vuelta" },
@@ -254,6 +260,7 @@ const dict = {
   // ─── Applications ─────────────────────────────────────────────────────────
   "apps.heading":           { en: "My Applications",        es: "Mis Solicitudes" },
   "apps.noApplications":    { en: "No applications yet.",   es: "Aún no hay solicitudes." },
+  "apps.noApplicationsDetail": { en: "Start your first application here — it takes about 5 minutes, and you can save a draft and finish anytime.", es: "Inicie aquí su primera solicitud — toma unos 5 minutos, y puede guardar un borrador y terminar cuando quiera." },
   "apps.startApplication":  { en: "Start Application",      es: "Iniciar Solicitud" },
   "apps.viewDetails":       { en: "View Details",           es: "Ver Detalles" },
   "apps.campus":            { en: "Campus",                 es: "Escuela" },
@@ -471,6 +478,13 @@ const dict = {
   "docs.uploadSuccess":       { en: "uploaded successfully.", es: "se cargó correctamente." },
   "docs.uploadUnexpected":    { en: "An unexpected error occurred during upload.", es: "Ocurrió un error inesperado durante la carga." },
 
+  // ─── Application detail: per-application panels ───────────────────────────
+  "apps.detail.noDocs":         { en: "No documents uploaded yet.", es: "Aún no se han subido documentos." },
+  "apps.detail.goToDocuments":  { en: "Go to Documents page to upload →", es: "Ir a la página de Documentos para subir →" },
+  "apps.detail.timelineTitle":  { en: "Application Timeline", es: "Cronología de la Solicitud" },
+  "apps.detail.timelineDesc":   { en: "Track the progress of this application.", es: "Siga el progreso de esta solicitud." },
+  "apps.detail.noActivity":     { en: "No activity recorded yet — updates will appear here as your application moves through review.", es: "Aún no hay actividad registrada — las actualizaciones aparecerán aquí a medida que su solicitud avance en la revisión." },
+
   // ─── Camera-first capture (UX Phase 5A) ───────────────────────────────────
   "docs.captureHint":         { en: "Lay the document flat, fill the frame, and avoid glare.", es: "Coloque el documento en una superficie plana, llene el encuadre y evite el brillo." },
   "docs.compressed":          { en: "compressed",                      es: "comprimido" },
@@ -651,6 +665,10 @@ const dict = {
   "lottery.startApplication": { en: "Start an application", es: "Iniciar una solicitud" },
   "lottery.learnLink":        { en: "Curious how enrollment works? Read about our lottery", es: "¿Curiosidad por saber cómo funciona la inscripción? Lea sobre nuestra lotería" },
   "public.howLotteryWorks":   { en: "How our lottery works", es: "Cómo funciona nuestra lotería" },
+  // Quiet inline link — placed wherever a family first meets the word
+  // "lottery" (dashboard journey, lottery result page, application form,
+  // sibling-priority note). Deliberately plain text, not a button.
+  "lottery.inlineLink":       { en: "How does the lottery work?", es: "¿Cómo funciona el sorteo?" },
 
   // ─── Family lottery result page ────────────────────────────────────────────
   "lotteryResult.badgeOffered":      { en: "Offered a seat",       es: "Le ofrecimos un cupo" },

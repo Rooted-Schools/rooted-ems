@@ -76,7 +76,7 @@ export function LotteryExplainerClient({ campuses }: LotteryExplainerClientProps
                   </div>
                   <div>
                     <p className="text-sm font-medium text-ink">{t(s.title)}</p>
-                    <p className="text-xs text-stone mt-0.5">{t(s.desc)}</p>
+                    <p className="text-xs text-stone-text mt-0.5">{t(s.desc)}</p>
                   </div>
                 </div>
               ))}
@@ -102,7 +102,7 @@ export function LotteryExplainerClient({ campuses }: LotteryExplainerClientProps
                     <li>{t("lottery.generalPool")}</li>
                   </ol>
                   {campus.closeDate && (
-                    <p className="text-xs text-stone mt-2">
+                    <p className="text-xs text-stone-text mt-2">
                       {t("lottery.closesLine").replace(
                         "{date}",
                         new Date(campus.closeDate).toLocaleDateString(

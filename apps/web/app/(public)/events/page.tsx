@@ -26,7 +26,7 @@ export default async function PublicEventsPage() {
 
           <div>
             <h1 className="text-2xl font-bold text-ink">{es ? "Próximos eventos" : "Upcoming events"}</h1>
-            <p className="text-sm text-stone mt-1">
+            <p className="text-sm text-stone-text mt-1">
               {es
                 ? "Venga a conocernos. Las familias y los estudiantes son bienvenidos."
                 : "Come meet us. Families and students are both welcome."}
@@ -35,7 +35,7 @@ export default async function PublicEventsPage() {
 
           {events.length === 0 ? (
             <div className="rounded-xl border border-stone/20 bg-white px-4 py-10 text-center">
-              <p className="text-stone text-sm">
+              <p className="text-stone-text text-sm">
                 {es
                   ? "No hay eventos programados por ahora. Vuelva pronto."
                   : "No events scheduled right now. Check back soon."}
@@ -54,13 +54,13 @@ export default async function PublicEventsPage() {
                     </span>
                     <h2 className="text-base font-semibold text-ink mt-1.5">{e.title}</h2>
                     <p className="text-sm text-ink/70">{formatEventWhen(e.starts_at, e.ends_at, es)}</p>
-                    <p className="text-xs text-stone mt-0.5">
+                    <p className="text-xs text-stone-text mt-0.5">
                       {e.campus_name}{e.location ? ` · ${e.location}` : ""}
                     </p>
                   </div>
                   <div className="shrink-0 self-center">
                     {e.is_full ? (
-                      <span className="text-xs text-stone">{es ? "Lleno" : "Full"}</span>
+                      <span className="text-xs text-stone-text">{es ? "Lleno" : "Full"}</span>
                     ) : (
                       <Link
                         href={`/events/${e.id}`}

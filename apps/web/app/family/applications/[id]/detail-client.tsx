@@ -15,13 +15,14 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useRef } from "react";
-import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
+import { getStatusConfig, getFamilyStatusLabel, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationDetail } from "@/lib/queries";
 import { uploadFile, getSignedUrl, validateFile, formatFileSize } from "@/lib/storage/upload";
 import { compressImageFile } from "@/lib/storage/compress-image";
 import { familyWithdrawApplication, familyAcceptOffer, familyDeclineOffer, familyAcceptDirect, familyDeclineDirect, familySubmitResponse, familyCreateDocumentRecord } from "../actions";
 import type { ReactNode } from "react";
 import { useLocale } from "@/lib/i18n/locale-context";
+import type { TranslationKey } from "@/lib/i18n/translations";
 import {
   IconPenLine,
   IconMail,
@@ -65,10 +66,13 @@ function getStatusExplanation(status: string): { title: string; explanation: str
   }
 }
 
-const docStatusConfig: Record<string, { label: string; variant: "success" | "warning" | "destructive" }> = {
-  pending: { label: "Pending Review", variant: "warning" },
-  verified: { label: "Verified", variant: "success" },
-  rejected: { label: "Needs Re-upload", variant: "destructive" },
+// Labels come from the existing docs.status.* / common.verified translation
+// keys (same wording used on /family/documents) rather than hardcoded
+// English strings, so this stays bilingual for parents.
+const docStatusConfig: Record<string, { labelKey: TranslationKey; variant: "success" | "warning" | "destructive" }> = {
+  pending: { labelKey: "docs.status.pending", variant: "warning" },
+  verified: { labelKey: "common.verified", variant: "success" },
+  rejected: { labelKey: "docs.status.rejected", variant: "destructive" },
 };
 
 function formatDate(dateStr: string | null) {
@@ -83,7 +87,7 @@ function formatDate(dateStr: string | null) {
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between py-2 border-b border-rooted-gray last:border-0">
-      <span className="text-sm text-stone">{label}</span>
+      <span className="text-sm text-stone-text">{label}</span>
       <span className="text-sm font-medium text-ink text-right">{value}</span>
     </div>
   );
@@ -99,7 +103,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
   const router = useRouter();
   // Only used for the Phase 5A capture-hint string below — the rest of this
   // component's copy predates the i18n system and is out of scope here.
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [showDeclineDialog, setShowDeclineDialog] = useState(false);
@@ -114,6 +118,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const statusCfg = getStatusConfig(detail.status);
+  const statusLabel = getFamilyStatusLabel(detail.status, locale);
   const statusExplanation = getStatusExplanation(detail.status);
   const isDraft = detail.status === "draft";
   const isOffered = detail.status === "offered";
@@ -254,9 +259,9 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-ink">{detail.student_name}</h1>
-            <Badge variant={statusCfg.variant}>{statusCfg.label}</Badge>
+            <Badge variant={statusCfg.variant}>{statusLabel}</Badge>
           </div>
-          <p className="text-sm text-stone mt-1">
+          <p className="text-sm text-stone-text mt-1">
             {getGradeLabel(detail.grade)} &middot; {detail.campus_name} &middot; {detail.enrollment_window_name}
           </p>
         </div>
@@ -544,9 +549,9 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
             if (visibleDocs.length === 0) {
               return (
                 <div className="text-center py-6">
-                  <p className="text-sm text-stone">No documents uploaded yet.</p>
+                  <p className="text-sm text-stone-text">{t("apps.detail.noDocs")}</p>
                   <Link href="/family/documents" className="text-xs text-rooted-green hover:underline mt-1 inline-block">
-                    Go to Documents page to upload →
+                    {t("apps.detail.goToDocuments")}
                   </Link>
                 </div>
               );
@@ -567,7 +572,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                           <p className="text-sm font-medium text-ink truncate">
                             {doc.file_name}
                           </p>
-                          <p className="text-xs text-stone">
+                          <p className="text-xs text-stone-text">
                             Uploaded {formatDate(doc.created_at)}
                           </p>
                           {doc.status === "rejected" && doc.rejection_reason && (
@@ -579,7 +584,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <Badge variant={dcfg.variant}>{dcfg.label}</Badge>
+                        <Badge variant={dcfg.variant}>{t(dcfg.labelKey)}</Badge>
                         {doc.status === "rejected" && (
                           <Link href="/family/documents">
                             <Button size="sm">Re-upload</Button>
@@ -606,15 +611,15 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
       {/* Timeline */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Application Timeline</CardTitle>
+          <CardTitle className="text-base">{t("apps.detail.timelineTitle")}</CardTitle>
           <CardDescription>
-            Track the progress of this application.
+            {t("apps.detail.timelineDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {detail.timeline.length === 0 ? (
-            <p className="text-center text-stone py-6 text-sm">
-              No activity recorded yet.
+            <p className="text-center text-stone-text py-6 text-sm max-w-sm mx-auto">
+              {t("apps.detail.noActivity")}
             </p>
           ) : (
             <div className="relative">
@@ -622,6 +627,8 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
               <div className="space-y-5">
                 {detail.timeline.map((entry, idx) => {
                   const toCfg = getStatusConfig(entry.to_status);
+                  const toLabel = getFamilyStatusLabel(entry.to_status, locale);
+                  const fromLabel = entry.from_status ? getFamilyStatusLabel(entry.from_status, locale) : null;
                   return (
                     <div key={entry.id} className="relative flex gap-4 pl-0">
                       <div
@@ -637,24 +644,24 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
                       </div>
                       <div className="flex-1 -mt-0.5">
                         <div className="flex items-center gap-2">
-                          {entry.from_status && (
+                          {fromLabel && (
                             <>
                               <Badge variant="secondary" className="text-xs">
-                                {getStatusConfig(entry.from_status).label}
+                                {fromLabel}
                               </Badge>
                               <span className="text-stone text-xs">→</span>
                             </>
                           )}
                           <Badge variant={toCfg.variant} className="text-xs">
-                            {toCfg.label}
+                            {toLabel}
                           </Badge>
                         </div>
                         {entry.reason && (
-                          <p className="text-sm text-stone mt-0.5">
+                          <p className="text-sm text-stone-text mt-0.5">
                             {entry.reason}
                           </p>
                         )}
-                        <p className="text-xs text-stone mt-1">
+                        <p className="text-xs text-stone-text mt-1">
                           {formatDate(entry.created_at)}
                         </p>
                       </div>
@@ -668,7 +675,7 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
       </Card>
 
       {/* Dates footer */}
-      <div className="flex gap-6 text-xs text-stone pb-4">
+      <div className="flex gap-6 text-xs text-stone-text pb-4">
         {detail.submitted_at && <span>Submitted: {formatDate(detail.submitted_at)}</span>}
         <span>Last Updated: {formatDate(detail.updated_at)}</span>
         <span>Application ID: {detail.id}</span>

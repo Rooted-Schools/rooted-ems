@@ -384,7 +384,7 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
               <div>
                 <label htmlFor="inq-email" className="block text-sm font-medium text-ink/70 mb-1">
                   {t("inquiry.email")}{" "}
-                  <span className="text-[11px] font-normal text-stone rounded-[6px] bg-sunken px-1.5 py-0.5 align-middle">
+                  <span className="text-[11px] font-normal text-stone-text rounded-[6px] bg-sunken px-1.5 py-0.5 align-middle">
                     {t("inquiry.optionalTag")}
                   </span>
                 </label>
@@ -446,7 +446,7 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
               <Button type="submit" className="w-full" size="lg" disabled={isPending}>
                 {isPending ? t("inquiry.sending") : t("inquiry.submit")}
               </Button>
-              <p className="text-xs text-stone text-center">{t("inquiry.responsePromise")}</p>
+              <p className="text-xs text-stone-text text-center">{t("inquiry.responsePromise")}</p>
             </form>
           </CardContent>
         </Card>

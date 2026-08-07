@@ -91,7 +91,7 @@ export function ReenrollmentIntentPulse({
                 "text-sm font-medium",
                 savedTone === "rooted-green" && "text-rooted-green",
                 savedTone === "warn" && "text-warn-text",
-                savedTone === "stone" && "text-stone"
+                savedTone === "stone" && "text-stone-text"
               )}
             >
               {savedMessage}
@@ -136,7 +136,7 @@ export function ReenrollmentIntentPulse({
                 type="button"
                 disabled={pending !== null}
                 onClick={() => handleTap("no")}
-                className="flex min-h-[44px] items-center justify-center gap-2 rounded-[6px] border border-stone/30 bg-stone/10 px-4 py-4 text-sm font-semibold text-stone hover:bg-stone/20 disabled:opacity-50 transition-colors"
+                className="flex min-h-[44px] items-center justify-center gap-2 rounded-[6px] border border-stone/30 bg-stone/10 px-4 py-4 text-sm font-semibold text-stone-text hover:bg-stone/20 disabled:opacity-50 transition-colors"
               >
                 <IconX size={18} />
                 {pending === "no" ? t("reenroll.pulseSaving") : t("reenroll.pulseNo")}

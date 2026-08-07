@@ -55,7 +55,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
             <IconCheckCircle size={40} />
           </div>
           <h2 className="text-xl font-bold text-ink">{t("offers.offerAccepted")}</h2>
-          <p className="text-sm text-stone max-w-xs mx-auto">
+          <p className="text-sm text-stone-text max-w-xs mx-auto">
             {t("offers.alreadyAcceptedPre")} {offer.student_name} {t("common.at")}{" "}
             {offer.campus_name}. {t("offers.alreadyAcceptedPost")}
           </p>
@@ -77,7 +77,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
             <IconBan size={40} />
           </div>
           <h2 className="text-xl font-bold text-ink">{t("offers.offerDeclined")}</h2>
-          <p className="text-sm text-stone max-w-xs mx-auto">
+          <p className="text-sm text-stone-text max-w-xs mx-auto">
             {t("offers.declinedPre")} {offer.student_name}. {t("offers.declinedPost")}
           </p>
           <Link href="/family/dashboard">
@@ -96,7 +96,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
             <IconClock size={40} />
           </div>
           <h2 className="text-xl font-bold text-ink">{t("offers.offerExpired")}</h2>
-          <p className="text-sm text-stone max-w-xs mx-auto">
+          <p className="text-sm text-stone-text max-w-xs mx-auto">
             {t("offers.expiredPre")} {offer.student_name} {t("offers.expiredPost")}
           </p>
           <Link href="/family/dashboard">
@@ -165,19 +165,19 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div>
-              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">{t("offers.student")}</p>
+              <p className="text-stone-text text-xs uppercase tracking-wide mb-0.5">{t("offers.student")}</p>
               <p className="font-medium text-ink">{offer.student_name}</p>
             </div>
             <div>
-              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">{t("offers.grade")}</p>
+              <p className="text-stone-text text-xs uppercase tracking-wide mb-0.5">{t("offers.grade")}</p>
               <p className="font-medium text-ink">{offer.grade}</p>
             </div>
             <div>
-              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">{t("offers.school")}</p>
+              <p className="text-stone-text text-xs uppercase tracking-wide mb-0.5">{t("offers.school")}</p>
               <p className="font-medium text-ink">{offer.campus_name}</p>
             </div>
             <div>
-              <p className="text-stone text-xs uppercase tracking-wide mb-0.5">{t("offers.deadline")}</p>
+              <p className="text-stone-text text-xs uppercase tracking-wide mb-0.5">{t("offers.deadline")}</p>
               <div>
                 {offer.is_urgent ? (
                   <Badge variant="destructive" className="text-xs whitespace-nowrap">
@@ -199,7 +199,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
           </div>
 
           <div className="border-t border-rooted-gray pt-3">
-            <p className="text-xs text-stone">
+            <p className="text-xs text-stone-text">
               {t("offers.respondBy")}{" "}
               <span className={`font-semibold ${offer.is_urgent ? "text-red-600" : "text-ink"}`}>
                 {formatExpiry(offer.expires_at, localeTag)}

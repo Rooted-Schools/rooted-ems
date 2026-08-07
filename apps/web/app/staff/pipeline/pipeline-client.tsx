@@ -383,6 +383,9 @@ export function PipelineClient({
         <div>
           <h1 className={cn("text-2xl font-bold text-ink", displayClass)}>Pipeline</h1>
           <p className="mt-1 text-sm text-stone">
+            Every application in review, grouped by stage from first submission to enrollment.
+          </p>
+          <p className="mt-0.5 text-sm text-stone">
             <span className="font-medium text-ink">{totalCount.toLocaleString("en-US")}</span> in {activeStageLabel.toLowerCase()}
           </p>
         </div>
@@ -541,7 +544,7 @@ export function PipelineClient({
           <EmptyState
             icon={<IconClipboardList size={40} />}
             title="No applications in this stage"
-            description={search || campusFilter !== "all" ? "Try adjusting your search or filters." : "Nothing is sitting in this stage right now."}
+            description={search || campusFilter !== "all" ? "Try adjusting your search or filters." : "Nothing is sitting in this stage right now — applications will land here automatically as they move through review."}
           />
         ) : (
           <Table>
