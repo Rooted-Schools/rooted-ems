@@ -739,6 +739,116 @@ export async function notifyFamilyRegistrationNudge({
   ]);
 }
 
+/**
+ * Registration is complete and the school year hasn't started yet — one warm
+ * "you're all set, here's what's next" touch during the summer melt window.
+ * Sent once per enrollment by the keep-the-seat cron, which owns the
+ * dedupe/throttle (registration_packet.keep_the_seat_sent_at from migration
+ * 00036), so this function just delivers on all channels, matching
+ * notifyFamilyRegistrationNudge's split of responsibility.
+ */
+export async function notifyFamilyKeepTheSeat({
+  enrollmentId,
+  studentName,
+  campusId,
+  startDate,
+}: {
+  enrollmentId: string;
+  studentName?: string;
+  campusId?: string;
+  /** ISO date string for the school year's first day, when known. */
+  startDate?: string;
+}): Promise<void> {
+  const contact = await getGuardianContactByEnrollment(enrollmentId);
+  const { userId, email } = contact;
+  if (!userId && !email) return;
+  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const studentFirstName = firstNameOf(studentName);
+  await Promise.all([
+    userId
+      ? notify({
+          userId,
+          subject: `You're all set at ${campusName}`,
+          body: `${
+            studentName ? `${studentName}'s` : "Your student's"
+          } registration is complete at ${campusName}. Watch your email and phone this summer for orientation details and what to bring.`,
+          link: `/family/registration`,
+          campusId,
+          logTag: "notifyFamilyKeepTheSeat",
+        })
+      : Promise.resolve(),
+    emailGuardian(
+      email,
+      emailTemplates.keepTheSeat({ studentFirstName, campusName, startDate }),
+      "notifyFamilyKeepTheSeat",
+      campusEmail
+    ),
+    smsGuardian(
+      contact,
+      `Rooted Schools: ${studentFirstName ?? "Your student"}'s seat at ${campusName} is all set! Watch for orientation details this summer.\n¡El cupo de ${
+        studentFirstName ?? "su estudiante"
+      } en ${campusName} está listo! Esté atento(a) a los detalles de orientación este verano.`,
+      "notifyFamilyKeepTheSeat"
+    ),
+  ]);
+}
+
+/**
+ * Spring re-enrollment intent pulse: staff-triggered only (no automated cron
+ * — spring timing is a human decision, per staffSendReenrollmentPulse in
+ * app/staff/enrollment/re-enrollment-actions.ts). Asks the family a one-tap
+ * question on their currently active enrollment — is your student coming
+ * back? — via in-app, bilingual email, and consented SMS.
+ */
+export async function notifyFamilyReenrollmentPulse({
+  enrollmentId,
+  studentName,
+  campusId,
+  nextSchoolYearName,
+}: {
+  enrollmentId: string;
+  studentName?: string;
+  campusId?: string;
+  nextSchoolYearName?: string;
+}): Promise<void> {
+  const contact = await getGuardianContactByEnrollment(enrollmentId);
+  const { userId, email } = contact;
+  if (!userId && !email && !contact.phone) return;
+  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const studentFirstName = firstNameOf(studentName);
+  await Promise.all([
+    userId
+      ? notify({
+          userId,
+          subject: `Is ${studentName ?? "your student"} returning to ${campusName}?`,
+          body: `We're planning seats${
+            nextSchoolYearName ? ` for ${nextSchoolYearName}` : " for next year"
+          } and want to hold ${
+            studentName ?? "your student"
+          }'s spot at ${campusName}. Tap here to let us know in one tap — yes, still deciding, or not returning.`,
+          link: `/family/reenrollment`,
+          campusId,
+          logTag: "notifyFamilyReenrollmentPulse",
+        })
+      : Promise.resolve(),
+    emailGuardian(
+      email,
+      emailTemplates.reenrollmentPulse({ studentFirstName, campusName, nextSchoolYearName }),
+      "notifyFamilyReenrollmentPulse",
+      campusEmail
+    ),
+    smsGuardian(
+      contact,
+      `Rooted Schools: Is ${studentFirstName ?? "your student"} coming back${
+        nextSchoolYearName ? ` for ${nextSchoolYearName}` : " next year"
+      }? One tap to let us know: ${APP_LINK}/family/reenrollment\n¿${
+        studentFirstName ?? "Su estudiante"
+      } regresará${nextSchoolYearName ? ` para ${nextSchoolYearName}` : " el próximo año"}? Responda con un toque: ${APP_LINK}/family/reenrollment`,
+      "notifyFamilyReenrollmentPulse"
+    ),
+  ]);
+}
+
 // ─── Lead (CRM) notifications ─────────────────────────────────────────────────
 
 interface LeadContact {

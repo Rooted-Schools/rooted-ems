@@ -184,9 +184,11 @@ const dict = {
   "reg.upload.uploading":      { en: "Uploading...",        es: "Cargando..." },
 
   // ─── Re-enrollment ────────────────────────────────────────────────────────
-  "reenroll.heading":     { en: "Re-enrollment Offers",    es: "Ofertas de Re-matrícula" },
+  "reenroll.heading":     { en: "Re-enrollment",    es: "Re-matrícula" },
+  "reenroll.subtitle":    { en: "Review and respond to re-enrollment offers for the upcoming school year.", es: "Revise y responda a las ofertas de re-matrícula para el próximo año escolar." },
   "reenroll.noOffers":    { en: "No re-enrollment offers.", es: "Sin ofertas de re-matrícula." },
   "reenroll.noOffersDetail": { en: "Your school will send re-enrollment offers when seats are confirmed for the upcoming year.", es: "Su escuela enviará ofertas de re-matrícula cuando los cupos se confirmen para el próximo año." },
+  "reenroll.contactOffice":  { en: "If you believe you should see an offer here, please contact your school's enrollment office.", es: "Si cree que debería ver una oferta aquí, comuníquese con la oficina de inscripciones de su escuela." },
   "reenroll.accept":         { en: "Accept & Enroll",         es: "Aceptar y Matricularse" },
   "reenroll.acceptLabel":    { en: "Accept Re-enrollment",    es: "Aceptar Re-matrícula" },
   "reenroll.decline":        { en: "Decline",                 es: "Rechazar" },
@@ -194,6 +196,21 @@ const dict = {
   "reenroll.declining":      { en: "Declining...",            es: "Rechazando..." },
   "reenroll.acceptSuccess":  { en: "Re-enrollment accepted. Your registration packet will be ready shortly.", es: "Re-matrícula aceptada. Su paquete de registro estará listo en breve." },
   "reenroll.declineSuccess": { en: "You have declined this re-enrollment offer.", es: "Ha rechazado esta oferta de re-matrícula." },
+  "reenroll.offerBadge":     { en: "Offer Pending",           es: "Oferta Pendiente" },
+  "reenroll.offerBody":      { en: "Your school has reserved a seat for {student} in Grade {grade} for the {year} school year. Accept to secure their spot or decline if you will not be returning.", es: "Su escuela ha reservado un cupo para {student} en el Grado {grade} para el año escolar {year}. Acepte para asegurar su lugar o rechace si no regresará." },
+
+  // ─── Re-enrollment: intent pulse (one-tap "are you returning?") ───────────
+  "reenroll.pulseSectionHeading":  { en: "Let us know if you're returning", es: "Avísenos si regresará" },
+  "reenroll.pulseSectionSubtitle": { en: "A quick one-tap answer helps your school plan seats for next year.", es: "Una respuesta rápida de un toque ayuda a su escuela a planificar los cupos para el próximo año." },
+  "reenroll.pulseQuestion":        { en: "Is {student} returning for the {year} school year?", es: "¿{student} regresará para el año escolar {year}?" },
+  "reenroll.pulseYes":             { en: "Yes, {student} is returning", es: "Sí, {student} regresa" },
+  "reenroll.pulseDeciding":        { en: "We're still deciding",        es: "Aún estamos decidiendo" },
+  "reenroll.pulseNo":              { en: "Not returning",               es: "No regresa" },
+  "reenroll.pulseSaving":          { en: "Saving...",                   es: "Guardando..." },
+  "reenroll.pulseYesSaved":        { en: "Thanks! We've noted {student} is returning.", es: "¡Gracias! Hemos anotado que {student} regresa." },
+  "reenroll.pulseDecidingSaved":   { en: "Got it — we've noted you're still deciding.", es: "Entendido — hemos anotado que aún está decidiendo." },
+  "reenroll.pulseNoSaved":         { en: "Thanks for letting us know — we've noted {student} is not returning.", es: "Gracias por avisarnos — hemos anotado que {student} no regresa." },
+  "reenroll.pulseChangeAnswer":    { en: "Change your answer",          es: "Cambiar su respuesta" },
 
   // ─── Documents ───────────────────────────────────────────────────────────────
   "docs.upload":           { en: "Upload Document",      es: "Cargar Documento" },
@@ -533,6 +550,12 @@ const dict = {
   "inquiry.thanksTitle":      { en: "Thank you — we'll be in touch!", es: "¡Gracias — estaremos en contacto!" },
   "inquiry.thanksBody":       { en: "Check your email or texts for a welcome note. A member of our enrollment team will reach out personally within a day. Ready now? You can start an application in just a few minutes.", es: "Revise su correo o mensajes de texto para ver nuestra nota de bienvenida. Un miembro de nuestro equipo se comunicará dentro de un día. ¿Listo/a ahora? Puede iniciar una solicitud en pocos minutos." },
   "inquiry.backHome":         { en: "Back to home",          es: "Volver al inicio" },
+  "inquiry.step1Hint":        { en: "Step 1 of 2 — takes about a minute", es: "Paso 1 de 2 — toma alrededor de un minuto" },
+  "inquiry.optionalTag":      { en: "optional",              es: "opcional" },
+  "inquiry.detailsTitle":     { en: "Help us get to know you", es: "Ayúdenos a conocerle" },
+  "inquiry.detailsSubtitle":  { en: "Optional — a couple quick questions, about 30 seconds.", es: "Opcional — un par de preguntas rápidas, unos 30 segundos." },
+  "inquiry.detailsSubmit":    { en: "Add details",           es: "Agregar detalles" },
+  "inquiry.skipForNow":       { en: "Skip for now",          es: "Omitir por ahora" },
   "public.ourSchools":       { en: "Our Schools",           es: "Nuestras Escuelas" },
   "public.schoolsLede":      { en: "operates career-connected schools across the country.", es: "opera escuelas conectadas con el mundo profesional en todo el país." },
   "public.clickToApply":     { en: "Click a campus to start your application.", es: "Haga clic en una escuela para iniciar su solicitud." },

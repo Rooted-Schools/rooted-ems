@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { requireStaffSession } from "@/lib/auth/get-session";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
-import { notifyFamilyStudentEnrolled } from "@/lib/notify";
+import { notifyFamilyStudentEnrolled, notifyFamilyReenrollmentPulse } from "@/lib/notify";
+import { createNote } from "@/lib/mutations";
+import { REENROLLMENT_PULSE_THROTTLE_DAYS } from "@/lib/queries/reenrollment";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -305,4 +307,139 @@ export async function staffBulkInitiateReenrollment(
   }
 
   return result;
+}
+
+// ─── Intent Pulse — Send ───────────────────────────────────────────────────
+
+interface PulseResult {
+  data: null;
+  error: string | null;
+}
+
+/**
+ * Staff-triggered send of the spring intent-to-return pulse to one family.
+ * No automated cron sends this — spring timing is a human decision. Throttled
+ * to once per REENROLLMENT_PULSE_THROTTLE_DAYS so a family isn't pulsed
+ * repeatedly; the check is re-verified here (not just in the UI) using the
+ * honest reenrollment_pulse_sent_at timestamp on the enrollment row.
+ */
+export async function staffSendReenrollmentPulse(enrollmentId: string): Promise<PulseResult> {
+  await requireStaffSession();
+  const supabase = createServiceRoleClient();
+
+  const { data: enrollment, error: fetchErr } = await supabase
+    .from("enrollment")
+    .select(
+      `
+      id,
+      campus_id,
+      status,
+      reenrollment_pulse_sent_at,
+      student:student_id (first_name, last_name)
+    `
+    )
+    .eq("id", enrollmentId)
+    .single();
+
+  if (fetchErr || !enrollment) {
+    return { data: null, error: fetchErr?.message ?? "Enrollment not found." };
+  }
+
+  const row = enrollment as unknown as {
+    id: string;
+    campus_id: string;
+    status: string;
+    reenrollment_pulse_sent_at: string | null;
+    student: { first_name: string; last_name: string } | null;
+  };
+
+  if (row.status !== "active") {
+    return { data: null, error: "This enrollment is no longer active." };
+  }
+
+  if (row.reenrollment_pulse_sent_at) {
+    const elapsedMs = Date.now() - new Date(row.reenrollment_pulse_sent_at).getTime();
+    const throttleMs = REENROLLMENT_PULSE_THROTTLE_DAYS * 24 * 60 * 60 * 1000;
+    if (elapsedMs < throttleMs) {
+      return {
+        data: null,
+        error: `A pulse was already sent within the last ${REENROLLMENT_PULSE_THROTTLE_DAYS} days.`,
+      };
+    }
+  }
+
+  const studentName = row.student
+    ? `${row.student.first_name} ${row.student.last_name}`
+    : undefined;
+
+  // Resolve the next school year's name for the notification copy, if one exists.
+  const { data: currentYear } = await supabase
+    .from("school_year")
+    .select("start_date")
+    .eq("is_current", true)
+    .maybeSingle();
+  let nextSchoolYearName: string | undefined;
+  if (currentYear) {
+    const { data: nextYear } = await supabase
+      .from("school_year")
+      .select("name")
+      .eq("is_current", false)
+      .gt("start_date", currentYear.start_date as string)
+      .order("start_date", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    nextSchoolYearName = (nextYear as { name: string } | null)?.name;
+  }
+
+  await notifyFamilyReenrollmentPulse({
+    enrollmentId,
+    studentName,
+    campusId: row.campus_id,
+    nextSchoolYearName,
+  });
+
+  const { error: stampErr } = await supabase
+    .from("enrollment")
+    .update({ reenrollment_pulse_sent_at: new Date().toISOString() })
+    .eq("id", enrollmentId);
+
+  if (stampErr) {
+    return { data: null, error: stampErr.message };
+  }
+
+  revalidatePath("/staff/enrollment");
+
+  return { data: null, error: null };
+}
+
+// ─── Intent Pulse — Mark Contacted ─────────────────────────────────────────
+
+/**
+ * Log that staff reached a non-responding family by another channel (phone
+ * call, in person). Stored as an internal note on the enrollment, same
+ * pattern as application notes (lib/mutations/notes.ts) — cheap, no new
+ * table, visible to any staff who open the note history for this entity.
+ */
+export async function staffMarkReenrollmentContacted(
+  enrollmentId: string,
+  campusId: string,
+  note?: string
+): Promise<PulseResult> {
+  await requireStaffSession();
+
+  const result = await createNote({
+    entity_type: "enrollment",
+    entity_id: enrollmentId,
+    campus_id: campusId,
+    content: note?.trim() || "Contacted about re-enrollment.",
+    is_internal: true,
+  });
+
+  if (result.error) {
+    return { data: null, error: result.error };
+  }
+
+  revalidatePath("/staff/enrollment");
+
+  return { data: null, error: null };
 }

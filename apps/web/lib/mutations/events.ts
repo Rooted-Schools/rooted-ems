@@ -129,6 +129,165 @@ export async function setRsvpStatus(
   return { data: null, error: null };
 }
 
+// ─── Check-in (migration 00037, additive — degrade when absent) ─────────
+
+/** True when the error says a named column is absent — migration not yet applied, not a missing row. */
+function isMissingColumn(error: { message?: string; code?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === "42703") return true;
+  return /column .* does not exist/i.test(error.message ?? "");
+}
+
+let warnedMissingCheckInColumn = false;
+function warnMissingCheckInColumn(context: string): void {
+  if (warnedMissingCheckInColumn) return;
+  warnedMissingCheckInColumn = true;
+  console.warn(
+    `[${context}] event_rsvp.checked_in_at not present — migration 00037_event_rsvp_loop.sql has not been applied. Falling back to status-only attendance.`
+  );
+}
+
+/**
+ * Check a family in at the door: stamps checked_in_at (idempotent — only
+ * the first tap sets it) and routes through setRsvpStatus so the lead
+ * timeline entry and "engaged" stage nudge stay identical to a manual
+ * Attended click. Never throws.
+ *
+ * Degrades honestly when checked_in_at isn't applied yet: still marks the
+ * RSVP attended via setRsvpStatus, but reports `checked_in_at: null` so
+ * the roster UI knows not to trust/display a live checked-in count.
+ */
+export async function checkInRsvp(
+  rsvpId: string,
+  actorId: string
+): Promise<MutationResult<{ checked_in_at: string | null }>> {
+  const supabase = await createServerClient();
+  const nowIso = new Date().toISOString();
+
+  const stamp = await supabase
+    .from("event_rsvp")
+    .update({ checked_in_at: nowIso } as never)
+    .eq("id", rsvpId)
+    .is("checked_in_at" as never, null);
+
+  let checkedInAt: string | null = nowIso;
+  if (stamp.error) {
+    if (isMissingColumn(stamp.error)) {
+      warnMissingCheckInColumn("checkInRsvp");
+      checkedInAt = null;
+    } else {
+      console.error("[checkInRsvp]", stamp.error.message);
+      return { data: null, error: "Failed to check in." };
+    }
+  }
+
+  const statusResult = await setRsvpStatus(rsvpId, "attended", actorId);
+  if (statusResult.error) return { data: null, error: statusResult.error };
+
+  return { data: { checked_in_at: checkedInAt }, error: null };
+}
+
+export interface WalkInInput {
+  event_id: string;
+  campus_id: string;
+  guardian_name: string;
+  phone?: string;
+}
+
+/**
+ * Staff-side walk-in quick-add from the event detail check-in roster: a
+ * family who didn't pre-register shows up at the door. Creates (or would
+ * create, via the existing staff lead mutation) the family's lead record
+ * with source "event" — the same attribution rsvpToEvent gives a public
+ * RSVP — and an event_rsvp row that is immediately marked attended, since a
+ * walk-in is by definition present right now. Degrades the same way
+ * checkInRsvp does when checked_in_at isn't applied yet.
+ */
+export async function addWalkInRsvp(
+  input: WalkInInput,
+  actorId: string
+): Promise<MutationResult<{ id: string; checked_in_at: string | null }>> {
+  const supabase = await createServerClient();
+
+  if (!input.guardian_name?.trim()) {
+    return { data: null, error: "Name is required." };
+  }
+
+  const { data: event } = await supabase
+    .from("event")
+    .select("id, title")
+    .eq("id", input.event_id)
+    .single();
+  if (!event) return { data: null, error: "Event not found." };
+
+  const nameParts = input.guardian_name.trim().split(/\s+/);
+  const firstName = nameParts[0] ?? input.guardian_name.trim();
+  const lastName = nameParts.slice(1).join(" ") || "(no last name)";
+
+  const { createLeadByStaff } = await import("./leads");
+  const leadResult = await createLeadByStaff(
+    {
+      campus_id: input.campus_id,
+      first_name: firstName,
+      last_name: lastName,
+      phone: input.phone?.trim() || undefined,
+      source: "event",
+      source_detail: `Walk-in: ${event.title as string}`,
+    },
+    actorId
+  );
+  const leadId = leadResult.data?.id ?? null;
+
+  const nowIso = new Date().toISOString();
+  const baseRow = {
+    event_id: input.event_id,
+    lead_id: leadId,
+    guardian_name: input.guardian_name.trim(),
+    phone: input.phone?.trim() || null,
+    party_size: 1,
+    status: "attended",
+  };
+
+  const withStamp = await supabase
+    .from("event_rsvp")
+    .insert({ ...baseRow, checked_in_at: nowIso } as never)
+    .select("id")
+    .single();
+
+  if (!withStamp.error) {
+    if (leadId) {
+      await supabase.from("lead_activity").insert({
+        lead_id: leadId,
+        activity_type: "note",
+        body: `Walked in to ${event.title as string}.`,
+        actor_id: actorId,
+      });
+    }
+    return { data: { id: withStamp.data.id as string, checked_in_at: nowIso }, error: null };
+  }
+
+  if (isMissingColumn(withStamp.error)) {
+    warnMissingCheckInColumn("addWalkInRsvp");
+    const fallback = await supabase.from("event_rsvp").insert(baseRow).select("id").single();
+    if (fallback.error) {
+      console.error("[addWalkInRsvp]", fallback.error.message);
+      return { data: null, error: "Failed to add walk-in." };
+    }
+    if (leadId) {
+      await supabase.from("lead_activity").insert({
+        lead_id: leadId,
+        activity_type: "note",
+        body: `Walked in to ${event.title as string}.`,
+        actor_id: actorId,
+      });
+    }
+    return { data: { id: fallback.data.id as string, checked_in_at: null }, error: null };
+  }
+
+  console.error("[addWalkInRsvp]", withStamp.error.message);
+  return { data: null, error: "Failed to add walk-in." };
+}
+
 // ─── Public RSVP (response-engine entry, service role) ──
 
 export interface RsvpInput {

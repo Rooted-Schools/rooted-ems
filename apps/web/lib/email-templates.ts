@@ -610,6 +610,164 @@ export function eventRsvpConfirmation({
   };
 }
 
+/**
+ * Pre-event reminder — sent twice per RSVP by app/api/cron/event-followups:
+ * once around 24h before starts_at ("day_before"), once around 2h before
+ * ("starting_soon"). Same template, tone shifts with urgency so the second
+ * text doesn't just repeat the first.
+ */
+export function eventReminder({
+  guardianFirstName,
+  campusName,
+  eventTitle,
+  whenText,
+  location,
+  urgency,
+}: {
+  guardianFirstName?: string;
+  campusName: string;
+  eventTitle: string;
+  whenText: string;
+  location?: string;
+  urgency: "day_before" | "starting_soon";
+}): EmailTemplate {
+  const openingEn =
+    urgency === "day_before"
+      ? `Just a friendly reminder — ${eventTitle} at ${campusName} is tomorrow!`
+      : `${eventTitle} at ${campusName} is starting soon!`;
+  const openingEs =
+    urgency === "day_before"
+      ? `Un recordatorio amistoso — ${eventTitle} en ${campusName} es mañana!`
+      : `${eventTitle} en ${campusName} está por comenzar!`;
+  const { html, text } = renderEmail(
+    {
+      greeting: guardianFirstName ? `Hi ${guardianFirstName},` : "Hello,",
+      paragraphs: [
+        openingEn,
+        `When: ${whenText}${location ? `\nWhere: ${location}` : ""}`,
+        "We're looking forward to meeting you. If your plans change, just reply to this email.",
+      ],
+      closing: `See you soon! — the ${campusName} Team`,
+    },
+    {
+      greeting: guardianFirstName ? `Hola ${guardianFirstName},` : "Hola,",
+      paragraphs: [
+        openingEs,
+        `Cuándo: ${whenText}${location ? `\nDónde: ${location}` : ""}`,
+        "Esperamos conocerle. Si sus planes cambian, simplemente responda a este correo.",
+      ],
+      closing: `¡Nos vemos pronto! — el Equipo de ${campusName}`,
+    }
+  );
+  return {
+    subject:
+      urgency === "day_before"
+        ? `Tomorrow: ${eventTitle} / Mañana`
+        : `Starting soon: ${eventTitle} / Comienza pronto`,
+    html,
+    text,
+  };
+}
+
+/**
+ * Post-event follow-up for a family who checked in. Sent once, the morning
+ * after the event, by app/api/cron/event-followups. Leads with the apply
+ * link since attendance is exactly the moment a warm lead is most ready to
+ * apply.
+ */
+export function eventFollowupAttended({
+  guardianFirstName,
+  campusName,
+  eventTitle,
+}: {
+  guardianFirstName?: string;
+  campusName: string;
+  eventTitle: string;
+}): EmailTemplate {
+  const { html, text } = renderEmail(
+    {
+      greeting: guardianFirstName ? `Hi ${guardianFirstName},` : "Hello,",
+      paragraphs: [
+        `It was great to meet you at ${eventTitle}! Thank you for taking the time to visit ${campusName}.`,
+        "If you're ready to take the next step, applying takes about five minutes on your phone — there's no fee, and it doesn't commit you to anything.",
+      ],
+      cta: { label: "Start your application", url: `${APP_URL}/login` },
+      closing: `We'd love to welcome your family. — the ${campusName} Team`,
+    },
+    {
+      greeting: guardianFirstName ? `Hola ${guardianFirstName},` : "Hola,",
+      paragraphs: [
+        `¡Fue un gusto conocerle en ${eventTitle}! Gracias por tomarse el tiempo de visitar ${campusName}.`,
+        "Si está listo(a) para el siguiente paso, la solicitud toma unos cinco minutos desde su teléfono — no tiene costo, y no le compromete a nada.",
+      ],
+      cta: { label: "Iniciar su solicitud", url: `${APP_URL}/login` },
+      closing: `Nos encantaría darle la bienvenida a su familia. — el Equipo de ${campusName}`,
+    }
+  );
+  return {
+    subject: `Great to meet you at ${eventTitle}! / ¡Un gusto conocerle!`,
+    html,
+    text,
+  };
+}
+
+/**
+ * Post-event follow-up for a family who RSVP'd but never checked in. Sent
+ * once, the morning after the event. Mentions the campus's next scheduled
+ * upcoming event only when one genuinely exists (data-honesty rule — never
+ * promise an event that isn't on the calendar); otherwise a general,
+ * honest invite to /inquire.
+ */
+export function eventFollowupNoShow({
+  guardianFirstName,
+  campusName,
+  eventTitle,
+  nextEvent,
+}: {
+  guardianFirstName?: string;
+  campusName: string;
+  eventTitle: string;
+  nextEvent?: { title: string; whenText: string; url: string };
+}): EmailTemplate {
+  const nextParagraphEn = nextEvent
+    ? `We'd love to see you at our next one — ${nextEvent.title} on ${nextEvent.whenText}. It's easy to register, and takes less than a minute.`
+    : "We'd still love to connect — reach out anytime and we'll find a time that works, or you can start an application whenever you're ready.";
+  const nextParagraphEs = nextEvent
+    ? `Nos encantaría verle en nuestro próximo evento — ${nextEvent.title} el ${nextEvent.whenText}. Es fácil registrarse y toma menos de un minuto.`
+    : "Nos encantaría conectar con usted — contáctenos cuando guste y buscaremos un horario que funcione, o puede iniciar una solicitud cuando esté listo(a).";
+  const cta = nextEvent
+    ? { label: "Register for the next event", url: nextEvent.url }
+    : { label: "Get in touch", url: `${APP_URL}/inquire` };
+  const ctaEs = nextEvent
+    ? { label: "Regístrese para el próximo evento", url: nextEvent.url }
+    : { label: "Póngase en contacto", url: `${APP_URL}/inquire` };
+  const { html, text } = renderEmail(
+    {
+      greeting: guardianFirstName ? `Hi ${guardianFirstName},` : "Hello,",
+      paragraphs: [
+        `We missed you at ${eventTitle}! We know plans change, and we didn't want that to be the end of the conversation.`,
+        nextParagraphEn,
+      ],
+      cta,
+      closing: `Hope to see you soon. — the ${campusName} Team`,
+    },
+    {
+      greeting: guardianFirstName ? `Hola ${guardianFirstName},` : "Hola,",
+      paragraphs: [
+        `¡Le extrañamos en ${eventTitle}! Sabemos que los planes cambian, y no queríamos que eso fuera el final de la conversación.`,
+        nextParagraphEs,
+      ],
+      cta: ctaEs,
+      closing: `Esperamos verle pronto. — el Equipo de ${campusName}`,
+    }
+  );
+  return {
+    subject: `We missed you at ${eventTitle} / Le extrañamos`,
+    html,
+    text,
+  };
+}
+
 export function inquiryWelcome({
   guardianFirstName,
   campusName,
@@ -714,6 +872,101 @@ export function registrationNudge({
   );
   return {
     subject: `Almost done — a few registration items remain / Faltan algunos pasos de inscripción`,
+    html,
+    text,
+  };
+}
+
+/**
+ * "Keep the seat" — one warm touch during the summer melt window: sent once,
+ * 2+ days after registration is fully verified, before the school year
+ * starts. The point isn't another task for the family; it's a congratulations
+ * plus a preview of what's coming so a fully-registered family doesn't go
+ * quiet and drift away before the first day. See app/api/cron/keep-the-seat.
+ */
+export function keepTheSeat({
+  studentFirstName,
+  campusName,
+  startDate,
+}: {
+  studentFirstName?: string;
+  campusName: string;
+  /** ISO date string for the school year's first day, when known. */
+  startDate?: string;
+}): EmailTemplate {
+  const startEn = startDate ? formatDateEn(startDate) : undefined;
+  const startEs = startDate ? formatDateEs(startDate) : undefined;
+  const { html, text } = renderEmail(
+    {
+      greeting: "Congratulations — registration is done!",
+      paragraphs: [
+        `${studentEn(studentFirstName)}'s seat at ${campusName} is fully secured for the coming school year. Thank you for completing every step — that was the hardest part, and it's behind you.`,
+        `Here's what's next: over the summer, watch your email and phone for orientation dates, schedule details, and a few "what to bring" reminders${
+          startEn ? ` before the first day of school on ${startEn}` : ""
+        }. Nothing else is required of you right now — just keep an eye out for our updates.`,
+      ],
+      cta: { label: "View your enrollment", url: `${APP_URL}/family/registration` },
+      closing: "We can't wait to welcome you this fall. — the Rooted Schools Enrollment Team",
+    },
+    {
+      greeting: "Felicidades — ¡la inscripción está completa!",
+      paragraphs: [
+        `El cupo de ${studentEs(studentFirstName)} en ${campusName} está completamente asegurado para el próximo año escolar. Gracias por completar cada paso — esa era la parte más difícil, y ya quedó atrás.`,
+        `Esto es lo que sigue: durante el verano, esté atento(a) a su correo y teléfono para las fechas de orientación, los detalles del horario y algunos recordatorios de "qué traer"${
+          startEs ? ` antes del primer día de clases el ${startEs}` : ""
+        }. No necesita hacer nada más por ahora — solo esté pendiente de nuestras actualizaciones.`,
+      ],
+      cta: { label: "Ver su inscripción", url: `${APP_URL}/family/registration` },
+      closing: "Esperamos darle la bienvenida este otoño. — el Equipo de Inscripción de Rooted Schools",
+    }
+  );
+  return {
+    subject: `You're all set at ${campusName} — here's what's next / Ya está todo listo`,
+    html,
+    text,
+  };
+}
+
+/**
+ * Spring re-enrollment intent pulse — asks a family with a currently active
+ * enrollment a one-tap question: is your student coming back next year?
+ * Sent only when staff trigger it (no automated cron — spring timing is a
+ * human decision). Links to the one-tap response page at /family/reenrollment.
+ */
+export function reenrollmentPulse({
+  studentFirstName,
+  campusName,
+  nextSchoolYearName,
+}: {
+  studentFirstName?: string;
+  campusName: string;
+  /** Name of the upcoming school year, when a next-year window already exists. */
+  nextSchoolYearName?: string;
+}): EmailTemplate {
+  const yearEn = nextSchoolYearName ? ` for ${nextSchoolYearName}` : " next year";
+  const yearEs = nextSchoolYearName ? ` para ${nextSchoolYearName}` : " el próximo año";
+  const { html, text } = renderEmail(
+    {
+      greeting: "Is your student coming back next year?",
+      paragraphs: [
+        `We're planning seats${yearEn} and want to hold ${studentEn(studentFirstName)}'s spot at ${campusName}. It only takes one tap to let us know.`,
+        `Log in to your family portal and tap "Yes, returning," "Still deciding," or "Not returning" — whichever fits right now. You can change your answer anytime before we send a formal seat offer.`,
+      ],
+      cta: { label: "Answer now", url: `${APP_URL}/family/reenrollment` },
+      closing: "Thank you for helping us plan ahead. — the Rooted Schools Enrollment Team",
+    },
+    {
+      greeting: "¿Su estudiante regresará el próximo año?",
+      paragraphs: [
+        `Estamos planificando los cupos${yearEs} y queremos reservar el lugar de ${studentEs(studentFirstName)} en ${campusName}. Solo toma un toque para avisarnos.`,
+        `Inicie sesión en su portal familiar y toque "Sí, regresa", "Aún decidiendo" o "No regresa" — lo que corresponda en este momento. Puede cambiar su respuesta en cualquier momento antes de que enviemos una oferta formal de cupo.`,
+      ],
+      cta: { label: "Responder ahora", url: `${APP_URL}/family/reenrollment` },
+      closing: "Gracias por ayudarnos a planificar con anticipación. — el Equipo de Inscripción de Rooted Schools",
+    }
+  );
+  return {
+    subject: `Is ${studentFirstName ?? "your student"} returning to ${campusName}? / ¿Regresa el próximo año?`,
     html,
     text,
   };

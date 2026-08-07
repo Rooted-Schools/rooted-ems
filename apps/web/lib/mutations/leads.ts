@@ -170,6 +170,88 @@ export async function createLeadFromInquiry(
   return { data: { id: lead.id }, error: null };
 }
 
+// ─── Public inquiry, Step 2 (optional "tell us more") ──
+
+export interface InquiryDetailsInput {
+  student_first_name?: string;
+  pathway_interest?: string;
+  /** The family's own "how did you hear about us?" answer. */
+  source?: string;
+}
+
+/** Sources that already carry real attribution — a family's own guess at
+ *  "how did you hear about us" must never clobber these. */
+const ATTRIBUTED_SOURCES = new Set(["referral", "qr"]);
+
+/**
+ * Step 2 of the public inquiry flow: fills in the details a family skipped
+ * to get through Step 1 fast (student name, pathway, how they heard about
+ * us). Never touches guardian identity, phone, campus, or stage — those are
+ * locked in at Step 1 and this is not a general lead-update endpoint.
+ *
+ * Attribution honesty: if the lead already carries real attribution (a
+ * referral link or a tagged/QR link — see submitInquiry), the family's own
+ * "how did you hear" answer is kept as a note on the timeline instead of
+ * overwriting `source`/`source_detail`, exactly mirroring the precedence
+ * submitInquiry already applies at creation.
+ *
+ * Service role: the submitter has no session. The caller (the server
+ * action) is responsible for verifying the per-lead token before invoking —
+ * this function trusts that the lead id it's given is already authorized.
+ */
+export async function updateLeadFromInquiryDetails(
+  leadId: string,
+  input: InquiryDetailsInput
+): Promise<MutationResult> {
+  const supabase = createServiceRoleClient();
+
+  const { data: lead } = await supabase
+    .from("lead")
+    .select("source, referred_by_lead_id")
+    .eq("id", leadId)
+    .single();
+  if (!lead) return { data: null, error: "Lead not found." };
+
+  const updates: Record<string, unknown> = {};
+  if (input.student_first_name?.trim()) {
+    updates.student_first_name = input.student_first_name.trim();
+  }
+  if (input.pathway_interest) {
+    updates.pathway_interest = input.pathway_interest;
+  }
+
+  const attributionLocked =
+    Boolean(lead.referred_by_lead_id) || ATTRIBUTED_SOURCES.has(lead.source as string);
+
+  if (input.source) {
+    if (!attributionLocked) {
+      updates.source = input.source;
+    } else {
+      await supabase.from("lead_activity").insert({
+        lead_id: leadId,
+        activity_type: "note",
+        body: `Family said they heard about us via: ${input.source}.`,
+      });
+    }
+  }
+
+  if (Object.keys(updates).length === 0) return { data: null, error: null };
+
+  const { error } = await supabase.from("lead").update(updates).eq("id", leadId);
+  if (error) {
+    console.error("[updateLeadFromInquiryDetails]", error.message);
+    return { data: null, error: "Something went wrong. Please try again." };
+  }
+
+  await supabase.from("lead_activity").insert({
+    lead_id: leadId,
+    activity_type: "inquiry",
+    body: "Family completed the optional details step.",
+  });
+
+  return { data: null, error: null };
+}
+
 // ─── Staff mutations (RLS-scoped) ──────────────────────
 
 /** Staff adds a lead manually (walk-in, phone call, event sign-up sheet). */

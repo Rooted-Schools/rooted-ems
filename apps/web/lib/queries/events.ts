@@ -24,11 +24,21 @@ export interface RsvpRow {
   party_size: number;
   status: string;
   created_at: string;
+  /** Migration 00037. Null when not checked in, or when the column isn't applied yet — see checkInAvailable. */
+  checked_in_at: string | null;
 }
 
 export interface EventDetail extends EventRow {
   description: string | null;
   rsvps: RsvpRow[];
+  /** Count of rsvps with checked_in_at set. 0 (honestly) when checkInAvailable is false. */
+  checked_in: number;
+  /**
+   * False when event_rsvp.checked_in_at (migration 00037) has not been
+   * applied to this database yet. The staff UI must hide the check-in
+   * roster/count rather than show a fabricated 0, per data-honesty rule.
+   */
+  checkInAvailable: boolean;
 }
 
 export interface PublicEvent {
@@ -98,28 +108,73 @@ export async function getStaffEvents(campusId?: string): Promise<EventRow[]> {
   });
 }
 
+/** True when the error says a named column is absent — migration not yet applied, not a missing row. */
+function isMissingColumn(error: { message?: string; code?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === "42703") return true;
+  return /column .* does not exist/i.test(error.message ?? "");
+}
+
+let warnedMissingCheckInColumn = false;
+function warnMissingCheckInColumn(): void {
+  if (warnedMissingCheckInColumn) return;
+  warnedMissingCheckInColumn = true;
+  console.warn(
+    "[getEventDetail] event_rsvp.checked_in_at not present — migration 00037_event_rsvp_loop.sql has not been applied. Check-in roster is hidden until it runs."
+  );
+}
+
 export async function getEventDetail(eventId: string): Promise<EventDetail | null> {
   const supabase = await createServerClient();
 
-  const [{ data: event, error }, { data: rsvps }] = await Promise.all([
-    supabase
-      .from("event")
-      .select("id, campus_id, title, description, event_type, location, starts_at, ends_at, capacity, is_published, campus:campus_id (name)")
-      .eq("id", eventId)
-      .single(),
-    supabase
+  const eventPromise = supabase
+    .from("event")
+    .select("id, campus_id, title, description, event_type, location, starts_at, ends_at, capacity, is_published, campus:campus_id (name)")
+    .eq("id", eventId)
+    .single();
+
+  // checked_in_at is additive (migration 00037) — try with it first, and
+  // fall back to the pre-migration column set if it isn't there yet rather
+  // than letting the whole roster query fail.
+  let checkInAvailable = true;
+  let rsvpQuery = await supabase
+    .from("event_rsvp")
+    .select("id, lead_id, guardian_name, email, phone, party_size, status, created_at, checked_in_at")
+    .eq("event_id", eventId)
+    .order("created_at", { ascending: true });
+
+  if (rsvpQuery.error && isMissingColumn(rsvpQuery.error)) {
+    warnMissingCheckInColumn();
+    checkInAvailable = false;
+    rsvpQuery = (await supabase
       .from("event_rsvp")
       .select("id, lead_id, guardian_name, email, phone, party_size, status, created_at")
       .eq("event_id", eventId)
-      .order("created_at", { ascending: true }),
-  ]);
+      .order("created_at", { ascending: true })) as typeof rsvpQuery;
+  }
+
+  const { data: event, error } = await eventPromise;
+  const { data: rsvps, error: rsvpError } = rsvpQuery;
 
   if (error || !event) {
     if (error) console.error("[getEventDetail]", error.message);
     return null;
   }
+  if (rsvpError) {
+    console.error("[getEventDetail] rsvps", rsvpError.message);
+  }
 
-  const roster = (rsvps ?? []) as RsvpRow[];
+  const roster: RsvpRow[] = ((rsvps ?? []) as Array<Record<string, unknown>>).map((r) => ({
+    id: r.id as string,
+    lead_id: (r.lead_id as string | null) ?? null,
+    guardian_name: r.guardian_name as string,
+    email: (r.email as string | null) ?? null,
+    phone: (r.phone as string | null) ?? null,
+    party_size: r.party_size as number,
+    status: r.status as string,
+    created_at: r.created_at as string,
+    checked_in_at: checkInAvailable ? ((r.checked_in_at as string | null) ?? null) : null,
+  }));
   const campus = event.campus as unknown as Record<string, string> | null;
   return {
     id: event.id as string,
@@ -135,6 +190,8 @@ export async function getEventDetail(eventId: string): Promise<EventDetail | nul
     is_published: event.is_published === true,
     registered: roster.filter((r) => r.status !== "cancelled").length,
     attended: roster.filter((r) => r.status === "attended").length,
+    checked_in: checkInAvailable ? roster.filter((r) => r.checked_in_at != null).length : 0,
+    checkInAvailable,
     rsvps: roster,
   };
 }

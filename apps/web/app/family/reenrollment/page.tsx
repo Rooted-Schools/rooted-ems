@@ -6,6 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { requireSession } from "@/lib/auth/get-session";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { ReenrollmentActions } from "./reenrollment-actions-client";
+import { ReenrollmentIntentPulse } from "./reenrollment-intent-client";
+import { getFamilyReenrollmentPulseCandidates } from "@/lib/queries/reenrollment";
+import { getLocale } from "@/lib/i18n/get-locale";
+import { tx } from "@/lib/i18n/translations";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -82,31 +86,61 @@ async function getPendingReenrollmentOffers(
 
 export default async function FamilyReenrollmentPage() {
   const session = await requireSession();
-  const offers = await getPendingReenrollmentOffers(session.user_id);
+  const locale = await getLocale();
+  const t = (key: Parameters<typeof tx>[0]) => tx(key, locale);
+
+  const [offers, pulseCandidates] = await Promise.all([
+    getPendingReenrollmentOffers(session.user_id),
+    getFamilyReenrollmentPulseCandidates(session.user_id),
+  ]);
+
+  const hasNothing = offers.length === 0 && pulseCandidates.length === 0;
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-ink">Re-enrollment Offers</h1>
-        <p className="text-sm text-stone mt-1">
-          Review and respond to re-enrollment offers for the upcoming school year.
-        </p>
+        <h1 className="text-2xl font-bold text-ink">{t("reenroll.heading")}</h1>
+        <p className="text-sm text-stone mt-1">{t("reenroll.subtitle")}</p>
       </div>
 
-      {offers.length === 0 ? (
+      {hasNothing && (
         <Card>
           <CardContent className="py-10 text-center">
-            <p className="text-stone">
-              You have no pending re-enrollment offers at this time.
-            </p>
-            <p className="text-xs text-stone/70 mt-2">
-              If you believe you should see an offer here, please contact your
-              school's enrollment office.
-            </p>
+            <p className="text-stone">{t("reenroll.noOffers")}</p>
+            <p className="text-xs text-stone/70 mt-2">{t("reenroll.contactOffice")}</p>
           </CardContent>
         </Card>
-      ) : (
+      )}
+
+      {pulseCandidates.length > 0 && (
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold text-ink">
+              {t("reenroll.pulseSectionHeading")}
+            </h2>
+            <p className="text-sm text-stone">{t("reenroll.pulseSectionSubtitle")}</p>
+          </div>
+          <div className="space-y-4">
+            {pulseCandidates.map((candidate) => (
+              <ReenrollmentIntentPulse
+                key={candidate.enrollmentId}
+                enrollmentId={candidate.enrollmentId}
+                studentName={candidate.studentName}
+                campusName={candidate.campusName}
+                grade={candidate.grade}
+                schoolYearName={candidate.schoolYearName}
+                initialIntent={candidate.intent}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {offers.length > 0 && (
         <div className="space-y-4">
+          {pulseCandidates.length > 0 && (
+            <h2 className="text-base font-semibold text-ink">{t("reenroll.heading")}</h2>
+          )}
           {offers.map((offer) => (
             <Card key={offer.applicationId}>
               <CardHeader className="pb-3">
@@ -116,24 +150,21 @@ export default async function FamilyReenrollmentPage() {
                       {offer.studentName}
                     </CardTitle>
                     <CardDescription>
-                      {offer.campusName} &middot; Grade {offer.grade}{" "}
+                      {offer.campusName} &middot; {t("offers.grade")} {offer.grade}{" "}
                       &middot; {offer.schoolYearName}
                     </CardDescription>
                   </div>
                   <Badge className="bg-rooted-green/10 text-rooted-green border-rooted-green/30">
-                    Offer Pending
+                    {t("reenroll.offerBadge")}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-stone mb-4">
-                  Your school has reserved a seat for{" "}
-                  <span className="font-medium text-ink">
-                    {offer.studentName}
-                  </span>{" "}
-                  in Grade {offer.grade} for the {offer.schoolYearName} school
-                  year. Accept to secure their spot or decline if you will not
-                  be returning.
+                  {t("reenroll.offerBody")
+                    .replace("{student}", offer.studentName)
+                    .replace("{grade}", offer.grade)
+                    .replace("{year}", offer.schoolYearName)}
                 </p>
                 <ReenrollmentActions applicationId={offer.applicationId} />
               </CardContent>

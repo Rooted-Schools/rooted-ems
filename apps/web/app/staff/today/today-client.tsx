@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn, displayClass } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
-import { textExpiringOffers, sendRegistrationNudges, releaseSeats } from "./actions";
+import { IconPhone } from "@/components/ui/icons";
+import { textExpiringOffers, sendRegistrationNudges, releaseSeats, markRegistrationContacted } from "./actions";
+import type { RegistrationCompletionStats, CallEscalationRow } from "@/lib/queries/melt";
 
 /* ------------------------------------------------------------------ */
 /*  Types shared with the server component                             */
@@ -44,6 +46,8 @@ interface TodayClientProps {
   rows: ExceptionRow[];
   timeCriticalCount: number;
   seatProgress: SeatProgressGroup[];
+  registrationCompletion: RegistrationCompletionStats;
+  callEscalationQueue: CallEscalationRow[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -256,6 +260,150 @@ function ExceptionRowCard({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Headline stat strip — registration completion                      */
+/* ------------------------------------------------------------------ */
+
+function RegistrationCompletionStrip({ stat }: { stat: RegistrationCompletionStats }) {
+  return (
+    <div className="rounded-[10px] border border-line bg-white p-4 sm:p-[18px]">
+      <p className={cn("text-[11px] font-semibold uppercase tracking-[0.08em] text-stone", displayClass)}>
+        Registration completion
+      </p>
+      {stat.packetsCreated === 0 ? (
+        <p className="mt-1 text-[15px] text-ink">No registration packets yet this cycle.</p>
+      ) : (
+        <p className="mt-1 text-[15px] text-ink">
+          <strong className="font-semibold">{stat.completionRate}%</strong> ({stat.packetsComplete} of{" "}
+          {stat.packetsCreated})
+          {stat.schoolYearName && <span className="text-stone"> &middot; {stat.schoolYearName}</span>}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Call escalation queue — "Needs a phone call"                       */
+/* ------------------------------------------------------------------ */
+
+function CallQueueRowCard({
+  row,
+  onContacted,
+}: {
+  row: CallEscalationRow;
+  onContacted: () => void;
+}) {
+  const { toast } = useToast();
+  const [isContacting, startContacting] = useTransition();
+  const [isNudging, startNudging] = useTransition();
+
+  function handleMarkContacted() {
+    startContacting(async () => {
+      const result = await markRegistrationContacted(row.enrollment_id);
+      if (!result.ok) {
+        toast({ variant: "error", title: "Could not log the call", description: result.error ?? "Please try again." });
+        return;
+      }
+      toast({
+        variant: "success",
+        title: `Logged a call to ${row.guardian_name}`,
+        description: "Off the call list for a week, or until they nudge again.",
+      });
+      onContacted();
+    });
+  }
+
+  function handleSendNudge() {
+    startNudging(async () => {
+      const result = await sendRegistrationNudges([row.enrollment_id]);
+      if (!result.ok) {
+        toast({ variant: "error", title: "Could not send nudge", description: result.error ?? "Please try again." });
+        return;
+      }
+      toast({
+        variant: result.count > 0 ? "success" : "info",
+        title: result.count > 0 ? `Nudged ${row.guardian_name}` : "Nothing left to nudge",
+        description:
+          result.count > 0
+            ? "Email and text (where opted in) sent with what's still missing."
+            : "No outstanding items were found for this family.",
+      });
+    });
+  }
+
+  const shown = row.outstanding_item_names.slice(0, 3);
+  const more = row.outstanding_item_names.length - shown.length;
+
+  return (
+    <div className="flex flex-wrap items-start gap-4 rounded-[6px] border border-line bg-white p-4">
+      <div className="min-w-0 flex-1 basis-64">
+        <p className="text-[15px] font-medium text-ink">{row.student_name}</p>
+        <p className="mt-0.5 text-sm text-stone">
+          {row.guardian_name}
+          {row.guardian_phone ? (
+            <>
+              {" "}
+              &middot;{" "}
+              <a href={`tel:${row.guardian_phone}`} className="text-rooted-green hover:text-deep-green">
+                {row.guardian_phone}
+              </a>
+            </>
+          ) : (
+            <> &middot; No phone on file</>
+          )}
+        </p>
+        <p className="mt-1 text-xs text-stone">
+          Stalled {row.days_stalled} day{row.days_stalled === 1 ? "" : "s"}
+          {row.outstanding_item_names.length > 0 && (
+            <>
+              {" "}
+              &middot; {row.outstanding_item_names.length} outstanding: {shown.join(", ")}
+              {more > 0 ? `, +${more} more` : ""}
+            </>
+          )}
+        </p>
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <ActionButton style="outline" disabled={isNudging} onClick={handleSendNudge}>
+          {isNudging ? "Sending…" : "Send nudge"}
+        </ActionButton>
+        <ActionButton style="solid-green" disabled={isContacting} onClick={handleMarkContacted}>
+          {isContacting ? "Logging…" : "Mark contacted"}
+        </ActionButton>
+      </div>
+    </div>
+  );
+}
+
+function CallEscalationSection({
+  rows,
+  onContacted,
+}: {
+  rows: CallEscalationRow[];
+  onContacted: (packetId: string) => void;
+}) {
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="rounded-[10px] border border-line bg-white p-4 sm:p-[18px]">
+      <div className="mb-1 flex items-center gap-2">
+        <IconPhone size={16} className="text-stone" />
+        <h2 className={cn("text-sm font-semibold text-ink", displayClass)}>Needs a phone call</h2>
+      </div>
+      <p className="mb-4 text-sm text-stone">
+        {rows.length} famil{rows.length === 1 ? "y has" : "ies have"} been stalled a week or more — an automated
+        nudge already went out and didn't move them. A call is the next real step.
+      </p>
+      <div className="space-y-2">
+        {rows.map((row) => (
+          <CallQueueRowCard key={row.packet_id} row={row} onContacted={() => onContacted(row.packet_id)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Seat progress bars                                                  */
 /* ------------------------------------------------------------------ */
 
@@ -293,11 +441,18 @@ export function TodayClient({
   rows: initialRows,
   timeCriticalCount,
   seatProgress,
+  registrationCompletion,
+  callEscalationQueue: initialCallEscalationQueue,
 }: TodayClientProps) {
   const [rows, setRows] = useState(initialRows);
+  const [callQueue, setCallQueue] = useState(initialCallEscalationQueue);
 
   function dropRow(key: ExceptionRow["key"]) {
     setRows((prev) => prev.filter((r) => r.key !== key));
+  }
+
+  function dropCallQueueRow(packetId: string) {
+    setCallQueue((prev) => prev.filter((r) => r.packet_id !== packetId));
   }
 
   return (
@@ -337,6 +492,9 @@ export function TodayClient({
         </p>
       </div>
 
+      {/* Headline stat strip */}
+      <RegistrationCompletionStrip stat={registrationCompletion} />
+
       {/* Exception rows */}
       {rows.length === 0 ? (
         <div className="rounded-[10px] border border-line bg-white p-8 text-center">
@@ -352,6 +510,9 @@ export function TodayClient({
           ))}
         </div>
       )}
+
+      {/* Needs a phone call — registration melt escalation */}
+      <CallEscalationSection rows={callQueue} onContacted={dropCallQueueRow} />
 
       {/* Per-grade seat progress */}
       {seatProgress.length > 0 && (

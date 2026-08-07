@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { IconBarChart, IconUsers, IconTrendingUp, IconClipboardList, IconSearch } from "@/components/ui/icons";
+import { IconBarChart, IconUsers, IconTrendingUp, IconClipboardList, IconSearch, IconHeartPulse } from "@/components/ui/icons";
 import type { ReportData } from "./page";
 
 interface ReportConfig {
@@ -117,6 +117,14 @@ export function ReportsClient({ data }: { data: ReportData }) {
   const totalRegistered = data.capacity.reduce((s, r) => s + r.seats_registered, 0);
   const conversionRate = totalApps > 0 ? ((registeredCount / totalApps) * 100).toFixed(1) : "0.0";
   const utilizationRate = totalSeats > 0 ? ((totalRegistered / totalSeats) * 100).toFixed(1) : "0.0";
+
+  // Re-enrollment: response + yes-rate for the current -> next school year transition.
+  const reenroll = data.reenrollment;
+  const reenrollResponded = reenroll.respondedYes + reenroll.respondedDeciding + reenroll.respondedNo;
+  const reenrollResponseRate =
+    reenroll.eligible > 0 ? Math.round((reenrollResponded / reenroll.eligible) * 100) : null;
+  const reenrollYesRate =
+    reenroll.eligible > 0 ? Math.round((reenroll.respondedYes / reenroll.eligible) * 100) : null;
 
   function handleExport(reportId: string) {
     let csv = "";
@@ -329,6 +337,57 @@ export function ReportsClient({ data }: { data: ReportData }) {
           </CardContent>
         </Card>
       )}
+
+      {/* Re-enrollment Visual — always visible */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-3">
+            <span className="text-stone" aria-hidden="true">
+              <IconHeartPulse size={20} />
+            </span>
+            <div>
+              <CardTitle className="text-base">Re-enrollment</CardTitle>
+              <CardDescription>
+                {reenroll.schoolYearName
+                  ? `Intent-to-return pulse, ${reenroll.schoolYearName}${
+                      reenroll.nextSchoolYearName ? ` → ${reenroll.nextSchoolYearName}` : ""
+                    }`
+                  : "Intent-to-return pulse for the current school year transition"}
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {reenroll.eligible === 0 ? (
+            <p className="text-sm text-stone text-center py-4">No re-enrollment season data yet.</p>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium text-ink/60 w-28 text-right">Responded</span>
+                <div className="flex-1">
+                  <Bar value={reenrollResponded} max={reenroll.eligible} color="bg-blue-400" />
+                </div>
+                <span className="text-xs font-bold text-ink/70 w-28 text-right">
+                  {reenrollResponseRate}% of {reenroll.eligible}
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium text-ink/60 w-28 text-right">Returning</span>
+                <div className="flex-1">
+                  <Bar value={reenroll.respondedYes} max={reenroll.eligible} color="bg-rooted-green" />
+                </div>
+                <span className="text-xs font-bold text-ink/70 w-28 text-right">
+                  {reenrollYesRate}% ({reenroll.respondedYes} of {reenroll.eligible})
+                </span>
+              </div>
+              <p className="text-xs text-stone pt-1">
+                {reenroll.respondedDeciding} still deciding &middot; {reenroll.respondedNo} not returning
+                &middot; {reenroll.noResponse} no response yet.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Other report cards in a grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
