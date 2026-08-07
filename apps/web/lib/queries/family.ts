@@ -625,18 +625,41 @@ export async function getFamilyDocuments(
 }
 
 /**
- * Fetch messages (notifications) for a family user.
+ * Which portal a notification belongs to. The notification table is shared
+ * and a user can hold both roles at once (staff who are also parents of
+ * applicants — including every test account). The link prefix is the
+ * audience signal: family-facing notifications link into /family/*, staff
+ * ones into /staff/*. Each portal's bell and messages page must only show
+ * its own context — otherwise a staff bell can route staff into the family
+ * portal (and vice versa).
+ */
+export type NotificationContext = "staff" | "family";
+
+function applyContextFilter<Q extends { or(filters: string): Q }>(
+  query: Q,
+  context?: NotificationContext
+): Q {
+  if (context === "staff") return query.or("link.is.null,link.like./staff%");
+  if (context === "family") return query.or("link.is.null,link.like./family%");
+  return query;
+}
+
+/**
+ * Fetch messages (notifications) for a user, scoped to one portal context.
  */
 export async function getFamilyMessages(
   userId: string,
-  limit: number = 50
+  limit: number = 50,
+  context?: NotificationContext
 ): Promise<FamilyMessageRow[]> {
   const supabase = createServiceRoleClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("notification")
     .select("id, title, body, link, is_read, created_at")
-    .eq("user_id", userId)
+    .eq("user_id", userId);
+  query = applyContextFilter(query, context);
+  const { data, error } = await query
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -654,6 +677,29 @@ export async function getFamilyMessages(
     created_at: row.created_at as string,
     time_ago: formatRelativeTime(row.created_at as string),
   }));
+}
+
+/**
+ * Unread notification count with the same context filter as
+ * getFamilyMessages, so a portal's badge always matches its list.
+ */
+export async function getUnreadNotificationCount(
+  userId: string,
+  context: NotificationContext
+): Promise<number> {
+  const supabase = createServiceRoleClient();
+  let query = supabase
+    .from("notification")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("is_read", false);
+  query = applyContextFilter(query, context);
+  const { count, error } = await query;
+  if (error) {
+    console.error("[getUnreadNotificationCount]", error.message);
+    return 0;
+  }
+  return count ?? 0;
 }
 
 // ─── Offer Types & Queries ───────────────────────────────

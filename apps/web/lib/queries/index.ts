@@ -48,6 +48,8 @@ export {
   type RegistrationSummary,
   getFamilyDocuments,
   getFamilyMessages,
+  getUnreadNotificationCount,
+  type NotificationContext,
   getFamilyOfferDetail,
   getFamilyPendingOffers,
   getLotteryOutcome,

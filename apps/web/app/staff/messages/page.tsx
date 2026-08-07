@@ -8,7 +8,8 @@ import { StaffMessagesClient } from "./messages-client";
 export default async function StaffMessagesPage() {
   const session = await requireStaffSession();
 
-  const messages = await getFamilyMessages(session.user_id);
+  // Staff context: never surface family-portal links here (dual-role users).
+  const messages = await getFamilyMessages(session.user_id, 50, "staff");
 
   return <StaffMessagesClient messages={messages} />;
 }
