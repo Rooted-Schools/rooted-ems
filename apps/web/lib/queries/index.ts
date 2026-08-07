@@ -23,11 +23,7 @@ export {
 
 // Staff dashboard queries
 export {
-  getStaffDashboardStats,
-  getRecentActivity,
   getUpcomingDeadlines,
-  type DashboardStats,
-  type RecentActivityItem,
   type UpcomingDeadline,
 } from "./dashboard";
 
