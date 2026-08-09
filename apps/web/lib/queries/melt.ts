@@ -16,6 +16,17 @@
 
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 
+/**
+ * Statuses that mean a family is no longer a live candidate for melt/call
+ * outreach — they already said no (or left) rather than going quiet.
+ * Mirrors the terminal states in packages/utils/src/state-machine.ts
+ * (application) and the DECLINED derivation in lib/playbook-status.ts.
+ * Without this, a withdrawn or declined family kept showing up on the
+ * Today "needs a phone call" queue and the MELT_RISK queue right alongside
+ * families who are actually just quiet.
+ */
+const TERMINAL_NEGATIVE_APPLICATION_STATUSES = new Set(["declined", "expired", "withdrawn"]);
+
 /** True when the error says a named column is absent — migration not yet applied, not a missing row. */
 function isMissingColumn(error: { message?: string; code?: string } | null): boolean {
   if (!error) return false;
@@ -177,10 +188,10 @@ export async function getCallEscalationQueue(
       id, enrollment_id, created_at, updated_at,
       last_nudged_at, contacted_at,
       enrollment:enrollment_id!inner (
-        id, campus_id, application_id,
+        id, campus_id, application_id, status,
         student:student_id (first_name, last_name),
         campus:campus_id (name),
-        application:application_id ( guardian:guardian_id (first_name, last_name, phone) )
+        application:application_id ( status, guardian:guardian_id (first_name, last_name, phone) )
       )
     `
     )
@@ -205,7 +216,16 @@ export async function getCallEscalationQueue(
     return { available: true, rows: [] };
   }
 
-  const packets = (data ?? []) as Array<Record<string, unknown>>;
+  // Exclude families who already withdrew or declined — an incomplete packet
+  // for a seat the family no longer holds is not a call to make.
+  const packets = ((data ?? []) as Array<Record<string, unknown>>).filter((row) => {
+    const enrollment = row.enrollment as Record<string, unknown> | null;
+    if (!enrollment) return false;
+    if (enrollment.status === "withdrawn") return false;
+    const application = enrollment.application as Record<string, unknown> | null;
+    const applicationStatus = application?.status as string | undefined;
+    return !applicationStatus || !TERMINAL_NEGATIVE_APPLICATION_STATUSES.has(applicationStatus);
+  });
   if (packets.length === 0) return { available: true, rows: [] };
 
   const enrollmentIds = packets
@@ -321,11 +341,11 @@ export async function getMeltRiskQueue(
       `
       id, enrollment_id, contacted_at, last_outreach_at, verified_at,
       enrollment:enrollment_id!inner (
-        id, campus_id, application_id,
+        id, campus_id, application_id, status,
         student:student_id (first_name, last_name),
         campus:campus_id (name),
         school_year:school_year_id (start_date),
-        application:application_id ( guardian:guardian_id (first_name, last_name, phone) )
+        application:application_id ( status, guardian:guardian_id (first_name, last_name, phone) )
       )
     `
     )
@@ -352,6 +372,14 @@ export async function getMeltRiskQueue(
 
   for (const row of (data ?? []) as Array<Record<string, unknown>>) {
     const enrollment = row.enrollment as Record<string, unknown> | null;
+
+    // A withdrawn or declined family is not a melt risk — they already left,
+    // rather than going quiet on a seat they still hold.
+    if (!enrollment || enrollment.status === "withdrawn") continue;
+    const application = enrollment.application as Record<string, unknown> | null;
+    const applicationStatus = application?.status as string | undefined;
+    if (applicationStatus && TERMINAL_NEGATIVE_APPLICATION_STATUSES.has(applicationStatus)) continue;
+
     const schoolYear = enrollment?.school_year as Record<string, unknown> | null;
     const startDate = (schoolYear?.start_date as string | null) ?? null;
 
@@ -362,7 +390,6 @@ export async function getMeltRiskQueue(
 
     const student = enrollment?.student as { first_name: string; last_name: string } | null;
     const campus = enrollment?.campus as { name: string } | null;
-    const application = enrollment?.application as Record<string, unknown> | null;
     const guardian = application?.guardian as
       | { first_name?: string; last_name?: string; phone?: string }
       | null;

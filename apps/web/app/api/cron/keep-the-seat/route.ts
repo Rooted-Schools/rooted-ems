@@ -33,6 +33,18 @@ import { notifyFamilyKeepTheSeat } from "@/lib/notify";
 const SEND_DELAY_DAYS = 2;
 
 /**
+ * Statuses that mean "this family is no longer on the seat we'd be
+ * congratulating them for keeping." Mirrors the terminal states in
+ * packages/utils/src/state-machine.ts (application) and the enrollment
+ * withdrawal path in lib/mutations/enrollment.ts withdrawEnrollment
+ * (enrollment.status = 'withdrawn'). Without this check, a family who
+ * withdrew or declined after their packet was marked complete kept
+ * receiving the "keep the seat" congratulations touch for a seat they no
+ * longer hold.
+ */
+const TERMINAL_NEGATIVE_APPLICATION_STATUSES = new Set(["declined", "expired", "withdrawn"]);
+
+/**
  * Playbook PB 24 v2.2 standard: WEEKLY contact, lottery day through the first
  * day of school. This route previously sent exactly one touch per enrollment
  * and then went silent all summer, which is the failure the playbook's own
@@ -90,9 +102,10 @@ export async function GET(request: NextRequest) {
       `
       id, enrollment_id, verified_at, keep_the_seat_sent_at, last_outreach_at,
       enrollment:enrollment_id (
-        id, campus_id, school_year_id,
+        id, campus_id, school_year_id, status, application_id,
         student:student_id (first_name, last_name),
-        school_year:school_year_id (start_date)
+        school_year:school_year_id (start_date),
+        application:application_id (status)
       )
     `
     )
@@ -110,10 +123,23 @@ export async function GET(request: NextRequest) {
   }
 
   // Only families still ahead of the first day of school — a congratulations
-  // email in October about a summer milestone is noise, not warmth.
+  // email in October about a summer milestone is noise, not warmth. Also
+  // exclude anyone whose enrollment or application has since moved to a
+  // terminal-negative status — a withdrawn or declined family should not
+  // keep hearing "congratulations, keep the seat."
   const eligible = (packets ?? []).filter((row: Record<string, unknown>) => {
     const enrollment = row.enrollment as Record<string, unknown> | null;
-    const schoolYear = enrollment?.school_year as Record<string, unknown> | null;
+    if (!enrollment) return false;
+
+    if (enrollment.status === "withdrawn") return false;
+
+    const application = enrollment.application as Record<string, unknown> | null;
+    const applicationStatus = application?.status as string | undefined;
+    if (applicationStatus && TERMINAL_NEGATIVE_APPLICATION_STATUSES.has(applicationStatus)) {
+      return false;
+    }
+
+    const schoolYear = enrollment.school_year as Record<string, unknown> | null;
     const startDate = schoolYear?.start_date as string | null;
     return Boolean(startDate) && (startDate as string) > todayDate;
   });

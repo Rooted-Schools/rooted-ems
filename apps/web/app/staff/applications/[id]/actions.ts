@@ -5,8 +5,28 @@ import { updateApplicationStatus, withdrawApplication, createNote, reviewDocumen
 import { sendOffer } from "@/lib/mutations/offers";
 import { verifyRegistrationItem, skipRegistrationItem } from "@/lib/mutations/registration";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
-import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
+import { requireStaffSession, requireRoleOnCampus, getAccessibleCampusIds } from "@/lib/auth/get-session";
 import { notifyFamilyStudentEnrolled, notifyFamilyDocumentRejected } from "@/lib/notify";
+
+/**
+ * Every action in this file previously gated on requireStaffSession() alone
+ * — staff on ANY campus could act on ANY application/document/registration
+ * id supplied by the client. Each mutating action below now resolves the
+ * target record's real campus_id (service role, by the id argument) and
+ * requires at least the lowest recognized role ON that campus via
+ * requireRoleOnCampus — the same "some staff role" bar requireStaffSession
+ * implied, just scoped to the campus the record actually belongs to instead
+ * of any campus the caller happens to hold a role on.
+ */
+async function resolveApplicationCampus(applicationId: string): Promise<string | undefined> {
+  const supabase = createServiceRoleClient();
+  const { data: app } = await supabase
+    .from("application")
+    .select("campus_id")
+    .eq("id", applicationId)
+    .single();
+  return app?.campus_id as string | undefined;
+}
 
 // ─── Status Transition ─────────────────────────────────
 
@@ -15,7 +35,7 @@ export async function changeApplicationStatus(
   newStatus: string,
   reason?: string
 ) {
-  await requireStaffSession();
+  await requireRoleOnCampus(await resolveApplicationCampus(applicationId), "compliance_auditor");
   const result = await updateApplicationStatus(applicationId, newStatus, reason);
 
   if (!result.error) {
@@ -38,7 +58,7 @@ export async function staffWithdrawApplication(
   applicationId: string,
   reason?: string
 ) {
-  await requireStaffSession();
+  await requireRoleOnCampus(await resolveApplicationCampus(applicationId), "compliance_auditor");
   const result = await withdrawApplication(applicationId, reason);
 
   if (!result.error) {
@@ -58,11 +78,15 @@ export async function addApplicationNote(
   campusId: string,
   content: string
 ) {
-  await requireStaffSession();
+  const realCampusId = await resolveApplicationCampus(applicationId);
+  await requireRoleOnCampus(realCampusId, "compliance_auditor");
   const result = await createNote({
     entity_type: "application",
     entity_id: applicationId,
-    campus_id: campusId,
+    // The application's real campus, not the client-supplied campusId — a
+    // note otherwise could be filed under a campus that isn't actually the
+    // application's.
+    campus_id: realCampusId ?? campusId,
     content,
     is_internal: true,
   });
@@ -82,7 +106,7 @@ export async function staffReviewDocument(
   decision: "verified" | "rejected",
   rejectionReason?: string
 ) {
-  await requireStaffSession();
+  await requireRoleOnCampus(await resolveApplicationCampus(applicationId), "compliance_auditor");
   const result = await reviewDocument(documentId, decision, rejectionReason);
 
   if (!result.error) {
@@ -121,7 +145,12 @@ export async function staffReviewDocument(
 // ─── Make Offer ────────────────────────────────────────
 
 /** `_offeredBy` is ignored — who made the offer comes from the session, not
- *  from the caller. The parameter stays for the existing call site. */
+ *  from the caller. The parameter stays for the existing call site.
+ *
+ *  Same fix as staffSendOffer in app/staff/offers/actions.ts: the campusId
+ *  argument is client-supplied and was previously trusted directly. The
+ *  application's real campus_id is resolved first and used both for the
+ *  campus gate and for the offer itself. */
 export async function staffMakeOffer(
   applicationId: string,
   campusId: string,
@@ -129,10 +158,11 @@ export async function staffMakeOffer(
   expiresAt: string,
   _offeredBy?: string
 ) {
-  const session = await requireStaffSession();
+  const realCampusId = await resolveApplicationCampus(applicationId);
+  const session = await requireRoleOnCampus(realCampusId, "compliance_auditor");
   const result = await sendOffer({
     application_id: applicationId,
-    campus_id: campusId,
+    campus_id: realCampusId ?? campusId,
     grade_level_id: gradeLevelId,
     expires_at: expiresAt,
     offered_by: session.user_id,
@@ -155,7 +185,7 @@ export async function staffVerifyRegistrationItem(
   itemId: string,
   applicationId: string
 ) {
-  const session = await requireStaffSession();
+  const session = await requireRoleOnCampus(await resolveApplicationCampus(applicationId), "compliance_auditor");
 
   const result = await verifyRegistrationItem(itemId, session.user_id);
 
@@ -175,7 +205,7 @@ export async function staffSkipRegistrationItem(
   itemId: string,
   applicationId: string
 ) {
-  const session = await requireStaffSession();
+  const session = await requireRoleOnCampus(await resolveApplicationCampus(applicationId), "compliance_auditor");
 
   const result = await skipRegistrationItem(itemId, session.user_id);
 
@@ -201,7 +231,8 @@ export async function staffCompleteAcademicAudit(
     reviewedBy: string;
   }
 ) {
-  await requireStaffSession();
+  const realCampusId = await resolveApplicationCampus(applicationId);
+  await requireRoleOnCampus(realCampusId, "compliance_auditor");
   // Record audit as an internal note
   const noteContent = [
     `ACADEMIC AUDIT COMPLETE`,
@@ -218,7 +249,8 @@ export async function staffCompleteAcademicAudit(
   await createNote({
     entity_type: "application",
     entity_id: applicationId,
-    campus_id: campusId,
+    // Application's real campus, not the client-supplied campusId.
+    campus_id: realCampusId ?? campusId,
     content: noteContent,
     is_internal: true,
   });
@@ -293,7 +325,7 @@ export async function staffCompleteAcademicAudit(
 // ─── Manually advance packet-complete application to placement_review ─────
 
 export async function staffConfirmPacketComplete(applicationId: string) {
-  await requireStaffSession();
+  await requireRoleOnCampus(await resolveApplicationCampus(applicationId), "compliance_auditor");
   const supabase = createServiceRoleClient();
 
   const { error } = await supabase

@@ -50,10 +50,14 @@ function packet(over: Record<string, unknown> = {}, enrollOver: Record<string, u
       id: "e1",
       campus_id: "c1",
       application_id: "a1",
+      status: "active",
       student: { first_name: "Ada", last_name: "Lovelace" },
       campus: { name: "C.R. Neal Academy" },
       school_year: { start_date: inDays(30) },
-      application: { guardian: { first_name: "Ann", last_name: "Lovelace", phone: "8035550100" } },
+      application: {
+        status: "enrolled",
+        guardian: { first_name: "Ann", last_name: "Lovelace", phone: "8035550100" },
+      },
       ...enrollOver,
     },
   };
@@ -123,5 +127,29 @@ describe("getMeltRiskQueue", () => {
 
     expect(result.available).toBe(false);
     expect(result.rows).toEqual([]);
+  });
+
+  it("excludes a family whose enrollment was withdrawn", async () => {
+    rows = [packet({}, { status: "withdrawn" })];
+
+    const result = await getMeltRiskQueue();
+
+    expect(result.rows).toHaveLength(0);
+  });
+
+  it("excludes a family whose application was declined", async () => {
+    rows = [packet({}, { application: { status: "declined", guardian: { first_name: "Ann" } } })];
+
+    const result = await getMeltRiskQueue();
+
+    expect(result.rows).toHaveLength(0);
+  });
+
+  it("excludes a family whose application was withdrawn even though the packet reads complete", async () => {
+    rows = [packet({}, { application: { status: "withdrawn", guardian: { first_name: "Ann" } } })];
+
+    const result = await getMeltRiskQueue();
+
+    expect(result.rows).toHaveLength(0);
   });
 });

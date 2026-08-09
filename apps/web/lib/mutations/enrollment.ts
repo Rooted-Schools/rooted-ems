@@ -116,6 +116,12 @@ export async function withdrawEnrollment(
       .from("application")
       .update({ status: "withdrawn", updated_at: new Date().toISOString() })
       .eq("id", enrollment.application_id);
+
+    // Stop the keep_the_seat (and any other) marketing journey for this
+    // family — without this a withdrawn student's family keeps receiving
+    // "keep the seat" nurture touches for a seat they no longer hold.
+    const { exitJourneysByApplication } = await import("./journeys");
+    await exitJourneysByApplication(enrollment.application_id as string, "manual");
   }
 
   await logAuditEvent({

@@ -131,9 +131,36 @@ export async function getEnrollmentFunnel(campusIds: string[] = []): Promise<Enr
   const schoolYearId = (sy?.id as string | undefined) ?? null;
   const schoolYearName = (sy?.name as string | undefined) ?? null;
 
+  // ── Cycle start: real boundary for `lead` and `offer`, which carry no
+  // school_year_id (confirmed — see recruitment-intel.ts, which discloses
+  // its own lead counts as explicitly all-time for the same reason). The
+  // earliest open_date among this school year's enrollment windows (in
+  // scope) is the actual start of this cycle's recruitment activity, so
+  // leads and offers before it belong to a prior cycle and must not be
+  // counted into this year's inquiryMultiple / inquiryToApp / pace figures.
+  // Falls back to all-time (cycleStart stays null) only when no window can
+  // be resolved — never a fabricated boundary.
+  let cycleStart: string | null = null;
+  if (schoolYearId) {
+    let windowQuery = supabase
+      .from("enrollment_window")
+      .select("open_date")
+      .eq("school_year_id", schoolYearId);
+    if (scopeCampus) windowQuery = windowQuery.in("campus_id", campusIds);
+    const { data: windows } = await windowQuery;
+    const openDates = ((windows ?? []) as Array<{ open_date: string }>)
+      .map((w) => w.open_date)
+      .filter(Boolean);
+    if (openDates.length > 0) {
+      cycleStart = openDates.reduce((min, d) => (d < min ? d : min), openDates[0]);
+    }
+  }
+
   // ── Stage 1: Generate Interest ──────────────────────────────────────────
-  const leadQuery = supabase.from("lead").select("stage");
-  const { data: leads } = await (scopeCampus ? leadQuery.in("campus_id", campusIds) : leadQuery);
+  let leadQuery = supabase.from("lead").select("stage");
+  if (scopeCampus) leadQuery = leadQuery.in("campus_id", campusIds);
+  if (cycleStart) leadQuery = leadQuery.gte("created_at", cycleStart);
+  const { data: leads } = await leadQuery;
   const leadRows = (leads ?? []) as Array<{ stage: string }>;
   const totalLeads = leadRows.length;
 
@@ -169,8 +196,10 @@ export async function getEnrollmentFunnel(campusIds: string[] = []): Promise<Enr
   const submittedApps = inYear.filter((a) => (a.status as string) !== "draft").length;
 
   // ── Stage 4: Enroll ─────────────────────────────────────────────────────
-  const offerQuery = supabase.from("offer").select("status");
-  const { data: offers } = await (scopeCampus ? offerQuery.in("campus_id", campusIds) : offerQuery);
+  let offerQuery = supabase.from("offer").select("status");
+  if (scopeCampus) offerQuery = offerQuery.in("campus_id", campusIds);
+  if (cycleStart) offerQuery = offerQuery.gte("offered_at", cycleStart);
+  const { data: offers } = await offerQuery;
   const offerRows = (offers ?? []) as Array<{ status: string }>;
   const offersMade = offerRows.length;
   const offersAccepted = offerRows.filter((o) => o.status === "accepted").length;
