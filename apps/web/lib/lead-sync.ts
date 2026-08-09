@@ -135,7 +135,7 @@ function parseTimestamp(v: string | undefined): Date | null {
 
 // ─── Row extraction per tab kind ─────────────────────────────────────────────
 
-interface CandidateLead {
+export interface CandidateLead {
   email: string;
   first_name: string;
   last_name: string;
@@ -221,18 +221,100 @@ function extractRows(kind: TabKind, header: string[], rows: string[][], formName
   return out;
 }
 
+// ─── Duplicate handling ───────────────────────────────────────────────────
+//
+// A family often appears more than once across a campus's tabs (Interest
+// Form, then Squarespace, then a later Contact Form) or across sync runs.
+// The old behavior treated any repeat email as fully handled and discarded
+// the row — so a later submission with a corrected phone number or a
+// filled-in grade never reached the record. Every duplicate is now compared
+// field by field against what we already have: a field is filled in if it
+// was missing, and overwritten only when the new submission is demonstrably
+// newer than the last time the record changed (comparing the candidate's
+// own submitted_at against the record's updated_at) — never blind overwrite,
+// never silently drop a correction either.
+
+const MERGE_FIELDS = [
+  "phone",
+  "first_name",
+  "last_name",
+  "student_first_name",
+  "entry_grade",
+  "zip",
+  "preferred_language",
+] as const;
+type MergeField = (typeof MERGE_FIELDS)[number];
+
+export interface ExistingLead {
+  id: string;
+  updated_at: string;
+  notes: string | null;
+  fields: Record<MergeField, string | null>;
+}
+
+/**
+ * Decide what a duplicate submission should change on the existing lead.
+ * Returns null when there is nothing worth writing (no actual difference).
+ */
+export function computeMerge(
+  existing: ExistingLead,
+  candidate: CandidateLead
+): { patch: Record<string, string>; changed: string[] } | null {
+  const patch: Record<string, string> = {};
+  const changed: string[] = [];
+  const candidateIsNewer =
+    candidate.submitted_at !== null && candidate.submitted_at.getTime() > new Date(existing.updated_at).getTime();
+
+  const candidateValues: Record<MergeField, string | undefined> = {
+    phone: candidate.phone,
+    first_name: candidate.first_name || undefined,
+    last_name: candidate.last_name || undefined,
+    student_first_name: candidate.student_first_name,
+    entry_grade: candidate.entry_grade,
+    zip: candidate.zip,
+    preferred_language: candidate.preferred_language,
+  };
+
+  for (const field of MERGE_FIELDS) {
+    const have = existing.fields[field];
+    const got = candidateValues[field];
+    if (!got) continue; // nothing offered, nothing to consider
+    const isMissing = have === null || have === "";
+    if (isMissing) {
+      patch[field] = got;
+      changed.push(`${field}: (blank) → "${got}"`);
+    } else if (have !== got && candidateIsNewer) {
+      patch[field] = got;
+      changed.push(`${field}: "${have}" → "${got}"`);
+    }
+  }
+
+  // Notes are free text — append rather than overwrite, so earlier context
+  // from another tab is never lost.
+  if (candidate.notes && candidate.notes.trim() && !(existing.notes ?? "").includes(candidate.notes.trim())) {
+    patch.notes = existing.notes ? `${existing.notes}\n${candidate.notes.trim()}` : candidate.notes.trim();
+    changed.push("notes: appended");
+  }
+
+  return changed.length > 0 ? { patch, changed } : null;
+}
+
 // ─── Sync ────────────────────────────────────────────────────────────────────
 
 export interface SyncSummary {
   checked: number;
   added: number;
   welcomed: number; // fresh rows that got the response engine
+  /** Duplicate rows that carried a new/newer value and updated the record. */
+  updated: number;
+  /** Duplicate rows seen but with nothing new to add (already fully current). */
+  duplicates: number;
   errors: string[];
 }
 
 export async function syncLeadSheets(): Promise<SyncSummary> {
   const supabase = createServiceRoleClient();
-  const summary: SyncSummary = { checked: 0, added: 0, welcomed: 0, errors: [] };
+  const summary: SyncSummary = { checked: 0, added: 0, welcomed: 0, updated: 0, duplicates: 0, errors: [] };
   const now = Date.now();
   const nowIso = new Date().toISOString();
 
@@ -248,16 +330,33 @@ export async function syncLeadSheets(): Promise<SyncSummary> {
       continue;
     }
 
-    // All existing lead emails for this campus (paged past the 1k cap)
-    const existing = new Set<string>();
+    // All existing leads for this campus, with the fields we can merge into
+    // (paged past the 1k cap) — a Map, not a Set, so a duplicate can be
+    // compared and corrected rather than just recognized and skipped.
+    const existing = new Map<string, ExistingLead>();
     for (let offset = 0; ; offset += 1000) {
       const { data } = await supabase
         .from("lead")
-        .select("email")
+        .select("id, email, phone, first_name, last_name, student_first_name, entry_grade, zip, preferred_language, notes, updated_at")
         .eq("campus_id", campus.id)
         .not("email", "is", null)
         .range(offset, offset + 999);
-      for (const r of data ?? []) existing.add((r as { email: string }).email.toLowerCase());
+      for (const r of (data ?? []) as Record<string, string | null>[]) {
+        existing.set((r.email as string).toLowerCase(), {
+          id: r.id as string,
+          updated_at: r.updated_at as string,
+          notes: r.notes,
+          fields: {
+            phone: r.phone,
+            first_name: r.first_name,
+            last_name: r.last_name,
+            student_first_name: r.student_first_name,
+            entry_grade: r.entry_grade,
+            zip: r.zip,
+            preferred_language: r.preferred_language,
+          },
+        });
+      }
       if (!data || data.length < 1000) break;
     }
 
@@ -275,8 +374,30 @@ export async function syncLeadSheets(): Promise<SyncSummary> {
         summary.checked += candidates.length;
 
         for (const candidate of candidates) {
-          if (existing.has(candidate.email)) continue;
-          existing.add(candidate.email); // also dedupes within this run
+          const dup = existing.get(candidate.email);
+          if (dup) {
+            const merge = computeMerge(dup, candidate);
+            if (!merge) {
+              summary.duplicates++;
+              continue;
+            }
+            const { error } = await supabase.from("lead").update(merge.patch).eq("id", dup.id);
+            if (error) {
+              summary.errors.push(`${candidate.email}: ${error.message}`);
+              continue;
+            }
+            await supabase.from("lead_activity").insert({
+              lead_id: dup.id,
+              activity_type: "inquiry",
+              body: `Duplicate submission on ${tab.sheetName} updated this record — ${merge.changed.join("; ")}.`,
+            });
+            // Reflect the merge so a third occurrence in this same run
+            // compares against the corrected state, not the stale original.
+            Object.assign(dup.fields, merge.patch);
+            if (merge.patch.notes) dup.notes = merge.patch.notes;
+            summary.updated++;
+            continue;
+          }
 
           const isFresh =
             candidate.submitted_at !== null &&
@@ -298,15 +419,29 @@ export async function syncLeadSheets(): Promise<SyncSummary> {
             });
             if (result.error) {
               summary.errors.push(`${candidate.email}: ${result.error}`);
-            } else {
-              // Fields the inquiry entry point doesn't accept
-              await supabase
-                .from("lead")
-                .update({ zip: candidate.zip ?? null, notes: candidate.notes ?? null })
-                .eq("id", result.data!.id);
-              summary.added++;
-              summary.welcomed++;
+              continue;
             }
+            // Fields the inquiry entry point doesn't accept
+            await supabase
+              .from("lead")
+              .update({ zip: candidate.zip ?? null, notes: candidate.notes ?? null })
+              .eq("id", result.data!.id);
+            summary.added++;
+            summary.welcomed++;
+            existing.set(candidate.email, {
+              id: result.data!.id,
+              updated_at: nowIso,
+              notes: candidate.notes ?? null,
+              fields: {
+                phone: candidate.phone ?? null,
+                first_name: candidate.first_name || candidate.email.split("@")[0],
+                last_name: candidate.last_name || "(no name given)",
+                student_first_name: candidate.student_first_name ?? null,
+                entry_grade: candidate.entry_grade ?? null,
+                zip: candidate.zip ?? null,
+                preferred_language: candidate.preferred_language ?? "en",
+              },
+            });
           } else {
             // Older straggler — quiet import, automation disarmed.
             const { data: lead, error } = await supabase
@@ -334,14 +469,28 @@ export async function syncLeadSheets(): Promise<SyncSummary> {
               .single();
             if (error) {
               summary.errors.push(`${candidate.email}: ${error.message}`);
-            } else {
-              await supabase.from("lead_activity").insert({
-                lead_id: lead.id,
-                activity_type: "inquiry",
-                body: `Synced from ${tab.sheetName}.`,
-              });
-              summary.added++;
+              continue;
             }
+            await supabase.from("lead_activity").insert({
+              lead_id: lead.id,
+              activity_type: "inquiry",
+              body: `Synced from ${tab.sheetName}.`,
+            });
+            summary.added++;
+            existing.set(candidate.email, {
+              id: lead.id as string,
+              updated_at: nowIso,
+              notes: candidate.notes ?? null,
+              fields: {
+                phone: candidate.phone ?? null,
+                first_name: candidate.first_name || candidate.email.split("@")[0],
+                last_name: candidate.last_name || "(no name given)",
+                student_first_name: candidate.student_first_name ?? null,
+                entry_grade: candidate.entry_grade ?? null,
+                zip: candidate.zip ?? null,
+                preferred_language: candidate.preferred_language ?? "en",
+              },
+            });
           }
         }
       } catch (err) {

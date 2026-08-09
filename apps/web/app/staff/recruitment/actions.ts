@@ -58,7 +58,7 @@ export async function staffSyncLeadSheets() {
   await requireStaffSession();
   const { syncLeadSheets } = await import("@/lib/lead-sync");
   const summary = await syncLeadSheets();
-  if (summary.added > 0) revalidatePath("/staff/recruitment");
+  if (summary.added > 0 || summary.updated > 0) revalidatePath("/staff/recruitment");
   return summary;
 }
 
