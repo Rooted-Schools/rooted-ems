@@ -65,6 +65,9 @@ interface Recipient {
   email: string;
   status: string;
   campus: string;
+  /** Has a phone on file AND has opted in — the real send-time eligibility,
+   *  not just "has a phone." */
+  smsEligible: boolean;
 }
 
 interface CommsClientProps {
@@ -490,11 +493,30 @@ export function CommsClient({
             if (result.error) {
               setFeedback({ type: "error", message: result.error });
             } else {
-              setFeedback({
-                type: "success",
-                message: `Sent ${result.data?.sentCount ?? 0} notification${(result.data?.sentCount ?? 0) !== 1 ? "s" : ""} successfully.`,
-              });
-              setShowNewMessage(false);
+              const sent = result.data?.sentCount ?? 0;
+              const skipped = result.data?.skipped ?? [];
+              if (result.data?.configured === false) {
+                // The provider itself isn't set up — every recipient was
+                // skipped for the same reason. Say that plainly rather than
+                // claiming any number of messages went out.
+                setFeedback({
+                  type: "error",
+                  message: skipped[0]?.reason ?? "This channel isn't connected in this environment.",
+                });
+              } else if (skipped.length > 0) {
+                const preview = skipped.slice(0, 3).map((s) => `${s.name} (${s.reason})`).join("; ");
+                const more = skipped.length > 3 ? `, +${skipped.length - 3} more` : "";
+                setFeedback({
+                  type: sent > 0 ? "success" : "error",
+                  message: `Sent to ${sent} of ${sent + skipped.length} — not reached: ${preview}${more}`,
+                });
+              } else {
+                setFeedback({
+                  type: "success",
+                  message: `Sent ${sent} message${sent !== 1 ? "s" : ""} successfully.`,
+                });
+              }
+              if (sent > 0 || result.data?.configured === false) setShowNewMessage(false);
               router.refresh();
             }
           });
@@ -763,6 +785,16 @@ function NewMessageDialog({
             <p className="text-xs text-stone mt-1">
               {recipientCount} recipient{recipientCount !== 1 ? "s" : ""} selected
             </p>
+            {channel === "sms" && (() => {
+              const targetIds = new Set(getTargetRecipients());
+              const eligible = recipients.filter((r) => targetIds.has(r.userId) && r.smsEligible).length;
+              return eligible < recipientCount ? (
+                <p className="text-xs text-warn-text mt-0.5">
+                  Only {eligible} of {recipientCount} can be texted — the rest have no phone on
+                  file or haven&apos;t opted in. They&apos;ll be skipped, not failed silently.
+                </p>
+              ) : null;
+            })()}
           </div>
 
           {/* Subject */}
