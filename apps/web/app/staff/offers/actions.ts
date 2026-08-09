@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireMinRole } from "@/lib/auth/get-session";
+import { isDeclineReason } from "@/lib/decline-reasons";
 import {
   sendOffer,
   acceptOffer,
@@ -102,9 +103,18 @@ export async function staffAcceptOfferOnBehalf(
   return result;
 }
 
-export async function staffDeclineOfferOnBehalf(offerId: string) {
+export async function staffDeclineOfferOnBehalf(
+  offerId: string,
+  reason?: string,
+  note?: string
+) {
   await requireMinRole("enrollment_manager");
-  const result = await declineOffer(offerId);
+  // Staff record most declines by phone, so this is the path where a reason is
+  // most likely known and least likely captured. Still optional.
+  const result = await declineOffer(offerId, undefined, {
+    reason: isDeclineReason(reason) ? reason : undefined,
+    note,
+  });
 
   if (!result.error) {
     revalidatePath("/staff/offers");

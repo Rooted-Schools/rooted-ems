@@ -81,7 +81,9 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Insights",
         href: "/staff/reports",
         icon: "insights",
-        activePaths: ["/staff/equity", "/staff/audit"],
+        // Funnel lives here rather than beside Pipeline on purpose: Pipeline is
+        // the daily work queue, Funnel is the strategy view.
+        activePaths: ["/staff/equity", "/staff/audit", "/staff/funnel"],
       },
     ],
   },

@@ -32,6 +32,18 @@ import { notifyFamilyKeepTheSeat } from "@/lib/notify";
 
 const SEND_DELAY_DAYS = 2;
 
+/**
+ * Playbook PB 24 v2.2 standard: WEEKLY contact, lottery day through the first
+ * day of school. This route previously sent exactly one touch per enrollment
+ * and then went silent all summer, which is the failure the playbook's own
+ * changelog was written to correct.
+ *
+ * This is the BACKSTOP, not the standard. The playbook says PERSONAL outreach;
+ * an automated email is not a person. The human half is the MELT_RISK queue on
+ * /staff/today, driven by contacted_at, which no automated send can clear.
+ */
+const OUTREACH_INTERVAL_DAYS = 7;
+
 /** True when the error says a named column is absent — migration not yet applied, not a missing row. */
 function isMissingColumn(error: { message?: string; code?: string } | null): boolean {
   if (!error) return false;
@@ -44,7 +56,7 @@ function warnMissingKeepTheSeatColumn(): void {
   if (warnedMissingKeepTheSeatColumn) return;
   warnedMissingKeepTheSeatColumn = true;
   console.warn(
-    "[cron/keep-the-seat] registration_packet.keep_the_seat_sent_at not present — migration 00036_registration_outreach.sql has not been applied. Skipping this run."
+    "[cron/keep-the-seat] registration_packet.last_outreach_at not present — migration 00041_weekly_melt_cadence.sql has not been applied. Weekly melt outreach is paused until it runs."
   );
 }
 
@@ -68,11 +80,15 @@ export async function GET(request: NextRequest) {
   // Complete packets, verified long enough ago, never sent the keep-the-seat
   // touch. keep_the_seat_sent_at is from migration 00036 and isn't in the
   // generated DB types yet, hence the casts below.
+  const outreachCutoff = new Date(
+    now.getTime() - OUTREACH_INTERVAL_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
+
   const { data: packets, error: fetchErr } = await supabase
     .from("registration_packet")
     .select(
       `
-      id, enrollment_id, verified_at, keep_the_seat_sent_at,
+      id, enrollment_id, verified_at, keep_the_seat_sent_at, last_outreach_at,
       enrollment:enrollment_id (
         id, campus_id, school_year_id,
         student:student_id (first_name, last_name),
@@ -82,12 +98,12 @@ export async function GET(request: NextRequest) {
     )
     .eq("status", "complete")
     .lte("verified_at", verifiedCutoff)
-    .is("keep_the_seat_sent_at" as never, null);
+    .or(`last_outreach_at.is.null,last_outreach_at.lt.${outreachCutoff}`);
 
   if (fetchErr) {
     if (isMissingColumn(fetchErr)) {
       warnMissingKeepTheSeatColumn();
-      return NextResponse.json({ skipped: "migration 00036 not applied" }, { status: 200 });
+      return NextResponse.json({ skipped: "migration 00041 not applied" }, { status: 200 });
     }
     console.error("[cron/keep-the-seat] fetch", fetchErr.message);
     return NextResponse.json({ error: "Failed to fetch completed packets." }, { status: 500 });
@@ -117,13 +133,26 @@ export async function GET(request: NextRequest) {
       } | null;
       if (!enrollment?.id || !enrollment.campus_id) continue;
 
-      // Atomic claim: only one runner flips keep_the_seat_sent_at from NULL.
-      const { data: claimed, error: claimErr } = await supabase
+      // Atomic claim. The guard is the same value the fetch filtered on, so
+      // two overlapping runs cannot both send this week's touch: whichever
+      // updates first moves last_outreach_at past the cutoff and the other
+      // claim matches zero rows.
+      const previousOutreach = packet.last_outreach_at as string | null;
+      let claim = supabase
         .from("registration_packet")
-        .update({ keep_the_seat_sent_at: nowIso } as never)
-        .eq("id", packet.id as string)
-        .is("keep_the_seat_sent_at" as never, null)
-        .select("id");
+        .update({
+          last_outreach_at: nowIso,
+          // Preserve the original first-touch marker; it records something
+          // different from "most recent check-in".
+          ...(packet.keep_the_seat_sent_at ? {} : { keep_the_seat_sent_at: nowIso }),
+        } as never)
+        .eq("id", packet.id as string);
+
+      claim = previousOutreach
+        ? claim.eq("last_outreach_at" as never, previousOutreach)
+        : claim.is("last_outreach_at" as never, null);
+
+      const { data: claimed, error: claimErr } = await claim.select("id");
 
       if (claimErr) {
         console.error(`[cron/keep-the-seat] claim ${packet.id}`, claimErr.message);

@@ -18,6 +18,11 @@ import { useToast } from "@/components/ui/toast";
 import type { FamilyOfferDetail } from "@/lib/queries";
 import { familyAcceptOffer, familyDeclineOffer } from "../../applications/actions";
 import { useLocale } from "@/lib/i18n/locale-context";
+import {
+  DECLINE_REASONS,
+  DECLINE_REASON_LABEL_KEY,
+  type DeclineReason,
+} from "@/lib/decline-reasons";
 import { IconAlertTriangle, IconBan, IconCheckCircle, IconClock } from "@/components/ui/icons";
 
 interface Props {
@@ -44,6 +49,11 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
   const [isPending, startTransition] = useTransition();
   const [showAcceptDialog, setShowAcceptDialog] = useState(false);
   const [showDeclineDialog, setShowDeclineDialog] = useState(false);
+  // Playbook s15 refusal tracking. Both stay optional: a family declining a
+  // seat is already having a hard moment, and gating that behind a required
+  // survey would be both hostile and a good way to collect garbage answers.
+  const [declineReason, setDeclineReason] = useState<DeclineReason | null>(null);
+  const [declineNote, setDeclineNote] = useState("");
 
   // ── Already-handled states ─────────────────────────────────────────────────
 
@@ -127,7 +137,12 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
 
   const handleDecline = () => {
     startTransition(async () => {
-      const result = await familyDeclineOffer(offer.id, offer.application_id);
+      const result = await familyDeclineOffer(
+        offer.id,
+        offer.application_id,
+        declineReason ?? undefined,
+        declineNote.trim() || undefined
+      );
       if (result.error) {
         toast({
           variant: "error",
@@ -308,6 +323,45 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
               <strong>{offer.campus_name}</strong>? {t("offers.cannotUndo")}
             </DialogDescription>
           </DialogHeader>
+
+          {/* Refusal tracking (playbook s15). Optional by design — the decline
+              button below is never blocked on answering this. */}
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium text-ink">
+              {t("offers.declineReasonPrompt")}{" "}
+              <span className="font-normal text-stone">{t("common.optional")}</span>
+            </legend>
+            <div className="space-y-1.5">
+              {DECLINE_REASONS.map((reason) => (
+                <label
+                  key={reason}
+                  className="flex items-center gap-2.5 text-sm text-ink cursor-pointer"
+                >
+                  <input
+                    type="radio"
+                    name="decline-reason"
+                    value={reason}
+                    checked={declineReason === reason}
+                    onChange={() => setDeclineReason(reason)}
+                    disabled={isPending}
+                    className="h-4 w-4 accent-rooted-green"
+                  />
+                  {t(DECLINE_REASON_LABEL_KEY[reason])}
+                </label>
+              ))}
+            </div>
+            <textarea
+              value={declineNote}
+              onChange={(e) => setDeclineNote(e.target.value)}
+              disabled={isPending}
+              rows={2}
+              maxLength={500}
+              placeholder={t("offers.declineNotePlaceholder")}
+              aria-label={t("offers.declineNotePlaceholder")}
+              className="w-full rounded-md border border-line p-2 text-sm text-ink placeholder:text-stone focus:border-rooted-green focus:outline-none"
+            />
+          </fieldset>
+
           <DialogFooter>
             <Button
               variant="outline"

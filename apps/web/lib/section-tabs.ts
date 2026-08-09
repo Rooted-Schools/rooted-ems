@@ -13,6 +13,9 @@ export const SEATS_LOTTERY_TABS: SectionTab[] = [
 
 export const INSIGHTS_TABS: SectionTab[] = [
   { label: "Insights", href: "/staff/reports" },
+  // Funnel sits first among the analytical tabs because it is the frame the
+  // playbook is organised around; Equity then asks who is falling out of it.
+  { label: "Funnel", href: "/staff/funnel" },
   { label: "Equity", href: "/staff/equity" },
   { label: "Audit Trail", href: "/staff/audit" },
 ];

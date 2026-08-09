@@ -4,6 +4,7 @@ import { createEnrollment } from "./enrollment";
 import { initializeRegistrationPacket } from "./registration";
 import { promoteFromWaitlist } from "./waitlist";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
+import type { DeclineReason } from "@/lib/decline-reasons";
 import { notifyFamilyOfOffer, notifyStaffOfferAccepted, notifyStaffOfferDeclined } from "@/lib/notify";
 import { requireStaffSession } from "@/lib/auth/get-session";
 
@@ -326,10 +327,25 @@ export async function acceptOffer(
   return { data: null, error: null };
 }
 
+export interface DeclineOptions {
+  /**
+   * Playbook s15 refusal tracking. Deliberately optional: a family that just
+   * wants out must never be blocked behind a required survey, and a staff
+   * member logging a phone decline may not have asked.
+   */
+  reason?: DeclineReason;
+  /** Free text alongside the reason. Never required. */
+  note?: string;
+}
+
 /**
- * Decline an offer (called by family).
+ * Decline an offer (called by family, or by staff on a family's behalf).
  */
-export async function declineOffer(offerId: string, declinedBy?: string): Promise<MutationResult> {
+export async function declineOffer(
+  offerId: string,
+  declinedBy?: string,
+  options?: DeclineOptions
+): Promise<MutationResult> {
   // Auth check
   const authClient = await createServerClient();
   const { data: { user } } = await authClient.auth.getUser();
@@ -368,6 +384,11 @@ export async function declineOffer(offerId: string, declinedBy?: string): Promis
     .update({
       status: "declined",
       responded_at: new Date().toISOString(),
+      // Written only when supplied. An unsupplied reason stays NULL rather
+      // than defaulting to 'other', so reports can tell "we never asked" apart
+      // from "the family said other".
+      ...(options?.reason ? { decline_reason: options.reason } : {}),
+      ...(options?.note?.trim() ? { decline_note: options.note.trim() } : {}),
     })
     .eq("id", offerId);
 
@@ -389,7 +410,10 @@ export async function declineOffer(offerId: string, declinedBy?: string): Promis
     campus_id: offer.campus_id ?? null,
     old_data: { status: "pending" },
     new_data: { status: "declined" },
-    metadata: { application_id: offer.application_id },
+    metadata: {
+      application_id: offer.application_id,
+      decline_reason: options?.reason ?? null,
+    },
   });
 
   // Seat is now available — immediately promote the next waitlist candidate

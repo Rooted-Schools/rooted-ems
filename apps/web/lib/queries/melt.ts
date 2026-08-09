@@ -256,3 +256,145 @@ export async function getCallEscalationQueue(
 
   return { available: true, rows };
 }
+
+
+// ─── MELT_RISK queue (playbook PB 24 v2.2) ────────────────────────────────
+
+/**
+ * Playbook status code MELT_RISK: "No contact in 14+ days → Alert DO for
+ * personal outreach."
+ *
+ * The opposite population to the call-escalation queue above. That one chases
+ * families whose registration is INCOMPLETE. This one chases families who
+ * already finished: said yes, submitted everything, and are now sitting
+ * quietly between registration and the first day. They look healthy in every
+ * other view in the app, which is exactly why they melt.
+ *
+ * Driven by contacted_at and nothing else. The weekly automated email advances
+ * last_outreach_at, deliberately NOT this. A family who has received four
+ * automated emails and spoken to no one is precisely who this exists to
+ * surface; letting automation clear the flag would delete the finding and
+ * leave the reassurance.
+ */
+export const MELT_RISK_DAYS = 14;
+
+let warnedMissingMeltRiskColumns = false;
+function warnMissingMeltRiskColumns(): void {
+  if (warnedMissingMeltRiskColumns) return;
+  warnedMissingMeltRiskColumns = true;
+  console.warn(
+    "[getMeltRiskQueue] registration_packet.last_outreach_at not present — migration 00041_weekly_melt_cadence.sql has not been applied. Melt risk is hidden until it runs."
+  );
+}
+
+export interface MeltRiskRow {
+  packet_id: string;
+  enrollment_id: string;
+  student_name: string;
+  guardian_name: string;
+  guardian_phone: string | null;
+  campus_id: string;
+  campus_name: string;
+  /** Days since a HUMAN last logged contact. Null when nobody ever has. */
+  days_since_contact: number | null;
+  /** Last automated touch, shown for context. Never clears the flag. */
+  last_outreach_at: string | null;
+  start_date: string | null;
+}
+
+export interface MeltRiskResult {
+  available: boolean;
+  rows: MeltRiskRow[];
+}
+
+export async function getMeltRiskQueue(
+  campusIds?: string[],
+  days: number = MELT_RISK_DAYS
+): Promise<MeltRiskResult> {
+  const supabase = createServiceRoleClient();
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const today = new Date().toISOString().slice(0, 10);
+
+  let query = supabase
+    .from("registration_packet")
+    .select(
+      `
+      id, enrollment_id, contacted_at, last_outreach_at, verified_at,
+      enrollment:enrollment_id!inner (
+        id, campus_id, application_id,
+        student:student_id (first_name, last_name),
+        campus:campus_id (name),
+        school_year:school_year_id (start_date),
+        application:application_id ( guardian:guardian_id (first_name, last_name, phone) )
+      )
+    `
+    )
+    .eq("status", "complete")
+    .or(`contacted_at.is.null,contacted_at.lt.${cutoff}`);
+
+  if (campusIds && campusIds.length > 0) {
+    query = query.in("enrollment.campus_id", campusIds);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    if (isMissingColumn(error)) {
+      warnMissingMeltRiskColumns();
+      return { available: false, rows: [] };
+    }
+    console.error("[getMeltRiskQueue]", error.message);
+    return { available: true, rows: [] };
+  }
+
+  const now = Date.now();
+  const rows: MeltRiskRow[] = [];
+
+  for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+    const enrollment = row.enrollment as Record<string, unknown> | null;
+    const schoolYear = enrollment?.school_year as Record<string, unknown> | null;
+    const startDate = (schoolYear?.start_date as string | null) ?? null;
+
+    // Only inside the melt window. After the first day a family is either
+    // enrolled or a retention problem; calling them a melt risk describes the
+    // wrong thing.
+    if (!startDate || startDate <= today) continue;
+
+    const student = enrollment?.student as { first_name: string; last_name: string } | null;
+    const campus = enrollment?.campus as { name: string } | null;
+    const application = enrollment?.application as Record<string, unknown> | null;
+    const guardian = application?.guardian as
+      | { first_name?: string; last_name?: string; phone?: string }
+      | null;
+
+    const contactedAt = row.contacted_at as string | null;
+
+    rows.push({
+      packet_id: row.id as string,
+      enrollment_id: (enrollment?.id as string) ?? "",
+      student_name: student ? `${student.first_name} ${student.last_name}` : "Unknown student",
+      guardian_name: guardian
+        ? `${guardian.first_name ?? ""} ${guardian.last_name ?? ""}`.trim() || "Unknown guardian"
+        : "Unknown guardian",
+      guardian_phone: guardian?.phone ?? null,
+      campus_id: (enrollment?.campus_id as string) ?? "",
+      campus_name: campus?.name ?? "",
+      days_since_contact: contactedAt
+        ? Math.floor((now - new Date(contactedAt).getTime()) / 86_400_000)
+        : null,
+      last_outreach_at: (row.last_outreach_at as string | null) ?? null,
+      start_date: startDate,
+    });
+  }
+
+  // Never-contacted first, then longest-silent. A null here is the most urgent
+  // case, not a missing value to sort to the bottom.
+  rows.sort((a, b) => {
+    if (a.days_since_contact === null && b.days_since_contact === null) return 0;
+    if (a.days_since_contact === null) return -1;
+    if (b.days_since_contact === null) return 1;
+    return b.days_since_contact - a.days_since_contact;
+  });
+
+  return { available: true, rows };
+}
