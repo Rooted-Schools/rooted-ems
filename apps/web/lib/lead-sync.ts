@@ -248,18 +248,34 @@ export function extractRows(kind: TabKind, header: string[], rows: string[][], f
       const isAd = ["meta", "facebook", "instagram", "google", "ad"].some((kw) => leadSourceLower.includes(kw));
       // The org has already mapped each historical inquiry's grade-at-submission
       // to the grade the student will enter for the 2027-28 cohort this pilot
-      // is opening — prefer that pre-computed value; fall back to the raw
-      // at-submission grade only if the mapped value doesn't parse.
-      const entryGrade = normGrade(get(row, "Mapped 2027 grade")) ?? normGrade(get(row, "Student grade when contact submitted"));
+      // is opening — prefer that pre-computed value. Real distribution check:
+      // values above 12 (13/14/15 — ~230 rows) are not bad data, they mean
+      // the student will already have graduated by 2027-28 and this lead is
+      // not a current prospect for this cycle. Falling back to the raw
+      // at-submission grade for those rows would fabricate false currency —
+      // e.g. showing "grade 8" from a submission years ago for a student who
+      // will actually be past 12th grade. Only fall back to the raw grade
+      // when the mapped column is genuinely blank (never attempted), and
+      // flag the graduated case in notes instead of silently leaving it
+      // blank with no explanation.
+      const mappedRaw = cleanCell(get(row, "Mapped 2027 grade"));
+      const mappedNum = Number(mappedRaw);
+      const mappedIndicatesGraduated = mappedRaw !== "" && Number.isFinite(mappedNum) && mappedNum > 12;
+      const entryGrade = mappedIndicatesGraduated
+        ? undefined
+        : normGrade(mappedRaw) ?? normGrade(get(row, "Student grade when contact submitted")) ?? undefined;
+      const graduatedNote = mappedIndicatesGraduated
+        ? `Mapped grade (${mappedRaw}) indicates this student will have graduated before the 2027-28 cohort — likely not a current prospect.`
+        : null;
       out.push({
         email,
         first_name: cleanCell(get(row, "Parent/Guardian First Name")),
         last_name: cleanCell(get(row, "Parent/Guardian Last Name")),
         phone: cleanCell(get(row, "Parent/Guardian Phone Number")) || undefined,
         student_first_name: cleanCell(get(row, "Student Name")).split(/\s+/)[0] || undefined,
-        entry_grade: entryGrade ?? undefined,
+        entry_grade: entryGrade,
         zip: cleanCell(get(row, "ZipCode")).slice(0, 10) || undefined,
-        notes: [status && `Status: ${status}`, notes].filter(Boolean).join("\n") || undefined,
+        notes: [status && `Status: ${status}`, notes, graduatedNote].filter(Boolean).join("\n") || undefined,
         source: isAd ? "ad" : "other",
         source_detail: leadSource || "CR Neal interest form",
         submitted_at: parseTimestamp(get(row, "Timestamp")),

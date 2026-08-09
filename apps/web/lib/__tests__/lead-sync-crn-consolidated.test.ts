@@ -91,12 +91,31 @@ describe("extractRows: crn_consolidated", () => {
     expect(result.entry_grade).toBe("6");
   });
 
-  it("falls back to Student grade when contact submitted when Mapped 2027 grade doesn't parse", () => {
-    // The literal sample row has "14" in Mapped 2027 grade, which normGrade
-    // rejects (out of 1-12 range) — this pins that exact real-world case.
+  it("does NOT fall back to the stale submitted grade when Mapped 2027 grade means graduated", () => {
+    // A real distribution check against the live sheet found ~230 rows where
+    // Mapped 2027 grade is 13/14/15 — not bad data, it means the student
+    // will have already graduated by the 2027-28 cohort this pilot is
+    // opening. Falling back to "Student grade when contact submitted" (e.g.
+    // "11" from a submission years ago) would fabricate false currency —
+    // the family would look like a live grade-11 prospect when the real
+    // signal is "no longer eligible for this cycle." entry_grade must stay
+    // honestly blank, with the reason surfaced in notes instead.
     const row = realRow({ "Mapped 2027 grade": "14", "Student grade when contact submitted": "11" });
     const [result] = extractRows("crn_consolidated", REAL_HEADER, [row], "C.R. Neal Academy");
-    expect(result.entry_grade).toBe("11");
+    expect(result.entry_grade).toBeUndefined();
+    expect(result.notes).toContain("graduated");
+    expect(result.notes).toContain("14");
+  });
+
+  it("still falls back to the submitted grade for an ordinary unparseable (non-graduated) mapped value", () => {
+    // Guards the distinction: only a plausible graduation-range number (>12)
+    // suppresses the fallback. Genuine garbage in the mapped column (blank
+    // handled separately below; this covers e.g. stray text) still falls
+    // back to the best available data rather than losing the lead's grade
+    // entirely.
+    const row = realRow({ "Mapped 2027 grade": "n/a", "Student grade when contact submitted": "6" });
+    const [result] = extractRows("crn_consolidated", REAL_HEADER, [row], "C.R. Neal Academy");
+    expect(result.entry_grade).toBe("6");
   });
 
   it("marks source as ad and preserves the literal Lead Source text for Meta/Facebook/etc.", () => {
@@ -123,7 +142,9 @@ describe("extractRows: crn_consolidated", () => {
   });
 
   it("combines Notes and Status into a single notes field", () => {
-    const row = realRow({ Status: "Contacted", Notes: "Interested in fall cohort." });
+    // "Mapped 2027 grade" overridden away from the default sample's "14" so
+    // the graduated-flag note (covered separately above) doesn't leak in.
+    const row = realRow({ "Mapped 2027 grade": "9", Status: "Contacted", Notes: "Interested in fall cohort." });
     const [result] = extractRows("crn_consolidated", REAL_HEADER, [row], "C.R. Neal Academy");
     expect(result.notes).toBe("Status: Contacted\nInterested in fall cohort.");
   });
