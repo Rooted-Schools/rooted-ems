@@ -952,7 +952,9 @@ export async function getStaffMessageTemplates(): Promise<MessageTemplateRow[]> 
 export async function getNotificationRecipients(
   campusIds?: string[],
   statusFilter?: string
-): Promise<{ userId: string; name: string; email: string; status: string; campus: string }[]> {
+): Promise<
+  { userId: string; name: string; email: string; status: string; campus: string; smsEligible: boolean }[]
+> {
   const supabase = await createServerClient();
   const hasCampusFilter = campusIds && campusIds.length > 0;
 
@@ -965,7 +967,9 @@ export async function getNotificationRecipients(
         user_id,
         first_name,
         last_name,
-        email
+        email,
+        phone,
+        sms_consent
       ),
       campus:campus_id (name)
     `)
@@ -983,21 +987,24 @@ export async function getNotificationRecipients(
 
   // Deduplicate by user_id
   const seen = new Set<string>();
-  const recipients: { userId: string; name: string; email: string; status: string; campus: string }[] = [];
+  const recipients: { userId: string; name: string; email: string; status: string; campus: string; smsEligible: boolean }[] = [];
 
   for (const row of (data ?? []) as Record<string, unknown>[]) {
-    const guardian = row.guardian as unknown as Record<string, string> | null;
+    const guardian = row.guardian as unknown as Record<string, unknown> | null;
     const campus = row.campus as Record<string, string> | null;
-    const userId = guardian?.user_id;
+    const userId = guardian?.user_id as string | undefined;
     if (!userId || seen.has(userId)) continue;
     seen.add(userId);
 
     recipients.push({
       userId,
-      name: `${guardian?.first_name ?? ""} ${guardian?.last_name ?? ""}`.trim(),
-      email: guardian?.email ?? "",
+      name: `${(guardian?.first_name as string) ?? ""} ${(guardian?.last_name as string) ?? ""}`.trim(),
+      email: (guardian?.email as string) ?? "",
       status: row.status as string,
       campus: campus?.name ?? "",
+      // Real send-time eligibility (phone on file AND opted in) — not just
+      // "has a phone" — so the UI's reach count doesn't overstate itself.
+      smsEligible: Boolean(guardian?.phone) && guardian?.sms_consent === true,
     });
   }
 

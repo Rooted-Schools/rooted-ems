@@ -2,8 +2,8 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 import { createServiceRoleClient, createServerClient } from "@rooted-ems/database/server";
-import { getCampuses, getActiveEnrollmentWindows } from "@/lib/queries";
-import { requireStaffSession } from "@/lib/auth/get-session";
+import { getCampuses } from "@/lib/queries";
+import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 import { StaffNewApplicationForm } from "./new-staff-application";
 
 export default async function StaffNewApplicationPage({
@@ -13,15 +13,22 @@ export default async function StaffNewApplicationPage({
 }) {
   const session = await requireStaffSession();
 
+  // Empty accessible list is the established signal for genuine CMO-level
+  // access with no per-campus assignment row (same convention
+  // resolveActiveCampus uses); anyone WITH assignments only ever sees their
+  // own campuses in this form, in the dropdown as well as the data it loads.
+  const accessibleIds = getAccessibleCampusIds(session);
+  const scopeToAccessible = accessibleIds.length > 0;
+
   const supabase = createServiceRoleClient();
 
-  // Fetch all campuses (CMO-level: all campuses, not just assigned)
-  const [campuses, windows] = await Promise.all([
-    getCampuses(),
-    getActiveEnrollmentWindows(),
-  ]);
+  const allCampuses = await getCampuses();
+  const campuses = scopeToAccessible
+    ? allCampuses.filter((c) => accessibleIds.includes(c.id))
+    : allCampuses;
 
-  // Fetch all grade levels
+  // Fetch all grade levels, then scope in memory (grade_level has no
+  // dedicated query with a campus filter yet).
   const { data: gradeLevels } = await supabase
     .from("grade_level")
     .select("id, grade, campus_id")
@@ -34,19 +41,23 @@ export default async function StaffNewApplicationPage({
     .eq("status", "open")
     .order("name");
 
-  const grades = (gradeLevels ?? []).map((g: Record<string, unknown>) => ({
-    id: g.id as string,
-    grade: g.grade as string,
-    campus_id: g.campus_id as string,
-  }));
+  const grades = (gradeLevels ?? [])
+    .map((g: Record<string, unknown>) => ({
+      id: g.id as string,
+      grade: g.grade as string,
+      campus_id: g.campus_id as string,
+    }))
+    .filter((g) => !scopeToAccessible || accessibleIds.includes(g.campus_id));
 
-  const enrollmentWindows = (allWindows ?? []).map((w: Record<string, unknown>) => ({
-    id: w.id as string,
-    name: w.name as string,
-    campus_id: w.campus_id as string,
-    school_year_id: w.school_year_id as string,
-    status: w.status as string,
-  }));
+  const enrollmentWindows = (allWindows ?? [])
+    .map((w: Record<string, unknown>) => ({
+      id: w.id as string,
+      name: w.name as string,
+      campus_id: w.campus_id as string,
+      school_year_id: w.school_year_id as string,
+      status: w.status as string,
+    }))
+    .filter((w) => !scopeToAccessible || accessibleIds.includes(w.campus_id));
 
   // Converting a recruitment lead (?lead=): seed the form so staff verify
   // instead of re-entering. The lead→application stitch happens automatically

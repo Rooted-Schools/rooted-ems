@@ -1,7 +1,7 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-import { requireMinRole } from "@/lib/auth/get-session";
+import { requireMinRole, getAccessibleCampusIds } from "@/lib/auth/get-session";
 import { getStaffUsers, type StaffUserRow } from "@/lib/queries/staff";
 import { getCampuses } from "@/lib/queries";
 import { TeamClient } from "./team-client";
@@ -50,19 +50,35 @@ function groupIntoMembers(rows: StaffUserRow[]): TeamMember[] {
 }
 
 export default async function TeamPage() {
-  await requireMinRole("system_admin");
+  const session = await requireMinRole("system_admin");
 
-  const [staffRows, allCampuses] = await Promise.all([
+  // requireMinRole only confirms system_admin SOMEWHERE, not everywhere — an
+  // admin scoped to one (or a few) campuses must only see their own roster
+  // and only be able to target their own campuses when adding someone. An
+  // empty accessible list is the established signal for genuine CMO-level
+  // access with no per-campus assignment row (same convention
+  // resolveActiveCampus uses); everyone else is scoped down here too.
+  const accessibleIds = getAccessibleCampusIds(session);
+  const scopeToAccessible = accessibleIds.length > 0;
+
+  const [allStaffRows, allCampuses] = await Promise.all([
     getStaffUsers(),
     getCampuses(),
   ]);
+
+  const staffRows = scopeToAccessible
+    ? allStaffRows.filter((r) => accessibleIds.includes(r.campus_id))
+    : allStaffRows;
+  const campuses = scopeToAccessible
+    ? allCampuses.filter((c) => accessibleIds.includes(c.id))
+    : allCampuses;
 
   const members = groupIntoMembers(staffRows);
 
   return (
     <TeamClient
       members={members}
-      campuses={allCampuses.map((c) => ({ id: c.id, name: c.name }))}
+      campuses={campuses.map((c) => ({ id: c.id, name: c.name }))}
     />
   );
 }
