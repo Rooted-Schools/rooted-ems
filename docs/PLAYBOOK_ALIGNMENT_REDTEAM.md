@@ -18,9 +18,32 @@ recoverable from git, because I had not committed.
 All 14 were re-applied and verified individually, and the work is now committed
 (`dd3cfd1`) so a repeat cannot destroy it.
 
-**Root cause is almost certainly the repo living on the iCloud-synced Desktop.**
-It caused two `mmap`/`index.lock` git failures earlier in the day. Moving the
-repo somewhere unsynced is the fix.
+**Root cause: a concurrent Claude session reset the shared working directory.**
+
+I initially blamed iCloud. That was wrong, and the reflog says so plainly:
+
+```
+18:30:17  checkout: moving from main to feat/playbook-alignment   <- recovery
+18:29:33  reset: moving to origin/main                            <- destruction
+18:29:33  checkout: moving from feat/playbook-alignment to main   <- destruction
+17:40:28  checkout: moving from main to feat/playbook-alignment   <- branch created
+```
+
+iCloud does not switch branches. That pair is `git checkout main` followed by
+`git reset --hard origin/main`, run by another process while this session was
+mid-build. Corroborating evidence: this session's start-up context carried a
+prior session's command history containing those exact commands against this
+repo, and there is a second Claude worktree at
+`.claude/worktrees/priceless-swartz-6ae23f`.
+
+**Two or more Claude sessions were operating on the same working tree.** That
+is the actual hazard. Separate sessions must not share one checkout: either run
+them in separate `git worktree` directories, or keep concurrent work to a
+single session.
+
+iCloud is a real but *separate* problem: it caused the `mmap` and `index.lock`
+failures during the merge earlier the same day. Moving the repo off the synced
+Desktop fixes those. It would not have prevented this.
 
 **My mistake, not the environment's:** I deferred committing because commits are
 normally gated on an explicit ask. For work of this size that was the wrong
