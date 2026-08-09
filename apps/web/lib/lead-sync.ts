@@ -22,10 +22,24 @@ import { createLeadFromInquiry } from "@/lib/mutations/leads";
 const FRESH_HOURS = 72;
 const SYNC_TAG = "sheet-sync";
 
-type TabKind = "interest_form" | "scholarlead" | "squarespace" | "contact_form";
+export type TabKind = "interest_form" | "scholarlead" | "squarespace" | "contact_form" | "crn_consolidated";
 
 interface SheetTab {
-  sheetName: string;
+  /**
+   * Human-readable label for logging/error messages (e.g. "Synced from
+   * ${tab.sheetName}", fetch error prefixes). Optional when the tab is
+   * addressed by `gid` — provide a descriptive fallback in that case since
+   * there's no sheet name to fall back on.
+   */
+  sheetName?: string;
+  /**
+   * Direct tab addressing by Google Sheets gid. Immune to future tab
+   * renames — unlike `sheetName`, which the gviz CSV export silently
+   * resolves to the spreadsheet's default tab when no match is found
+   * (rather than erroring), so a stale name degrades silently instead of
+   * failing loudly. Prefer `gid` for any tab that matters.
+   */
+  gid?: string;
   kind: TabKind;
 }
 
@@ -41,10 +55,14 @@ const SHEET_CONFIGS: SheetConfig[] = [
     campusShortCode: "CRN",
     spreadsheetId: "1he5CZL_vVW6v9gCimeEQbwhefWgP4esBkUZYRiOJMbM",
     tabs: [
-      { sheetName: "Interest Form", kind: "interest_form" },
-      { sheetName: "Scholarlead Interest Form", kind: "scholarlead" },
-      { sheetName: "Squarespace Contacts", kind: "squarespace" },
-      { sheetName: "Contact Form", kind: "contact_form" },
+      // The four tab names this used to list ("Interest Form", "Scholarlead
+      // Interest Form", "Squarespace Contacts", "Contact Form") don't exist
+      // in the real spreadsheet — the gviz CSV export silently falls back to
+      // the default tab for any unmatched name, so all four fetches were
+      // returning the same single real tab, whose columns matched none of
+      // the extraction cases above. Addressed by gid instead of name so a
+      // future rename can't silently misroute this again.
+      { gid: "1886397153", sheetName: "CR Neal Interest Sheet", kind: "crn_consolidated" },
     ],
   },
   {
@@ -150,7 +168,7 @@ export interface CandidateLead {
   submitted_at: Date | null;
 }
 
-function extractRows(kind: TabKind, header: string[], rows: string[][], formName: string): CandidateLead[] {
+export function extractRows(kind: TabKind, header: string[], rows: string[][], formName: string): CandidateLead[] {
   const col = (name: string) => header.findIndex((h) => h.trim().toLowerCase() === name.toLowerCase());
   const get = (row: string[], name: string) => row[col(name)] ?? "";
 
@@ -201,7 +219,7 @@ function extractRows(kind: TabKind, header: string[], rows: string[][], formName
         source_detail: `Squarespace contact (${SYNC_TAG})`,
         submitted_at: parseTimestamp(get(row, "Created On")),
       });
-    } else {
+    } else if (kind === "contact_form") {
       const email = normEmail(get(row, "Email"));
       if (!email) continue;
       const reason = cleanCell(get(row, "Reason"));
@@ -214,6 +232,36 @@ function extractRows(kind: TabKind, header: string[], rows: string[][], formName
         notes: [reason && `Reason: ${reason}`, message && `Message: ${message}`].filter(Boolean).join("\n") || undefined,
         source: "website",
         source_detail: `${formName} Contact Form (${SYNC_TAG})`,
+        submitted_at: parseTimestamp(get(row, "Timestamp")),
+      });
+    } else {
+      // crn_consolidated — CR Neal's single real interest-list tab. The four
+      // tab names this campus used to be configured with don't exist in the
+      // spreadsheet; this is the one real tab (see SHEET_CONFIGS), and its
+      // columns are its own shape, matching none of the cases above.
+      const email = normEmail(get(row, "Parent/Guardian Email"));
+      if (!email) continue;
+      const notes = cleanCell(get(row, "Notes"));
+      const status = cleanCell(get(row, "Status"));
+      const leadSource = cleanCell(get(row, "Lead Source"));
+      const leadSourceLower = leadSource.toLowerCase();
+      const isAd = ["meta", "facebook", "instagram", "google", "ad"].some((kw) => leadSourceLower.includes(kw));
+      // The org has already mapped each historical inquiry's grade-at-submission
+      // to the grade the student will enter for the 2027-28 cohort this pilot
+      // is opening — prefer that pre-computed value; fall back to the raw
+      // at-submission grade only if the mapped value doesn't parse.
+      const entryGrade = normGrade(get(row, "Mapped 2027 grade")) ?? normGrade(get(row, "Student grade when contact submitted"));
+      out.push({
+        email,
+        first_name: cleanCell(get(row, "Parent/Guardian First Name")),
+        last_name: cleanCell(get(row, "Parent/Guardian Last Name")),
+        phone: cleanCell(get(row, "Parent/Guardian Phone Number")) || undefined,
+        student_first_name: cleanCell(get(row, "Student Name")).split(/\s+/)[0] || undefined,
+        entry_grade: entryGrade ?? undefined,
+        zip: cleanCell(get(row, "ZipCode")).slice(0, 10) || undefined,
+        notes: [status && `Status: ${status}`, notes].filter(Boolean).join("\n") || undefined,
+        source: isAd ? "ad" : "other",
+        source_detail: leadSource || "CR Neal interest form",
         submitted_at: parseTimestamp(get(row, "Timestamp")),
       });
     }
@@ -361,11 +409,15 @@ export async function syncLeadSheets(): Promise<SyncSummary> {
     }
 
     for (const tab of config.tabs) {
+      // Purely for logging/error messages — the fetch itself uses gid when
+      // present (see below), never this label.
+      const tabLabel = tab.sheetName ?? `gid:${tab.gid}`;
       try {
-        const url = `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab.sheetName)}`;
+        const addressing = tab.gid ? `&gid=${tab.gid}` : `&sheet=${encodeURIComponent(tab.sheetName!)}`;
+        const url = `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/gviz/tq?tqx=out:csv${addressing}`;
         const response = await fetch(url, { signal: AbortSignal.timeout(20_000), cache: "no-store" });
         if (!response.ok) {
-          summary.errors.push(`${config.campusShortCode}/${tab.sheetName}: HTTP ${response.status}`);
+          summary.errors.push(`${config.campusShortCode}/${tabLabel}: HTTP ${response.status}`);
           continue;
         }
         const rows = parseCsv(await response.text());
@@ -389,7 +441,7 @@ export async function syncLeadSheets(): Promise<SyncSummary> {
             await supabase.from("lead_activity").insert({
               lead_id: dup.id,
               activity_type: "inquiry",
-              body: `Duplicate submission on ${tab.sheetName} updated this record — ${merge.changed.join("; ")}.`,
+              body: `Duplicate submission on ${tabLabel} updated this record — ${merge.changed.join("; ")}.`,
             });
             // Reflect the merge so a third occurrence in this same run
             // compares against the corrected state, not the stale original.
@@ -474,7 +526,7 @@ export async function syncLeadSheets(): Promise<SyncSummary> {
             await supabase.from("lead_activity").insert({
               lead_id: lead.id,
               activity_type: "inquiry",
-              body: `Synced from ${tab.sheetName}.`,
+              body: `Synced from ${tabLabel}.`,
             });
             summary.added++;
             existing.set(candidate.email, {
@@ -495,7 +547,7 @@ export async function syncLeadSheets(): Promise<SyncSummary> {
         }
       } catch (err) {
         summary.errors.push(
-          `${config.campusShortCode}/${tab.sheetName}: ${err instanceof Error ? err.message : String(err)}`
+          `${config.campusShortCode}/${tabLabel}: ${err instanceof Error ? err.message : String(err)}`
         );
       }
     }
