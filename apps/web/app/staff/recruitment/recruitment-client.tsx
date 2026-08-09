@@ -132,12 +132,17 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
     startTransition(async () => {
       try {
         const summary = await staffSyncLeadSheets();
-        setSyncStatus(
-          summary.added === 0
-            ? "Up to date — no new families on the forms."
-            : `Added ${summary.added} new famil${summary.added === 1 ? "y" : "ies"}${summary.welcomed > 0 ? ` (${summary.welcomed} welcomed just now)` : ""}.`
-        );
-        if (summary.added > 0) router.refresh();
+        const parts: string[] = [];
+        if (summary.added > 0) {
+          parts.push(
+            `Added ${summary.added} new famil${summary.added === 1 ? "y" : "ies"}${summary.welcomed > 0 ? ` (${summary.welcomed} welcomed just now)` : ""}`
+          );
+        }
+        if (summary.updated > 0) {
+          parts.push(`updated ${summary.updated} existing record${summary.updated === 1 ? "" : "s"} with new info`);
+        }
+        setSyncStatus(parts.length > 0 ? `${parts.join("; ")}.` : "Up to date — no new families or changes on the forms.");
+        if (summary.added > 0 || summary.updated > 0) router.refresh();
       } catch {
         setSyncStatus("Sync failed — try again in a minute.");
       }

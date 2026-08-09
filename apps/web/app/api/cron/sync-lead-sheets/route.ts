@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
   const [summary, tabling] = await Promise.all([syncLeadSheets(), syncTablingEvents()]);
   console.log(
-    `[cron/sync-lead-sheets] leads: checked ${summary.checked}, added ${summary.added}, welcomed ${summary.welcomed}; ` +
+    `[cron/sync-lead-sheets] leads: checked ${summary.checked}, added ${summary.added}, welcomed ${summary.welcomed}, updated ${summary.updated}, duplicates ${summary.duplicates}; ` +
       `tabling: confirmed ${tabling.confirmed}, added ${tabling.added}, updated ${tabling.updated}`,
     [...summary.errors.slice(0, 3), ...tabling.errors.slice(0, 3)]
   );
