@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireMinRole } from "@/lib/auth/get-session";
+import { requireRoleOnCampus } from "@/lib/auth/get-session";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import {
   createLotteryRun,
   runLotteryPreview,
@@ -19,12 +20,29 @@ import {
  * arguments — a client could sign someone else's name to a finalized lottery.
  * They come from the session now; the parameters stay in the signatures for
  * the existing callers and are ignored.
+ *
+ * They also previously trusted requireMinRole("enrollment_manager") alone,
+ * which only checks the caller's best role on ANY campus. An enrollment
+ * manager at Campus A could finalize, send offers from, or waitlist the
+ * losers of a lottery run at Campus B just by supplying that run's id. Every
+ * action below resolves the run's (or the input's) real campus_id and gates
+ * on requireRoleOnCampus for that specific campus.
  */
+
+async function resolveLotteryRunCampus(runId: string): Promise<string | undefined> {
+  const supabase = createServiceRoleClient();
+  const { data: run } = await supabase
+    .from("lottery_run")
+    .select("campus_id")
+    .eq("id", runId)
+    .single();
+  return run?.campus_id as string | undefined;
+}
 
 // ─── Create Draft Lottery Run ─────────────────────────
 
 export async function staffCreateLotteryRun(input: CreateLotteryRunInput) {
-  await requireMinRole("enrollment_manager");
+  await requireRoleOnCampus(input.campus_id, "enrollment_manager");
   const result = await createLotteryRun(input);
 
   if (!result.error) {
@@ -38,7 +56,7 @@ export async function staffCreateLotteryRun(input: CreateLotteryRunInput) {
 // ─── Simulate (read-only what-if) ─────────────────────
 
 export async function staffSimulateLottery(runId: string, seatsOverride?: number) {
-  await requireMinRole("enrollment_manager");
+  await requireRoleOnCampus(await resolveLotteryRunCampus(runId), "enrollment_manager");
   // Read-only — no revalidation needed, nothing changes.
   return simulateLotteryRun(runId, seatsOverride);
 }
@@ -46,7 +64,7 @@ export async function staffSimulateLottery(runId: string, seatsOverride?: number
 // ─── Run Preview ──────────────────────────────────────
 
 export async function staffRunLotteryPreview(runId: string) {
-  await requireMinRole("enrollment_manager");
+  await requireRoleOnCampus(await resolveLotteryRunCampus(runId), "enrollment_manager");
   const result = await runLotteryPreview(runId);
 
   if (!result.error) {
@@ -60,7 +78,7 @@ export async function staffRunLotteryPreview(runId: string) {
 // ─── Finalize as Official ─────────────────────────────
 
 export async function staffFinalizeLottery(runId: string, _executedBy?: string) {
-  const session = await requireMinRole("enrollment_manager");
+  const session = await requireRoleOnCampus(await resolveLotteryRunCampus(runId), "enrollment_manager");
   const result = await finalizeLotteryRun(runId, session.user_id);
 
   if (!result.error) {
@@ -76,7 +94,7 @@ export async function staffFinalizeLottery(runId: string, _executedBy?: string) 
 // ─── Archive Lottery Run ──────────────────────────────
 
 export async function staffArchiveLottery(runId: string) {
-  await requireMinRole("enrollment_manager");
+  await requireRoleOnCampus(await resolveLotteryRunCampus(runId), "enrollment_manager");
   const result = await archiveLotteryRun(runId);
 
   if (!result.error) {
@@ -94,7 +112,7 @@ export async function staffSendLotteryOffers(
   expiresAt: string,
   _offeredBy?: string
 ) {
-  const session = await requireMinRole("enrollment_manager");
+  const session = await requireRoleOnCampus(await resolveLotteryRunCampus(runId), "enrollment_manager");
   const result = await sendOffersFromLottery(runId, expiresAt, session.user_id);
 
   if (!result.error) {
@@ -112,7 +130,7 @@ export async function staffSendLotteryOffers(
 // ─── Complete Lottery Results (Waitlist Non-Selected) ─
 
 export async function staffCompleteLotteryResults(runId: string, _actorId?: string) {
-  const session = await requireMinRole("enrollment_manager");
+  const session = await requireRoleOnCampus(await resolveLotteryRunCampus(runId), "enrollment_manager");
   const result = await completeLotteryResults(runId, session.user_id);
 
   if (!result.error) {

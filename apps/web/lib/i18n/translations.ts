@@ -576,6 +576,36 @@ const dict = {
   "offers.yesAccept":       { en: "Yes, Accept Offer",    es: "Sí, Aceptar Oferta" },
   "offers.yesDecline":      { en: "Yes, Decline Offer",   es: "Sí, Rechazar Oferta" },
   "offers.keepOffer":       { en: "Keep Offer",           es: "Mantener Oferta" },
+
+  // ─── Decline reasons (playbook s15 refusal tracking) ──────────────────────
+  // Worded as the family's situation, never as a justification they owe us.
+  "common.optional":        { en: "(optional)",           es: "(opcional)" },
+  "offers.declineReasonPrompt": {
+    en: "If you're comfortable sharing, what led to this decision?",
+    es: "Si desea compartirlo, ¿qué influyó en esta decisión?",
+  },
+  "offers.declineNotePlaceholder": {
+    en: "Anything else you'd like us to know",
+    es: "Cualquier otra cosa que desee compartir",
+  },
+  "offers.declineReason.chose_another_school": {
+    en: "We chose another school",
+    es: "Elegimos otra escuela",
+  },
+  "offers.declineReason.transportation": { en: "Transportation", es: "Transporte" },
+  "offers.declineReason.program_fit": {
+    en: "The program wasn't the right fit",
+    es: "El programa no era adecuado para nosotros",
+  },
+  "offers.declineReason.moved": {
+    en: "We moved or are moving",
+    es: "Nos mudamos o nos vamos a mudar",
+  },
+  "offers.declineReason.timing": {
+    en: "Timing",
+    es: "El momento no era adecuado",
+  },
+  "offers.declineReason.other": { en: "Something else", es: "Otra razón" },
   "offers.student":         { en: "Student",              es: "Estudiante" },
   "offers.school":          { en: "School",               es: "Escuela" },
   "offers.deadline":        { en: "Deadline",             es: "Fecha Límite" },

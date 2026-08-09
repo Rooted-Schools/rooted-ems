@@ -12,6 +12,7 @@ import {
   type CreateApplicationInput,
   type UpdateApplicationInput,
 } from "@/lib/mutations";
+import { isDeclineReason } from "@/lib/decline-reasons";
 import { createFamilyResponse } from "@/lib/mutations/notes";
 import { createEnrollment, initializeRegistrationPacket } from "@/lib/mutations";
 import {
@@ -114,10 +115,19 @@ export async function familyAcceptOffer(
 
 export async function familyDeclineOffer(
   offerId: string,
-  applicationId: string
+  applicationId: string,
+  reason?: string,
+  note?: string
 ) {
   await requireSession();
-  const result = await declineOffer(offerId);
+  // Validate rather than trust: `reason` arrives from a client form. An
+  // unrecognised value is dropped (degrading to "not captured", which is
+  // honest) rather than written, which would fail the enum check and take the
+  // whole decline down with it, stranding a family who only wanted to decline.
+  const result = await declineOffer(offerId, undefined, {
+    reason: isDeclineReason(reason) ? reason : undefined,
+    note,
+  });
 
   if (!result.error) {
     revalidatePath("/family/applications");

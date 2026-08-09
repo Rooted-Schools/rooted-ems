@@ -20,7 +20,7 @@ INSERT INTO region (id, organization_id, name, state_code) VALUES
 -- ─── Campuses ────────────────────────────────────────────
 INSERT INTO campus (id, organization_id, region_id, name, short_code, address_line1, city, state, zip, phone, email, timezone) VALUES
   ('00000000-0000-0000-0002-000000000001', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0001-000000000001',
-   'Rooted School Vancouver', 'VAN', '5700 E 18th St', 'Vancouver', 'WA', '98661', '(360) 555-0100', 'vancouver@rootedschool.org', 'America/Los_Angeles'),
+   'Rooted School Vancouver', 'RSV', '5700 E 18th St', 'Vancouver', 'WA', '98661', '(360) 555-0100', 'vancouver@rootedschool.org', 'America/Los_Angeles'),
   ('00000000-0000-0000-0002-000000000002', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0001-000000000002',
    'C.R. Neal Academy', 'CRN', '2600 Harden St', 'Columbia', 'SC', '29203', '(803) 555-0200', 'columbia@rootedschool.org', 'America/New_York'),
   ('00000000-0000-0000-0002-000000000003', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0001-000000000003',

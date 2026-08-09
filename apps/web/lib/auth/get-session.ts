@@ -215,3 +215,54 @@ export async function requireCMOAccess(): Promise<AuthSession> {
   }
   return session;
 }
+
+/**
+ * Check if the user holds at least minRole on a SPECIFIC campus.
+ *
+ * This is NOT the same question as hasMinRole, which checks the caller's
+ * highest role across ANY campus. A system_admin at Campus A is not a
+ * system_admin at Campus B just because requireMinRole only ever looked at
+ * their best role anywhere — that gap is what let a single-campus admin
+ * mutate another campus's offers, lottery runs, and enrollments by supplying
+ * that campus's record id. Every campus-scoped mutation must check the role
+ * on the campus the RECORD actually belongs to, not the role gate on the
+ * page that renders the button.
+ */
+export function hasRoleOnCampus(
+  session: AuthSession,
+  campusId: string | null | undefined,
+  minRole: string
+): boolean {
+  if (!campusId) return false;
+  const requiredLevel = ROLE_LEVEL[minRole] ?? 0;
+  const roles = session.campus_roles[campusId] ?? [];
+  let userLevel = 0;
+  for (const r of roles) {
+    const lvl = ROLE_LEVEL[r as string] ?? 0;
+    if (lvl > userLevel) userLevel = lvl;
+  }
+  return userLevel >= requiredLevel;
+}
+
+/**
+ * Require a minimum role level on a SPECIFIC campus, or redirect.
+ *
+ * Use this instead of requireMinRole for any server action that mutates a
+ * campus-scoped record identified by a client-supplied id (offerId, runId,
+ * enrollmentId, applicationId, rowId, ...). The caller must resolve the
+ * record's real campus_id first (typically a service-role lookup by that
+ * id) and pass it here — resolving from a client-supplied campusId argument
+ * defeats the point, since that is exactly the value an attacker controls.
+ */
+export async function requireRoleOnCampus(
+  campusId: string | null | undefined,
+  minRole: string
+): Promise<AuthSession> {
+  const session = await requireStaffSession();
+  if (!hasRoleOnCampus(session, campusId, minRole)) {
+    // Same quiet-banner pattern as requireMinRole: authenticated but not
+    // permitted on this campus, not a bounce to login.
+    redirect("/staff/today?denied=1");
+  }
+  return session;
+}

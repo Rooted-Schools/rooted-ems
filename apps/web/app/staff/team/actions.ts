@@ -2,9 +2,25 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
-import { requireMinRole } from "@/lib/auth/get-session";
+import { requireStaffSession, hasRoleOnCampus } from "@/lib/auth/get-session";
+import { redirect } from "next/navigation";
 
 const VALID_ROLES = ["compliance_auditor", "enrollment_staff", "enrollment_manager", "system_admin"];
+
+/**
+ * requireMinRole("system_admin") only proved the caller is a system_admin
+ * SOMEWHERE — a system_admin at Campus A could grant, change, or revoke
+ * roles at Campus B, i.e. mint themselves (or anyone) network-wide admin
+ * access one campus at a time. Every mutation below now requires
+ * system_admin specifically on the campus being granted or modified.
+ */
+async function requireSystemAdminOnCampus(campusId: string | null | undefined) {
+  const session = await requireStaffSession();
+  if (!hasRoleOnCampus(session, campusId, "system_admin")) {
+    redirect("/staff/today?denied=1");
+  }
+  return session;
+}
 
 // ─── Add a new staff member ───────────────────────────────────────────────────
 // Looks up the user's UUID from Supabase Auth by email, then provisions
@@ -16,14 +32,23 @@ export async function addTeamMember(
   email: string,
   campusAssignments: { campusId: string; role: string }[]
 ): Promise<{ error: string | null }> {
-  await requireMinRole("system_admin");
-
   if (!email || campusAssignments.length === 0) {
     return { error: "Email and at least one campus assignment are required." };
   }
 
   const invalidRole = campusAssignments.find((a) => !VALID_ROLES.includes(a.role));
   if (invalidRole) return { error: `Invalid role: ${invalidRole.role}` };
+
+  // The caller must be system_admin on EVERY campus they are assigning a
+  // role to — a system_admin at Campus A must not be able to grant any role
+  // (including system_admin) at Campus B.
+  const session = await requireStaffSession();
+  const unauthorizedCampus = campusAssignments.find(
+    (a) => !hasRoleOnCampus(session, a.campusId, "system_admin")
+  );
+  if (unauthorizedCampus) {
+    return { error: "You are not a system admin on one or more of the selected campuses." };
+  }
 
   const supabase = createServiceRoleClient();
 
@@ -86,8 +111,6 @@ export async function updateTeamMemberRole(
   rowId: string,
   newRole: string
 ): Promise<{ error: string | null }> {
-  await requireMinRole("system_admin");
-
   if (!VALID_ROLES.includes(newRole)) return { error: `Invalid role: ${newRole}` };
 
   const supabase = createServiceRoleClient();
@@ -98,6 +121,10 @@ export async function updateTeamMemberRole(
     .select("user_id, campus_id")
     .eq("id", rowId)
     .single();
+
+  // The row being modified determines which campus's admin bar applies —
+  // not the caller's best campus anywhere.
+  await requireSystemAdminOnCampus(existing?.campus_id as string | undefined);
 
   if (existing) {
     const { data: dup } = await supabase
@@ -130,9 +157,15 @@ export async function removeCampusFromMember(
   rowId: string,
   userId: string
 ): Promise<{ error: string | null }> {
-  await requireMinRole("system_admin");
-
   const supabase = createServiceRoleClient();
+
+  // The row being removed determines which campus's admin bar applies.
+  const { data: existingRow } = await supabase
+    .from("user_campus_role")
+    .select("campus_id")
+    .eq("id", rowId)
+    .single();
+  await requireSystemAdminOnCampus(existingRow?.campus_id as string | undefined);
 
   const { error } = await supabase
     .from("user_campus_role")

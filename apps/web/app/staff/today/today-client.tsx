@@ -5,10 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn, displayClass } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
-import { IconPhone, IconInfo, IconX } from "@/components/ui/icons";
+import { IconPhone, IconInfo, IconX, IconAlertTriangle } from "@/components/ui/icons";
+// From the leaf module, NOT the "@/lib/queries" barrel: the barrel re-exports
+// server-only queries that reach next/headers, which fails the client build.
+import { formatRelativeTime } from "@/lib/queries/utils";
 import { textExpiringOffers, sendRegistrationNudges, releaseSeats, markRegistrationContacted } from "./actions";
 import { registrationNudgeSubject, registrationNudgeBody, registrationNudgeSms } from "@/lib/nudge-copy";
-import type { RegistrationCompletionStats, CallEscalationRow } from "@/lib/queries/melt";
+import type { RegistrationCompletionStats, CallEscalationRow, MeltRiskRow } from "@/lib/queries/melt";
 
 /* ------------------------------------------------------------------ */
 /*  Types shared with the server component                             */
@@ -49,6 +52,9 @@ interface TodayClientProps {
   seatProgress: SeatProgressGroup[];
   registrationCompletion: RegistrationCompletionStats;
   callEscalationQueue: CallEscalationRow[];
+  /** Enrolled families with no PERSONAL contact in 14+ days (playbook MELT_RISK). */
+  meltRiskQueue: MeltRiskRow[];
+  meltRiskAvailable: boolean;
   callEscalationAvailable: boolean;
   /** True when the user landed here via requireMinRole/requireCMOAccess bouncing them off a page they don't have access to. */
   denied?: boolean;
@@ -489,6 +495,90 @@ function CallEscalationSection({
 }
 
 /* ------------------------------------------------------------------ */
+/*  MELT_RISK — playbook PB 24 v2.2                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The families this surfaces look completely healthy everywhere else in the
+ * app: registration complete, every document in, nothing outstanding. That is
+ * the whole problem. They said yes months ago and nobody has spoken to them
+ * since, and the playbook's answer is that silence past 14 days is itself the
+ * exception worth acting on.
+ *
+ * Shows the automated-email date next to the silence deliberately, because the
+ * natural staff reaction is "but we've been emailing them". Four emails and no
+ * conversation is the pattern, not the mitigation.
+ */
+function MeltRiskSection({
+  rows,
+  available,
+}: {
+  rows: MeltRiskRow[];
+  available: boolean;
+}) {
+  if (!available) {
+    return (
+      <div className="rounded-[10px] border border-line bg-white p-4 sm:p-[18px]">
+        <div className="mb-1 flex items-center gap-2">
+          <IconAlertTriangle size={16} className="text-stone" />
+          <h2 className={cn("text-sm font-semibold text-ink", displayClass)}>Summer melt risk</h2>
+        </div>
+        <p className="text-sm text-stone">
+          Melt risk activates after database migration 00041 is applied.
+        </p>
+      </div>
+    );
+  }
+
+  if (rows.length === 0) return null;
+
+  const neverContacted = rows.filter((r) => r.days_since_contact === null).length;
+
+  return (
+    <div className="rounded-[10px] border border-warn/40 bg-white p-4 sm:p-[18px]">
+      <div className="mb-1 flex items-center gap-2">
+        <IconAlertTriangle size={16} className="text-warn" />
+        <h2 className={cn("text-sm font-semibold text-ink", displayClass)}>Summer melt risk</h2>
+      </div>
+      <p className="mb-4 text-sm text-stone">
+        {rows.length} enrolled famil{rows.length === 1 ? "y has" : "ies have"} had no personal contact in 14+ days
+        {neverContacted > 0 && <> ({neverContacted} never contacted at all)</>}. Registration is complete, so nothing
+        else in the app will flag them. The playbook standard is weekly personal outreach through the first day of school.
+      </p>
+      <div className="space-y-2">
+        {rows.map((row) => (
+          <div
+            key={row.packet_id}
+            className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-lg border border-line bg-sunken/40 px-3 py-2.5"
+          >
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-ink">{row.student_name}</span>
+              <span className="text-sm text-stone"> &middot; {row.guardian_name}</span>
+              {row.guardian_phone && (
+                <a
+                  href={`tel:${row.guardian_phone}`}
+                  className="ml-2 text-sm text-rooted-green underline underline-offset-2"
+                >
+                  {row.guardian_phone}
+                </a>
+              )}
+            </div>
+            <div className="text-xs text-stone">
+              {row.days_since_contact === null
+                ? "Never contacted"
+                : `${row.days_since_contact} days since contact`}
+              {row.last_outreach_at && (
+                <> &middot; last automated email {formatRelativeTime(row.last_outreach_at)}</>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Seat progress bars                                                  */
 /* ------------------------------------------------------------------ */
 
@@ -529,6 +619,8 @@ export function TodayClient({
   registrationCompletion,
   callEscalationQueue: initialCallEscalationQueue,
   callEscalationAvailable,
+  meltRiskQueue,
+  meltRiskAvailable,
   denied = false,
 }: TodayClientProps) {
   const [rows, setRows] = useState(initialRows);
@@ -631,6 +723,9 @@ export function TodayClient({
 
       {/* Needs a phone call — registration melt escalation */}
       <CallEscalationSection rows={callQueue} onContacted={dropCallQueueRow} available={callEscalationAvailable} />
+
+      {/* Summer melt risk — enrolled families who have gone quiet */}
+      <MeltRiskSection rows={meltRiskQueue} available={meltRiskAvailable} />
 
       {/* Per-grade seat progress */}
       {seatProgress.length > 0 && (

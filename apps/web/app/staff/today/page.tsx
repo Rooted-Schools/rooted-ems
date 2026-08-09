@@ -7,7 +7,7 @@ import {
   getDuplicateSuspects,
   getUpcomingDeadlines,
 } from "@/lib/queries";
-import { getRegistrationCompletion, getCallEscalationQueue } from "@/lib/queries/melt";
+import { getRegistrationCompletion, getCallEscalationQueue, getMeltRiskQueue } from "@/lib/queries/melt";
 import {
   requireStaffSession,
   getAccessibleCampusIds,
@@ -51,6 +51,7 @@ export default async function StaffTodayPage({
     deadlines,
     registrationCompletion,
     callEscalation,
+    meltRisk,
   ] = await Promise.all([
     supabase.from("user_profile").select("first_name, full_name").eq("id", session.user_id).maybeSingle(),
     supabase.from("school_year").select("id, name").eq("is_current", true).maybeSingle(),
@@ -62,6 +63,7 @@ export default async function StaffTodayPage({
     getUpcomingDeadlines(activeCampus),
     getRegistrationCompletion(scopedCampusIds),
     getCallEscalationQueue(scopedCampusIds),
+    getMeltRiskQueue(scopedCampusIds),
   ]);
 
   let capacityRows: Record<string, unknown>[] = [];
@@ -253,6 +255,8 @@ export default async function StaffTodayPage({
       registrationCompletion={registrationCompletion}
       callEscalationQueue={callEscalation.rows}
       callEscalationAvailable={callEscalation.available}
+      meltRiskQueue={meltRisk.rows}
+      meltRiskAvailable={meltRisk.available}
       denied={searchParams?.denied === "1"}
     />
   );

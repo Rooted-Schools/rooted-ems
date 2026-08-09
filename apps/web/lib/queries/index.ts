@@ -167,5 +167,13 @@ export {
   type SourceRow,
 } from "./recruitment-analytics";
 
+// Refusal tracking (playbook s15)
+export {
+  getDeclineReasonBreakdown,
+  RATE_SUPPRESSION_THRESHOLD,
+  type DeclineReasonBreakdown,
+  type DeclineReasonRow,
+} from "./decline-reasons";
+
 // Shared utilities
 export { formatRelativeTime } from "./utils";

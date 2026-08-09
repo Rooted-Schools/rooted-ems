@@ -33,7 +33,13 @@ import { createServiceRoleClient } from "@rooted-ems/database/server";
 export const SUPPRESSION_THRESHOLD = 10;
 
 /** Percentage points below the campus overall that trips the gap flag. */
-export const GAP_FLAG_POINTS = 15;
+/**
+ * Playbook PB 24 v2.2 s6/s17: a gap of more than 10 percentage points between
+ * demographic groups requires a written root-cause analysis and corrective
+ * action plan. Was 15 here, looser than the standard the network holds itself
+ * to, so gaps the playbook calls RED rendered as unremarkable.
+ */
+export const GAP_FLAG_POINTS = 10;
 
 /** Top N zip codes by application volume that get their own row. */
 const TOP_ZIP_COUNT = 10;
@@ -78,7 +84,7 @@ export interface ConversionGroupRow {
 }
 
 export interface ConversionCut {
-  key: "language" | "zip";
+  key: "language" | "zip" | "iep";
   title: string;
   /** Names the actual column the cut reads, for the footnote. */
   source_note: string;
@@ -130,6 +136,13 @@ interface ScopedApplication {
   status: string;
   language: string;
   zip: string;
+  /**
+   * student.has_iep is BOOLEAN DEFAULT false, so unlike language and zip there
+   * is no "not recorded" state: an unasked question and a genuine "no" are
+   * stored identically. The cut still earns its place, but the negative group
+   * is labelled to keep that ambiguity visible.
+   */
+  hasIep: boolean;
   reachedOffered: boolean;
   reachedRegistered: boolean;
 }
@@ -244,7 +257,7 @@ export async function getEquityFunnelConversion(
       id,
       status,
       enrollment_window:enrollment_window_id (school_year_id),
-      student:student_id ( household:household_id (primary_language, zip) ),
+      student:student_id ( has_iep, household:household_id (primary_language, zip) ),
       guardian:guardian_id ( household:household_id (primary_language, zip) )
     `
     )
@@ -314,6 +327,7 @@ export async function getEquityFunnelConversion(
       status,
       language: normalizeLanguage(home?.primary_language),
       zip: normalizeZip(home?.zip),
+      hasIep: ((row.student as Record<string, unknown> | null)?.has_iep as boolean | null) === true,
       reachedOffered: OFFERED_OR_BEYOND.has(status) || everOffered.has(id),
       reachedRegistered: REGISTERED_OR_BEYOND.has(status) || everRegistered.has(id),
     };
@@ -383,7 +397,30 @@ export async function getEquityFunnelConversion(
   };
 
   // ── 7. Gap flags, measured against the campus overall ──
-  for (const cut of [languageCut, zipCut]) {
+  // ── Disability cut (playbook Equity Tracker: "Students with IEPs") ──
+  const iepApps = apps.filter((a) => a.hasIep);
+  const nonIepApps = apps.filter((a) => !a.hasIep);
+
+  const iepCut: ConversionCut = {
+    key: "iep",
+    title: "Conversion by IEP status",
+    source_note: "student.has_iep",
+    rows:
+      iepApps.length > 0
+        ? [
+            buildRow("Students with IEPs", iepApps),
+            // "No IEP recorded", not "No IEP": the column defaults to false, so
+            // this group mixes genuine negatives with families nobody asked.
+            buildRow("No IEP recorded", nonIepApps),
+          ]
+        : [],
+    unavailable_reason:
+      iepApps.length > 0
+        ? null
+        : "No application in scope has an IEP flagged. Because student.has_iep defaults to false, this may mean nobody was asked rather than that no student has an IEP.",
+  };
+
+  for (const cut of [languageCut, zipCut, iepCut]) {
     for (const row of cut.rows) {
       applyGapFlag(row.application_to_offer, overall.application_to_offer);
       applyGapFlag(row.offer_to_registration, overall.offer_to_registration);
@@ -394,7 +431,7 @@ export async function getEquityFunnelConversion(
     school_year_name: schoolYearName,
     total_applications: apps.length,
     overall,
-    cuts: [languageCut, zipCut],
+    cuts: [languageCut, zipCut, iepCut],
     suppression_threshold: SUPPRESSION_THRESHOLD,
     gap_flag_points: GAP_FLAG_POINTS,
     empty_reason: null,
