@@ -27,7 +27,9 @@ const nextConfig = {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      "connect-src 'self' https://szockdlohlmkyloubgtd.supabase.co https://accounts.google.com",
+      // Sentry's ingest host must be allowed or every error report is refused
+      // by the CSP and production monitoring silently reports nothing.
+      "connect-src 'self' https://szockdlohlmkyloubgtd.supabase.co https://accounts.google.com https://*.ingest.us.sentry.io",
       "frame-ancestors *",
       "object-src 'none'",
       "base-uri 'self'",
@@ -68,7 +70,9 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data:",
-              "connect-src 'self' https://szockdlohlmkyloubgtd.supabase.co https://accounts.google.com",
+              // Sentry ingest — without this, CSP blocks every error report and
+              // production monitoring is silently blind.
+              "connect-src 'self' https://szockdlohlmkyloubgtd.supabase.co https://accounts.google.com https://*.ingest.us.sentry.io",
               "frame-src 'none'",
               "object-src 'none'",
               "base-uri 'self'",
