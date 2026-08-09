@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn, displayClass } from "@/lib/utils";
@@ -627,6 +627,16 @@ export function TodayClient({
   const [callQueue, setCallQueue] = useState(initialCallEscalationQueue);
   const [deniedVisible, setDeniedVisible] = useState(denied);
 
+  // The `timeOfDay` prop is computed on the server, whose clock is UTC on
+  // Vercel — so it greets by UTC hour, not the viewer's. Recompute from the
+  // browser clock after mount (post-hydration to avoid an SSR mismatch); the
+  // server value is only ever shown for the first paint.
+  const [localTimeOfDay, setLocalTimeOfDay] = useState(timeOfDay);
+  useEffect(() => {
+    const h = new Date().getHours();
+    setLocalTimeOfDay(h < 12 ? "morning" : h < 18 ? "afternoon" : "evening");
+  }, []);
+
   function dropRow(key: ExceptionRow["key"]) {
     setRows((prev) => prev.filter((r) => r.key !== key));
   }
@@ -679,7 +689,7 @@ export function TodayClient({
       {/* Greeting */}
       <div>
         <h1 className={cn("text-2xl font-bold text-ink", displayClass)}>
-          Good {timeOfDay}, {firstName}.
+          Good {localTimeOfDay}, {firstName}.
         </h1>
         <p className="mt-1 text-sm text-stone">
           {rows.length === 0
