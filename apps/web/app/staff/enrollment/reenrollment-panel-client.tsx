@@ -261,7 +261,18 @@ export function ReenrollmentPanel({
                             </div>
                           </TableCell>
                           <TableCell>{row.guardianName ?? "—"}</TableCell>
-                          <TableCell>{row.guardianPhone ?? "—"}</TableCell>
+                          <TableCell>
+                            {row.guardianPhone ? (
+                              <a
+                                href={`tel:${row.guardianPhone}`}
+                                className="text-rooted-green hover:text-deep-green"
+                              >
+                                {row.guardianPhone}
+                              </a>
+                            ) : (
+                              "—"
+                            )}
+                          </TableCell>
                           <TableCell className="text-stone">
                             {lastPulsed ? (
                               <span className="inline-flex items-center gap-1">

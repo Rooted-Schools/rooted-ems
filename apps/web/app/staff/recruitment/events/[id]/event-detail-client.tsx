@@ -197,8 +197,18 @@ export function EventDetailClient({
                         <span className="font-medium text-ink">{r.guardian_name}</span>
                       )}
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell text-xs text-stone">
-                      {r.email ?? r.phone ?? "—"}
+                    <TableCell className="hidden sm:table-cell text-xs">
+                      {r.email ? (
+                        <a href={`mailto:${r.email}`} className="text-rooted-green hover:text-deep-green">
+                          {r.email}
+                        </a>
+                      ) : r.phone ? (
+                        <a href={`tel:${r.phone}`} className="text-rooted-green hover:text-deep-green">
+                          {r.phone}
+                        </a>
+                      ) : (
+                        <span className="text-stone">—</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-center text-sm">{r.party_size}</TableCell>
                     {event.checkInAvailable && (

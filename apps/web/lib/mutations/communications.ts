@@ -5,6 +5,10 @@ import { createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 import { sendSms, isSmsConfigured } from "@/lib/sms";
 import { sendEmail, isEmailConfigured } from "@/lib/email";
+import { staffComposedEmail } from "@/lib/email-templates";
+import { getSuppressedEmails } from "@/lib/email-compliance";
+import { logLeadActivity } from "./leads";
+import { createNote } from "./notes";
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -348,4 +352,176 @@ export async function deleteMessageTemplate(
   }
 
   return { data: null, error: null };
+}
+
+// ─── One-off staff email (tracked 1:1 send) ─────────────
+
+export interface SendOneOffEmailInput {
+  /** Exactly one of leadId / applicationId is expected — the caller resolves
+   *  which surface (recruitment vs. application) it was opened from. */
+  leadId?: string;
+  applicationId?: string;
+  subject: string;
+  message: string;
+}
+
+export type SendOneOffEmailResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Staff sends a single tracked email to a lead or application guardian from
+ * inside the app. Honest by construction: every early return states the real
+ * reason nothing was sent, and the activity/note that makes the send visible
+ * on the family's history is only written after sendEmail reports ok:true —
+ * never in advance, never on a provider failure.
+ *
+ * Campus scope must be checked by the caller (the server action, which holds
+ * the session) — accessibleCampusIds is passed in rather than resolved here.
+ * An empty list means org-wide access (see getAccessibleCampusIds).
+ */
+export async function sendOneOffEmail(
+  input: SendOneOffEmailInput,
+  actorId: string,
+  accessibleCampusIds: string[]
+): Promise<SendOneOffEmailResult> {
+  const subject = input.subject?.trim();
+  const message = input.message?.trim();
+  if (!subject || !message) {
+    return { ok: false, error: "Write a subject and a message before sending." };
+  }
+  if (!input.leadId && !input.applicationId) {
+    return { ok: false, error: "No recipient specified." };
+  }
+
+  const supabase = createServiceRoleClient();
+
+  let recipientEmail: string | null = null;
+  let recipientCampusId: string | null = null;
+  let recipientUserId: string | null = null;
+
+  if (input.leadId) {
+    const { data: lead } = await supabase
+      .from("lead")
+      .select("id, campus_id, email, unsubscribed_at")
+      .eq("id", input.leadId)
+      .single();
+    if (!lead) return { ok: false, error: "Lead not found." };
+    if (lead.unsubscribed_at) {
+      return { ok: false, error: "This family has unsubscribed from email." };
+    }
+    recipientEmail = (lead.email as string | null) ?? null;
+    recipientCampusId = (lead.campus_id as string | null) ?? null;
+  } else if (input.applicationId) {
+    const { data: app } = await supabase
+      .from("application")
+      .select("id, campus_id, guardian:guardian_id (user_id, email)")
+      .eq("id", input.applicationId)
+      .single();
+    if (!app) return { ok: false, error: "Application not found." };
+    const guardian = app.guardian as unknown as
+      | { user_id: string | null; email: string | null }
+      | null;
+    recipientEmail = guardian?.email ?? null;
+    recipientCampusId = (app.campus_id as string | null) ?? null;
+    recipientUserId = guardian?.user_id ?? null;
+  }
+
+  // Campus scope — empty accessibleCampusIds means org-wide (system) access,
+  // matching getAccessibleCampusIds elsewhere in the app.
+  if (
+    accessibleCampusIds.length > 0 &&
+    (!recipientCampusId || !accessibleCampusIds.includes(recipientCampusId))
+  ) {
+    return { ok: false, error: "Not on a campus you can access." };
+  }
+
+  if (!recipientEmail) {
+    return { ok: false, error: "No email on file for this family." };
+  }
+
+  // Address-level suppression (bounce/complaint) applies regardless of
+  // whether this is a lead or an applied family — it's keyed on the address.
+  const suppressed = await getSuppressedEmails([recipientEmail]);
+  if (suppressed.has(recipientEmail.toLowerCase())) {
+    return {
+      ok: false,
+      error: "This email address is suppressed — a previous message bounced or was marked as spam.",
+    };
+  }
+
+  if (!isEmailConfigured()) {
+    return { ok: false, error: "Email isn't connected in this environment." };
+  }
+
+  const { data: campus } = await supabase
+    .from("campus")
+    .select("name, email")
+    .eq("id", recipientCampusId ?? "")
+    .single();
+  const campusName = (campus?.name as string | null) ?? "Rooted Schools";
+  const campusEmail = (campus?.email as string | null) ?? undefined;
+
+  const template = staffComposedEmail({ subject, message, campusName });
+
+  const sendResult = await sendEmail({
+    to: recipientEmail,
+    subject: template.subject,
+    html: template.html,
+    text: template.text,
+    replyTo: campusEmail,
+  });
+
+  if (!sendResult.ok) {
+    return { ok: false, error: sendResult.error ?? "Delivery failed." };
+  }
+
+  // Log the send on the family's real history — only reached on a confirmed
+  // provider success, so this is never a claim ahead of the facts.
+  const excerpt = message.length > 200 ? `${message.slice(0, 200)}…` : message;
+  if (input.leadId) {
+    // logLeadActivity also stamps lead.last_contact_at and (for a
+    // brand-new lead) advances the stage to "contacted" — same as a logged
+    // call — since "email" is one of CONTACT_ACTIVITY_TYPES.
+    const activityResult = await logLeadActivity(
+      input.leadId,
+      "email",
+      `Email sent: ${subject} — ${excerpt}`,
+      actorId
+    );
+    if (activityResult.error) {
+      console.error("[sendOneOffEmail] lead_activity log failed", activityResult.error);
+    }
+  } else if (input.applicationId) {
+    const now = new Date().toISOString();
+    const { error: logError } = await supabase.from("communication_log").insert({
+      campus_id: recipientCampusId,
+      recipient_user_id: recipientUserId,
+      recipient_address: recipientEmail,
+      channel: "email",
+      subject,
+      body: message,
+      status: "delivered",
+      sent_at: now,
+      delivered_at: now,
+    });
+    if (logError) {
+      console.error("[sendOneOffEmail] communication_log insert failed", logError.message);
+    }
+
+    // The application detail page's "Internal notes" list (ContextRail) is
+    // what staff actually look at — communication_log isn't surfaced
+    // anywhere on that page — so the send also lands there or it's
+    // effectively invisible to the reviewing staff member.
+    const noteResult = await createNote({
+      entity_type: "application",
+      entity_id: input.applicationId,
+      campus_id: recipientCampusId ?? undefined,
+      content: `Email sent: ${subject}\n\n${excerpt}`,
+      is_internal: true,
+    });
+    if (noteResult.error) {
+      console.error("[sendOneOffEmail] note log failed", noteResult.error);
+    }
+  }
+
+  return { ok: true };
 }

@@ -152,7 +152,10 @@ export {
   createMessageTemplate,
   updateMessageTemplate,
   deleteMessageTemplate,
+  sendOneOffEmail,
   type SendNotificationInput,
   type CreateTemplateInput,
   type UpdateTemplateInput,
+  type SendOneOffEmailInput,
+  type SendOneOffEmailResult,
 } from "./communications";

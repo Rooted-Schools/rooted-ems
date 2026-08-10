@@ -61,6 +61,7 @@ import { RequirementList } from "./_components/requirement-list";
 import { ContextRail } from "./_components/context-rail";
 import { RegistrationPanel } from "./_components/registration-panel";
 import { QueueBar } from "./_components/queue-bar";
+import { ComposeEmailDialog } from "@/components/staff/compose-email-dialog";
 
 /* ─── Status actions based on current status (unchanged from the original file) ─── */
 function getAvailableActions(status: string): HeaderAction[] {
@@ -134,6 +135,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
   const [showRejectDocDialog, setShowRejectDocDialog] = useState(false);
   const [rejectDocId, setRejectDocId] = useState<string | null>(null);
   const [rejectDocReason, setRejectDocReason] = useState("");
+  const [showComposeEmailDialog, setShowComposeEmailDialog] = useState(false);
 
   const actions = getAvailableActions(detail.status);
   const canWithdraw = WITHDRAWABLE.includes(detail.status);
@@ -557,7 +559,14 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
           )}
         </div>
         <div className="lg:col-span-1">
-          <ContextRail detail={detail} noteText={noteText} setNoteText={setNoteText} isPending={isPending} onAddNote={handleAddNote} />
+          <ContextRail
+            detail={detail}
+            noteText={noteText}
+            setNoteText={setNoteText}
+            isPending={isPending}
+            onAddNote={handleAddNote}
+            onSendEmail={() => setShowComposeEmailDialog(true)}
+          />
         </div>
       </div>
 
@@ -726,6 +735,14 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ComposeEmailDialog
+        open={showComposeEmailDialog}
+        onOpenChange={setShowComposeEmailDialog}
+        recipientEmail={detail.guardian_email}
+        recipientName={detail.guardian_name}
+        applicationId={detail.id}
+      />
     </div>
   );
 }

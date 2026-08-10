@@ -458,8 +458,19 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
                         <p className="font-medium text-ink">
                           {lead.first_name} {lead.last_name}
                         </p>
-                        <p className="text-xs text-stone">
-                          {[lead.email, lead.phone].filter(Boolean).join(" · ") || "—"}
+                        <p className="text-xs text-stone flex flex-wrap items-center gap-x-1">
+                          {lead.email && (
+                            <a href={`mailto:${lead.email}`} className="text-rooted-green hover:text-deep-green">
+                              {lead.email}
+                            </a>
+                          )}
+                          {lead.email && lead.phone && <span>·</span>}
+                          {lead.phone && (
+                            <a href={`tel:${lead.phone}`} className="text-rooted-green hover:text-deep-green">
+                              {lead.phone}
+                            </a>
+                          )}
+                          {!lead.email && !lead.phone && "—"}
                         </p>
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-sm">
