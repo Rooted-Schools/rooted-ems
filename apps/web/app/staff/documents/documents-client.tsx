@@ -206,7 +206,17 @@ export function DocumentQueueClient({ initialRows, stats, campusOptions }: Props
                     </div>
                     <p className="text-xs text-stone truncate">
                       {doc.guardian_name}
-                      {doc.guardian_email ? ` · ${doc.guardian_email}` : ""}
+                      {doc.guardian_email && (
+                        <>
+                          {" · "}
+                          <a
+                            href={`mailto:${doc.guardian_email}`}
+                            className="text-rooted-green hover:text-deep-green"
+                          >
+                            {doc.guardian_email}
+                          </a>
+                        </>
+                      )}
                     </p>
                     <p className="text-xs text-stone/60">
                       {doc.campus_name} · {doc.file_name}

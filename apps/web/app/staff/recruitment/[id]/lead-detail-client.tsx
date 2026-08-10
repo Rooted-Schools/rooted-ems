@@ -31,6 +31,7 @@ import type { LeadDetail } from "@/lib/queries/leads";
 import { formatRelativeTime } from "@/lib/queries/utils";
 import { staffDeleteLead, staffGetReferralLink, staffLogLeadActivity, staffUpdateLead } from "../actions";
 import { PATHWAY_LABELS, SOURCE_LABELS, STAGE_CONFIG } from "../recruitment-client";
+import { ComposeEmailDialog } from "@/components/staff/compose-email-dialog";
 
 const ACTIVITY_ICONS: Record<string, ReactNode> = {
   inquiry: <IconSprout size={16} />,
@@ -68,6 +69,7 @@ export function LeadDetailClient({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [referralCode, setReferralCode] = useState<string | null>(lead?.referral_code ?? null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
 
   const appBase = process.env.NEXT_PUBLIC_APP_URL ?? "https://enroll.rootedschool.org";
   const referralLink = referralCode ? `${appBase}/refer/${referralCode}` : null;
@@ -180,6 +182,15 @@ export function LeadDetailClient({
           </Button>
           <Button variant="outline" className="gap-1.5" onClick={() => openLog("note")} disabled={isPending}>
             <IconPenLine size={16} /> Add note
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => setComposeOpen(true)}
+            disabled={isPending || !lead.email}
+            title={!lead.email ? "No email on file" : undefined}
+          >
+            <IconMail size={16} /> Send email
           </Button>
           {!lead.application_id && (
             <Link href={`/staff/applications/new?lead=${lead.id}`}>
@@ -466,6 +477,14 @@ export function LeadDetailClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ComposeEmailDialog
+        open={composeOpen}
+        onOpenChange={setComposeOpen}
+        recipientEmail={lead.email}
+        recipientName={`${lead.first_name} ${lead.last_name}`}
+        leadId={lead.id}
+      />
     </div>
   );
 }

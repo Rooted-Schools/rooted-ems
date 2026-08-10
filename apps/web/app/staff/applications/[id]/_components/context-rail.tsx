@@ -23,6 +23,7 @@
  */
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { IconMail } from "@/components/ui/icons";
 import { getStatusConfig } from "@/lib/application-helpers";
 import type { ApplicationDetail } from "@/lib/queries";
 
@@ -43,9 +44,10 @@ interface ContextRailProps {
   setNoteText: (v: string) => void;
   isPending: boolean;
   onAddNote: () => void;
+  onSendEmail: () => void;
 }
 
-export function ContextRail({ detail, noteText, setNoteText, isPending, onAddNote }: ContextRailProps) {
+export function ContextRail({ detail, noteText, setNoteText, isPending, onAddNote, onSendEmail }: ContextRailProps) {
   return (
     <div className="space-y-4">
       {/* Household */}
@@ -59,16 +61,41 @@ export function ContextRail({ detail, noteText, setNoteText, isPending, onAddNot
           {detail.guardian_email && (
             <div className="flex justify-between gap-3">
               <dt className="text-stone">Email</dt>
-              <dd className="text-ink text-right break-all">{detail.guardian_email}</dd>
+              <dd className="text-right break-all">
+                <a
+                  href={`mailto:${detail.guardian_email}`}
+                  className="text-rooted-green hover:text-deep-green"
+                >
+                  {detail.guardian_email}
+                </a>
+              </dd>
             </div>
           )}
           {detail.guardian_phone && (
             <div className="flex justify-between gap-3">
               <dt className="text-stone">Phone</dt>
-              <dd className="text-ink text-right">{detail.guardian_phone}</dd>
+              <dd className="text-right">
+                <a
+                  href={`tel:${detail.guardian_phone}`}
+                  className="text-rooted-green hover:text-deep-green"
+                >
+                  {detail.guardian_phone}
+                </a>
+              </dd>
             </div>
           )}
         </dl>
+        {detail.guardian_email && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 mt-3 w-full rounded-[6px]"
+            onClick={onSendEmail}
+            disabled={isPending}
+          >
+            <IconMail size={14} /> Send email
+          </Button>
+        )}
       </div>
 
       {/* Application — preserved from the original "Application Details" /

@@ -420,10 +420,24 @@ export default async function StudentDetailPage({
                         {g.is_legal_guardian ? " (Legal Guardian)" : ""}
                       </p>
                       {g.email && (
-                        <p className="text-xs text-ink/60 mt-1">{g.email}</p>
+                        <p className="mt-1">
+                          <a
+                            href={`mailto:${g.email}`}
+                            className="text-xs text-rooted-green hover:text-deep-green"
+                          >
+                            {g.email}
+                          </a>
+                        </p>
                       )}
                       {g.phone && (
-                        <p className="text-xs text-ink/60">{g.phone}</p>
+                        <p>
+                          <a
+                            href={`tel:${g.phone}`}
+                            className="text-xs text-rooted-green hover:text-deep-green"
+                          >
+                            {g.phone}
+                          </a>
+                        </p>
                       )}
                     </div>
                   ))}

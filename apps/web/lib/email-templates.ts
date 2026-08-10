@@ -105,6 +105,51 @@ function renderEmail(en: Section, es: Section): { html: string; text: string } {
   return { html, text };
 }
 
+/**
+ * A single staff-composed message, wrapped in the same branded shell as the
+ * rest of the system's mail. English-only (staff type the message once, in
+ * whatever language they're writing to the family in) and no opt-out
+ * language — this is a direct 1:1 reply to a specific family, not a bulk
+ * campaign send, so it's exempt from the marketing-suppression footer the
+ * same way transactional enrollment mail is (see lib/email-compliance.ts).
+ */
+export function staffComposedEmail({
+  subject,
+  message,
+  campusName,
+  senderName,
+}: {
+  subject: string;
+  message: string;
+  campusName: string;
+  senderName?: string;
+}): EmailTemplate {
+  const paragraphs = message
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const closing = senderName ? `${senderName}, ${campusName}` : `The ${campusName} Team`;
+
+  const bodyHtml = paragraphs
+    .map((p) => `<p style="margin:0 0 16px 0;">${escapeHtml(p).replace(/\n/g, "<br />")}</p>`)
+    .join("\n");
+
+  const html = `
+<div style="margin:0 auto;max-width:600px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:${TEXT_COLOR};padding:24px;">
+  <div style="border-top:4px solid ${BRAND_GREEN};padding-top:24px;">
+    ${bodyHtml}
+    <p style="margin:24px 0 0 0;">${escapeHtml(closing)}</p>
+  </div>
+  <p style="margin:32px 0 0 0;font-size:12px;color:${MUTED_COLOR};">
+    Rooted Schools Enrollment &middot; <a href="${APP_URL}" style="color:${BRAND_GREEN};">${APP_URL.replace(/^https?:\/\//, "")}</a>
+  </p>
+</div>`.trim();
+
+  const text = `${paragraphs.join("\n\n")}\n\n${closing}`;
+
+  return { subject, html, text };
+}
+
 function studentEn(studentFirstName?: string): string {
   return studentFirstName ?? "your student";
 }

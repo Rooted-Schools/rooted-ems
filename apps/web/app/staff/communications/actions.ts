@@ -1,15 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireStaffSession } from "@/lib/auth/get-session";
+import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 import {
   sendNotification,
   createMessageTemplate,
   updateMessageTemplate,
   deleteMessageTemplate,
+  sendOneOffEmail,
   type SendNotificationInput,
   type CreateTemplateInput,
   type UpdateTemplateInput,
+  type SendOneOffEmailInput,
+  type SendOneOffEmailResult,
 } from "@/lib/mutations";
 
 /**
@@ -71,6 +74,32 @@ export async function staffDeleteTemplate(templateId: string) {
   const result = await deleteMessageTemplate(templateId);
   if (!result.error) {
     revalidatePath("/staff/communications");
+  }
+  return result;
+}
+
+/**
+ * Send a single tracked email to a lead or an application's guardian from
+ * inside the app (compose-email-dialog.tsx). This is the enforcement
+ * boundary: the session and the caller's accessible campuses are resolved
+ * here and handed to sendOneOffEmail, which rejects any record outside that
+ * scope before it reads or sends anything else. An empty accessible-campus
+ * list means org-wide (system_admin) access — see getAccessibleCampusIds.
+ */
+export async function staffSendOneOffEmail(
+  input: SendOneOffEmailInput
+): Promise<SendOneOffEmailResult> {
+  const session = await requireStaffSession();
+  const accessibleCampusIds = getAccessibleCampusIds(session);
+  const result = await sendOneOffEmail(input, session.user_id, accessibleCampusIds);
+  if (result.ok) {
+    if (input.leadId) {
+      revalidatePath("/staff/recruitment");
+      revalidatePath(`/staff/recruitment/${input.leadId}`);
+    }
+    if (input.applicationId) {
+      revalidatePath(`/staff/applications/${input.applicationId}`);
+    }
   }
   return result;
 }
