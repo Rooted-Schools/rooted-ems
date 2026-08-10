@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
-import { requireStaffSession, hasRoleOnCampus } from "@/lib/auth/get-session";
+import { requireStaffSession, requireMinRole, hasRoleOnCampus } from "@/lib/auth/get-session";
 import { redirect } from "next/navigation";
 
 const VALID_ROLES = ["compliance_auditor", "enrollment_staff", "enrollment_manager", "system_admin"];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * requireMinRole("system_admin") only proved the caller is a system_admin
@@ -103,6 +104,175 @@ export async function addTeamMember(
 
   revalidatePath("/staff/team");
   return { error: null };
+}
+
+// ─── Invite a new staff member (no prior sign-in required) ────────────────────
+// Unlike addTeamMember above, this does not require the person to have ever
+// signed in — it creates their Supabase Auth account for them and emails an
+// invite, or (if the email already has an auth account) just provisions the
+// profile/roles onto that existing account.
+//
+// Redirect choice: /auth/reset-password, not /auth/callback.
+// supabase.auth.admin.inviteUserByEmail() explicitly does not support the
+// PKCE flow — the browser that sends the invite is never the browser that
+// opens it — so the emailed link carries session tokens in the URL hash
+// (implicit flow), not a `?code=` param. /auth/callback only knows how to
+// handle a `?code=` param (exchangeCodeForSession) and would also sign the
+// user back out if it doesn't find is_staff = true at the instant they
+// click. /auth/reset-password's client effect handles the implicit flow
+// directly: it checks for a `code` param first, and otherwise falls back to
+// whatever session the browser Supabase client already parsed from the URL
+// hash on page load, then lets the user set a password via
+// updateUser({ password }). That is exactly the "first sign-in" landing this
+// feature needs, and it is unconditional on is_staff — which matters here
+// because is_staff is set by this action moments before the email is sent,
+// not certain to have replicated everywhere by the time they click.
+
+export interface InviteStaffMemberResult {
+  error: string | null;
+  outcome?: "invited" | "existing_account";
+}
+
+export async function inviteStaffMember(
+  rawEmail: string,
+  rawFirstName: string,
+  rawLastName: string,
+  campusAssignments: { campusId: string; role: string }[]
+): Promise<InviteStaffMemberResult> {
+  // Auth-first: prove system_admin (somewhere) before doing anything else.
+  // The per-campus check below (mirroring addTeamMember) still gates the
+  // actual grant — requireMinRole alone only proves system_admin SOMEWHERE.
+  const session = await requireMinRole("system_admin");
+
+  const email = rawEmail.trim().toLowerCase();
+  const firstName = rawFirstName.trim();
+  const lastName = rawLastName.trim();
+
+  if (!email || !EMAIL_RE.test(email)) {
+    return { error: "Enter a valid email address." };
+  }
+  if (!firstName || !lastName) {
+    return { error: "First and last name are required." };
+  }
+  if (campusAssignments.length === 0) {
+    return { error: "Select at least one campus." };
+  }
+
+  const invalidRole = campusAssignments.find((a) => !VALID_ROLES.includes(a.role));
+  if (invalidRole) return { error: `Invalid role: ${invalidRole.role}` };
+
+  // The caller must be system_admin on EVERY campus they are assigning a
+  // role to — same invariant as addTeamMember above.
+  const unauthorizedCampus = campusAssignments.find(
+    (a) => !hasRoleOnCampus(session, a.campusId, "system_admin")
+  );
+  if (unauthorizedCampus) {
+    return { error: "You are not a system admin on one or more of the selected campuses." };
+  }
+
+  const supabase = createServiceRoleClient();
+
+  // ── Look up whether an auth user already exists for this email ──
+  // listUsers has no email filter so we page through until we find the
+  // match, same approach as addTeamMember and lib/mutations/settings.ts.
+  let existingUserId: string | null = null;
+  let page = 1;
+  const perPage = 100;
+
+  while (!existingUserId) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+    if (error) return { error: "Failed to query auth users: " + error.message };
+    if (!data?.users?.length) break;
+
+    const match = data.users.find(
+      (u) => u.email?.toLowerCase() === email
+    );
+    if (match) {
+      existingUserId = match.id;
+      break;
+    }
+    if (data.users.length < perPage) break; // last page
+    page++;
+  }
+
+  let userId: string;
+  let outcome: "invited" | "existing_account";
+
+  if (existingUserId) {
+    userId = existingUserId;
+    outcome = "existing_account";
+  } else {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (!appUrl) return { error: "NEXT_PUBLIC_APP_URL is not configured." };
+
+    const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
+      email,
+      {
+        redirectTo: `${appUrl}/auth/reset-password`,
+        data: { first_name: firstName, last_name: lastName },
+      }
+    );
+
+    if (inviteError) {
+      // Never claim an invite went out when the API call actually failed.
+      return { error: "Failed to send invite: " + inviteError.message };
+    }
+    if (!inviteData?.user) {
+      return { error: "Invite call returned no user; nothing was created." };
+    }
+
+    userId = inviteData.user.id;
+    outcome = "invited";
+  }
+
+  // ── Skip role grants the person already holds (existing accounts only —
+  // a freshly invited user can't have any yet) ──
+  const { data: existingRoles } = await supabase
+    .from("user_campus_role")
+    .select("campus_id, role")
+    .eq("user_id", userId);
+
+  const alreadyHeld = new Set(
+    (existingRoles ?? []).map((r) => `${r.campus_id}:${r.role}`)
+  );
+  const newAssignments = campusAssignments.filter(
+    (a) => !alreadyHeld.has(`${a.campusId}:${a.role}`)
+  );
+
+  if (outcome === "existing_account" && newAssignments.length === 0) {
+    return { error: "This person already has that role on the selected campus(es)." };
+  }
+
+  // ── Upsert user_profile with is_staff = true ──
+  const { error: profileError } = await supabase
+    .from("user_profile")
+    .upsert(
+      { id: userId, email, first_name: firstName, last_name: lastName, is_staff: true },
+      { onConflict: "id" }
+    );
+
+  if (profileError) return { error: "Failed to create staff profile: " + profileError.message };
+
+  // ── Insert campus role assignments ──
+  if (newAssignments.length > 0) {
+    const rows = newAssignments.map(({ campusId, role }) => ({
+      user_id: userId,
+      campus_id: campusId,
+      role,
+      // Actor is always the session that authorized this action, never a
+      // caller-supplied value — that is the actual audit trail.
+      assigned_by: session.user_id,
+    }));
+
+    const { error: roleError } = await supabase
+      .from("user_campus_role")
+      .upsert(rows, { onConflict: "user_id,campus_id,role", ignoreDuplicates: true });
+
+    if (roleError) return { error: "Failed to assign campus roles: " + roleError.message };
+  }
+
+  revalidatePath("/staff/team");
+  return { error: null, outcome };
 }
 
 // ─── Update a single campus-role row ──────────────────────────────────────────
