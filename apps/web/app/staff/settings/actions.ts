@@ -10,8 +10,16 @@ import {
   removeStaffRole,
   updatePacketRequirement,
   bulkUpdatePacketRequirements,
+  createSchoolYear,
+  updateSchoolYearCurrent,
+  createGradeLevel,
+  deleteGradeLevel,
+  createCapacityPlan,
   type CreateEnrollmentWindowInput,
   type AssignStaffRoleInput,
+  type CreateSchoolYearInput,
+  type CreateGradeLevelInput,
+  type CreateCapacityPlanInput,
 } from "@/lib/mutations/settings";
 
 /**
@@ -96,6 +104,62 @@ export async function staffBulkUpdatePacketRequirements(
   if (!result.error) {
     revalidatePath("/staff/settings");
     revalidatePath("/family/registration");
+  }
+  return result;
+}
+
+/**
+ * School-year setup actions. All gated system_admin — the mutation layer
+ * enforces this independently (see lib/mutations/settings.ts), the gate here
+ * just fails fast before any DB round trip. The settings UI hides these
+ * controls for lower roles, but that is a courtesy, not the boundary.
+ */
+
+export async function staffCreateSchoolYear(input: CreateSchoolYearInput) {
+  await requireMinRole("system_admin");
+  const result = await createSchoolYear(input);
+  if (!result.error) {
+    revalidatePath("/staff/settings");
+  }
+  return result;
+}
+
+export async function staffUpdateSchoolYearCurrent(schoolYearId: string, isCurrent: boolean) {
+  await requireMinRole("system_admin");
+  const result = await updateSchoolYearCurrent(schoolYearId, isCurrent);
+  if (!result.error) {
+    revalidatePath("/staff/settings");
+    revalidatePath("/staff/seats");
+  }
+  return result;
+}
+
+export async function staffCreateGradeLevel(input: CreateGradeLevelInput) {
+  await requireMinRole("system_admin");
+  const result = await createGradeLevel(input);
+  if (!result.error) {
+    revalidatePath("/staff/settings");
+  }
+  return result;
+}
+
+export async function staffDeleteGradeLevel(gradeLevelId: string) {
+  await requireMinRole("system_admin");
+  const result = await deleteGradeLevel(gradeLevelId);
+  if (!result.error) {
+    revalidatePath("/staff/settings");
+  }
+  return result;
+}
+
+export async function staffCreateCapacityPlan(input: CreateCapacityPlanInput) {
+  await requireMinRole("system_admin");
+  const result = await createCapacityPlan(input);
+  if (!result.error) {
+    revalidatePath("/staff/settings");
+    revalidatePath("/staff/seats");
+    revalidatePath("/staff/dashboard");
+    revalidatePath("/staff/today");
   }
   return result;
 }
