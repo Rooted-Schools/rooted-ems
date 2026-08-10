@@ -1,5 +1,6 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { NextResponse, type NextRequest } from "next/server";
+import { recordCronRun } from "@/lib/cron-heartbeat";
 import { notifyLeadReengagement } from "@/lib/notify";
 
 /**
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
 
   if (fetchErr) {
     console.error("[cron/reengage-leads] fetch", fetchErr.message);
+    await recordCronRun("reengage-leads", undefined, true);
     return NextResponse.json({ error: "Failed to fetch quiet leads." }, { status: 500 });
   }
 
@@ -110,6 +112,6 @@ export async function GET(request: NextRequest) {
   console.log(
     `[cron/reengage-leads] Checked ${checked} quiet leads, re-engaged ${reengaged}, errors ${errors}`
   );
-
+  await recordCronRun("reengage-leads", { checked, reengaged, errors });
   return NextResponse.json({ checked, reengaged, errors, timestamp: nowIso });
 }

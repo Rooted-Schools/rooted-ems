@@ -1,5 +1,6 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { NextResponse, type NextRequest } from "next/server";
+import { recordCronRun } from "@/lib/cron-heartbeat";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
 
 /**
@@ -45,6 +46,7 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     console.error("[cron/purge-stale-leads] fetch", error.message);
+    await recordCronRun("purge-stale-leads", undefined, true);
     return NextResponse.json({ error: "Failed to fetch stale leads." }, { status: 500 });
   }
 
@@ -70,5 +72,6 @@ export async function GET(request: NextRequest) {
   }
 
   console.log(`[cron/purge-stale-leads] purged ${purged} leads older than ${RETENTION_MONTHS} months`);
+  await recordCronRun("purge-stale-leads", { purged });
   return NextResponse.json({ purged, timestamp: new Date().toISOString() });
 }
