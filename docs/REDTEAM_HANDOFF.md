@@ -7,7 +7,8 @@
 > - **Section 2 (bucket): PASS.** `documents` bucket is **private**.
 > - **Section 3 (data state): CLEAN.** 0 staff without campus roles; 0 orphaned waitlist promotions (no families were dropped by the old broken cron); packet requirements populated (36 per campus, 2026-27); all three campus reply-to emails set. **Open: still exactly 1 system_admin** — the single-point-of-failure decision remains with Steven.
 > - **Journey engine ("Push to Apply" 7/0/0): NOT frozen — genuinely waiting.** 7 active enrollments, zero overdue; the earliest step comes due 2026-08-11 19:29 UTC, so the first sends should go out with the 2026-08-12 16:30 UTC cron run. No journey step, offer reminder, or registration nudge has ever left a DB trace — consistent with "nothing due yet," but cron liveness itself is still unproven until the first heartbeat stamps land (PR #20) or a Vercel invocation log is checked.
-> - **Still outside DB reach: Sections 4–6** (Vercel env vars incl. `CRON_SECRET`, Twilio webhook, governance decisions).
+> - **Section 4 (Vercel) — VERIFIED 2026-08-10 via dashboard:** `CRON_SECRET` EXISTS (all environments), as do `NEXT_PUBLIC_APP_URL`, `RESEND_API_KEY`, `LEAD_WEBHOOK_SECRET`, Supabase vars, and `NEXT_PUBLIC_SENTRY_DSN`. Cron feature is Enabled with the full schedule live, including `event-followups` hourly (Pro plan accepted it) and `keep-the-seat` daily. **Twilio vars confirmed absent** — SMS stays off until added (Section 5). Minor hygiene: Vercel flags `SUPABASE_SERVICE_ROLE_KEY` and `CRON_SECRET` "Needs Attention" (not marked Sensitive) — 30-second fix in the dashboard.
+> - **Still open: Section 5 (Twilio, when ready) and Section 6 (governance decisions, incl. the single system_admin).**
 
 **For:** a Claude session with access to the Rooted EMS production Supabase project (and ideally the Vercel + Twilio dashboards).
 **From:** the 2026-08-06 full red team + fix wave (see PR "fix/notification-context-and-nudge-ux" and commit history).
