@@ -6,12 +6,22 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import type { TeamMember } from "./page";
 import {
   addTeamMember,
   updateTeamMemberRole,
   removeCampusFromMember,
+  inviteStaffMember,
 } from "./actions";
 
 const ROLES = [
@@ -181,6 +191,223 @@ function AddMemberForm({
   );
 }
 
+// ─── Invite Staff Member Dialog ────────────────────────────────────────────────
+// Adds someone who has never signed in before. The server action creates
+// their Supabase Auth account and emails them an invite, or — if they
+// already have an account under this email — just grants the role(s)
+// directly with no email sent.
+
+function InviteMemberDialog({ campuses }: { campuses: Campus[] }) {
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [assignments, setAssignments] = useState<{ campusId: string; role: string }[]>([
+    { campusId: campuses[0]?.id ?? "", role: "enrollment_staff" },
+  ]);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
+
+  function resetForm() {
+    setEmail("");
+    setFirstName("");
+    setLastName("");
+    setAssignments([{ campusId: campuses[0]?.id ?? "", role: "enrollment_staff" }]);
+    setError(null);
+  }
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) resetForm();
+  }
+
+  function addRow() {
+    setAssignments((prev) => [
+      ...prev,
+      { campusId: campuses[0]?.id ?? "", role: "enrollment_staff" },
+    ]);
+  }
+
+  function removeRow(i: number) {
+    setAssignments((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  function updateRow(i: number, field: "campusId" | "role", value: string) {
+    setAssignments((prev) =>
+      prev.map((row, idx) => (idx === i ? { ...row, [field]: value } : row))
+    );
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const trimmedEmail = email.trim();
+    startTransition(async () => {
+      const result = await inviteStaffMember(
+        trimmedEmail,
+        firstName.trim(),
+        lastName.trim(),
+        assignments
+      );
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      if (result.outcome === "invited") {
+        toast({
+          variant: "success",
+          title: "Invite sent",
+          description: `Invite sent to ${trimmedEmail}. They set their password from the email link.`,
+        });
+      } else {
+        toast({
+          variant: "success",
+          title: "Staff member added",
+          description: "Added: they already had an account.",
+        });
+      }
+      handleOpenChange(false);
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="min-h-[44px]">
+          Invite staff member
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="rounded-[6px]">
+        <DialogHeader>
+          <DialogTitle>Invite staff member</DialogTitle>
+          <DialogDescription>
+            They do not need to have signed in before. We will email them a link to set a
+            password, or add the role directly if they already have an account.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-ink/70 mb-1">
+                First name
+              </label>
+              <Input
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="min-h-[44px]"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-ink/70 mb-1">
+                Last name
+              </label>
+              <Input
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="min-h-[44px]"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-ink/70 mb-1">
+              Email address
+            </label>
+            <Input
+              type="email"
+              placeholder="staff@rootedschool.org"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="min-h-[44px]"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-ink/70 mb-2">
+              Role and campus
+            </label>
+            <div className="space-y-2">
+              {assignments.map((row, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <Select
+                    value={row.role}
+                    onChange={(e) => updateRow(i, "role", e.target.value)}
+                    className="flex-1 min-h-[44px]"
+                  >
+                    {ROLES.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <Select
+                    value={row.campusId}
+                    onChange={(e) => updateRow(i, "campusId", e.target.value)}
+                    className="flex-1 min-h-[44px]"
+                  >
+                    {campuses.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </Select>
+                  {assignments.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeRow(i)}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center text-stone hover:text-red-500 text-lg leading-none"
+                      aria-label="Remove campus"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={addRow}
+              className="mt-2 text-xs text-rooted-green hover:underline"
+            >
+              + Add another campus
+            </button>
+          </div>
+
+          {error && (
+            <p className="text-sm text-warn-text bg-warn/10 border border-warn/40 rounded-[6px] px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <DialogFooter className="pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-[44px]"
+              onClick={() => handleOpenChange(false)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="min-h-[44px] bg-rooted-green hover:bg-rooted-green/90 text-white"
+              disabled={isPending || !email || !firstName || !lastName || assignments.length === 0}
+            >
+              {isPending ? "Sending invite..." : "Send invite"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Member Row ───────────────────────────────────────────────────────────────
 
 function MemberRow({
@@ -236,9 +463,19 @@ function MemberRow({
           {member.initials || "?"}
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-ink truncate">
-            {member.full_name !== "Unknown" ? member.full_name : member.email}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-semibold text-ink truncate">
+              {member.full_name !== "Unknown" ? member.full_name : member.email}
+            </p>
+            {member.invited && (
+              <span
+                className="shrink-0 inline-flex items-center rounded-[6px] border border-warn/40 bg-warn/10 px-1.5 py-0.5 text-[10px] font-medium text-warn-text"
+                title="Invited but has not signed in yet"
+              >
+                Invited
+              </span>
+            )}
+          </div>
           <p className="text-xs text-stone truncate">{member.email}</p>
         </div>
       </div>
@@ -325,14 +562,17 @@ export function TeamClient({ members, campuses }: TeamClientProps) {
             {members.length} staff member{members.length !== 1 ? "s" : ""} across all campuses
           </p>
         </div>
-        {!showAdd && (
-          <Button
-            onClick={() => setShowAdd(true)}
-            className="bg-rooted-green hover:bg-rooted-green/90 text-white"
-          >
-            + Add Staff Member
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <InviteMemberDialog campuses={campuses} />
+          {!showAdd && (
+            <Button
+              onClick={() => setShowAdd(true)}
+              className="min-h-[44px] bg-rooted-green hover:bg-rooted-green/90 text-white"
+            >
+              + Add Staff Member
+            </Button>
+          )}
+        </div>
       </div>
 
       {showAdd && (

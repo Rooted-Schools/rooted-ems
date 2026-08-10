@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { requireMinRole, getAccessibleCampusIds } from "@/lib/auth/get-session";
 import { getStaffUsers, type StaffUserRow } from "@/lib/queries/staff";
 import { getCampuses } from "@/lib/queries";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { TeamClient } from "./team-client";
 
 export const metadata = {
@@ -15,6 +16,8 @@ export interface TeamMember {
   full_name: string;
   email: string;
   initials: string;
+  /** True when the person has an invited auth account but has never signed in. */
+  invited: boolean;
   campusRoles: {
     row_id: string;
     campus_id: string;
@@ -23,7 +26,10 @@ export interface TeamMember {
   }[];
 }
 
-function groupIntoMembers(rows: StaffUserRow[]): TeamMember[] {
+function groupIntoMembers(
+  rows: StaffUserRow[],
+  invitedIds: Set<string>
+): TeamMember[] {
   const map = new Map<string, TeamMember>();
 
   for (const row of rows) {
@@ -33,6 +39,7 @@ function groupIntoMembers(rows: StaffUserRow[]): TeamMember[] {
         full_name: row.full_name,
         email: row.email,
         initials: row.initials,
+        invited: invitedIds.has(row.user_id),
         campusRoles: [],
       });
     }
@@ -47,6 +54,34 @@ function groupIntoMembers(rows: StaffUserRow[]): TeamMember[] {
   return Array.from(map.values()).sort((a, b) =>
     a.full_name.localeCompare(b.full_name)
   );
+}
+
+/**
+ * Which of these staff user ids have never signed in (last_sign_in_at is
+ * null on their auth record) — drives the "Invited" hint on team rows.
+ *
+ * Uses getUserById per staff member rather than paging through
+ * auth.admin.listUsers(): this scales with the size of the STAFF roster
+ * (dozens, not the full family/guardian user base), so it stays cheap as
+ * the app grows. Failures are swallowed to "not invited" — this is a
+ * cosmetic hint, not a security signal, so it should never block the page.
+ */
+async function getNeverSignedInIds(userIds: string[]): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set();
+
+  const supabase = createServiceRoleClient();
+  const results = await Promise.all(
+    userIds.map(async (id) => {
+      try {
+        const { data } = await supabase.auth.admin.getUserById(id);
+        return { id, neverSignedIn: !!data?.user && !data.user.last_sign_in_at };
+      } catch {
+        return { id, neverSignedIn: false };
+      }
+    })
+  );
+
+  return new Set(results.filter((r) => r.neverSignedIn).map((r) => r.id));
 }
 
 export default async function TeamPage() {
@@ -73,7 +108,10 @@ export default async function TeamPage() {
     ? allCampuses.filter((c) => accessibleIds.includes(c.id))
     : allCampuses;
 
-  const members = groupIntoMembers(staffRows);
+  const staffUserIds = Array.from(new Set(staffRows.map((r) => r.user_id)));
+  const neverSignedInIds = await getNeverSignedInIds(staffUserIds);
+
+  const members = groupIntoMembers(staffRows, neverSignedInIds);
 
   return (
     <TeamClient
