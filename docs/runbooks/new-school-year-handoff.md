@@ -1,29 +1,37 @@
-# New School Year Handoff
+# New School Year Setup
 
-Opening a new enrollment cycle is not something you can do entirely from the sidebar. School years, grade levels, and the first capacity plan for a new year all have to be created by your system administrator directly. There is no button in the app for any of the three. Your job is to assemble everything the administrator needs, cleanly and early, so the build is a short conversation instead of a scramble.
+Opening a new enrollment cycle is now done inside the app, from Settings. Creating the school year, its grade levels, and the first capacity plans requires the system administrator role: if that is you, the build takes minutes once you have the numbers; if it is not you, your job is to assemble everything the administrator needs, cleanly and early, so the build is a short conversation instead of a scramble.
 
-## What to gather before you ask
+## What to gather before anyone builds
 
-1. **The school year itself.** Confirm the exact year label your campus uses and the start date. The start date matters beyond the calendar: it is what several automations (like keep-the-seat outreach) use to know when to stop reaching out to newly registered families.
+1. **The school year itself.** Confirm the exact year label your campus uses and the start and end dates. The start date matters beyond the calendar: it is what several automations (like keep-the-seat outreach) use to know when to stop reaching out to newly registered families.
 2. **Grade levels being served.** List every grade the campus will enroll for that year, including any new grade being added or any grade being dropped.
 3. **Seats per grade.** For each grade, the number of seats you want available. Be specific rather than approximate; this becomes the number lottery runs and the Seats tab work from.
 4. **Enrollment window dates.** When applications open and close for the new cycle, by grade if your campus varies them.
-5. **Packet requirement changes.** If anything about what families must submit to complete registration is changing for the new year (a new document, a retired one, a state-specific item), write it out explicitly rather than assuming the administrator remembers last year's list.
+5. **Packet requirement changes.** If anything about what families must submit to complete registration is changing for the new year (a new document, a retired one, a state-specific item), write it out explicitly rather than carrying last year's list forward on assumption.
 
-## Handing it off
+## Building it (system administrator)
 
-Send this as one package, not a scattered set of messages, and give real lead time: weeks, not days, since your administrator needs time to build and verify the year before your first application can be filed against it. Confirm receipt and ask for a date when you can expect it built.
+All of this lives in Settings, in order:
 
-## What you can still do yourself once the year exists
+1. **Settings, School Years: create the year.** Name, start date, end date. A new recruiting year can be current at the same time as the operating year; mark both current during the transition and un-mark the old year when its season truly ends.
+2. **Settings, Grade Levels: add each grade** for the campus and the new year. Grades belong to a specific year, never reused across years.
+3. **Settings, Capacity Plans: create a plan** for each campus, new-year grade, and seat count.
+4. **Settings, Enrollment Windows: create the window** with open and close dates. Leave it in draft until opening day, then flip it to open.
+5. **Settings, Packet Requirements: confirm the new year's list.** Copy forward what stays, apply the changes gathered above.
 
-Once your system administrator has created the school year, grades, and initial capacity plan, you can adjust the seat total on an existing plan yourself from the Seats tab if your numbers need to change mid-cycle. That is the one piece of this that comes back into your hands after the initial build. Creating a plan from nothing is still administrator-only.
+Verify before opening day: the public site should show the real open date on the campus card (it reads it from the window you created), and a test look at the Seats tab should show every grade with its seat count.
+
+## What campus staff can do without the administrator
+
+Adjust the seat total on an existing capacity plan from the Seats tab, edit enrollment windows, and edit packet requirements. Creating the year and its grades stays with the system administrator.
 
 ## Hardest questions
 
-**Why can't I just create the school year myself?** It is a deliberate guardrail. A school year, once families start applying against it, touches lottery runs, capacity, and every automation on a school calendar; a mistake here is hard to unwind cleanly, so it is kept in fewer hands.
+**Why is creating the year still admin-only?** It is a deliberate guardrail. A school year, once families start applying against it, touches lottery runs, capacity, and every automation on a school calendar; a mistake here is hard to unwind cleanly, so it is kept in fewer hands. The difference now is that those hands use Settings, not the database.
 
-**What if I find out about a new grade or a seat change after the year is already built?** Adding a grade after the fact still needs your administrator, since grade levels are not staff-editable either. A seat count change on an existing grade you can handle yourself through the Seats tab. Know which kind of change you are asking for before you escalate.
+**What if I find out about a new grade or a seat change after the year is built?** A new grade is a two-minute Settings addition for the administrator (plus a capacity plan for it). A seat count change on an existing grade you can handle yourself through the Seats tab. Know which kind of change you are asking for before you escalate.
 
-**How much lead time is actually enough?** This depends on your administrator's other work and how close to open enrollment you are asking. Check with your system administrator directly on their current turnaround rather than assuming a fixed number.
+**Can two school years really be current at once?** Yes, and during a transition they should be: the year your operating campus is finishing and the year your opening campuses are recruiting for. Every current-year view handles this. Just remember to un-mark the old year when its season closes, or stale data lingers in current-year stats.
 
-Only your system administrator can create a new school year, add or remove grade levels, or build the first capacity plan for a new cycle.
+Only your system administrator can create a new school year, add grade levels, or build the first capacity plan for a cycle. Everything else comes back into campus hands once the year exists.
