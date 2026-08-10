@@ -20,6 +20,12 @@ export interface LandingSchool {
   closeDate: string | null;
   daysRemaining: number | null;
   campusId: string | null;
+  /**
+   * ISO date string for the campus's next upcoming enrollment window (real
+   * data from the enrollment_window table, any status including draft).
+   * Null when the campus has no scheduled window — never a placeholder.
+   */
+  upcomingOpenDate: string | null;
 }
 
 interface LandingClientProps {
@@ -65,7 +71,7 @@ const campusAccent: Record<string, {
   },
 };
 
-function formatCloseDate(iso: string, locale: Locale): string {
+function formatDate(iso: string, locale: Locale): string {
   return new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
     month: "long",
     day: "numeric",
@@ -211,6 +217,13 @@ function LandingContent({ schools }: LandingClientProps) {
                         {t("public.openEnrollment")}
                       </span>
                     </div>
+                  ) : school.upcomingOpenDate ? (
+                    <div className={`mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] border max-w-full ${accent?.badgeBg ?? "bg-rooted-green/10"} ${accent?.badgeBorder ?? "border-rooted-green/30"}`}>
+                      <span className={`w-2 h-2 shrink-0 rounded-full ${accent?.dot ?? "bg-rooted-green"}`} />
+                      <span className={`text-xs font-semibold ${accent?.badgeText ?? "text-rooted-green"}`}>
+                        {t("public.applicationsOpen").replace("{date}", formatDate(school.upcomingOpenDate, locale))}
+                      </span>
+                    </div>
                   ) : (
                     <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rooted-gray border border-rooted-gray-dark">
                       <span className="w-2 h-2 rounded-full bg-stone" />
@@ -223,13 +236,20 @@ function LandingContent({ schools }: LandingClientProps) {
                   {/* Close date info */}
                   {school.isOpen && school.closeDate && (
                     <p className="text-[11px] text-stone-text mt-1.5">
-                      {t("public.closes")} {formatCloseDate(school.closeDate, locale)}
+                      {t("public.closes")} {formatDate(school.closeDate, locale)}
                       {school.daysRemaining !== null && school.daysRemaining <= 14 && (
                         <span className="text-amber-600 font-semibold">
                           {" "}({school.daysRemaining}{" "}
                           {school.daysRemaining === 1 ? t("public.dayLeft") : t("public.daysLeft")})
                         </span>
                       )}
+                    </p>
+                  )}
+
+                  {/* Closed, no scheduled window yet — still an honest state, but not a dead end */}
+                  {!school.isOpen && !school.upcomingOpenDate && (
+                    <p className="text-[11px] text-stone-text mt-1.5 max-w-[220px]">
+                      {t("public.joinInterestListClosed")}
                     </p>
                   )}
 
@@ -241,6 +261,16 @@ function LandingContent({ schools }: LandingClientProps) {
                         className="inline-flex items-center text-sm font-medium text-white bg-rooted-green hover:bg-deep-green px-4 py-2 rounded-lg transition-colors"
                       >
                         {t("public.applyNow")}
+                      </Link>
+                    </div>
+                  )}
+                  {!school.isOpen && (
+                    <div className="mt-4 flex gap-2">
+                      <Link
+                        href={school.campusId ? `/inquire?campus=${school.campusId}` : "/inquire"}
+                        className="inline-flex min-h-[44px] items-center justify-center rounded-[6px] border border-line bg-white px-4 text-sm font-medium text-ink hover:bg-sunken transition-colors"
+                      >
+                        {t("public.joinInterestList")}
                       </Link>
                     </div>
                   )}
