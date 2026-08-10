@@ -72,10 +72,13 @@ const campusAccent: Record<string, {
 };
 
 function formatDate(iso: string, locale: Locale): string {
+  // Window dates are stored as UTC midnight; format in UTC so "Oct 26
+  // 00:00Z" never renders as Oct 25 for a viewer west of Greenwich.
   return new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
     month: "long",
     day: "numeric",
     year: "numeric",
+    timeZone: "UTC",
   }).format(new Date(iso));
 }
 
