@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { getStaffEnrollmentWindows, getStaffUsers, getCampuses, getStaffPacketRequirements } from "@/lib/queries";
 import { SettingsClient } from "./settings-client";
-import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus, hasMinRole } from "@/lib/auth/get-session";
 import { isSmsConfigured } from "@/lib/sms";
 import { isEmailConfigured } from "@/lib/email";
 import { ChannelStatus } from "./_components/channel-status";
@@ -37,7 +37,7 @@ export default async function StaffSettingsPage({
     getStaffUsers(activeCampus),
     supabase.from("school_year").select("id, name, is_current, start_date, end_date").order("start_date", { ascending: false }),
     getStaffPacketRequirements(),
-    supabase.from("grade_level").select("id, grade, campus_id").order("grade"),
+    supabase.from("grade_level").select("id, grade, campus_id, school_year_id").order("grade"),
     supabase.from("setting").select("key, value").limit(50),
     getAutomationHealth(),
     getOverdueJourneySteps(),
@@ -74,12 +74,14 @@ export default async function StaffSettingsPage({
         id: g.id as string,
         grade: g.grade as string,
         campus_id: g.campus_id as string,
+        school_year_id: g.school_year_id as string,
       }))}
       systemSettings={Object.fromEntries(
         (settings ?? []).map((s: Record<string, string>) => [s.key, s.value])
       )}
         staffUserId={session.user_id}
         activeCampusId={activeCampus ?? undefined}
+        isSystemAdmin={hasMinRole(session, "system_admin")}
       />
     </div>
   );

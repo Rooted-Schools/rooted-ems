@@ -12,6 +12,7 @@ import {
   IconClipboardList,
   IconUsers,
   IconGraduationCap,
+  IconX,
 } from "@/components/ui/icons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
@@ -32,7 +33,15 @@ import {
   staffEditRole,
   staffRemoveRole,
   staffUpdatePacketRequirement,
+  staffCreateSchoolYear,
+  staffUpdateSchoolYearCurrent,
+  staffCreateGradeLevel,
+  staffDeleteGradeLevel,
+  staffCreateCapacityPlan,
 } from "./actions";
+
+/** The real grade_level_code enum values (supabase/migrations/00001_enums.sql). */
+const GRADE_LEVEL_CODES = ["6", "7", "8", "9", "10", "11", "12"];
 
 const roleLabels: Record<string, string> = {
   system_admin: "System Admin",
@@ -60,6 +69,7 @@ interface GradeLevel {
   id: string;
   grade: string;
   campus_id: string;
+  school_year_id: string;
 }
 
 interface SettingsClientProps {
@@ -72,6 +82,15 @@ interface SettingsClientProps {
   systemSettings?: Record<string, string>;
   staffUserId: string;
   activeCampusId?: string;
+  /**
+   * Whether the signed-in staff member holds system_admin on at least one
+   * campus. Drives visibility of the school-year, grade-level, and capacity
+   * plan create/edit/delete controls. This is a UI courtesy only — every
+   * mutation those controls call re-checks system_admin server-side via
+   * requireMinRole, so hiding a button here is not what keeps a lower role
+   * from acting; it just keeps them from seeing a control they can't use.
+   */
+  isSystemAdmin?: boolean;
 }
 
 export function SettingsClient({
@@ -84,6 +103,7 @@ export function SettingsClient({
   systemSettings = {},
   staffUserId,
   activeCampusId,
+  isSystemAdmin = false,
 }: SettingsClientProps) {
   return (
     <div className="space-y-6">
@@ -122,6 +142,7 @@ export function SettingsClient({
             gradeLevels={gradeLevels}
             campuses={campuses}
             activeCampusId={activeCampusId}
+            isSystemAdmin={isSystemAdmin}
           />
         </TabsContent>
 
@@ -1014,46 +1035,290 @@ function SchoolYearsGradesTab({
   gradeLevels,
   campuses,
   activeCampusId,
+  isSystemAdmin,
 }: {
   schoolYears: SchoolYear[];
   gradeLevels: GradeLevel[];
   campuses: CampusRow[];
   activeCampusId?: string;
+  isSystemAdmin: boolean;
 }) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+
   const [selectedCampus, setSelectedCampus] = useState(activeCampusId ?? campuses[0]?.id ?? "");
+  const [selectedYear, setSelectedYear] = useState(
+    schoolYears.find((sy) => sy.is_current)?.id ?? schoolYears[0]?.id ?? ""
+  );
+
+  // ── School Year create dialog state ──
+  const [yearDialogOpen, setYearDialogOpen] = useState(false);
+  const [yearFeedback, setYearFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [yearName, setYearName] = useState("");
+  const [yearStart, setYearStart] = useState("");
+  const [yearEnd, setYearEnd] = useState("");
+  const [yearIsCurrent, setYearIsCurrent] = useState(false);
+
+  function resetYearForm() {
+    setYearName("");
+    setYearStart("");
+    setYearEnd("");
+    setYearIsCurrent(false);
+  }
+
+  function handleCreateYear() {
+    if (!yearName.trim() || !yearStart || !yearEnd) return;
+    if (new Date(yearEnd) <= new Date(yearStart)) {
+      setYearFeedback({ type: "error", message: "End date must be after start date." });
+      return;
+    }
+    setYearFeedback(null);
+    startTransition(async () => {
+      const result = await staffCreateSchoolYear({
+        name: yearName.trim(),
+        start_date: yearStart,
+        end_date: yearEnd,
+        is_current: yearIsCurrent,
+      });
+      if (result.error) {
+        setYearFeedback({ type: "error", message: result.error });
+      } else {
+        setYearDialogOpen(false);
+        resetYearForm();
+        toast({ variant: "success", title: `${yearName.trim()} created.` });
+        router.refresh();
+      }
+    });
+  }
+
+  function handleToggleCurrent(sy: SchoolYear) {
+    startTransition(async () => {
+      const result = await staffUpdateSchoolYearCurrent(sy.id, !sy.is_current);
+      if (result.error) {
+        toast({ variant: "error", title: result.error });
+      } else {
+        toast({
+          variant: "success",
+          title: sy.is_current ? `${sy.name} is no longer marked current` : `${sy.name} marked current`,
+        });
+        router.refresh();
+      }
+    });
+  }
+
+  // ── Grade Level create dialog state ──
+  const [gradeDialogOpen, setGradeDialogOpen] = useState(false);
+  const [gradeFeedback, setGradeFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [gradeCampusId, setGradeCampusId] = useState(selectedCampus);
+  const [gradeYearId, setGradeYearId] = useState(selectedYear);
+  const [gradeSelection, setGradeSelection] = useState<string[]>([]);
+
+  function openGradeDialog() {
+    setGradeCampusId(selectedCampus);
+    setGradeYearId(selectedYear);
+    setGradeSelection([]);
+    setGradeFeedback(null);
+    setGradeDialogOpen(true);
+  }
+
+  function toggleGradeSelection(grade: string) {
+    setGradeSelection((prev) =>
+      prev.includes(grade) ? prev.filter((g) => g !== grade) : [...prev, grade]
+    );
+  }
+
+  function handleCreateGrades() {
+    if (!gradeCampusId || !gradeYearId || gradeSelection.length === 0) return;
+    setGradeFeedback(null);
+    startTransition(async () => {
+      const result = await staffCreateGradeLevel({
+        campus_id: gradeCampusId,
+        school_year_id: gradeYearId,
+        grades: gradeSelection,
+      });
+      if (result.error) {
+        setGradeFeedback({ type: "error", message: result.error });
+      } else {
+        setGradeDialogOpen(false);
+        const skipped = result.data?.skipped ?? [];
+        toast({
+          variant: "success",
+          title: `Added ${result.data?.inserted ?? 0} grade level${result.data?.inserted === 1 ? "" : "s"}.`,
+          description: skipped.length > 0 ? `Grade${skipped.length > 1 ? "s" : ""} ${skipped.join(", ")} already existed and ${skipped.length > 1 ? "were" : "was"} skipped.` : undefined,
+        });
+        router.refresh();
+      }
+    });
+  }
+
+  function handleDeleteGrade(g: GradeLevel) {
+    if (!confirm(`Remove Grade ${g.grade}? This cannot be undone.`)) return;
+    startTransition(async () => {
+      const result = await staffDeleteGradeLevel(g.id);
+      if (result.error) {
+        toast({ variant: "error", title: result.error });
+      } else {
+        toast({ variant: "success", title: `Grade ${g.grade} removed.` });
+        router.refresh();
+      }
+    });
+  }
+
+  // ── Capacity Plan create dialog state ──
+  const [planDialogOpen, setPlanDialogOpen] = useState(false);
+  const [planFeedback, setPlanFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [planCampusId, setPlanCampusId] = useState(selectedCampus);
+  const [planYearId, setPlanYearId] = useState(selectedYear);
+  const [planGradeLevelId, setPlanGradeLevelId] = useState("");
+  const [planTotalSeats, setPlanTotalSeats] = useState<number>(0);
+
+  const planGradeOptions = gradeLevels
+    .filter((g) => g.campus_id === planCampusId && g.school_year_id === planYearId)
+    .sort((a, b) => (parseInt(a.grade) || 0) - (parseInt(b.grade) || 0));
+
+  function openPlanDialog() {
+    setPlanCampusId(selectedCampus);
+    setPlanYearId(selectedYear);
+    setPlanGradeLevelId("");
+    setPlanTotalSeats(0);
+    setPlanFeedback(null);
+    setPlanDialogOpen(true);
+  }
+
+  function handleCreatePlan() {
+    if (!planCampusId || !planYearId || !planGradeLevelId || planTotalSeats < 0) return;
+    setPlanFeedback(null);
+    startTransition(async () => {
+      const result = await staffCreateCapacityPlan({
+        campus_id: planCampusId,
+        grade_level_id: planGradeLevelId,
+        school_year_id: planYearId,
+        total_seats: planTotalSeats,
+      });
+      if (result.error) {
+        setPlanFeedback({ type: "error", message: result.error });
+      } else {
+        setPlanDialogOpen(false);
+        toast({ variant: "success", title: "Capacity plan created." });
+        router.refresh();
+      }
+    });
+  }
 
   const campusGrades = gradeLevels
-    .filter((g) => g.campus_id === selectedCampus)
-    .sort((a, b) => {
-      const numA = parseInt(a.grade) || 0;
-      const numB = parseInt(b.grade) || 0;
-      return numA - numB;
-    });
+    .filter((g) => g.campus_id === selectedCampus && g.school_year_id === selectedYear)
+    .sort((a, b) => (parseInt(a.grade) || 0) - (parseInt(b.grade) || 0));
+
+  const fieldClass =
+    "w-full px-3 py-2 border border-line rounded-[6px] text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 min-h-[44px]";
 
   return (
     <div className="space-y-6">
       {/* School Years */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">School Years</CardTitle>
-          <CardDescription>
-            Configured school years in the system. The current year is used as the default for enrollment windows and reports.
-          </CardDescription>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-base">School Years</CardTitle>
+              <CardDescription>
+                Configured school years in the system. Enrollment windows and reports default to whichever year is marked current.
+              </CardDescription>
+            </div>
+            {isSystemAdmin && (
+              <Dialog open={yearDialogOpen} onOpenChange={setYearDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="rounded-[6px] min-h-[44px]">Add School Year</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add School Year</DialogTitle>
+                    <DialogDescription>
+                      Set up a new school year so enrollment windows, grade levels, and capacity plans can be built against it.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div>
+                      <label className="block text-sm font-medium text-ink/70 mb-1">Name</label>
+                      <input
+                        type="text"
+                        value={yearName}
+                        onChange={(e) => setYearName(e.target.value)}
+                        placeholder="e.g. 2028-29"
+                        className={fieldClass}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-ink/70 mb-1">Start Date</label>
+                        <input
+                          type="date"
+                          value={yearStart}
+                          onChange={(e) => setYearStart(e.target.value)}
+                          className={fieldClass}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-ink/70 mb-1">End Date</label>
+                        <input
+                          type="date"
+                          value={yearEnd}
+                          onChange={(e) => setYearEnd(e.target.value)}
+                          className={fieldClass}
+                        />
+                      </div>
+                    </div>
+                    <label className="flex min-h-[44px] items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={yearIsCurrent}
+                        onChange={(e) => setYearIsCurrent(e.target.checked)}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm text-ink">Mark as current</span>
+                    </label>
+                    <p className="text-xs text-stone-text">
+                      More than one year can be current at the same time, for example a recruiting year alongside an operating year.
+                    </p>
+                  </div>
+                  {yearFeedback?.type === "error" && (
+                    <p className="text-sm text-red-600 mb-2">{yearFeedback.message}</p>
+                  )}
+                  <DialogFooter>
+                    <Button variant="outline" className="rounded-[6px] min-h-[44px]" onClick={() => setYearDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      className="rounded-[6px] min-h-[44px]"
+                      onClick={handleCreateYear}
+                      disabled={isPending || !yearName.trim() || !yearStart || !yearEnd}
+                    >
+                      {isPending ? "Creating…" : "Create School Year"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {schoolYears.length === 0 ? (
             <EmptyState
               icon={<IconCalendar size={40} />}
               title="No school years configured"
-              description="School years are managed in the database."
+              description={
+                isSystemAdmin
+                  ? "Add a school year to start building enrollment windows and grade levels against it."
+                  : "No school years have been set up yet. Ask a system administrator to add one."
+              }
             />
           ) : (
             <div className="space-y-3">
               {schoolYears.map((sy) => (
                 <div
                   key={sy.id}
-                  className={`flex items-center justify-between p-3 rounded-md border ${
-                    sy.is_current ? "border-rooted-green/40 bg-rooted-green/5" : "border-stone/20"
+                  className={`flex items-center justify-between p-3 rounded-[6px] border ${
+                    sy.is_current ? "border-rooted-green/40 bg-rooted-green/5" : "border-line"
                   }`}
                 >
                   <div>
@@ -1067,12 +1332,18 @@ function SchoolYearsGradesTab({
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    {sy.is_current && (
-                      <Badge variant="success">Current</Badge>
+                    {sy.is_current && <Badge variant="success">Current</Badge>}
+                    {isSystemAdmin && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-[6px] min-h-[44px]"
+                        disabled={isPending}
+                        onClick={() => handleToggleCurrent(sy)}
+                      >
+                        {sy.is_current ? "Unmark current" : "Mark current"}
+                      </Button>
                     )}
-                    <Badge variant="outline" className="text-[10px] font-mono">
-                      {sy.id.slice(0, 8)}
-                    </Badge>
                   </div>
                 </div>
               ))}
@@ -1084,24 +1355,115 @@ function SchoolYearsGradesTab({
       {/* Grade Levels */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
               <CardTitle className="text-base">Grade Levels</CardTitle>
               <CardDescription>
-                Grade levels configured for each campus. These determine which grades families can apply for.
+                Grade levels configured per campus and school year. These determine which grades families can apply for.
               </CardDescription>
             </div>
-            {campuses.length > 1 && (
+            <div className="flex items-center gap-2 flex-wrap">
               <select
                 value={selectedCampus}
                 onChange={(e) => setSelectedCampus(e.target.value)}
-                className="px-3 py-1.5 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                className="px-3 py-1.5 border border-line rounded-[6px] text-sm min-h-[44px] focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
               >
                 {campuses.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
-            )}
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="px-3 py-1.5 border border-line rounded-[6px] text-sm min-h-[44px] focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+              >
+                {schoolYears.map((sy) => (
+                  <option key={sy.id} value={sy.id}>{sy.name}</option>
+                ))}
+              </select>
+              {isSystemAdmin && (
+                <Dialog open={gradeDialogOpen} onOpenChange={setGradeDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="rounded-[6px] min-h-[44px]" onClick={openGradeDialog}>
+                      Add Grade Levels
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add Grade Levels</DialogTitle>
+                      <DialogDescription>
+                        Choose a campus and school year, then select which grades to open for applications.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-ink/70 mb-1">Campus</label>
+                          <select
+                            value={gradeCampusId}
+                            onChange={(e) => setGradeCampusId(e.target.value)}
+                            className={fieldClass}
+                          >
+                            {campuses.map((c) => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-ink/70 mb-1">School Year</label>
+                          <select
+                            value={gradeYearId}
+                            onChange={(e) => setGradeYearId(e.target.value)}
+                            className={fieldClass}
+                          >
+                            {schoolYears.map((sy) => (
+                              <option key={sy.id} value={sy.id}>{sy.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-ink/70 mb-2">Grades</label>
+                        <div className="flex flex-wrap gap-2">
+                          {GRADE_LEVEL_CODES.map((grade) => {
+                            const checked = gradeSelection.includes(grade);
+                            return (
+                              <button
+                                key={grade}
+                                type="button"
+                                onClick={() => toggleGradeSelection(grade)}
+                                className={`min-h-[44px] px-4 rounded-[6px] border text-sm font-medium transition-colors ${
+                                  checked
+                                    ? "border-rooted-green bg-rooted-green/10 text-deep-green"
+                                    : "border-line bg-white text-ink hover:bg-rooted-gray-light"
+                                }`}
+                              >
+                                Grade {grade}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                    {gradeFeedback?.type === "error" && (
+                      <p className="text-sm text-red-600 mb-2">{gradeFeedback.message}</p>
+                    )}
+                    <DialogFooter>
+                      <Button variant="outline" className="rounded-[6px] min-h-[44px]" onClick={() => setGradeDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        className="rounded-[6px] min-h-[44px]"
+                        onClick={handleCreateGrades}
+                        disabled={isPending || !gradeCampusId || !gradeYearId || gradeSelection.length === 0}
+                      >
+                        {isPending ? "Adding…" : "Add Grade Levels"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -1109,28 +1471,159 @@ function SchoolYearsGradesTab({
             <EmptyState
               icon={<IconGraduationCap size={40} />}
               title="No grade levels configured"
-              description="Grade levels for this campus can be added in the database."
+              description={
+                isSystemAdmin
+                  ? `No grade levels for ${campuses.find((c) => c.id === selectedCampus)?.name ?? "this campus"} in ${schoolYears.find((sy) => sy.id === selectedYear)?.name ?? "this year"}. Add one above.`
+                  : "No grade levels are configured for this campus and year yet."
+              }
             />
           ) : (
             <div className="flex flex-wrap gap-2">
               {campusGrades.map((g) => (
                 <div
                   key={g.id}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-stone/20 bg-white"
+                  className="flex items-center gap-2 pl-4 pr-2 py-2.5 rounded-[6px] border border-line bg-white"
                 >
-                  <span className="text-sm font-medium text-ink">
-                    Grade {g.grade}
-                  </span>
+                  <span className="text-sm font-medium text-ink">Grade {g.grade}</span>
+                  {isSystemAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteGrade(g)}
+                      disabled={isPending}
+                      title={`Remove Grade ${g.grade}`}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-[6px] text-stone hover:bg-rooted-gray-light hover:text-red-600 disabled:opacity-40"
+                    >
+                      <IconX size={14} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
           )}
           <p className="text-xs text-stone mt-4">
             {campusGrades.length} grade level{campusGrades.length !== 1 ? "s" : ""} configured for{" "}
-            {campuses.find((c) => c.id === selectedCampus)?.name ?? "this campus"}
+            {campuses.find((c) => c.id === selectedCampus)?.name ?? "this campus"} in{" "}
+            {schoolYears.find((sy) => sy.id === selectedYear)?.name ?? "this year"}
           </p>
         </CardContent>
       </Card>
+
+      {/* Capacity Plans — create-only here; day-to-day seat editing lives on
+          the Seats page, which already points here for creation (see its
+          empty state: "Add capacity plans in Settings"). Keeping creation
+          next to Grade Levels means the campus/grade/year picker in this
+          dialog is scoped by the same data staff just configured above,
+          instead of re-deriving that context on a separate page. */}
+      {isSystemAdmin && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-base">Capacity Plans</CardTitle>
+                <CardDescription>
+                  Set seat capacity for a campus, grade, and school year. Manage existing seat counts on the Seats page.
+                </CardDescription>
+              </div>
+              <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="rounded-[6px] min-h-[44px]" onClick={openPlanDialog}>
+                    Add Capacity Plan
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Capacity Plan</DialogTitle>
+                    <DialogDescription>
+                      Set total seats for one campus, grade, and school year combination.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-ink/70 mb-1">Campus</label>
+                        <select
+                          value={planCampusId}
+                          onChange={(e) => {
+                            setPlanCampusId(e.target.value);
+                            setPlanGradeLevelId("");
+                          }}
+                          className={fieldClass}
+                        >
+                          {campuses.map((c) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-ink/70 mb-1">School Year</label>
+                        <select
+                          value={planYearId}
+                          onChange={(e) => {
+                            setPlanYearId(e.target.value);
+                            setPlanGradeLevelId("");
+                          }}
+                          className={fieldClass}
+                        >
+                          {schoolYears.map((sy) => (
+                            <option key={sy.id} value={sy.id}>{sy.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-ink/70 mb-1">Grade Level</label>
+                        {planGradeOptions.length === 0 ? (
+                          <p className="text-xs text-stone-text py-2">
+                            No grade levels exist for this campus and year yet. Add one above first.
+                          </p>
+                        ) : (
+                          <select
+                            value={planGradeLevelId}
+                            onChange={(e) => setPlanGradeLevelId(e.target.value)}
+                            className={fieldClass}
+                          >
+                            <option value="">Select grade</option>
+                            {planGradeOptions.map((g) => (
+                              <option key={g.id} value={g.id}>Grade {g.grade}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-ink/70 mb-1">Total Seats</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={999}
+                          value={planTotalSeats}
+                          onChange={(e) => setPlanTotalSeats(Math.max(0, parseInt(e.target.value) || 0))}
+                          className={fieldClass}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  {planFeedback?.type === "error" && (
+                    <p className="text-sm text-red-600 mb-2">{planFeedback.message}</p>
+                  )}
+                  <DialogFooter>
+                    <Button variant="outline" className="rounded-[6px] min-h-[44px]" onClick={() => setPlanDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      className="rounded-[6px] min-h-[44px]"
+                      onClick={handleCreatePlan}
+                      disabled={isPending || !planCampusId || !planYearId || !planGradeLevelId}
+                    >
+                      {isPending ? "Creating…" : "Create Capacity Plan"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardHeader>
+        </Card>
+      )}
     </div>
   );
 }
