@@ -1,5 +1,6 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { NextResponse, type NextRequest } from "next/server";
+import { recordCronRun } from "@/lib/cron-heartbeat";
 import { notifyFamilyRegistrationNudge } from "@/lib/notify";
 
 /**
@@ -58,6 +59,7 @@ export async function GET(request: NextRequest) {
 
   if (fetchErr) {
     console.error("[cron/nudge-registrations] fetch", fetchErr.message);
+    await recordCronRun("nudge-registrations", undefined, true);
     return NextResponse.json(
       { error: "Failed to fetch stalled packets." },
       { status: 500 }
@@ -145,6 +147,6 @@ export async function GET(request: NextRequest) {
   console.log(
     `[cron/nudge-registrations] Checked ${checked} packets, nudged ${nudged}, errors ${errors}`
   );
-
+  await recordCronRun("nudge-registrations", { checked, nudged, errors });
   return NextResponse.json({ checked, nudged, errors, timestamp: nowIso });
 }

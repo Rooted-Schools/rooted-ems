@@ -1,5 +1,6 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { NextResponse, type NextRequest } from "next/server";
+import { recordCronRun } from "@/lib/cron-heartbeat";
 import { sendEmail } from "@/lib/email";
 import { sendSms, SMS_NOT_CONFIGURED } from "@/lib/sms";
 import * as emailTemplates from "@/lib/email-templates";
@@ -169,7 +170,11 @@ export async function GET(request: NextRequest) {
         results.reminders_24h.errors + results.reminders_2h.errors + results.followups.errors
       }`
   );
-
+  await recordCronRun("event-followups", {
+    reminders_24h_sent: results.reminders_24h.sent,
+    reminders_2h_sent: results.reminders_2h.sent,
+    followups_sent: results.followups.sent,
+  });
   return NextResponse.json({ ...results, timestamp: nowIso });
 }
 

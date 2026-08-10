@@ -1,5 +1,14 @@
 # Rooted EMS — Red-Team Remediation Handoff
 
+> ## ✅ VERIFICATION RESULTS — 2026-08-10
+> Run directly against production (project `rooted-ems`, read-only object-level checks):
+>
+> - **Section 1 (migration 00039): APPLIED.** `trg_protect_is_staff` exists, `profile_own_update` has its WITH CHECK, `audit_event` has zero insert policies, storage staff-read policy is re-keyed to `user_campus_role`. Migrations **00035–00044 are ALL applied** (verified by object existence, not the ledger).
+> - **Section 2 (bucket): PASS.** `documents` bucket is **private**.
+> - **Section 3 (data state): CLEAN.** 0 staff without campus roles; 0 orphaned waitlist promotions (no families were dropped by the old broken cron); packet requirements populated (36 per campus, 2026-27); all three campus reply-to emails set. **Open: still exactly 1 system_admin** — the single-point-of-failure decision remains with Steven.
+> - **Journey engine ("Push to Apply" 7/0/0): NOT frozen — genuinely waiting.** 7 active enrollments, zero overdue; the earliest step comes due 2026-08-11 19:29 UTC, so the first sends should go out with the 2026-08-12 16:30 UTC cron run. No journey step, offer reminder, or registration nudge has ever left a DB trace — consistent with "nothing due yet," but cron liveness itself is still unproven until the first heartbeat stamps land (PR #20) or a Vercel invocation log is checked.
+> - **Still outside DB reach: Sections 4–6** (Vercel env vars incl. `CRON_SECRET`, Twilio webhook, governance decisions).
+
 **For:** a Claude session with access to the Rooted EMS production Supabase project (and ideally the Vercel + Twilio dashboards).
 **From:** the 2026-08-06 full red team + fix wave (see PR "fix/notification-context-and-nudge-ux" and commit history).
 **Context:** Rooted EMS is the production enrollment system at enroll.rootedschool.org for Rooted School Foundation (charter network; minor-student PII). A four-dimension red team (functional, security, UX, operability) found ~60 issues. Everything fixable in code was fixed and is in the PR. This file is the remainder: actions that need database access, dashboard access, or a human decision. Work top to bottom — the order is by risk.

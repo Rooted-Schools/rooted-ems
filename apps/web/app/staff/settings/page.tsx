@@ -8,6 +8,8 @@ import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/l
 import { isSmsConfigured } from "@/lib/sms";
 import { isEmailConfigured } from "@/lib/email";
 import { ChannelStatus } from "./_components/channel-status";
+import { AutomationHealth } from "./_components/automation-health";
+import { getAutomationHealth, getOverdueJourneySteps } from "@/lib/queries/automation-health";
 
 export default async function StaffSettingsPage({
   searchParams,
@@ -19,7 +21,17 @@ export default async function StaffSettingsPage({
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const supabase = createServiceRoleClient();
 
-  const [allCampuses, windows, users, { data: schoolYears }, packetRequirements, { data: gradeLevels }, { data: settings }] = await Promise.all([
+  const [
+    allCampuses,
+    windows,
+    users,
+    { data: schoolYears },
+    packetRequirements,
+    { data: gradeLevels },
+    { data: settings },
+    automationHealth,
+    overdueJourneySteps,
+  ] = await Promise.all([
     getCampuses(),
     getStaffEnrollmentWindows(activeCampus),
     getStaffUsers(activeCampus),
@@ -27,6 +39,8 @@ export default async function StaffSettingsPage({
     getStaffPacketRequirements(),
     supabase.from("grade_level").select("id, grade, campus_id").order("grade"),
     supabase.from("setting").select("key, value").limit(50),
+    getAutomationHealth(),
+    getOverdueJourneySteps(),
   ]);
 
   // Scope campuses to accessible ones
@@ -39,6 +53,10 @@ export default async function StaffSettingsPage({
       <ChannelStatus
         emailConfigured={isEmailConfigured()}
         smsConfigured={isSmsConfigured()}
+      />
+      <AutomationHealth
+        rows={automationHealth}
+        overdueJourneySteps={overdueJourneySteps}
       />
       <SettingsClient
       campuses={campuses}

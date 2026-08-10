@@ -1,5 +1,6 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { NextResponse, type NextRequest } from "next/server";
+import { recordCronRun } from "@/lib/cron-heartbeat";
 import { notifyFamilyOfferExpiringSoon } from "@/lib/notify";
 
 /**
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest) {
 
   if (fetchErr) {
     console.error("[cron/offer-reminders] fetch", fetchErr.message);
+    await recordCronRun("offer-reminders", undefined, true);
     return NextResponse.json(
       { error: "Failed to fetch expiring offers." },
       { status: 500 }
@@ -105,6 +107,6 @@ export async function GET(request: NextRequest) {
   console.log(
     `[cron/offer-reminders] Checked ${checked} offers, reminded ${reminded}, errors ${errors}`
   );
-
+  await recordCronRun("offer-reminders", { checked, reminded, errors });
   return NextResponse.json({ checked, reminded, errors, timestamp: nowIso });
 }

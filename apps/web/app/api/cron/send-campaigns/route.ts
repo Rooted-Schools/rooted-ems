@@ -1,5 +1,6 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { NextResponse, type NextRequest } from "next/server";
+import { recordCronRun } from "@/lib/cron-heartbeat";
 import { sendEmail } from "@/lib/email";
 import {
   renderCampaignEmail,
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest) {
 
   if (fetchErr) {
     console.error("[cron/send-campaigns] fetch", fetchErr.message);
+    await recordCronRun("send-campaigns", undefined, true);
     return NextResponse.json({ error: "Failed to fetch campaigns." }, { status: 500 });
   }
 
@@ -165,6 +167,6 @@ export async function GET(request: NextRequest) {
     `[cron/send-campaigns] sent ${totalSent}, failed ${totalFailed}`,
     perCampaign
   );
-
+  await recordCronRun("send-campaigns", { sent: totalSent, failed: totalFailed });
   return NextResponse.json({ sent: totalSent, failed: totalFailed, perCampaign, timestamp: nowIso });
 }

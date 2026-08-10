@@ -8,6 +8,7 @@ import {
   type CampaignTemplateKey,
 } from "@/lib/email-templates";
 import { getSuppressedEmails, unsubscribeUrl } from "@/lib/email-compliance";
+import { recordCronRun } from "@/lib/cron-heartbeat";
 
 /**
  * Journey engine daily runner (LG-2). Advances every active enrollment whose
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     console.error("[cron/run-journeys] fetch", error.message);
+    await recordCronRun("run-journeys", undefined, true);
     return NextResponse.json({ error: "Failed to fetch enrollments." }, { status: 500 });
   }
 
@@ -158,5 +160,6 @@ export async function GET(request: NextRequest) {
   }
 
   console.log(`[cron/run-journeys] sent ${sent}, completed ${completed}, exited ${exited}`);
+  await recordCronRun("run-journeys", { sent, completed, exited });
   return NextResponse.json({ sent, completed, exited, timestamp: nowIso });
 }

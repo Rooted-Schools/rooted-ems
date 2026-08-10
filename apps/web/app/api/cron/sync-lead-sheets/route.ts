@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { recordCronRun } from "@/lib/cron-heartbeat";
 import { syncLeadSheets } from "@/lib/lead-sync";
 import { syncTablingEvents } from "@/lib/event-sync";
 
@@ -28,6 +29,15 @@ export async function GET(request: NextRequest) {
       `tabling: confirmed ${tabling.confirmed}, added ${tabling.added}, updated ${tabling.updated}`,
     [...summary.errors.slice(0, 3), ...tabling.errors.slice(0, 3)]
   );
-
+  await recordCronRun("sync-lead-sheets", {
+    leads_checked: summary.checked,
+    leads_added: summary.added,
+    leads_welcomed: summary.welcomed,
+    leads_updated: summary.updated,
+    leads_duplicates: summary.duplicates,
+    tabling_confirmed: tabling.confirmed,
+    tabling_added: tabling.added,
+    tabling_updated: tabling.updated,
+  });
   return NextResponse.json({ leads: summary, tabling, timestamp: new Date().toISOString() });
 }

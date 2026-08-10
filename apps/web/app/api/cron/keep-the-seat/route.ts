@@ -1,5 +1,6 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { NextResponse, type NextRequest } from "next/server";
+import { recordCronRun } from "@/lib/cron-heartbeat";
 import { notifyFamilyKeepTheSeat } from "@/lib/notify";
 
 /**
@@ -119,6 +120,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ skipped: "migration 00041 not applied" }, { status: 200 });
     }
     console.error("[cron/keep-the-seat] fetch", fetchErr.message);
+    await recordCronRun("keep-the-seat", undefined, true);
     return NextResponse.json({ error: "Failed to fetch completed packets." }, { status: 500 });
   }
 
@@ -203,6 +205,6 @@ export async function GET(request: NextRequest) {
   }
 
   console.log(`[cron/keep-the-seat] Checked ${checked} completed packets, sent ${sent}, errors ${errors}`);
-
+  await recordCronRun("keep-the-seat", { checked, sent, errors });
   return NextResponse.json({ checked, sent, errors, timestamp: nowIso });
 }
