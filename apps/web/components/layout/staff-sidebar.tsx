@@ -25,7 +25,8 @@ type IconName =
   | "messages"
   | "insights"
   | "settings"
-  | "team";
+  | "team"
+  | "feedback";
 
 /** Which live badge (if any) a nav item can carry. Badges only render when the
  *  corresponding count prop is passed in — no badge is invented without real data. */
@@ -91,6 +92,7 @@ export const NAV_SECTIONS: NavSection[] = [
 
 /** Settings + Team stay pinned at the bottom of the rail, visually separated. */
 export const PINNED_NAV_ITEMS: NavItem[] = [
+  { label: "Pilot feedback", href: "/staff/feedback", icon: "feedback" },
   { label: "Team", href: "/staff/team", icon: "team", minRole: "system_admin" },
   { label: "Settings", href: "/staff/settings", icon: "settings", minRole: "enrollment_manager" },
 ];
@@ -196,6 +198,15 @@ function NavIcon({ name }: { name: IconName }) {
           <circle cx="9" cy="7" r="4" />
           <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
           <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      );
+    case "feedback":
+      // Message square with a plus — pilot feedback
+      return (
+        <svg {...common}>
+          <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          <path d="M12 7v6" />
+          <path d="M9 10h6" />
         </svg>
       );
     default:
