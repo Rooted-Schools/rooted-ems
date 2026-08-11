@@ -21,6 +21,24 @@ export default async function StaffSettingsPage({
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
   const supabase = createServiceRoleClient();
 
+  // Capacity plans, scoped to accessible campuses — feeds the Settings
+  // Capacity Plans card's inline seat-total editing (mirrors /staff/seats).
+  let capacityPlanQuery = supabase
+    .from("capacity_plan")
+    .select(
+      `
+      id, total_seats, campus_id, grade_level_id, school_year_id,
+      campus:campus_id (name),
+      grade_level:grade_level_id (grade),
+      school_year:school_year_id (name)
+    `
+    )
+    .order("campus_id")
+    .order("grade_level_id");
+  if (accessibleIds.length > 0) {
+    capacityPlanQuery = capacityPlanQuery.in("campus_id", accessibleIds);
+  }
+
   const [
     allCampuses,
     windows,
@@ -31,6 +49,7 @@ export default async function StaffSettingsPage({
     { data: settings },
     automationHealth,
     overdueJourneySteps,
+    { data: capacityPlans },
   ] = await Promise.all([
     getCampuses(),
     getStaffEnrollmentWindows(activeCampus),
@@ -41,6 +60,7 @@ export default async function StaffSettingsPage({
     supabase.from("setting").select("key, value").limit(50),
     getAutomationHealth(),
     getOverdueJourneySteps(),
+    capacityPlanQuery,
   ]);
 
   // Scope campuses to accessible ones
@@ -76,6 +96,21 @@ export default async function StaffSettingsPage({
         campus_id: g.campus_id as string,
         school_year_id: g.school_year_id as string,
       }))}
+      capacityPlans={(capacityPlans ?? []).map((p: Record<string, unknown>) => {
+        const campus = p.campus as Record<string, string> | null;
+        const grade = p.grade_level as Record<string, string> | null;
+        const schoolYear = p.school_year as Record<string, string> | null;
+        return {
+          id: p.id as string,
+          campus_id: p.campus_id as string,
+          campus_name: campus?.name ?? "",
+          grade_level_id: p.grade_level_id as string,
+          grade: grade?.grade ?? "",
+          school_year_id: p.school_year_id as string,
+          school_year_name: schoolYear?.name ?? "",
+          total_seats: (p.total_seats as number) ?? 0,
+        };
+      })}
       systemSettings={Object.fromEntries(
         (settings ?? []).map((s: Record<string, string>) => [s.key, s.value])
       )}

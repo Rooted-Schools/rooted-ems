@@ -117,7 +117,11 @@ export interface EnrollmentWindowRow {
   name: string;
   open_date: string;
   close_date: string;
+  /** Raw ISO timestamps, for populating an edit form's date inputs — open_date/close_date above are display-formatted. */
+  open_date_iso: string;
+  close_date_iso: string;
   status: string;
+  campus_name: string;
 }
 
 export interface StaffUserRow {
@@ -1079,7 +1083,7 @@ export async function getStaffEnrollmentWindows(
 
   let query = supabase
     .from("enrollment_window")
-    .select("id, name, open_date, close_date, status")
+    .select("id, name, open_date, close_date, status, campus:campus_id (name)")
     .order("open_date", { ascending: false });
 
   if (campusId) {
@@ -1093,21 +1097,27 @@ export async function getStaffEnrollmentWindows(
     return [];
   }
 
-  return (data ?? []).map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    name: (row.name as string) ?? "",
-    open_date: new Date(row.open_date as string).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }),
-    close_date: new Date(row.close_date as string).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }),
-    status: row.status as string,
-  }));
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const campus = row.campus as Record<string, string> | null;
+    return {
+      id: row.id as string,
+      name: (row.name as string) ?? "",
+      open_date: new Date(row.open_date as string).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }),
+      close_date: new Date(row.close_date as string).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }),
+      open_date_iso: row.open_date as string,
+      close_date_iso: row.close_date as string,
+      status: row.status as string,
+      campus_name: campus?.name ?? "",
+    };
+  });
 }
 
 // ─── Work Queue Types ──────────────────────────────────

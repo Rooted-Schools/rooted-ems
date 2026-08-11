@@ -5,6 +5,7 @@ import { requireMinRole } from "@/lib/auth/get-session";
 import {
   createEnrollmentWindow,
   updateEnrollmentWindowStatus,
+  updateEnrollmentWindow,
   assignStaffRole,
   editStaffRole,
   removeStaffRole,
@@ -16,6 +17,7 @@ import {
   deleteGradeLevel,
   createCapacityPlan,
   type CreateEnrollmentWindowInput,
+  type UpdateEnrollmentWindowInput,
   type AssignStaffRoleInput,
   type CreateSchoolYearInput,
   type CreateGradeLevelInput,
@@ -44,6 +46,18 @@ export async function staffUpdateWindowStatus(
 ) {
   await requireMinRole("enrollment_manager");
   const result = await updateEnrollmentWindowStatus(windowId, status);
+  if (!result.error) {
+    revalidatePath("/staff/settings");
+  }
+  return result;
+}
+
+export async function staffUpdateEnrollmentWindow(
+  windowId: string,
+  input: UpdateEnrollmentWindowInput
+) {
+  await requireMinRole("enrollment_manager");
+  const result = await updateEnrollmentWindow(windowId, input);
   if (!result.error) {
     revalidatePath("/staff/settings");
   }
