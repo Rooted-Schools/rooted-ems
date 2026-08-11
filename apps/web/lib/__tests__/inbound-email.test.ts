@@ -320,7 +320,7 @@ describe("handleInboundEmail — matching", () => {
 
     expect(outcome).toMatchObject({ matched: "none", notified: true, forwarded: false });
     expect(sendNotificationMock).toHaveBeenCalledWith(
-      expect.objectContaining({ link: "/staff/messages" })
+      expect.objectContaining({ link: "/staff/communications/inbound" })
     );
     // Still recorded, unattributed, rather than dropped.
     expect(supabaseMock.writes("inbound_email")[0].payload).toMatchObject({
