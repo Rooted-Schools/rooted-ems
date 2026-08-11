@@ -1091,6 +1091,150 @@ export async function getStaffCommunications(campusIds?: string[]): Promise<{
   return { messages, stats };
 }
 
+// ─── Inbound Email ──────────────────────────────────────
+
+export interface InboundEmailRow {
+  id: string;
+  from_email: string;
+  to_email: string | null;
+  subject: string | null;
+  body_text: string | null;
+  received_at: string;
+  forwarded_at: string | null;
+  campus_id: string | null;
+  campus_name: string | null;
+  matched: "guardian" | "lead" | "none";
+  family_name: string | null;
+  /** /staff/applications/{id} for a matched guardian, /staff/recruitment/{id}
+   *  for a matched lead, null when unmatched or the matched guardian has no
+   *  application on file yet. */
+  family_link: string | null;
+}
+
+/**
+ * Read-only feed of everything stored in inbound_email (migration 00046) —
+ * the surface staff actually need after lib/inbound-email.ts's unmatched
+ * notification link was pointing at /staff/messages, a route with nothing
+ * to open. inbound_email's own RLS policy is deliberately network-wide
+ * (an unmatched reply has no campus to scope to), so the campus scoping a
+ * real staff view needs happens here in app code — service role on purpose,
+ * same reasoning as getStaffWorkQueue.
+ *
+ * accessibleCampusIds: from getAccessibleCampusIds(session). An empty array
+ * means org-wide access (system_admin with no scoped campus rows) — every
+ * row is returned regardless of includeUnmatched.
+ * includeUnmatched: whether campus_id IS NULL rows (nobody matched, or a
+ * matched guardian whose application had no campus yet) are visible to this
+ * caller. Org-wide callers always see them; scoped staff only when they hold
+ * system_admin on at least one of their campuses.
+ */
+export async function getInboundEmails(
+  accessibleCampusIds: string[],
+  includeUnmatched: boolean
+): Promise<InboundEmailRow[]> {
+  if (accessibleCampusIds.length === 0 && !includeUnmatched) {
+    // Contract says empty accessibleCampusIds is always org-wide (and org-wide
+    // always includes unmatched) — this combination shouldn't occur from the
+    // page, but showing nothing is the safe fallback rather than everything.
+    return [];
+  }
+
+  const supabase = createServiceRoleClient();
+
+  let query = supabase
+    .from("inbound_email")
+    .select(
+      `
+      id, from_email, to_email, subject, body_text, received_at, forwarded_at, campus_id,
+      lead:matched_lead_id ( id, first_name, last_name ),
+      guardian:matched_guardian_id ( id, first_name, last_name ),
+      campus:campus_id ( name )
+    `
+    )
+    .order("received_at", { ascending: false })
+    .limit(100);
+
+  if (accessibleCampusIds.length > 0) {
+    query = includeUnmatched
+      ? query.or(`campus_id.in.(${accessibleCampusIds.join(",")}),campus_id.is.null`)
+      : query.in("campus_id", accessibleCampusIds);
+  }
+  // else: accessibleCampusIds is empty and includeUnmatched is true (org-wide) — no filter.
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("[getInboundEmails]", error.message);
+    return [];
+  }
+
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+
+  // Batch-resolve each matched guardian's latest application, the same
+  // record lib/inbound-email.ts attaches the reply to as an internal note —
+  // that's the family record to link to, since there's no standalone
+  // guardian detail page.
+  const guardianIds = Array.from(
+    new Set(
+      rows
+        .map((r) => (r.guardian as { id?: string } | null)?.id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+  const guardianLatestAppId = new Map<string, string>();
+  if (guardianIds.length > 0) {
+    const { data: apps, error: appsError } = await supabase
+      .from("application")
+      .select("id, guardian_id, created_at")
+      .in("guardian_id", guardianIds)
+      .order("created_at", { ascending: false });
+    if (appsError) {
+      console.error("[getInboundEmails] application lookup failed", appsError.message);
+    } else {
+      for (const app of (apps ?? []) as Array<{ id: string; guardian_id: string }>) {
+        if (!guardianLatestAppId.has(app.guardian_id)) {
+          guardianLatestAppId.set(app.guardian_id, app.id);
+        }
+      }
+    }
+  }
+
+  return rows.map((row) => {
+    const lead = row.lead as { id?: string; first_name?: string; last_name?: string } | null;
+    const guardian = row.guardian as { id?: string; first_name?: string; last_name?: string } | null;
+    const campus = row.campus as { name?: string } | null;
+
+    let matched: InboundEmailRow["matched"] = "none";
+    let familyName: string | null = null;
+    let familyLink: string | null = null;
+
+    if (guardian?.id) {
+      matched = "guardian";
+      familyName = [guardian.first_name, guardian.last_name].filter(Boolean).join(" ") || null;
+      const appId = guardianLatestAppId.get(guardian.id);
+      familyLink = appId ? `/staff/applications/${appId}` : null;
+    } else if (lead?.id) {
+      matched = "lead";
+      familyName = [lead.first_name, lead.last_name].filter(Boolean).join(" ") || null;
+      familyLink = `/staff/recruitment/${lead.id}`;
+    }
+
+    return {
+      id: row.id as string,
+      from_email: row.from_email as string,
+      to_email: (row.to_email as string) ?? null,
+      subject: (row.subject as string) ?? null,
+      body_text: (row.body_text as string) ?? null,
+      received_at: row.received_at as string,
+      forwarded_at: (row.forwarded_at as string) ?? null,
+      campus_id: (row.campus_id as string) ?? null,
+      campus_name: campus?.name ?? null,
+      matched,
+      family_name: familyName,
+      family_link: familyLink,
+    };
+  });
+}
+
 // ─── Settings Queries ───────────────────────────────────
 
 export async function getStaffEnrollmentWindows(

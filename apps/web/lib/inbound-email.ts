@@ -605,7 +605,7 @@ async function notifySystemAdmins({
     channel: "in_app",
     subject,
     body,
-    link: "/staff/messages",
+    link: "/staff/communications/inbound",
   });
   if (result.error) {
     console.error("[handleInboundEmail] system_admin notification failed", result.error);
