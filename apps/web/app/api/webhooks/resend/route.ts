@@ -8,7 +8,8 @@ import type { createServiceRoleClient } from "@rooted-ems/database/server";
 type ServiceRoleClient = ReturnType<typeof createServiceRoleClient>;
 
 /**
- * Resend webhook receiver (LG-0.1 + LG-2 engagement, migration 00045).
+ * Resend webhook receiver (LG-0.1 + LG-2 engagement, migration 00045;
+ * two-way email, migration 00046).
  *
  * Handles delivery-health events — email.bounced and email.complained go
  * straight to the suppression list so no bulk sender ever emails that
@@ -23,6 +24,18 @@ type ServiceRoleClient = ReturnType<typeof createServiceRoleClient>;
  * family timeline and journey roster. Entirely graceful when migration 00045
  * hasn't been applied yet, or when the id doesn't match any row (unknown ids
  * are ignored, never a 500 — Resend would just retry into the same no-op).
+ *
+ * Also handles email.received (inbound — 00046): a family replying to any
+ * system email that carried INBOUND_REPLY_ADDRESS as its Reply-To. Built
+ * against Resend's documented inbound receiving feature — see the header
+ * comment in lib/inbound-email.ts for the doc URLs and the exact assumed
+ * payload shape. IMPORTANT: per Resend's docs, the email.received webhook
+ * event carries metadata only (from/to/subject/email_id), not the body — the
+ * body is fetched separately via GET /emails/receiving/{email_id}
+ * (fetchReceivedEmailBody in lib/inbound-email.ts) before handleInboundEmail
+ * is called. Verified with the SAME Svix signature check as every other
+ * event on this endpoint — Resend does not document a separate endpoint or
+ * verification scheme for inbound, so no new endpoint was added.
  *
  * Security: Resend signs webhooks with the Svix scheme. Verification is
  * implemented dependency-free below. Env-gated on RESEND_WEBHOOK_SECRET —
@@ -155,7 +168,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Stale timestamp" }, { status: 401 });
   }
 
-  let event: { type?: string; data?: { to?: string[]; bounce?: { subType?: string }; email_id?: string } };
+  let event: {
+    type?: string;
+    data?: {
+      to?: string[];
+      bounce?: { subType?: string };
+      email_id?: string;
+      // email.received (00046) — tolerant of whatever else Resend sends;
+      // unknown fields are simply never read.
+      from?: string;
+      subject?: string;
+      message_id?: string;
+    };
+  };
   try {
     event = JSON.parse(payload);
   } catch {
@@ -163,6 +188,32 @@ export async function POST(request: NextRequest) {
   }
 
   const recipients = event.data?.to ?? [];
+
+  if (event.type === "email.received") {
+    // Malformed/incomplete payload → acknowledge, do nothing. A family
+    // reply we can't even identify a sender for isn't safe to guess at.
+    const from = event.data?.from;
+    if (!from) return NextResponse.json({ ok: true });
+
+    const { handleInboundEmail, fetchReceivedEmailBody } = await import("@/lib/inbound-email");
+    const emailId = event.data?.email_id;
+    const text = emailId ? await fetchReceivedEmailBody(emailId) : null;
+
+    try {
+      await handleInboundEmail({
+        fromEmail: from,
+        toEmail: recipients[0],
+        subject: event.data?.subject,
+        text: text ?? undefined,
+        providerId: emailId ?? event.data?.message_id,
+      });
+    } catch (err) {
+      // handleInboundEmail already never throws, but belt-and-braces so a
+      // truly unexpected failure still returns 200 rather than a retry storm.
+      console.error("[webhooks/resend] email.received handler failed", err);
+    }
+    return NextResponse.json({ ok: true });
+  }
 
   // LG-2 engagement tracking: opens/clicks land on the lead so journeys and
   // the lead detail reflect real interest.

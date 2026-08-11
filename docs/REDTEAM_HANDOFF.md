@@ -71,6 +71,66 @@ Read the migration's header comment before treating "opened" as a real
 metric — Apple Mail Privacy Protection inflates it toward 100% on an
 iOS-heavy list; clicks are the reliable signal.
 
+### Two-way email (00046)
+
+File: `supabase/migrations/00046_inbound_email.sql`. Adds `inbound_email` so
+a parent replying to any system email lands on the family's timeline, alerts
+campus staff in-app, and still reaches a human (a full copy forwards to the
+campus's real inbox with the parent's address as the forward's Reply-To).
+Handled in `lib/inbound-email.ts`, wired into the existing Resend webhook
+(`app/api/webhooks/resend/route.ts`, `email.received` event). Purely
+additive plus one constraint loosening (`note.created_by` becomes nullable,
+for system-authored notes — see the migration's own comment); every
+reader/writer degrades gracefully when this table doesn't exist yet, so
+applying it is not urgent, but **nothing in this feature does anything at
+all** until every step below is done — until then, current behavior (Reply-To
+= campus inbox, no inbound capture) is untouched, exactly as before.
+
+Owner's setup steps, in order, from Resend's documented inbound-receiving
+flow (resend.com/docs/dashboard/receiving/introduction and
+resend.com/docs/dashboard/webhooks/introduction):
+
+1. **Apply this migration** (same paste-into-SQL-Editor process as Section 1).
+2. **Enable inbound receiving in Resend** — Resend dashboard → Emails → your
+   sending domain → **Receiving** tab.
+   - Fastest path (no DNS work): click the three-dot menu → **Receiving
+     address** to get a Resend-managed address like
+     `<anything>@<id>.resend.app`. Fine for a pilot; every reply comes back
+     as `something@<id>.resend.app`, which is fine since only the `From`
+     matters to this app, not the receiving alias.
+   - Real path (recommended for production): add the **MX record** Resend
+     shows you to the domain or subdomain you want receiving email at (e.g.
+     `reply.rootedschool.org`). Once that MX record resolves, Resend
+     receives mail for **any** address at that domain/subdomain — pick one
+     specific address for INBOUND_REPLY_ADDRESS (step 3) rather than a
+     shared catch-all.
+3. **Set `INBOUND_REPLY_ADDRESS` in Vercel** (Settings → Environment
+   Variables → Production) to the address you just enabled receiving for
+   (e.g. `inbound@reply.rootedschool.org`, or the `Name <addr>` form).
+   Leaving this unset keeps current behavior — do this last, after the
+   webhook subscription below is confirmed live, so there's no gap where
+   family replies go to an address nothing is listening to yet.
+4. **Subscribe the webhook to `email.received`** — Resend dashboard →
+   Webhooks → the existing endpoint already receiving
+   `email.bounced`/`email.complained`/`email.delivered`/`email.opened`/
+   `email.clicked` for `https://enroll.rootedschool.org/api/webhooks/resend`
+   → add the `email.received` event to that same subscription (no new
+   endpoint or secret needed — same Svix signature, same
+   `RESEND_WEBHOOK_SECRET`).
+5. **Verify end-to-end**: send yourself a system email that carries a campus
+   Reply-To (any family-facing notification once step 3 is live), reply to
+   it from a personal inbox, and confirm within a minute or two that (a) the
+   reply appears on the matching lead/application timeline, (b) a staff
+   in-app notification fired, and (c) the campus inbox received the
+   forwarded copy with the personal address as its Reply-To.
+
+```sql
+-- Confirm replies are landing once live:
+SELECT from_email, subject, matched_lead_id, matched_guardian_id,
+       campus_id, forwarded_at, received_at
+FROM inbound_email ORDER BY received_at DESC LIMIT 10;
+```
+
 ## 2. VERIFY THE DOCUMENTS BUCKET IS PRIVATE
 
 The repo never creates the bucket, so its visibility was set in the dashboard and could not be verified from the code side. If it is public, every uploaded family document (birth certificates, custody orders, IEPs) is fetchable by URL with no auth at all.
