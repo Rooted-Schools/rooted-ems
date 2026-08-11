@@ -130,6 +130,7 @@ export async function GET(request: NextRequest) {
           "List-Unsubscribe": `<${unsub}>`,
           "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
         },
+        meta: { leadId: recipient.lead_id as string, kind: "campaign" },
       });
 
       if (result.ok) {

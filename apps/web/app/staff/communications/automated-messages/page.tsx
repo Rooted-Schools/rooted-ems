@@ -1,6 +1,7 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { requireStaffSession } from "@/lib/auth/get-session";
 import { IconMail, IconPhone, IconBell, IconAlertTriangle } from "@/components/ui/icons";
 import {
@@ -10,6 +11,7 @@ import {
   type MessageChannel,
 } from "@/lib/automated-messages";
 import { isWelcomeMessagingEnabled } from "@/lib/messaging-flags";
+import { getPausedJourneyCount } from "@/lib/queries/journeys";
 
 /**
  * Read-only catalog of every automated family-facing message the system
@@ -21,6 +23,7 @@ import { isWelcomeMessagingEnabled } from "@/lib/messaging-flags";
 export default async function AutomatedMessagesPage() {
   await requireStaffSession();
   const welcomeMessagingEnabled = await isWelcomeMessagingEnabled();
+  const pausedJourneyCount = await getPausedJourneyCount();
 
   const groups = FUNNEL_STAGE_ORDER.map((stage) => ({
     stage,
@@ -67,6 +70,16 @@ export default async function AutomatedMessagesPage() {
             <p className="flex items-center gap-1.5 rounded-[6px] border border-warn/30 bg-warn/10 px-3 py-2 text-xs font-medium text-warn-text">
               <IconAlertTriangle size={14} aria-hidden />
               Welcome messages are currently paused in Settings.
+            </p>
+          )}
+          {stage === "Campaign building blocks" && pausedJourneyCount > 0 && (
+            <p className="flex items-center gap-1.5 rounded-[6px] border border-warn/30 bg-warn/10 px-3 py-2 text-xs font-medium text-warn-text">
+              <IconAlertTriangle size={14} aria-hidden />
+              {pausedJourneyCount} nurture journey{pausedJourneyCount === 1 ? " is" : "s are"} currently paused — no
+              sends until resumed.{" "}
+              <Link href="/staff/recruitment/journeys" className="underline">
+                Manage journeys
+              </Link>
             </p>
           )}
           <div className="space-y-3">

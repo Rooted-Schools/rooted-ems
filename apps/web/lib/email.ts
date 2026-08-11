@@ -7,6 +7,12 @@
  *
  * Rule: never throw. An email failure must never break the calling operation
  * (same rule as lib/notify.ts).
+ *
+ * Open/click tracking (00045): when a caller passes `meta`, a confirmed send
+ * is recorded in `email_event` keyed by the Resend message id, so the
+ * webhook (app/api/webhooks/resend/route.ts) can later stamp delivery/open/
+ * click against it. Requires migration 00045 — until it's applied this is a
+ * silent, once-logged no-op, same shape as the RESEND_API_KEY-absent path.
  */
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
@@ -16,6 +22,7 @@ const FROM_ADDRESS =
   process.env.EMAIL_FROM ?? "Rooted Schools Enrollment <enroll@rootedschool.org>";
 
 let warnedNotConfigured = false;
+let warnedEmailEventMissing = false;
 
 export interface SendEmailInput {
   to: string;
@@ -26,11 +33,68 @@ export interface SendEmailInput {
   replyTo?: string;
   /** Extra SMTP headers (e.g. List-Unsubscribe on bulk sends). */
   headers?: Record<string, string>;
+  /**
+   * When provided and the send is confirmed, records a row in `email_event`
+   * (migration 00045) so opens/clicks can be attributed back to a lead and a
+   * send kind. Optional and purely additive — omit for sends that don't need
+   * engagement tracking (most transactional family email).
+   */
+  meta?: {
+    leadId?: string;
+    /** 'journey_step' | 'campaign' | 'welcome' | 'reengagement' | 'one_off' */
+    kind?: string;
+  };
 }
 
 export interface SendEmailResult {
   ok: boolean;
+  /** Resend's message id, when the provider confirmed the send. */
+  id?: string;
   error?: string;
+}
+
+/** True when a Postgres error means "the table/relation doesn't exist yet". */
+function isMissingTableError(error: { code?: string; message?: string }): boolean {
+  return error.code === "42P01" || /does not exist/i.test(error.message ?? "");
+}
+
+/**
+ * Best-effort engagement record for a confirmed send. Never throws — a
+ * missing migration or a DB blip must never fail the email that already
+ * went out. Logs the "table not present" case exactly once per process.
+ */
+async function recordEmailEvent(input: {
+  resendId: string;
+  to: string;
+  subject: string;
+  leadId?: string;
+  kind?: string;
+}): Promise<void> {
+  try {
+    const { createServiceRoleClient } = await import("@rooted-ems/database/server");
+    const supabase = createServiceRoleClient();
+    const { error } = await supabase.from("email_event").insert({
+      resend_id: input.resendId,
+      to_email: input.to,
+      lead_id: input.leadId ?? null,
+      kind: input.kind ?? "one_off",
+      subject: input.subject,
+    });
+    if (error) {
+      if (isMissingTableError(error)) {
+        if (!warnedEmailEventMissing) {
+          console.debug(
+            "[sendEmail] email_event table not present — open/click tracking disabled until migration 00045 is applied"
+          );
+          warnedEmailEventMissing = true;
+        }
+        return;
+      }
+      console.error("[sendEmail] email_event insert failed", error.message);
+    }
+  } catch (err) {
+    console.error("[sendEmail] email_event insert threw", err instanceof Error ? err.message : err);
+  }
 }
 
 /**
@@ -46,7 +110,7 @@ export function isEmailConfigured(): boolean {
  * Send a single email. Resolves `{ ok: false, error }` on any failure —
  * never throws, never rejects.
  */
-export async function sendEmail({ to, subject, html, text, replyTo, headers }: SendEmailInput): Promise<SendEmailResult> {
+export async function sendEmail({ to, subject, html, text, replyTo, headers, meta }: SendEmailInput): Promise<SendEmailResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     if (!warnedNotConfigured) {
@@ -82,7 +146,14 @@ export async function sendEmail({ to, subject, html, text, replyTo, headers }: S
       return { ok: false, error };
     }
 
-    return { ok: true };
+    const body = await response.json().catch(() => null);
+    const id = body && typeof (body as { id?: unknown }).id === "string" ? (body as { id: string }).id : undefined;
+
+    if (id && meta) {
+      await recordEmailEvent({ resendId: id, to, subject, leadId: meta.leadId, kind: meta.kind });
+    }
+
+    return { ok: true, id };
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
     console.error("[sendEmail] request failed", error, { to, subject });

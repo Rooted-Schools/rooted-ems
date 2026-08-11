@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     .from("journey_enrollment")
     .select(
       `id, journey_id, lead_id, current_step,
-       journey:journey_id (name),
+       journey:journey_id (name, is_active),
        lead:lead_id (email, unsubscribed_at, unsubscribe_token, campus_id, first_name, application_id, campus:campus_id (name, email))`
     )
     .eq("status", "active")
@@ -65,8 +65,20 @@ export async function GET(request: NextRequest) {
   let sent = 0;
   let completed = 0;
   let exited = 0;
+  let paused = 0;
 
   for (const enr of due ?? []) {
+    const journeyMeta = enr.journey as unknown as { name?: string; is_active?: boolean } | null;
+
+    // Paused journey: skip without exiting. next_step_at is left exactly
+    // where it is, so the moment someone resumes the journey, this
+    // enrollment is due again on the very next run — nothing is lost, and
+    // the family is never marked exited just because staff hit Pause.
+    if (journeyMeta?.is_active === false) {
+      paused++;
+      continue;
+    }
+
     const lead = enr.lead as unknown as {
       email: string | null;
       unsubscribed_at: string | null;
@@ -120,6 +132,7 @@ export async function GET(request: NextRequest) {
         "List-Unsubscribe": `<${unsub}>`,
         "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       },
+      meta: { leadId: enr.lead_id as string, kind: "journey_step" },
     });
 
     if (!result.ok) {
@@ -148,7 +161,7 @@ export async function GET(request: NextRequest) {
     }
     await supabase.from("journey_enrollment").update(updates).eq("id", enr.id as string);
 
-    const journeyName = (enr.journey as unknown as { name?: string } | null)?.name ?? "journey";
+    const journeyName = journeyMeta?.name ?? "journey";
     await Promise.all([
       supabase.from("lead_activity").insert({
         lead_id: enr.lead_id as string,
@@ -159,7 +172,7 @@ export async function GET(request: NextRequest) {
     ]);
   }
 
-  console.log(`[cron/run-journeys] sent ${sent}, completed ${completed}, exited ${exited}`);
-  await recordCronRun("run-journeys", { sent, completed, exited });
-  return NextResponse.json({ sent, completed, exited, timestamp: nowIso });
+  console.log(`[cron/run-journeys] sent ${sent}, completed ${completed}, exited ${exited}, paused ${paused}`);
+  await recordCronRun("run-journeys", { sent, completed, exited, paused });
+  return NextResponse.json({ sent, completed, exited, paused, timestamp: nowIso });
 }

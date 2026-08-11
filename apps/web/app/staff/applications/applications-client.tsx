@@ -428,22 +428,24 @@ export function StaffApplicationsClient({
                 }}
               />
             </div>
-            <Select
-              value={campusFilter}
-              onChange={(e) => {
-                const v = e.target.value;
-                setCampusFilter(v);
-                pushFilters({ campus: v });
-              }}
-              className="w-full sm:w-48"
-            >
-              <option value="all">All Campuses</option>
-              {campuses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
+            {campuses.length > 1 && (
+              <Select
+                value={campusFilter}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setCampusFilter(v);
+                  pushFilters({ campus: v });
+                }}
+                className="w-full sm:w-48"
+              >
+                <option value="all">All Campuses</option>
+                {campuses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </Select>
+            )}
           </div>
         </CardContent>
       </Card>

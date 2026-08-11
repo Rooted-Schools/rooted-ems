@@ -21,7 +21,13 @@ export interface AddToWaitlistInput {
 export async function addToWaitlist(
   input: AddToWaitlistInput
 ): Promise<MutationResult<{ id: string }>> {
-  const supabase = await createServerClient();
+  // Service role on purpose: called only from staff-gated paths (the
+  // manual waitlist-add action, and completeLotteryResults which is itself
+  // gated behind requireRoleOnCampus). Updates `application` directly, which
+  // trips the same latent RLS recursion (application policy -> guardian
+  // policy -> application policy) documented in
+  // lib/queries/recruitment-intel.ts.
+  const supabase = createServiceRoleClient();
 
   const { data, error } = await supabase
     .from("waitlist_position")
@@ -215,7 +221,12 @@ export async function removeFromWaitlist(
   reason: string,
   removedBy?: string
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
+  // Service role on purpose: called only from staff-gated paths
+  // (requireStaffSession / requireRoleOnCampus in the calling actions).
+  // Updates `application` directly, which trips the same latent RLS
+  // recursion (application policy -> guardian policy -> application policy)
+  // documented in lib/queries/recruitment-intel.ts.
+  const supabase = createServiceRoleClient();
 
   // Fetch position to get the application_id and campus before removing
   const { data: position } = await supabase

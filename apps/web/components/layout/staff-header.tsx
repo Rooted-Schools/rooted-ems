@@ -79,8 +79,12 @@ export function StaffHeader({
     router.push(qs ? `${pathname}?${qs}` : pathname);
   }
 
+  // Single-campus staff never see "All Campuses" — their one campus is the
+  // only possible scope, regardless of whether a ?campus= param is present.
   const selectedCampusName =
-    campuses.find((c) => c.id === selectedCampus)?.name ?? "All Campuses";
+    campuses.length === 1
+      ? campuses[0].name
+      : campuses.find((c) => c.id === selectedCampus)?.name ?? "All Campuses";
 
   return (
     <div ref={containerRef}>

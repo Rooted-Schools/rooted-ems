@@ -332,7 +332,11 @@ export interface LotteryEntrant {
 export async function getStaffLotteryDetail(
   runId: string
 ): Promise<{ run: LotteryRunDetail | null; entrants: LotteryEntrant[] }> {
-  const supabase = await createServerClient();
+  // Service role on purpose: staff-only page (requireStaffSession), scoped by
+  // runId. The entrants query joins lottery_entry -> application -> guardian,
+  // which trips the same latent RLS recursion (application policy -> guardian
+  // policy -> application policy) documented in lib/queries/recruitment-intel.ts.
+  const supabase = createServiceRoleClient();
 
   // Fetch lottery run with related data
   const { data: runData, error: runError } = await supabase
@@ -574,7 +578,11 @@ export async function getStaffLotteryReport(runId: string): Promise<{
 // ─── Offer Queries ──────────────────────────────────────
 
 export async function getStaffOffers(campusIds?: string[]): Promise<{ offers: OfferRow[]; stats: OfferStats }> {
-  const supabase = await createServerClient();
+  // Service role on purpose: staff-only page (requireStaffSession), campus-
+  // scoped by campusIds. Joins offer -> application -> student, which trips
+  // the same latent RLS recursion (application policy -> guardian policy ->
+  // application policy) documented in lib/queries/recruitment-intel.ts.
+  const supabase = createServiceRoleClient();
 
   let query = supabase
     .from("offer")
@@ -673,7 +681,12 @@ export async function getStaffWaitlist(campusIds?: string[]): Promise<{
     return { entries: [], campusCounts: [] };
   }
 
-  const supabase = await createServerClient();
+  // Service role on purpose: staff-only page (requireStaffSession), campus-
+  // scoped by the campusIds guard above. Joins waitlist_position ->
+  // application -> student, which trips the same latent RLS recursion
+  // (application policy -> guardian policy -> application policy) documented
+  // in lib/queries/recruitment-intel.ts.
+  const supabase = createServiceRoleClient();
 
   // Push campus filter into the DB query via PostgREST joined-column filter
   const { data, error } = await supabase
@@ -959,7 +972,11 @@ export async function getNotificationRecipients(
 ): Promise<
   { userId: string; name: string; email: string; status: string; campus: string; smsEligible: boolean }[]
 > {
-  const supabase = await createServerClient();
+  // Service role on purpose: staff-only page (requireStaffSession), campus-
+  // scoped by campusIds. Joins application -> guardian directly, the exact
+  // recursive pair (application policy -> guardian policy -> application
+  // policy) documented in lib/queries/recruitment-intel.ts.
+  const supabase = createServiceRoleClient();
   const hasCampusFilter = campusIds && campusIds.length > 0;
 
   // Get all families with active applications (those who have a user_profile via guardian)
@@ -1136,7 +1153,13 @@ export interface WorkQueueItem {
 // ─── Work Queue Queries ────────────────────────────────
 
 export async function getStaffWorkQueue(campusIds?: string[]): Promise<WorkQueueItem[]> {
-  const supabase = await createServerClient();
+  // Service role on purpose: staff-only, campus-scoped by campusIds. Queries
+  // application directly (several shapes below) and offer -> application ->
+  // student, which trips the same latent RLS recursion (application policy ->
+  // guardian policy -> application policy) documented in
+  // lib/queries/recruitment-intel.ts. (Currently unwired — no page calls this
+  // yet — fixed proactively so the first caller doesn't inherit a known crash.)
+  const supabase = createServiceRoleClient();
   const items: WorkQueueItem[] = [];
   const hasCampusFilter = campusIds && campusIds.length > 0;
 
@@ -1321,7 +1344,14 @@ export async function getStaffWorkQueue(campusIds?: string[]): Promise<WorkQueue
 // ─── Student Queries ───────────────────────────────────
 
 export async function getStaffStudents(campusIds?: string[]): Promise<StudentRow[]> {
-  const supabase = await createServerClient();
+  // Service role on purpose: staff-only, campus-scoped by campusIds. Joins
+  // application -> student and application -> guardian, the exact recursive
+  // pair (application policy -> guardian policy -> application policy)
+  // documented in lib/queries/recruitment-intel.ts. (Currently unwired — no
+  // page calls this yet, students/page.tsx runs its own inline service-role
+  // query — fixed proactively so the first caller doesn't inherit a known
+  // crash.)
+  const supabase = createServiceRoleClient();
 
   let query = supabase
     .from("application")

@@ -24,7 +24,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { CampaignRow, JourneyStat, LeadPipelineSummary, LeadRow } from "@/lib/queries/leads";
+import type { CampaignRow, LeadPipelineSummary, LeadRow } from "@/lib/queries/leads";
+import type { JourneySummary } from "@/lib/queries/journeys";
 import { formatRelativeTime } from "@/lib/queries/utils";
 import { IconCalendar, IconBarChart, IconLink, IconRefreshCw, IconMail, IconPhone, IconSprout, IconAlertTriangle } from "@/components/ui/icons";
 import { staffCancelCampaign, staffCreateLead, staffSyncLeadSheets } from "./actions";
@@ -87,7 +88,7 @@ interface RecruitmentClientProps {
   summary: LeadPipelineSummary;
   leads: LeadRow[];
   campaigns: CampaignRow[];
-  journeys: JourneyStat[];
+  journeys: JourneySummary[];
   campuses: { id: string; name: string; short_code: string }[];
   /** Campus filter from ?campus= — "all" when viewing every campus. */
   activeCampusId: string;
@@ -340,21 +341,46 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
       {journeys.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-1.5"><IconSprout size={16} /> Nurture journeys</CardTitle>
-            <CardDescription>
-              Automated email sequences that run themselves — and stop the moment a family applies, RSVPs, or you log a call.
-            </CardDescription>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <CardTitle className="text-base flex items-center gap-1.5"><IconSprout size={16} /> Nurture journeys</CardTitle>
+                <CardDescription>
+                  Automated email sequences that run themselves — and stop the moment a family applies, RSVPs, or you log a call.
+                </CardDescription>
+              </div>
+              <Link
+                href={activeCampusId === "all" ? "/staff/recruitment/journeys" : `/staff/recruitment/journeys?campus=${activeCampusId}`}
+                className="text-sm text-rooted-green hover:underline whitespace-nowrap shrink-0"
+              >
+                Manage journeys &rarr;
+              </Link>
+            </div>
           </CardHeader>
           <CardContent className="space-y-2">
+            {journeys.some((j) => !j.is_active) && (
+              <p className="text-xs text-stone-text">
+                {journeys.filter((j) => !j.is_active).length} journey
+                {journeys.filter((j) => !j.is_active).length === 1 ? "" : "s"} currently paused — no sends until resumed.
+              </p>
+            )}
             {journeys.map((j) => (
-              <div key={j.key} className="flex items-center justify-between gap-3 rounded-lg border border-stone/15 px-3 py-2">
-                <p className="text-sm font-medium text-ink">{j.name}</p>
-                <div className="flex items-center gap-3 text-xs">
+              <Link
+                key={j.id}
+                href={`/staff/recruitment/journeys/${j.id}`}
+                className="flex items-center justify-between gap-3 rounded-lg border border-stone/15 px-3 py-2 hover:border-rooted-green/40 transition-colors"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <p className="text-sm font-medium text-ink truncate">{j.name}</p>
+                  <Badge variant={j.is_active ? "success" : "secondary"} className="shrink-0">
+                    {j.is_active ? "Active" : "Paused"}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-3 text-xs shrink-0">
                   <span className="text-rooted-green font-semibold">{j.active} active</span>
                   <span className="text-stone">{j.completed} completed</span>
                   <span className="text-stone">{j.exited} exited</span>
                 </div>
-              </div>
+              </Link>
             ))}
           </CardContent>
         </Card>

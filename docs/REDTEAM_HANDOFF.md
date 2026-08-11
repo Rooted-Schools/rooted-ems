@@ -51,6 +51,26 @@ JOIN pg_class c ON c.oid = p.polrelid
 WHERE c.relname = 'objects' AND polname = 'Staff can read all documents';
 ```
 
+### Email open tracking (00045)
+
+File: `supabase/migrations/00045_email_events.sql`. Adds `email_event`, keyed
+by the Resend message id, so journey/campaign/welcome/re-engagement sends can
+be matched back to delivery/open/click webhook events and shown on the
+journey roster and lead timeline. Purely additive; every reader/writer in the
+codebase (`lib/email.ts`, `app/api/webhooks/resend/route.ts`,
+`lib/queries/journeys.ts`) degrades gracefully when this table doesn't exist
+yet, so applying it is not urgent, but two things are both required before
+opens/clicks actually populate:
+
+1. Apply this migration (same paste-into-SQL-Editor process as Section 1).
+2. In the Resend dashboard, enable open tracking and click tracking on the
+   sending domain — Resend does not emit `email.opened` / `email.clicked`
+   webhook events at all until that's turned on.
+
+Read the migration's header comment before treating "opened" as a real
+metric — Apple Mail Privacy Protection inflates it toward 100% on an
+iOS-heavy list; clicks are the reliable signal.
+
 ## 2. VERIFY THE DOCUMENTS BUCKET IS PRIVATE
 
 The repo never creates the bucket, so its visibility was set in the dashboard and could not be verified from the code side. If it is public, every uploaded family document (birth certificates, custody orders, IEPs) is fetchable by URL with no auth at all.

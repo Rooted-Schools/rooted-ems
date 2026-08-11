@@ -1,4 +1,4 @@
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { generateLotterySeed, runDeterministicLottery } from "@rooted-ems/utils";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
 import { notifyFamilyApplicationWaitlisted, notifyFamilyOfOffer } from "@/lib/notify";
@@ -104,7 +104,7 @@ interface ResolvedRuleSet {
  * falls back to the default rather than failing a lottery.
  */
 async function resolvePriorityTiers(
-  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  supabase: Awaited<ReturnType<typeof createServerClient>> | ReturnType<typeof createServiceRoleClient>,
   campusId: string,
   ruleSetId?: string
 ): Promise<ResolvedRuleSet> {
@@ -140,7 +140,7 @@ async function resolvePriorityTiers(
  * with any matching matcher, else tiers.length (general pool).
  */
 async function assignPriorityTiers(
-  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  supabase: Awaited<ReturnType<typeof createServerClient>> | ReturnType<typeof createServiceRoleClient>,
   appIds: string[],
   tiers: PriorityTierDef[]
 ): Promise<Map<string, number>> {
@@ -190,7 +190,12 @@ async function assignPriorityTiers(
 export async function createLotteryRun(
   input: CreateLotteryRunInput
 ): Promise<MutationResult<{ id: string }>> {
-  const supabase = await createServerClient();
+  // Service role on purpose: staff-only action (staffCreateLotteryRun gates
+  // on requireRoleOnCampus for input.campus_id). Selects/updates `application`
+  // directly, which trips the same latent RLS recursion (application policy
+  // -> guardian policy -> application policy) documented in
+  // lib/queries/recruitment-intel.ts.
+  const supabase = createServiceRoleClient();
 
   // Compute the next run_number for this campus/grade
   const { data: existing } = await supabase
@@ -548,7 +553,12 @@ export async function finalizeLotteryRun(
   runId: string,
   executedBy: string
 ): Promise<MutationResult> {
-  const supabase = await createServerClient();
+  // Service role on purpose: staff-only action (staffFinalizeLottery gates on
+  // requireRoleOnCampus for the run's campus). Joins lottery_entry ->
+  // application -> student, which trips the same latent RLS recursion
+  // (application policy -> guardian policy -> application policy) documented
+  // in lib/queries/recruitment-intel.ts.
+  const supabase = createServiceRoleClient();
 
   // Verify run is in preview status
   const { data: run, error: fetchError } = await supabase
@@ -682,7 +692,12 @@ export async function sendOffersFromLottery(
   expiresAt: string,
   offeredBy: string
 ): Promise<MutationResult<{ offersCreated: number }>> {
-  const supabase = await createServerClient();
+  // Service role on purpose: staff-only action (staffSendLotteryOffers gates
+  // on requireRoleOnCampus for the run's campus). Joins lottery_entry ->
+  // application -> student and updates `application` directly, which trips
+  // the same latent RLS recursion (application policy -> guardian policy ->
+  // application policy) documented in lib/queries/recruitment-intel.ts.
+  const supabase = createServiceRoleClient();
 
   // Get the run details
   const { data: run, error: runError } = await supabase
