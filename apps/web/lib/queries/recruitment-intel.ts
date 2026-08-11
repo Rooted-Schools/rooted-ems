@@ -1,4 +1,10 @@
-import { createServerClient } from "@rooted-ems/database/server";
+// Service role on purpose: these run on staff pages that already gate with
+// requireStaffSession and pass explicit campus scope. The user-scoped client
+// trips a latent RLS recursion (application policy -> guardian policy ->
+// application policy) under certain query plans; seen live 2026-08-11 as
+// "[getGradeFunnelTable] infinite recursion detected in policy for relation
+// application". The deeper policy fix is tracked in the red-team backlog.
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 
 /**
  * Recruitment intelligence — speed-to-lead and per-grade funnel arithmetic.
@@ -68,7 +74,7 @@ export interface SpeedToContactResult {
 export async function getSpeedToFirstContactByCampus(
   campusIds?: string[]
 ): Promise<SpeedToContactResult> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   let campusQuery = supabase.from("campus").select("id, name").order("name");
   if (campusIds && campusIds.length > 0) campusQuery = campusQuery.in("id", campusIds);
@@ -216,7 +222,7 @@ export interface GradeFunnelTable {
  * applicant→enrolled conversion rate from — see the module doc comment.
  */
 export async function getGradeFunnelTable(campusIds?: string[]): Promise<GradeFunnelTable> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   const { data: currentYear, error: yearError } = await supabase
     .from("school_year")
