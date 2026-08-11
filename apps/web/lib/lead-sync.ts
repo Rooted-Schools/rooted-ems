@@ -18,6 +18,7 @@
 
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { createLeadFromInquiry } from "@/lib/mutations/leads";
+import { isWelcomeMessagingEnabled } from "@/lib/messaging-flags";
 
 const FRESH_HOURS = 72;
 const SYNC_TAG = "sheet-sync";
@@ -381,6 +382,10 @@ export async function syncLeadSheets(): Promise<SyncSummary> {
   const summary: SyncSummary = { checked: 0, added: 0, welcomed: 0, updated: 0, duplicates: 0, errors: [] };
   const now = Date.now();
   const nowIso = new Date().toISOString();
+  // Owner-facing pause switch (lib/messaging-flags.ts), read once for the
+  // whole run rather than once per fresh lead — this sync can process many
+  // leads across two campuses in a single invocation.
+  const welcomeEnabled = await isWelcomeMessagingEnabled();
 
   for (const config of SHEET_CONFIGS) {
     const { data: campusRows } = await supabase
@@ -484,6 +489,7 @@ export async function syncLeadSheets(): Promise<SyncSummary> {
               entry_grade: candidate.entry_grade,
               source: candidate.source,
               source_detail: candidate.source_detail,
+              welcomeMessagingEnabled: welcomeEnabled,
             });
             if (result.error) {
               summary.errors.push(`${candidate.email}: ${result.error}`);
@@ -495,7 +501,10 @@ export async function syncLeadSheets(): Promise<SyncSummary> {
               .update({ zip: candidate.zip ?? null, notes: candidate.notes ?? null })
               .eq("id", result.data!.id);
             summary.added++;
-            summary.welcomed++;
+            // Only count a lead as "welcomed" when the send actually fired —
+            // while the pause switch is off, the lead still lands in the
+            // pipeline (added) but got no automatic message.
+            if (welcomeEnabled) summary.welcomed++;
             existing.set(candidate.email, {
               id: result.data!.id,
               updated_at: nowIso,
