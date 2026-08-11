@@ -117,12 +117,14 @@ You'll need a `.env.local` in `apps/web/` — get this from Steven. It contains:
 
 | Campus | School Year | Grades | Status |
 |--------|------------|--------|--------|
-| C.R. Neal Academy (RSSC) | 2027-28 | 6, 9 | Active pilot |
+| C.R. Neal Academy (RSSC) | 2027-28 | 6, 9 | Active pilot (window opens 2026-10-26) |
+| Rooted Schools Cleveland (RSOH) | 2027-28 | 6, 9 | Active pilot (window opens 2026-10-26) |
 | Rooted School Vancouver (RSV) | 2026-27 | 9, 10, 11, 12 | Active pilot |
 
 ## Staff Accounts
 - `scarney@rootedschool.org` — system_admin (Steven Carney)
 - `lradney@rootedschoolcola.org` — enrollment_manager (Lalah Radney, CRN)
+- `tjones@rootedschoolcle.org` — system_admin, Cleveland (Tim Jones, RSOH)
 
 ---
 
