@@ -63,6 +63,12 @@ export function StaffMessagesClient({ messages }: StaffMessagesClientProps) {
           >
             Outbound communications &rarr;
           </Link>
+          <Link
+            href="/staff/communications/automated-messages"
+            className="inline-block text-xs text-stone hover:text-ink mt-1.5 ml-3"
+          >
+            Automated messages &rarr;
+          </Link>
         </div>
         {unreadCount > 0 && (
           <Button

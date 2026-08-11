@@ -2,6 +2,7 @@ import { createServerClient, createServiceRoleClient } from "@rooted-ems/databas
 import type { MutationResult } from "./applications";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
 import { notifyLeadWelcome, notifyStaffNewLead } from "@/lib/notify";
+import { isWelcomeMessagingEnabled } from "@/lib/messaging-flags";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -35,6 +36,14 @@ export interface CreateLeadInput {
   notes?: string;
   /** Set when this lead arrived via another family's referral link. */
   referred_by_lead_id?: string;
+  /**
+   * Precomputed welcome-messaging pause-switch value, threaded through by
+   * callers that create many leads in one run (the sheet sync) so the
+   * setting is read once per run rather than once per lead. Direct
+   * single-lead callers (public inquiry form, ad webhook) omit this and
+   * this function reads the flag itself — one query per request either way.
+   */
+  welcomeMessagingEnabled?: boolean;
 }
 
 /**
@@ -183,17 +192,28 @@ export async function createLeadFromInquiry(
   const { enrollLeadInJourney } = await import("./journeys");
   await enrollLeadInJourney(lead.id, "push_to_apply");
 
+  // Owner-facing pause switch (see lib/messaging-flags.ts): while training
+  // is underway, the welcome send is skipped but everything else in the
+  // response engine — lead creation, staff routing, the nurture journey —
+  // proceeds unchanged. Callers processing many leads in one run pass the
+  // value in; a direct single-lead caller leaves it undefined and this
+  // reads the flag itself (still one query for the request).
+  const welcomeEnabled =
+    input.welcomeMessagingEnabled ?? (await isWelcomeMessagingEnabled());
+
   // Response engine — guarded: notification failures never lose the lead.
   await Promise.all([
-    notifyLeadWelcome({
-      lead: {
-        first_name: input.first_name.trim(),
-        email: input.email?.trim() || null,
-        phone: input.phone?.trim() || null,
-        sms_consent: input.sms_consent ?? false,
-      },
-      campusId: input.campus_id,
-    }),
+    welcomeEnabled
+      ? notifyLeadWelcome({
+          lead: {
+            first_name: input.first_name.trim(),
+            email: input.email?.trim() || null,
+            phone: input.phone?.trim() || null,
+            sms_consent: input.sms_consent ?? false,
+          },
+          campusId: input.campus_id,
+        })
+      : Promise.resolve(),
     notifyStaffNewLead({
       campusId: input.campus_id,
       leadId: lead.id,

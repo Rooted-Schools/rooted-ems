@@ -831,7 +831,7 @@ export function inquiryWelcome({
       greeting: guardianFirstName ? `Hello ${guardianFirstName},` : "Hello,",
       paragraphs: [
         `Thank you for your interest in ${campusName}! We're excited to tell you more about what makes our school special — career-connected learning, real industry partnerships, and a personalized pathway for every student.`,
-        "Someone from our enrollment team will reach out personally within a day. In the meantime, you can start an application anytime — it takes just a few minutes on your phone.",
+        "Someone from our enrollment team will reach out personally soon. In the meantime, you can start an application anytime — it takes just a few minutes on your phone.",
       ],
       cta: { label: "Start an application", url: `${APP_URL}/login` },
       closing: "Warmly, the Rooted Schools Enrollment Team",
@@ -840,7 +840,7 @@ export function inquiryWelcome({
       greeting: guardianFirstName ? `Hola ${guardianFirstName},` : "Hola,",
       paragraphs: [
         `¡Gracias por su interés en ${campusName}! Nos encantaría contarle más sobre lo que hace especial a nuestra escuela — aprendizaje conectado con carreras, alianzas reales con la industria y un camino personalizado para cada estudiante.`,
-        "Alguien de nuestro equipo de inscripción se comunicará con usted personalmente dentro de un día. Mientras tanto, puede iniciar una solicitud en cualquier momento — toma solo unos minutos desde su teléfono.",
+        "Alguien de nuestro equipo de inscripción se comunicará con usted personalmente pronto. Mientras tanto, puede iniciar una solicitud en cualquier momento — toma solo unos minutos desde su teléfono.",
       ],
       cta: { label: "Iniciar una solicitud", url: `${APP_URL}/login` },
       closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",

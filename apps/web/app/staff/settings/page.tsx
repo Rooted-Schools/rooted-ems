@@ -9,7 +9,9 @@ import { isSmsConfigured } from "@/lib/sms";
 import { isEmailConfigured } from "@/lib/email";
 import { ChannelStatus } from "./_components/channel-status";
 import { AutomationHealth } from "./_components/automation-health";
+import { WelcomeMessagingToggle } from "./_components/welcome-messaging-toggle";
 import { getAutomationHealth, getOverdueJourneySteps } from "@/lib/queries/automation-health";
+import { isWelcomeMessagingEnabled } from "@/lib/messaging-flags";
 
 export default async function StaffSettingsPage({
   searchParams,
@@ -50,6 +52,7 @@ export default async function StaffSettingsPage({
     automationHealth,
     overdueJourneySteps,
     { data: capacityPlans },
+    welcomeMessagingEnabled,
   ] = await Promise.all([
     getCampuses(),
     getStaffEnrollmentWindows(activeCampus),
@@ -61,6 +64,7 @@ export default async function StaffSettingsPage({
     getAutomationHealth(),
     getOverdueJourneySteps(),
     capacityPlanQuery,
+    isWelcomeMessagingEnabled(),
   ]);
 
   // Scope campuses to accessible ones
@@ -73,6 +77,10 @@ export default async function StaffSettingsPage({
       <ChannelStatus
         emailConfigured={isEmailConfigured()}
         smsConfigured={isSmsConfigured()}
+      />
+      <WelcomeMessagingToggle
+        enabled={welcomeMessagingEnabled}
+        canEdit={hasMinRole(session, "system_admin")}
       />
       <AutomationHealth
         rows={automationHealth}

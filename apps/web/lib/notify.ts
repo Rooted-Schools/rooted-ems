@@ -947,7 +947,7 @@ export async function notifyLeadWelcome({
     ),
     smsGuardian(
       { phone: lead.phone, smsConsent: lead.sms_consent },
-      `Rooted Schools: Hi ${lead.first_name}! Thanks for your interest in ${campusName}. A member of our team will reach out within a day. Questions? Just reply.\n¡Gracias por su interés! Nuestro equipo le contactará pronto.`,
+      `Rooted Schools: Hi ${lead.first_name}! Thanks for your interest in ${campusName}. A member of our team will reach out soon. Questions? Just reply.\n¡Gracias por su interés! Nuestro equipo le contactará pronto.`,
       "notifyLeadWelcome"
     ),
   ]);

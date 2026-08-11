@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -168,6 +169,12 @@ export function CommsClient({
           <p className="text-sm text-stone mt-1">
             Send and track messages to families via email, SMS, or in-app notifications.
           </p>
+          <Link
+            href="/staff/communications/automated-messages"
+            className="inline-block text-xs text-stone hover:text-ink mt-1.5"
+          >
+            Automated messages &rarr;
+          </Link>
         </div>
         <Button onClick={() => setShowNewMessage(true)}>New Message</Button>
       </div>

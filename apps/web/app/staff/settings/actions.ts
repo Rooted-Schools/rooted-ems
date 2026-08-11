@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireMinRole } from "@/lib/auth/get-session";
+import { setWelcomeMessagingEnabled } from "@/lib/messaging-flags";
 import {
   createEnrollmentWindow,
   updateEnrollmentWindowStatus,
@@ -162,6 +163,22 @@ export async function staffDeleteGradeLevel(gradeLevelId: string) {
   const result = await deleteGradeLevel(gradeLevelId);
   if (!result.error) {
     revalidatePath("/staff/settings");
+  }
+  return result;
+}
+
+/**
+ * Owner-facing pause switch for the instant bilingual welcome (see
+ * lib/messaging-flags.ts). system_admin only — this is a network-wide
+ * on/off, not an operational setting an enrollment_manager should be able
+ * to flip while a campus team is mid-training.
+ */
+export async function staffSetWelcomeMessages(enabled: boolean) {
+  const session = await requireMinRole("system_admin");
+  const result = await setWelcomeMessagingEnabled(enabled, session.user_id);
+  if (!result.error) {
+    revalidatePath("/staff/settings");
+    revalidatePath("/staff/communications/automated-messages");
   }
   return result;
 }
