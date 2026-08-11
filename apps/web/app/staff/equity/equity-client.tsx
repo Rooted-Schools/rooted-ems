@@ -175,24 +175,26 @@ export function EquityClient({
             Demographic breakdowns and equity analysis across the enrollment pipeline
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Select
-            value={campusFilter}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-              const v = e.target.value;
-              setCampusFilter(v);
-              pushFilters({ campus: v });
-            }}
-            className="w-48"
-          >
-            <option value="all">All Campuses</option>
-            {campuses.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
-        </div>
+        {campuses.length > 1 && (
+          <div className="flex items-center gap-3">
+            <Select
+              value={campusFilter}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                const v = e.target.value;
+                setCampusFilter(v);
+                pushFilters({ campus: v });
+              }}
+              className="w-48"
+            >
+              <option value="all">All Campuses</option>
+              {campuses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
       </div>
 
       {/* Summary Cards */}

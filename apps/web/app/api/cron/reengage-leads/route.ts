@@ -91,6 +91,7 @@ export async function GET(request: NextRequest) {
         },
         campusId: lead.campus_id as string,
         unsubscribeToken: (lead.unsubscribe_token as string | null) ?? null,
+        leadId: lead.id as string,
       });
 
       await supabase.from("lead_activity").insert({

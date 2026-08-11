@@ -1,4 +1,4 @@
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 
 /**
  * Recruitment funnel analytics — the board-facing view of the lead pipeline.
@@ -11,8 +11,13 @@ import { createServerClient } from "@rooted-ems/database/server";
  *  - The lead→enrolled funnel is traced through lead.application_id into the
  *    real application status, so downstream counts are exact, not inferred.
  *
- * All reads are RLS-scoped; pass a campusId to narrow, omit for the network
- * roll-up (CMO admins only).
+ * Service role on purpose: this runs on a staff page already gated by
+ * requireStaffSession and passes explicit campus scope. The user-scoped
+ * client trips the same latent RLS recursion (application policy -> guardian
+ * policy -> application policy) documented in lib/queries/recruitment-intel.ts
+ * — this file's step-3 application status lookup selects straight from
+ * `application`, the same shape that broke live. Deeper policy fix tracked in
+ * the red-team backlog.
  */
 
 export interface FunnelStage {
@@ -71,7 +76,7 @@ interface LeadLite {
 }
 
 export async function getRecruitmentFunnel(campusId?: string): Promise<RecruitmentFunnel> {
-  const supabase = await createServerClient();
+  const supabase = createServiceRoleClient();
 
   // 1) Page all leads for the scope (past PostgREST's 1k cap).
   const leads: LeadLite[] = [];
@@ -203,7 +208,7 @@ export async function getRecruitmentFunnel(campusId?: string): Promise<Recruitme
 }
 
 async function computeResponseSpeed(
-  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  supabase: ReturnType<typeof createServiceRoleClient>,
   campusId?: string
 ): Promise<RecruitmentFunnel["response"]> {
   // First staff call per lead, joined to the lead's creation time.

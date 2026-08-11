@@ -126,7 +126,9 @@ async function emailGuardian(
   email: string | null,
   template: EmailTemplate,
   logTag: string,
-  replyTo?: string | null
+  replyTo?: string | null,
+  /** 00045 engagement tracking — omitted for flows that don't need it (most transactional email). */
+  meta?: { leadId?: string; kind?: string }
 ): Promise<boolean> {
   if (!email) return false;
   const result = await sendEmail({
@@ -135,6 +137,7 @@ async function emailGuardian(
     html: template.html,
     text: template.text,
     replyTo: replyTo ?? undefined,
+    meta,
   });
   if (!result.ok && result.error !== "email not configured") {
     console.error(`[${logTag}] email failed`, result.error);
@@ -951,7 +954,8 @@ export async function notifyLeadWelcome({
       lead.email,
       emailTemplates.inquiryWelcome({ guardianFirstName: lead.first_name, campusName }),
       "notifyLeadWelcome",
-      campusEmail
+      campusEmail,
+      leadId ? { leadId, kind: "welcome" } : undefined
     ),
     smsGuardian(
       { phone: lead.phone, smsConsent: lead.sms_consent },
@@ -1004,11 +1008,14 @@ export async function notifyLeadReengagement({
   lead,
   campusId,
   unsubscribeToken,
+  leadId,
 }: {
   lead: LeadContact;
   campusId: string;
   /** LG-0.1: per-lead one-click unsubscribe (bulk send → link + headers required). */
   unsubscribeToken?: string | null;
+  /** 00045 engagement tracking — when provided, the send is recorded in email_event (kind: "reengagement"). */
+  leadId?: string;
 }): Promise<void> {
   const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
   const template = emailTemplates.leadReengagement({
@@ -1029,6 +1036,7 @@ export async function notifyLeadReengagement({
             "List-Unsubscribe": `<${unsub}>`,
             "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
           },
+          meta: leadId ? { leadId, kind: "reengagement" } : undefined,
         }).then((r) => {
           if (!r.ok && r.error !== "email not configured")
             console.error("[notifyLeadReengagement] email failed", r.error);

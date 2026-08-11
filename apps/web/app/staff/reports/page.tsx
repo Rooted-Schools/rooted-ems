@@ -108,7 +108,10 @@ export default async function StaffReportsPage({
     (() => {
       let q = supabase
         .from("audit_event")
-        .select("action, table_name, created_at, changes, actor:actor_id (full_name, email)")
+        // audit_event has old_data/new_data, not a single "changes" column —
+        // selecting the latter errors and (since this destructure never
+        // checked `error`) silently emptied the Audit Events tab.
+        .select("action, table_name, created_at, old_data, new_data, actor:actor_id (full_name, email)")
         .order("created_at", { ascending: false })
         .limit(200);
       if (hasCampusFilter) q = q.in("campus_id", scopedCampusIds);
@@ -184,6 +187,7 @@ export default async function StaffReportsPage({
   const auditEvents = (auditRows ?? []).map(
     (row: Record<string, unknown>) => {
       const actor = row.actor as Record<string, string> | null;
+      const changes = row.new_data ?? row.old_data;
       return {
       action: row.action as string,
       table_name: row.table_name as string,
@@ -195,7 +199,7 @@ export default async function StaffReportsPage({
         hour: "numeric",
         minute: "2-digit",
       }),
-      details: row.changes ? JSON.stringify(row.changes).slice(0, 120) : "",
+      details: changes ? JSON.stringify(changes).slice(0, 120) : "",
     };
     });
 

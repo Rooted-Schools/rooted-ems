@@ -7,7 +7,8 @@ import {
   resolveActiveCampus,
 } from "@/lib/auth/get-session";
 import { createServerClient } from "@rooted-ems/database/server";
-import { getCampaigns, getFollowUpQueue, getJourneyStats, getLeadPipelineSummary, getLeads } from "@/lib/queries";
+import { getCampaigns, getFollowUpQueue, getLeadPipelineSummary, getLeads } from "@/lib/queries";
+import { getJourneys } from "@/lib/queries/journeys";
 import { RecruitmentClient } from "./recruitment-client";
 
 export default async function StaffRecruitmentPage({
@@ -31,7 +32,7 @@ export default async function StaffRecruitmentPage({
     getLeadPipelineSummary(activeCampus),
     getLeads({ campusId: activeCampus }),
     getCampaigns(activeCampus),
-    getJourneyStats(activeCampus),
+    getJourneys(activeCampus),
     supabase.from("campus").select("id, name, short_code").order("name"),
   ]);
 
