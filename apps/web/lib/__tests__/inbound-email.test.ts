@@ -16,7 +16,7 @@
  *      with no human ever seeing it, since email (unlike SMS) has no
  *      "reply from a wrong number" norm.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ─── Supabase mock ────────────────────────────────────────────────────────────
 //
@@ -141,6 +141,14 @@ beforeEach(() => {
   sendEmailMock.mockResolvedValue({ ok: true, id: "resend-fwd-1" });
   isOwnSendingAddressMock.mockReset();
   isOwnSendingAddressMock.mockReturnValue(false);
+  // Default the suite to choke-point mode (Reply-To routed through the
+  // receiving address), where the campus-inbox forward is expected. The
+  // campus-native test below unsets this to assert the forward is skipped.
+  process.env.INBOUND_REPLY_ADDRESS = "replies@test.resend.app";
+});
+
+afterEach(() => {
+  delete process.env.INBOUND_REPLY_ADDRESS;
 });
 
 const FROM = "dana@example.com";
@@ -169,6 +177,29 @@ describe("handleInboundEmail — loop guard", () => {
     const outcome = await handleInboundEmail({ fromEmail: "not-an-address", text: "hi" });
     expect(outcome.skipped).toBe("unusable_address");
     expect(supabaseMock.ops).toHaveLength(0);
+  });
+
+  it("campus-native mode (INBOUND_REPLY_ADDRESS unset): stores and notifies but never forwards", async () => {
+    delete process.env.INBOUND_REPLY_ADDRESS;
+    supabaseMock.queueResult("inbound_email", { data: null, error: null }); // dedupe: not seen
+    supabaseMock.queueResult("guardian", { data: [GUARDIAN], error: null });
+    supabaseMock.queueResult("application", { data: { id: "app-1", campus_id: "campus-1" }, error: null });
+    supabaseMock.queueResult("inbound_email", { data: null, error: null }); // insert ok
+    supabaseMock.queueResult("note", { data: null, error: null });
+    supabaseMock.queueResult("user_campus_role", { data: [{ user_id: "u-1" }], error: null });
+
+    const outcome = await handleInboundEmail({
+      fromEmail: FROM,
+      toEmail: "info@rootedschoolcle.org",
+      subject: "Re: welcome",
+      text: "Thanks, quick question",
+      providerId: "p-native-1",
+    });
+
+    // The original already sits in the campus inbox (it forwarded the copy
+    // to us) — forwarding back would duplicate every reply.
+    expect(outcome).toMatchObject({ matched: "guardian", stored: true, notified: true, forwarded: false });
+    expect(sendEmailMock).not.toHaveBeenCalled();
   });
 });
 
