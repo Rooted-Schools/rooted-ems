@@ -385,8 +385,28 @@ async function processInboundEmail({
   }
 
   // ── Notify campus staff (unmatched or campus-less → system admins).
+  // When the sender is enrolled in an active journey, say so in the alert:
+  // a mid-sequence reply is exactly when a human should take over, and the
+  // journey context saves staff a lookup.
+  let journeyContext = "";
+  if (matched === "lead" && lead) {
+    try {
+      const { data: enrollment } = await supabase
+        .from("journey_enrollment")
+        .select("current_step, journey:journey_id (name)")
+        .eq("lead_id", lead.id)
+        .eq("status", "active")
+        .maybeSingle();
+      const journeyName = (enrollment?.journey as unknown as { name?: string } | null)?.name;
+      if (journeyName) {
+        journeyContext = ` (in ${journeyName}, after step ${enrollment?.current_step ?? 0})`;
+      }
+    } catch {
+      // Context is a nicety — never let it block the alert.
+    }
+  }
   let notified = false;
-  const subjectLine = `Email reply from ${who}`;
+  const subjectLine = `Email reply from ${who}${journeyContext}`;
   const notificationBody = preview || "(empty message)";
   const link =
     matched === "lead" && lead
@@ -406,8 +426,14 @@ async function processInboundEmail({
   // ── Forward a full copy to the campus's real inbox. Skipped when there's
   // no campus inbox to send to, or nobody matched at all (admins already
   // got the in-app alert above and there's no "family" inbox in play).
+  //
+  // Campus-native mode: when INBOUND_REPLY_ADDRESS is unset, outbound
+  // Reply-To is the campus inbox itself and inbound copies reach us via the
+  // campus's own Google forwarding — meaning the original already sits in
+  // that inbox. Forwarding it back would duplicate every reply, so skip.
   let forwarded = false;
-  if (campusId) {
+  const campusNativeMode = !process.env.INBOUND_REPLY_ADDRESS;
+  if (campusId && !campusNativeMode) {
     const campusResult = await supabase.from("campus").select("email").eq("id", campusId).maybeSingle();
     const campusEmail = (campusResult.data as { email?: string | null } | null)?.email ?? null;
     if (campusEmail && bareAddress(campusEmail).toLowerCase() !== from.toLowerCase()) {
