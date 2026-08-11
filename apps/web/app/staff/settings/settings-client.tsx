@@ -13,6 +13,7 @@ import {
   IconUsers,
   IconGraduationCap,
   IconX,
+  IconPenLine,
 } from "@/components/ui/icons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
@@ -29,6 +30,7 @@ import type { CampusRow, EnrollmentWindowRow, StaffUserRow, PacketRequirementRow
 import {
   staffCreateEnrollmentWindow,
   staffUpdateWindowStatus,
+  staffUpdateEnrollmentWindow,
   staffAssignRole,
   staffEditRole,
   staffRemoveRole,
@@ -39,6 +41,9 @@ import {
   staffDeleteGradeLevel,
   staffCreateCapacityPlan,
 } from "./actions";
+// Reused directly rather than duplicated: this is the same mutation and the
+// same access gate the Seats tab's inline seat-total editor already uses.
+import { staffUpdateCapacity } from "@/app/staff/seats/actions";
 
 /** The real grade_level_code enum values (supabase/migrations/00001_enums.sql). */
 const GRADE_LEVEL_CODES = ["6", "7", "8", "9", "10", "11", "12"];
@@ -72,6 +77,17 @@ interface GradeLevel {
   school_year_id: string;
 }
 
+interface CapacityPlanRow {
+  id: string;
+  campus_id: string;
+  campus_name: string;
+  grade_level_id: string;
+  grade: string;
+  school_year_id: string;
+  school_year_name: string;
+  total_seats: number;
+}
+
 interface SettingsClientProps {
   campuses: CampusRow[];
   windows: EnrollmentWindowRow[];
@@ -79,6 +95,7 @@ interface SettingsClientProps {
   packetRequirements: PacketRequirementRow[];
   schoolYears: SchoolYear[];
   gradeLevels?: GradeLevel[];
+  capacityPlans?: CapacityPlanRow[];
   systemSettings?: Record<string, string>;
   staffUserId: string;
   activeCampusId?: string;
@@ -100,6 +117,7 @@ export function SettingsClient({
   packetRequirements,
   schoolYears,
   gradeLevels = [],
+  capacityPlans = [],
   systemSettings = {},
   staffUserId,
   activeCampusId,
@@ -140,6 +158,7 @@ export function SettingsClient({
           <SchoolYearsGradesTab
             schoolYears={schoolYears}
             gradeLevels={gradeLevels}
+            capacityPlans={capacityPlans}
             campuses={campuses}
             activeCampusId={activeCampusId}
             isSystemAdmin={isSystemAdmin}
@@ -226,6 +245,7 @@ function EnrollmentWindowsTab({
   const [isPending, startTransition] = useTransition();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [openConfirm, setOpenConfirm] = useState<{ windowId: string; name: string; campusName: string } | null>(null);
 
   // Form state
   const [name, setName] = useState("");
@@ -272,13 +292,92 @@ function EnrollmentWindowsTab({
     });
   }
 
-  function handleStatusChange(windowId: string, newStatus: "draft" | "open" | "closed" | "archived") {
+  function performStatusChange(windowId: string, newStatus: "draft" | "open" | "closed" | "archived") {
     startTransition(async () => {
       const result = await staffUpdateWindowStatus(windowId, newStatus);
       if (result.error) {
         setFeedback({ type: "error", message: result.error });
       } else {
         toast({ variant: "success", title: `Window status changed to ${newStatus}` });
+        router.refresh();
+      }
+    });
+  }
+
+  // Opening a window is the one transition that goes live for families the
+  // instant it saves, so it gets a confirmation step. Every other transition
+  // (draft, closed, archived) stays a single click.
+  function handleStatusChange(
+    windowId: string,
+    newStatus: "draft" | "open" | "closed" | "archived",
+    windowName: string,
+    campusName: string
+  ) {
+    if (newStatus === "open") {
+      setOpenConfirm({ windowId, name: windowName, campusName });
+      return;
+    }
+    performStatusChange(windowId, newStatus);
+  }
+
+  function confirmOpenWindow() {
+    if (!openConfirm) return;
+    performStatusChange(openConfirm.windowId, "open");
+    setOpenConfirm(null);
+  }
+
+  // ── Edit dialog state — name, open date, close date only. Status is
+  // handled entirely by the transitions above, so editing never routes
+  // through the open-confirmation dialog. ──
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editWindow, setEditWindow] = useState<EnrollmentWindowRow | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editOpenDate, setEditOpenDate] = useState("");
+  const [editCloseDate, setEditCloseDate] = useState("");
+  const [editFeedback, setEditFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  function toDateInputValue(iso: string) {
+    return iso ? iso.slice(0, 10) : "";
+  }
+
+  function openEditDialog(w: EnrollmentWindowRow) {
+    setEditWindow(w);
+    setEditName(w.name);
+    setEditOpenDate(toDateInputValue(w.open_date_iso));
+    setEditCloseDate(toDateInputValue(w.close_date_iso));
+    setEditFeedback(null);
+    setEditDialogOpen(true);
+  }
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  // The window is live right now and the new close date has already passed —
+  // still allowed (staff may be closing it out retroactively), just flagged.
+  const editCloseDateInPast =
+    editWindow?.status === "open" && !!editCloseDate && editCloseDate < todayStr;
+
+  function handleSaveEdit() {
+    if (!editWindow) return;
+    const trimmedName = editName.trim();
+    if (!trimmedName || !editOpenDate || !editCloseDate) {
+      setEditFeedback({ type: "error", message: "Name, open date, and close date are required." });
+      return;
+    }
+    if (new Date(editCloseDate).getTime() <= new Date(editOpenDate).getTime()) {
+      setEditFeedback({ type: "error", message: "Close date must be after open date." });
+      return;
+    }
+    setEditFeedback(null);
+    startTransition(async () => {
+      const result = await staffUpdateEnrollmentWindow(editWindow.id, {
+        name: trimmedName,
+        open_date: new Date(editOpenDate).toISOString(),
+        close_date: new Date(editCloseDate).toISOString(),
+      });
+      if (result.error) {
+        setEditFeedback({ type: "error", message: result.error });
+      } else {
+        toast({ variant: "success", title: "Enrollment window updated." });
+        setEditDialogOpen(false);
         router.refresh();
       }
     });
@@ -432,12 +531,21 @@ function EnrollmentWindowsTab({
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-[6px] min-h-[44px]"
+                      disabled={isPending}
+                      onClick={() => openEditDialog(w)}
+                    >
+                      Edit
+                    </Button>
                     {nextStatus && (
                       <Button
                         variant="outline"
                         size="sm"
                         disabled={isPending}
-                        onClick={() => handleStatusChange(w.id, nextStatus)}
+                        onClick={() => handleStatusChange(w.id, nextStatus, w.name, w.campus_name)}
                       >
                         {nextStatus === "open" ? "Open" : "Close"}
                       </Button>
@@ -454,6 +562,103 @@ function EnrollmentWindowsTab({
           </div>
         )}
       </CardContent>
+
+      <Dialog open={!!openConfirm} onOpenChange={(v) => !v && setOpenConfirm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Open enrollment for families?</DialogTitle>
+            <DialogDescription>
+              Applications go live for families the moment this saves. The public site will show{" "}
+              {openConfirm?.campusName || "this campus"} as open for &ldquo;{openConfirm?.name}&rdquo;.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="rounded-[6px] min-h-[44px]"
+              onClick={() => setOpenConfirm(null)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="rounded-[6px] min-h-[44px]"
+              onClick={confirmOpenWindow}
+              disabled={isPending}
+            >
+              {isPending ? "Opening…" : "Open Enrollment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Enrollment Window</DialogTitle>
+            <DialogDescription>
+              Update the name and dates for {editWindow?.campus_name || "this campus"}. Status changes
+              still happen from the window list.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="block text-sm font-medium text-ink/70 mb-1">Name</label>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="w-full px-3 py-2 border border-line rounded-[6px] text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 min-h-[44px]"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-ink/70 mb-1">Open Date</label>
+                <input
+                  type="date"
+                  value={editOpenDate}
+                  onChange={(e) => setEditOpenDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-line rounded-[6px] text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 min-h-[44px]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-ink/70 mb-1">Close Date</label>
+                <input
+                  type="date"
+                  value={editCloseDate}
+                  onChange={(e) => setEditCloseDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-line rounded-[6px] text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 min-h-[44px]"
+                />
+              </div>
+            </div>
+            {editCloseDateInPast && (
+              <p className="text-sm text-warn-text border-l-2 border-line pl-3">
+                This close date is in the past; the window will stop accepting applications.
+              </p>
+            )}
+          </div>
+          {editFeedback?.type === "error" && (
+            <p className="text-sm text-red-600 mb-2">{editFeedback.message}</p>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="rounded-[6px] min-h-[44px]"
+              onClick={() => setEditDialogOpen(false)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="rounded-[6px] min-h-[44px]"
+              onClick={handleSaveEdit}
+              disabled={isPending || !editName.trim() || !editOpenDate || !editCloseDate}
+            >
+              {isPending ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
@@ -1033,12 +1238,14 @@ function StaffUsersTab({
 function SchoolYearsGradesTab({
   schoolYears,
   gradeLevels,
+  capacityPlans,
   campuses,
   activeCampusId,
   isSystemAdmin,
 }: {
   schoolYears: SchoolYear[];
   gradeLevels: GradeLevel[];
+  capacityPlans: CapacityPlanRow[];
   campuses: CampusRow[];
   activeCampusId?: string;
   isSystemAdmin: boolean;
@@ -1209,6 +1416,44 @@ function SchoolYearsGradesTab({
   const campusGrades = gradeLevels
     .filter((g) => g.campus_id === selectedCampus && g.school_year_id === selectedYear)
     .sort((a, b) => (parseInt(a.grade) || 0) - (parseInt(b.grade) || 0));
+
+  // ── Capacity Plan inline seat-total editing ──
+  // Same interaction as the Seats tab (click value -> number input -> save/cancel),
+  // scoped to the campus/year currently selected above so it lines up with the
+  // grade levels shown there. Day-to-day editing across all campuses still lives
+  // on the Seats tab; this closes the gap for staff already in Settings.
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [editPlanValue, setEditPlanValue] = useState<number>(0);
+  const [planRowFeedback, setPlanRowFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  const campusCapacityPlans = capacityPlans
+    .filter((p) => p.campus_id === selectedCampus && p.school_year_id === selectedYear)
+    .sort((a, b) => (parseInt(a.grade) || 0) - (parseInt(b.grade) || 0));
+
+  function handleEditPlan(plan: CapacityPlanRow) {
+    setEditingPlanId(plan.id);
+    setEditPlanValue(plan.total_seats);
+    setPlanRowFeedback(null);
+  }
+
+  function handleCancelPlanEdit() {
+    setEditingPlanId(null);
+    setEditPlanValue(0);
+  }
+
+  function handleSavePlan(planId: string) {
+    if (editPlanValue < 0) return;
+    startTransition(async () => {
+      const result = await staffUpdateCapacity(planId, editPlanValue);
+      if (result.error) {
+        setPlanRowFeedback({ type: "error", message: result.error });
+      } else {
+        setPlanRowFeedback({ type: "success", message: "Capacity updated." });
+        setEditingPlanId(null);
+        router.refresh();
+      }
+    });
+  }
 
   const fieldClass =
     "w-full px-3 py-2 border border-line rounded-[6px] text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 min-h-[44px]";
@@ -1508,12 +1753,12 @@ function SchoolYearsGradesTab({
         </CardContent>
       </Card>
 
-      {/* Capacity Plans — create-only here; day-to-day seat editing lives on
-          the Seats page, which already points here for creation (see its
-          empty state: "Add capacity plans in Settings"). Keeping creation
-          next to Grade Levels means the campus/grade/year picker in this
-          dialog is scoped by the same data staff just configured above,
-          instead of re-deriving that context on a separate page. */}
+      {/* Capacity Plans — creation lives here next to Grade Levels, so the
+          campus/grade/year picker in the create dialog is scoped by the same
+          data staff just configured above instead of re-deriving that context
+          on a separate page. Editing an existing plan's seat total also lives
+          here now (mirrors the Seats tab's inline editor), so staff no longer
+          have to leave Settings to fix a number they just set. */}
       {isSystemAdmin && (
         <Card>
           <CardHeader>
@@ -1521,7 +1766,7 @@ function SchoolYearsGradesTab({
               <div>
                 <CardTitle className="text-base">Capacity Plans</CardTitle>
                 <CardDescription>
-                  Set seat capacity for a campus, grade, and school year. Manage existing seat counts on the Seats page.
+                  Set seat capacity for a campus, grade, and school year.
                 </CardDescription>
               </div>
               <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>
@@ -1622,6 +1867,85 @@ function SchoolYearsGradesTab({
               </Dialog>
             </div>
           </CardHeader>
+          <CardContent>
+            {planRowFeedback && (
+              <div
+                className={`mb-4 p-3 rounded-[6px] text-sm ${
+                  planRowFeedback.type === "success"
+                    ? "bg-green-50 border border-green-200 text-green-800"
+                    : "bg-red-50 border border-red-200 text-red-800"
+                }`}
+              >
+                {planRowFeedback.message}
+              </div>
+            )}
+            {campusCapacityPlans.length === 0 ? (
+              <p className="text-sm text-stone">
+                No capacity plans configured for{" "}
+                {campuses.find((c) => c.id === selectedCampus)?.name ?? "this campus"} in{" "}
+                {schoolYears.find((sy) => sy.id === selectedYear)?.name ?? "this year"}.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {campusCapacityPlans.map((plan) => (
+                  <div
+                    key={plan.id}
+                    className="flex items-center justify-between p-3 rounded-[6px] border border-stone/20"
+                  >
+                    <p className="font-medium text-sm text-ink">Grade {plan.grade}</p>
+                    {editingPlanId === plan.id ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={editPlanValue}
+                          onChange={(e) => setEditPlanValue(Math.max(0, parseInt(e.target.value) || 0))}
+                          min={0}
+                          max={999}
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSavePlan(plan.id);
+                            if (e.key === "Escape") handleCancelPlanEdit();
+                          }}
+                          className="w-20 px-2 py-2 text-right border border-stone/30 rounded-[6px] text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 min-h-[44px]"
+                        />
+                        <span className="text-xs text-stone">seats</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-[6px] min-h-[44px]"
+                          onClick={handleCancelPlanEdit}
+                          disabled={isPending}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="rounded-[6px] min-h-[44px]"
+                          onClick={() => handleSavePlan(plan.id)}
+                          disabled={isPending}
+                        >
+                          {isPending ? "Saving…" : "Save"}
+                        </Button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleEditPlan(plan)}
+                        className="flex items-center gap-2 text-sm text-ink/80 hover:text-rooted-green transition-colors min-h-[44px] px-2 -mr-2 rounded-[6px]"
+                        title="Edit total seats"
+                      >
+                        <span className="font-medium">{plan.total_seats}</span>
+                        <span className="text-xs text-stone">seats</span>
+                        <IconPenLine size={14} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-stone mt-4 border-l-2 border-line pl-3">
+              Seat totals can also be edited on the Seats tab.
+            </p>
+          </CardContent>
         </Card>
       )}
     </div>

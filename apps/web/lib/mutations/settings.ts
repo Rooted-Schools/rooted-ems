@@ -67,6 +67,73 @@ export async function updateEnrollmentWindowStatus(
   }
 }
 
+export interface UpdateEnrollmentWindowInput {
+  name: string;
+  open_date: string; // ISO date
+  close_date: string; // ISO date
+}
+
+/**
+ * Edits an existing window's name and dates. Status is deliberately out of
+ * scope here — that stays on updateEnrollmentWindowStatus above, which the
+ * client gates behind a confirmation when the transition is to "open".
+ * The DB also enforces close_date > open_date (window_dates_check,
+ * 00004_applications.sql); this validates first so the caller gets an
+ * honest message instead of a raw constraint violation.
+ */
+export async function updateEnrollmentWindow(
+  windowId: string,
+  input: UpdateEnrollmentWindowInput
+): Promise<MutationResult> {
+  const session = await requireMinRole("enrollment_manager");
+  try {
+    const name = input.name.trim();
+    if (!name) return { data: null, error: "Name is required." };
+    if (!input.open_date || !input.close_date) {
+      return { data: null, error: "Open and close dates are required." };
+    }
+    if (new Date(input.close_date).getTime() <= new Date(input.open_date).getTime()) {
+      return { data: null, error: "Close date must be after open date." };
+    }
+
+    const supabase = createServiceRoleClient();
+
+    const { data: before, error: beforeError } = await supabase
+      .from("enrollment_window")
+      .select("name, open_date, close_date, campus_id")
+      .eq("id", windowId)
+      .single();
+    if (beforeError) return { data: null, error: beforeError.message };
+
+    const { error } = await supabase
+      .from("enrollment_window")
+      .update({
+        name,
+        open_date: input.open_date,
+        close_date: input.close_date,
+      })
+      .eq("id", windowId);
+
+    if (error) return { data: null, error: error.message };
+
+    await logAuditEvent({
+      table_name: "enrollment_window",
+      record_id: windowId,
+      action: AuditAction.Update,
+      actor_id: session.user_id,
+      campus_id: before?.campus_id ?? null,
+      old_data: before
+        ? { name: before.name, open_date: before.open_date, close_date: before.close_date }
+        : undefined,
+      new_data: { name, open_date: input.open_date, close_date: input.close_date },
+    });
+
+    return { data: null, error: null };
+  } catch (err) {
+    return { data: null, error: "Failed to update enrollment window" };
+  }
+}
+
 // ─── Staff User Role Mutations ──────────────────────────
 
 export interface AssignStaffRoleInput {
