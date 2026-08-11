@@ -212,6 +212,7 @@ export async function createLeadFromInquiry(
             sms_consent: input.sms_consent ?? false,
           },
           campusId: input.campus_id,
+          leadId: lead.id,
         })
       : Promise.resolve(),
     notifyStaffNewLead({

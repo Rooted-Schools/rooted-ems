@@ -77,12 +77,13 @@ async function smsGuardian(
   contact: Pick<GuardianContact, "phone" | "smsConsent">,
   body: string,
   logTag: string
-): Promise<void> {
-  if (!contact.smsConsent || !contact.phone) return;
+): Promise<boolean> {
+  if (!contact.smsConsent || !contact.phone) return false;
   const result = await sendSms({ to: contact.phone, body });
   if (!result.ok && result.error !== SMS_NOT_CONFIGURED) {
     console.error(`[${logTag}] sms failed`, result.error);
   }
+  return result.ok;
 }
 
 /**
@@ -126,8 +127,8 @@ async function emailGuardian(
   template: EmailTemplate,
   logTag: string,
   replyTo?: string | null
-): Promise<void> {
-  if (!email) return;
+): Promise<boolean> {
+  if (!email) return false;
   const result = await sendEmail({
     to: email,
     subject: template.subject,
@@ -138,6 +139,9 @@ async function emailGuardian(
   if (!result.ok && result.error !== "email not configured") {
     console.error(`[${logTag}] email failed`, result.error);
   }
+  // True only when the provider confirmed the send — callers that record
+  // "sent" on a timeline must never log an attempt as a delivery.
+  return result.ok;
 }
 
 interface CampusInfo {
@@ -933,12 +937,16 @@ interface LeadContact {
 export async function notifyLeadWelcome({
   lead,
   campusId,
+  leadId,
 }: {
   lead: LeadContact;
   campusId: string;
+  /** When provided, confirmed sends are recorded on the lead's timeline so
+   *  staff can always answer "who got the welcome, and when". */
+  leadId?: string;
 }): Promise<void> {
   const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
-  await Promise.all([
+  const [emailSent, smsSent] = await Promise.all([
     emailGuardian(
       lead.email,
       emailTemplates.inquiryWelcome({ guardianFirstName: lead.first_name, campusName }),
@@ -951,6 +959,23 @@ export async function notifyLeadWelcome({
       "notifyLeadWelcome"
     ),
   ]);
+
+  // Timeline record — only for sends the provider actually confirmed.
+  if (leadId && (emailSent || smsSent)) {
+    try {
+      const supabase = createServiceRoleClient();
+      const channels = [emailSent ? "email" : null, smsSent ? "text" : null]
+        .filter(Boolean)
+        .join(" and ");
+      await supabase.from("lead_activity").insert({
+        lead_id: leadId,
+        activity_type: "email",
+        body: `Welcome message sent (${channels}).`,
+      });
+    } catch (err) {
+      console.error("[notifyLeadWelcome] activity log failed", err);
+    }
+  }
 }
 
 /** New inquiry — route to campus staff so a human follows up fast. */

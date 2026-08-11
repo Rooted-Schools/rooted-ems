@@ -25,8 +25,14 @@ export default async function RecruitmentAnalyticsPage({
 
   const accessibleIds = getAccessibleCampusIds(session);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus);
-  // undefined = CMO-level admin with no explicit scoping (all campuses).
-  const scopedCampusIds = accessibleIds.length > 0 ? accessibleIds : undefined;
+  // An explicit campus selection narrows EVERY section on this page, not just
+  // the funnel — an org-admin viewing "Cleveland" must never see other
+  // campuses' rows here. No selection: role scope (undefined = org-wide).
+  const scopedCampusIds = activeCampus
+    ? [activeCampus]
+    : accessibleIds.length > 0
+      ? accessibleIds
+      : undefined;
 
   const supabase = await createServerClient();
   const [funnel, speedToContactResult, gradeFunnel, { data: campusRows }] = await Promise.all([
