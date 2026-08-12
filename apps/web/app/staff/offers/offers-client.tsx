@@ -108,6 +108,8 @@ export function OffersClient({
   eligibleApplicants = [],
   waitlistEntries = [],
   waitlistCampusCounts = [],
+  policyAcceptanceDays = null,
+  policyWaitlistDays = null,
 }: {
   offers: OfferRow[];
   stats: OfferStats;
@@ -115,6 +117,10 @@ export function OffersClient({
   eligibleApplicants?: EligibleApplicant[];
   waitlistEntries?: WaitlistEntry[];
   waitlistCampusCounts?: CampusCount[];
+  /** Acceptance window from the campus's adopted policy, when there is one. */
+  policyAcceptanceDays?: number | null;
+  /** Waitlist offer window from the campus's adopted policy, when there is one. */
+  policyWaitlistDays?: number | null;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
@@ -131,13 +137,17 @@ export function OffersClient({
 
   // Create Offer form state
   const [selectedAppId, setSelectedAppId] = useState("");
-  const [expiresIn, setExpiresIn] = useState("14");
+  // Defaults come from the adopted policy where the campus has one, so the
+  // deadline in the family's email is the deadline the board set.
+  const defaultAcceptanceDays = policyAcceptanceDays ? String(policyAcceptanceDays) : "14";
+  const defaultWaitlistDays = policyWaitlistDays ? String(policyWaitlistDays) : "14";
+  const [expiresIn, setExpiresIn] = useState(defaultAcceptanceDays);
   const [creatingOffer, setCreatingOffer] = useState(false);
 
   // Promote dialog state
   const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
   const [promotePositionId, setPromotePositionId] = useState<string | null>(null);
-  const [promoteExpiresIn, setPromoteExpiresIn] = useState("14");
+  const [promoteExpiresIn, setPromoteExpiresIn] = useState(defaultWaitlistDays);
 
   // Remove confirmation dialog state
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
@@ -216,7 +226,7 @@ export function OffersClient({
       setSuccess(`Offer sent to ${applicant.student_name}.`);
       setDialogOpen(false);
       setSelectedAppId("");
-      setExpiresIn("14");
+      setExpiresIn(defaultAcceptanceDays);
       router.refresh();
     }
     setCreatingOffer(false);
@@ -225,7 +235,7 @@ export function OffersClient({
   // Waitlist actions — open dialogs instead of hardcoding
   function handlePromote(positionId: string) {
     setPromotePositionId(positionId);
-    setPromoteExpiresIn("14");
+    setPromoteExpiresIn(defaultWaitlistDays);
     setPromoteDialogOpen(true);
   }
 
@@ -700,6 +710,12 @@ export function OffersClient({
                       onChange={(e) => setPromoteExpiresIn(e.target.value)}
                       className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
                     >
+                      {policyWaitlistDays !== null && ![7, 10, 14, 21, 30].includes(policyWaitlistDays) && (
+                        <option value={String(policyWaitlistDays)}>
+                          {policyWaitlistDays} day{policyWaitlistDays === 1 ? "" : "s"} (adopted
+                          policy)
+                        </option>
+                      )}
                       <option value="7">7 days</option>
                       <option value="10">10 days</option>
                       <option value="14">14 days</option>
@@ -708,6 +724,10 @@ export function OffersClient({
                     </select>
                     <p className="text-xs text-stone mt-1">
                       Offer will expire on {expDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                      {policyWaitlistDays !== null &&
+                      parseInt(promoteExpiresIn, 10) !== policyWaitlistDays
+                        ? `. The adopted policy sets a ${policyWaitlistDays}-day waitlist offer window.`
+                        : ""}
                     </p>
                   </div>
                 </>

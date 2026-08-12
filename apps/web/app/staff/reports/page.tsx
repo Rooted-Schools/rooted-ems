@@ -216,6 +216,12 @@ export default async function StaffReportsPage({
     ? INSIGHTS_TABS
     : INSIGHTS_TABS.filter((t) => t.href === "/staff/reports");
 
+  // Same org-wide convention as the campus filters above this line
+  // (accessibleIds.length === 0 = no single-campus scoping = CMO-level
+  // access): only surface the Network view link to a staff member who can
+  // actually see the network. A scoped enrollment_manager gets none.
+  const showNetworkLink = accessibleIds.length === 0;
+
   return (
     <div className="space-y-6">
       <SectionTabs
@@ -223,7 +229,7 @@ export default async function StaffReportsPage({
         activeHref="/staff/reports"
         campusParam={searchParams?.campus}
       />
-      <ReportsClient data={reportData} />
+      <ReportsClient data={reportData} showNetworkLink={showNetworkLink} />
     </div>
   );
 }

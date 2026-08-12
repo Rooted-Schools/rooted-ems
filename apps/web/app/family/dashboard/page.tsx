@@ -17,6 +17,14 @@ export const dynamic = "force-dynamic";
  * First day). Statuses absent here (waitlisted / declined / expired /
  * withdrawn) are off the happy path and render a status note instead.
  */
+/**
+ * Statuses where the campus enrollment window's own dates are still the
+ * live, relevant fact — before a lottery run has actually assigned this
+ * application, so "applications open/close {date}" is honest information,
+ * not something superseded by an offer or a placement result.
+ */
+const WINDOW_CHIP_STATUSES = new Set(["draft", "submitted", "needs_info", "verified"]);
+
 const JOURNEY2_INDEX: Record<string, number> = {
   draft: 0,
   submitted: 0,
@@ -95,6 +103,38 @@ export default async function FamilyDashboardPage() {
       day: "numeric",
       year: "numeric",
     });
+
+  // enrollment_window.open_date/close_date are TIMESTAMPTZ stored as UTC
+  // midnight — format in UTC so "Oct 26 00:00Z" never renders as Oct 25 for
+  // a family west of Greenwich (same fix as app/(public)/landing-client.tsx
+  // formatDate).
+  const windowDate = (iso: string) =>
+    new Intl.DateTimeFormat(localeTag, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(new Date(iso));
+
+  /**
+   * Real window-derived date note for the "Where {name} is" section — only
+   * for the pre-lottery statuses where the window's own dates are still the
+   * live fact. Never invents a lottery date: enrollment_window has no such
+   * column, so a closed, pre-lottery window simply omits this note.
+   */
+  const windowDateNote = (card: FamilyJourneyCard): string | null => {
+    if (!WINDOW_CHIP_STATUSES.has(card.status) || !card.enrollment_window) return null;
+    const now = Date.now();
+    const openMs = new Date(card.enrollment_window.open_date).getTime();
+    const closeMs = new Date(card.enrollment_window.close_date).getTime();
+    if (now < openMs) {
+      return t("public.applicationsOpen").replace("{date}", windowDate(card.enrollment_window.open_date));
+    }
+    if (now <= closeMs) {
+      return t("dashboard.window.closesOn").replace("{date}", windowDate(card.enrollment_window.close_date));
+    }
+    return null; // closed, pre-lottery — no real lottery date exists to show yet
+  };
 
   // ONE next-action per card, derived from status
   const actionFor = (
@@ -369,6 +409,7 @@ export default async function FamilyDashboardPage() {
               {journeyIndex > 0 && (
                 <span>{t("dashboard.updatedOn").replace("{date}", shortDate(primaryCard.updated_at))}</span>
               )}
+              {windowDateNote(primaryCard) && <span>{windowDateNote(primaryCard)}</span>}
             </div>
             {journeyIndex === 0 && primaryCard.status !== "draft" && (
               <Link

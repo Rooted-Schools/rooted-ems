@@ -7,7 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconTicket } from "@/components/ui/icons";
-import { getStaffLotteryRuns, getCampuses } from "@/lib/queries";
+import {
+  getStaffLotteryRuns,
+  getCampuses,
+  getAdoptedPolicyForCampus,
+  getRunGovernanceBatch,
+} from "@/lib/queries";
 import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 import { SectionTabs } from "@/components/layout/section-tabs";
 import { SEATS_LOTTERY_TABS } from "@/lib/section-tabs";
@@ -66,6 +71,25 @@ export default async function StaffLotteryPage({
 
   const dialogCampuses = campuses.map((c) => ({ id: c.id, name: c.name }));
 
+  // Governing policy per campus, so the creation dialog can state which rules
+  // a new run will bind to before it is created — or say plainly that there
+  // are none.
+  const policyLabels = await Promise.all(
+    dialogCampuses.map(async (c) => {
+      const adopted = await getAdoptedPolicyForCampus(c.id);
+      return {
+        campus_id: c.id,
+        label: adopted
+          ? `${adopted.row.name} v${adopted.row.version}${
+              adopted.row.adopted_date ? ` (adopted ${adopted.row.adopted_date})` : ""
+            }`
+          : null,
+      };
+    })
+  );
+
+  const governanceByRun = await getRunGovernanceBatch(runs.map((r) => r.id));
+
   return (
     <div className="space-y-6">
       <SectionTabs
@@ -84,8 +108,17 @@ export default async function StaffLotteryPage({
           campuses={dialogCampuses}
           gradeLevels={gradeLevels}
           windows={enrollmentWindows}
+          policyLabels={policyLabels}
         />
       </div>
+
+      {policyLabels.some((p) => p.label === null) && (
+        <div className="rounded-[6px] border border-warn/30 bg-warn/10 px-4 py-3 text-sm text-warn-text">
+          {policyLabels.filter((p) => p.label === null).length === policyLabels.length
+            ? "No campus you can see has an adopted lottery policy. Official lotteries require one; see the Policy tab."
+            : `${policyLabels.filter((p) => p.label === null).length} of these campuses have no adopted lottery policy. Official lotteries there are blocked until a board-adopted policy is in place; see the Policy tab.`}
+        </div>
+      )}
 
       {runs.length === 0 ? (
         <Card>
@@ -99,6 +132,7 @@ export default async function StaffLotteryPage({
                 campuses={dialogCampuses}
                 gradeLevels={gradeLevels}
                 windows={enrollmentWindows}
+                policyLabels={policyLabels}
               />
             </EmptyState>
           </CardContent>
@@ -108,6 +142,7 @@ export default async function StaffLotteryPage({
           {runs.map((run) => {
             const s = statusVariants[run.status] ?? statusVariants.draft;
             const overSubscribed = run.total_applicants > run.total_seats;
+            const governance = governanceByRun.get(run.id);
 
             return (
               <Link key={run.id} href={`/staff/lottery/${run.id}`}>
@@ -119,8 +154,18 @@ export default async function StaffLotteryPage({
                         <CardDescription className="mt-1">
                           {run.campus_name} · {run.grade}
                         </CardDescription>
+                        <p className="mt-1 text-xs text-stone">
+                          {governance?.policyLabel
+                            ? `Governed by: ${governance.policyLabel}`
+                            : "No adopted policy"}
+                        </p>
                       </div>
-                      <Badge variant={s.variant}>{s.label}</Badge>
+                      <div className="flex items-center gap-2">
+                        {governance?.isRehearsal && (
+                          <Badge variant="warning">Test rehearsal</Badge>
+                        )}
+                        <Badge variant={s.variant}>{s.label}</Badge>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>

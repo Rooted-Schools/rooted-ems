@@ -32,15 +32,23 @@ interface WindowOption {
   campus_id: string;
 }
 
+/** Governing policy per campus, resolved on the server. */
+export interface CampusPolicyLabel {
+  campus_id: string;
+  label: string | null;
+}
+
 /* ─── Component ─── */
 export function NewLotteryRunDialog({
   campuses,
   gradeLevels,
   windows,
+  policyLabels = [],
 }: {
   campuses: CampusOption[];
   gradeLevels: GradeLevelOption[];
   windows: WindowOption[];
+  policyLabels?: CampusPolicyLabel[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -52,6 +60,11 @@ export function NewLotteryRunDialog({
   const [gradeId, setGradeId] = useState("");
   const [windowId, setWindowId] = useState("");
   const [totalSeats, setTotalSeats] = useState("");
+  const [isRehearsal, setIsRehearsal] = useState(false);
+
+  const policyLabel = campusId
+    ? (policyLabels.find((p) => p.campus_id === campusId)?.label ?? null)
+    : null;
 
   // Filter grade levels and windows by selected campus
   const filteredGrades = campusId
@@ -89,6 +102,7 @@ export function NewLotteryRunDialog({
         campus_id: campusId,
         grade_level_id: gradeId,
         total_seats: seats,
+        is_rehearsal: isRehearsal,
       });
 
       if (result.error) {
@@ -201,6 +215,49 @@ export function NewLotteryRunDialog({
             </p>
           </div>
 
+          {/* Governing policy — the rules this run will bind to, frozen at creation */}
+          {campusId && (
+            <div
+              className={
+                policyLabel
+                  ? "rounded-[6px] border border-line bg-sunken p-3 text-sm"
+                  : "rounded-[6px] border border-warn/30 bg-warn/10 p-3 text-sm text-warn-text"
+              }
+            >
+              {policyLabel ? (
+                <>
+                  <p className="text-xs uppercase tracking-wider text-stone">Governed by</p>
+                  <p className="mt-0.5 text-ink">{policyLabel}</p>
+                </>
+              ) : (
+                <p>
+                  No adopted lottery policy for this campus. Official lotteries require one. This run
+                  can be created, previewed, and rehearsed, but it cannot be finalized as official.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Test rehearsal */}
+          <div className="rounded-[6px] border border-line p-3">
+            <label className="flex min-h-[44px] items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isRehearsal}
+                onChange={(e) => setIsRehearsal(e.target.checked)}
+                disabled={isPending}
+                className="mt-1 w-4 h-4"
+              />
+              <span className="text-sm text-ink">Test rehearsal</span>
+            </label>
+            <p className="text-xs text-stone">
+              Runs the complete lottery against the real applicant pool and produces a full report,
+              with no effect on any family: no application changes, no offers, no waitlist, no
+              notifications. A rehearsal can be repeated as often as you like and can never become
+              the official record.
+            </p>
+          </div>
+
           {/* Error */}
           {error && (
             <div className="p-3 rounded-lg bg-red-50 text-red-800 border border-red-200 text-sm">
@@ -218,7 +275,11 @@ export function NewLotteryRunDialog({
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={isPending}>
-            {isPending ? "Creating..." : "Create Lottery Run"}
+            {isPending
+              ? "Creating..."
+              : isRehearsal
+                ? "Create Test Rehearsal"
+                : "Create Lottery Run"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -2,7 +2,7 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 import { createServiceRoleClient } from "@rooted-ems/database/server";
-import { getStaffOffers, getStaffWaitlist } from "@/lib/queries";
+import { getStaffOffers, getStaffWaitlist, getAdoptedPolicyForCampus } from "@/lib/queries";
 import { OffersClient } from "./offers-client";
 import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 import { SectionTabs } from "@/components/layout/section-tabs";
@@ -66,6 +66,21 @@ export default async function StaffOffersPage({
     };
   });
 
+  // Response windows come from the campus's adopted lottery policy where there
+  // is one, so the dialog opens on the number the board actually set rather
+  // than on a default someone typed once. Only resolvable when a single campus
+  // is in view — with several campuses in scope, their policies may differ and
+  // a single number would be a guess.
+  let policyAcceptanceDays: number | null = null;
+  let policyWaitlistDays: number | null = null;
+  if (activeCampus) {
+    const adopted = await getAdoptedPolicyForCampus(activeCampus);
+    if (adopted) {
+      policyAcceptanceDays = adopted.config.acceptanceWindowDays;
+      policyWaitlistDays = adopted.config.waitlistOfferWindow.days;
+    }
+  }
+
   return (
     <div className="space-y-6">
       <SectionTabs
@@ -80,6 +95,8 @@ export default async function StaffOffersPage({
         eligibleApplicants={eligibleApplicants}
         waitlistEntries={waitlistData.entries}
         waitlistCampusCounts={waitlistData.campusCounts}
+        policyAcceptanceDays={policyAcceptanceDays}
+        policyWaitlistDays={policyWaitlistDays}
       />
     </div>
   );

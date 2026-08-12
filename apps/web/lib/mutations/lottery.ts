@@ -4,6 +4,27 @@ import { AuditAction, logAuditEvent } from "@/lib/audit";
 import { notifyFamilyApplicationWaitlisted, notifyFamilyOfOffer } from "@/lib/notify";
 import { ensureWaitlist, addToWaitlist } from "./waitlist";
 import type { MutationResult } from "./applications";
+import {
+  parseLotteryPolicyConfig,
+  siblingAbsolutePreference,
+  enabledWeightedTiers,
+  acceptanceExpiryFrom,
+  NO_ADOPTED_POLICY_MESSAGE,
+  type LotteryPolicyConfig,
+} from "@/lib/lottery-policy";
+import { getAdoptedPolicyForCampus, isMissingRelation } from "@/lib/queries/lottery-policy";
+import {
+  deriveSiblingOfEnrolled,
+  deriveLinkedSiblings,
+  matchWeightedTiers,
+} from "@/lib/lottery-eligibility";
+import {
+  runPolicyDraw,
+  TIER_GENERAL,
+  TIER_LINKED_SIBLING,
+  TIER_SIBLING_ABSOLUTE,
+  type DrawEntry,
+} from "@/lib/lottery-draw";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -14,20 +35,30 @@ export interface CreateLotteryRunInput {
   lottery_rule_set_id?: string;
   total_seats: number;
   notes?: string;
+  /**
+   * Dress rehearsal. Runs the complete pipeline against the real applicant
+   * pool and writes only this run's own records — no application status
+   * changes, no offers, no waitlist rows, no family notification of any kind.
+   * A rehearsal can never be finalized as official; the database refuses it
+   * (lottery_run_rehearsal_never_official, 00047_lottery_policy.sql).
+   */
+  is_rehearsal?: boolean;
 }
 
 // ─── Priority Tiers ────────────────────────────────────
 //
-// Tiers come from lottery_rule_set.priority_tiers (JSONB, per campus) so each
-// campus can encode what its authorizer permits — sibling preference, children
-// of staff, geographic zones — without a code change. Tier order = priority:
-// index 0 fills seats first. Applications matching no tier land in the general
-// pool (tier = tiers.length).
+// LEGACY PATH. Tiers come from lottery_rule_set.priority_tiers (JSONB, per
+// campus). Runs created before the policy governance layer existed, and runs
+// at a campus with no adopted policy, still resolve their tiers this way.
+//
+// Runs bound to an adopted policy do NOT use this: their tier bands come from
+// lib/lottery-draw.ts (sibling absolute / linked sibling / general) and their
+// weighting comes from the policy's weightedTiers. See resolveRunPolicy below.
 
 interface TierMatcher {
   /** "column" matches a boolean column on application; "answer" matches application_answer. */
   source: "column" | "answer";
-  /** Column name (allowlisted) or application_answer.question_key. */
+  /** Column name (allowlisted) or application_answer.field_key. */
   field: string;
   /** For answers: value that grants the tier (case-insensitive). Defaults to yes/true. */
   match_value?: string;
@@ -49,9 +80,7 @@ const MATCHABLE_APP_COLUMNS = new Set(["has_sibling_enrolled"]);
  * Default rule set: sibling preference only — the behavior every campus had
  * before rule sets were wired up. Checks BOTH sibling signals: the
  * application column (set by staff-submitted apps) and the family form's
- * answer key. (The old code queried question_key "hasSiblingEnrolled", which
- * no writer ever produced, so sibling priority silently never applied to
- * family applications.)
+ * answer key.
  */
 const DEFAULT_PRIORITY_TIERS: PriorityTierDef[] = [
   {
@@ -138,6 +167,11 @@ async function resolvePriorityTiers(
 /**
  * Assign each application its priority tier: the index of the FIRST tier
  * with any matching matcher, else tiers.length (general pool).
+ *
+ * NOTE on the answer matcher: application_answer's real columns are field_key
+ * and value (00004_applications.sql:58-66). Earlier code here queried
+ * question_key / answer_value, which do not exist, so the answer branch
+ * silently matched nobody. Corrected.
  */
 async function assignPriorityTiers(
   supabase: Awaited<ReturnType<typeof createServerClient>> | ReturnType<typeof createServiceRoleClient>,
@@ -163,13 +197,20 @@ async function assignPriorityTiers(
           : ["yes", "true"];
         const { data } = await supabase
           .from("application_answer")
-          .select("application_id, answer_value")
+          .select("application_id, value")
           .in("application_id", appIds)
-          .eq("question_key", matcher.field);
+          .eq("field_key", matcher.field);
         for (const row of data ?? []) {
-          const r = row as Record<string, string>;
-          if (accepted.includes((r.answer_value ?? "").toLowerCase())) {
-            matched.add(r.application_id);
+          const r = row as Record<string, unknown>;
+          const raw = r.value;
+          const normalized =
+            typeof raw === "boolean"
+              ? raw
+                ? "true"
+                : "false"
+              : String(raw ?? "").trim().toLowerCase();
+          if (accepted.includes(normalized)) {
+            matched.add(r.application_id as string);
           }
         }
       }
@@ -185,17 +226,78 @@ async function assignPriorityTiers(
   return assignment;
 }
 
+// ─── Policy binding ────────────────────────────────────
+//
+// A run binds to its campus's ADOPTED policy at creation and carries a frozen
+// copy forever (lottery_run.policy_snapshot, immutable by trigger). Preview,
+// official, and every report read the snapshot — never the live policy row —
+// so editing or superseding a policy afterward cannot retroactively change how
+// a completed lottery reads.
+
+export interface RunPolicyBinding {
+  policyId: string | null;
+  config: LotteryPolicyConfig | null;
+  /** True when the run has no adopted policy behind it. */
+  ungoverned: boolean;
+  /** True when the governance columns are absent (migration 00047 not applied). */
+  legacySchema: boolean;
+}
+
+async function resolveRunPolicy(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  runId: string
+): Promise<RunPolicyBinding> {
+  const { data, error } = await supabase
+    .from("lottery_run")
+    .select("policy_id, policy_snapshot")
+    .eq("id", runId)
+    .single();
+
+  if (error) {
+    if (isMissingRelation(error)) {
+      console.warn(
+        "[resolveRunPolicy] policy columns not present — migration 00047 has not been applied. Falling back to legacy rule-set behavior."
+      );
+      return { policyId: null, config: null, ungoverned: true, legacySchema: true };
+    }
+    console.error("[resolveRunPolicy]", error.message);
+    return { policyId: null, config: null, ungoverned: true, legacySchema: false };
+  }
+
+  const row = (data ?? {}) as Record<string, unknown>;
+  if (!row.policy_id || !row.policy_snapshot) {
+    return { policyId: null, config: null, ungoverned: true, legacySchema: false };
+  }
+
+  const { config, errors } = parseLotteryPolicyConfig(row.policy_snapshot);
+  if (!config || errors.length > 0) {
+    console.error("[resolveRunPolicy] policy snapshot failed validation", {
+      runId,
+      errors,
+    });
+    return { policyId: row.policy_id as string, config: null, ungoverned: true, legacySchema: false };
+  }
+
+  return {
+    policyId: row.policy_id as string,
+    config,
+    ungoverned: false,
+    legacySchema: false,
+  };
+}
+
 // ─── Create Draft Lottery Run ──────────────────────────
 
 export async function createLotteryRun(
   input: CreateLotteryRunInput
-): Promise<MutationResult<{ id: string }>> {
+): Promise<MutationResult<{ id: string; governed: boolean; policyWarning: string | null }>> {
   // Service role on purpose: staff-only action (staffCreateLotteryRun gates
   // on requireRoleOnCampus for input.campus_id). Selects/updates `application`
   // directly, which trips the same latent RLS recursion (application policy
   // -> guardian policy -> application policy) documented in
   // lib/queries/recruitment-intel.ts.
   const supabase = createServiceRoleClient();
+  const isRehearsal = input.is_rehearsal === true;
 
   // Compute the next run_number for this campus/grade
   const { data: existing } = await supabase
@@ -224,24 +326,65 @@ export async function createLotteryRun(
     input.lottery_rule_set_id
   );
 
-  const { data: run, error } = await supabase
+  // Bind the adopted policy. A campus with no adopted policy can still create
+  // a run — staff need to be able to rehearse and to see the seat math — but
+  // the run is flagged, and finalizeLotteryRun refuses to make it official.
+  const adopted = await getAdoptedPolicyForCampus(input.campus_id);
+  let policyWarning: string | null = null;
+  if (!adopted) {
+    policyWarning = `${NO_ADOPTED_POLICY_MESSAGE} This run can be previewed and rehearsed, but it cannot be finalized as official.`;
+  } else if (adopted.configErrors.length > 0) {
+    policyWarning = `The adopted policy for this campus has configuration problems: ${adopted.configErrors.join(" ")}`;
+  }
+
+  const baseRow: Record<string, unknown> = {
+    enrollment_window_id: input.enrollment_window_id,
+    campus_id: input.campus_id,
+    grade_level_id: input.grade_level_id,
+    lottery_rule_set_id: ruleSetId,
+    status: "draft",
+    run_number: nextRunNumber,
+    total_applicants: applicantCount ?? 0,
+    total_seats: input.total_seats,
+    notes: input.notes ?? null,
+  };
+
+  const governedRow: Record<string, unknown> = {
+    ...baseRow,
+    is_rehearsal: isRehearsal,
+    policy_id: adopted?.row.id ?? null,
+    policy_snapshot: adopted ? adopted.row.config : null,
+  };
+
+  let { data: run, error } = await supabase
     .from("lottery_run")
-    .insert({
-      enrollment_window_id: input.enrollment_window_id,
-      campus_id: input.campus_id,
-      grade_level_id: input.grade_level_id,
-      lottery_rule_set_id: ruleSetId,
-      status: "draft",
-      run_number: nextRunNumber,
-      total_applicants: applicantCount ?? 0,
-      total_seats: input.total_seats,
-      notes: input.notes ?? null,
-    })
+    .insert(governedRow)
     .select("id")
     .single();
 
-  if (error) {
-    console.error("[createLotteryRun]", error.message);
+  // Graceful absence: if migration 00047 has not been applied, the governance
+  // columns do not exist. Fall back to the legacy row shape and warn loudly
+  // rather than failing the lottery.
+  if (error && isMissingRelation(error)) {
+    console.warn(
+      "[createLotteryRun] governance columns absent — creating an ungoverned legacy run. Apply supabase/migrations/00047_lottery_policy.sql."
+    );
+    if (isRehearsal) {
+      return {
+        data: null,
+        error:
+          "Rehearsal runs need supabase/migrations/00047_lottery_policy.sql applied. Without it the database cannot guarantee a rehearsal stays out of the official record.",
+      };
+    }
+    const retry = await supabase.from("lottery_run").insert(baseRow).select("id").single();
+    run = retry.data;
+    error = retry.error;
+    policyWarning =
+      "Lottery policy tables are not present in this database. This run is not governed by an adopted policy and cannot be finalized as official.";
+  }
+
+  if (error || !run) {
+    console.error("[createLotteryRun]", error?.message);
     return { data: null, error: "Failed to create lottery run." };
   }
 
@@ -272,44 +415,108 @@ export async function createLotteryRun(
       console.error("[createLotteryRun] entries", entryError.message);
     }
 
-    // Update those applications to "lottery_assigned" status
-    await supabase
-      .from("application")
-      .update({ status: "lottery_assigned", updated_at: new Date().toISOString() })
-      .in("id", appIds)
-      .eq("status", "verified");
+    // Update those applications to "lottery_assigned" status.
+    //
+    // REHEARSAL ISOLATION: skipped entirely for a rehearsal. A dress rehearsal
+    // writes only its own lottery_run and lottery_entry rows; it must leave
+    // every application exactly as it found it.
+    if (!isRehearsal) {
+      await supabase
+        .from("application")
+        .update({ status: "lottery_assigned", updated_at: new Date().toISOString() })
+        .in("id", appIds)
+        .eq("status", "verified");
+    }
   }
 
-  return { data: { id: run.id }, error: null };
+  return {
+    data: { id: run.id, governed: !!adopted, policyWarning },
+    error: null,
+  };
+}
+
+// ─── Building draw entries from the governing policy ───
+
+interface BuiltEntries {
+  entries: DrawEntry[];
+  summary: Record<string, unknown>;
+}
+
+async function buildPolicyDrawEntries(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  runId: string,
+  campusId: string,
+  config: LotteryPolicyConfig,
+  rawEntries: Array<{ id: string; application_id: string }>
+): Promise<BuiltEntries> {
+  const applicationIds = rawEntries.map((e) => e.application_id);
+
+  const preference = siblingAbsolutePreference(config);
+  const sibling = await deriveSiblingOfEnrolled(supabase, applicationIds, campusId, preference);
+  const linked = deriveLinkedSiblings(sibling.guardiansByApplication);
+
+  const tiers = enabledWeightedTiers(config);
+  const tierMatch = await matchWeightedTiers(supabase, applicationIds, tiers, config.defaultWeight);
+
+  const inRun = new Set(applicationIds);
+
+  const entries: DrawEntry[] = rawEntries.map((raw) => ({
+    id: raw.id,
+    applicationId: raw.application_id,
+    weight: tierMatch.weightByApplication.get(raw.application_id) ?? config.defaultWeight,
+    tierKeys: tierMatch.tierKeysByApplication.get(raw.application_id) ?? [],
+    siblingOfEnrolled: sibling.qualified.has(raw.application_id),
+    linkedSiblingApplicationIds: (linked.get(raw.application_id) ?? []).filter((id) => inRun.has(id)),
+  }));
+
+  const summary: Record<string, unknown> = {
+    sibling_method: sibling.method,
+    sibling_qualified: sibling.qualified.size,
+    sibling_claimed_unverified: sibling.claimedUnverified.size,
+    sibling_linkage_unresolvable: sibling.linkageUnresolvable,
+    linked_sibling_pairs: [...linked.values()].filter((v) => v.length > 0).length,
+    tier_counts: tiers.map((tier) => ({
+      key: tier.key,
+      label: tier.label,
+      weight: tier.weight,
+      applicants: tierMatch.matchedCountByTier.get(tier.key) ?? 0,
+      entries: (tierMatch.matchedCountByTier.get(tier.key) ?? 0) * tier.weight,
+      unsourced: tierMatch.unsourcedTierKeys.includes(tier.key),
+      source_field: tier.source.field,
+    })),
+    unsourced_tiers: tierMatch.unsourcedTierKeys,
+    default_weight: config.defaultWeight,
+  };
+
+  return { entries, summary };
 }
 
 // ─── Run Preview (Deterministic — Seeded & Reproducible) ───────────────────
 //
-// WHAT CHANGED FROM THE ORIGINAL:
-//   The original code used Math.random() and stored a seed that was never
-//   actually used to influence the random numbers. Every run was unreproducible.
+// The seed is generated and STORED BEFORE any result is computed, so even a
+// crash partway through leaves a seed that reproduces the identical draw.
 //
-//   This version:
-//   1. Generates a seed using crypto.randomUUID() for high-quality randomness
-//   2. Stores the seed in the database FIRST — before any results are computed
-//   3. Uses runDeterministicLottery() — a pure function that given the same
-//      seed always produces the same ranked output (djb2 hash per entry)
-//   4. Writes all entry updates in a single batch instead of N individual calls
-//
-//   To verify any run: take the stored random_seed, the entry IDs, and their
-//   priority tiers — call runDeterministicLottery(seed, entries, totalSeats)
-//   and the ranked output must be identical to what's stored.
+// Two draw paths:
+//   - GOVERNED: the run carries a policy snapshot. The full policy pipeline
+//     runs — sibling pre-pass, weighted entries, linked-sibling activation
+//     (lib/lottery-draw.ts).
+//   - LEGACY: no policy snapshot (pre-00047 run, or a campus with no adopted
+//     policy). The original tier-ordered draw runs unchanged. Such a run can
+//     be previewed but never finalized as official.
 
-export async function runLotteryPreview(
-  runId: string
-): Promise<MutationResult> {
-  const supabase = await createServerClient();
-
+export async function runLotteryPreview(runId: string): Promise<
+  MutationResult<{ governed: boolean; summary: Record<string, unknown> | null }>
+> {
+  // Service role: the governed path reads guardian_student, enrollment, and
+  // application_answer across households, which trips the same latent RLS
+  // recursion documented in lib/queries/recruitment-intel.ts.
+  const authClient = await createServerClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await authClient.auth.getUser();
 
-  // Verify run exists and is in draft or preview status
+  const supabase = createServiceRoleClient();
+
   const { data: run, error: fetchError } = await supabase
     .from("lottery_run")
     .select("id, status, total_seats, campus_id")
@@ -324,27 +531,25 @@ export async function runLotteryPreview(
     return { data: null, error: `Cannot run preview — status is ${run.status}.` };
   }
 
-  // Fetch all entries for this run
   const { data: entries, error: entriesError } = await supabase
     .from("lottery_entry")
-    .select("id, priority_tier")
+    .select("id, application_id, priority_tier")
     .eq("lottery_run_id", runId);
 
   if (entriesError || !entries || entries.length === 0) {
     return { data: null, error: "No entries found for this lottery run." };
   }
 
-  // ── Step 1: Generate seed and store it BEFORE computing results ────────────
-  // Storing the seed first means: even if the update loop fails partway through,
-  // the stored seed can be used to re-run and get identical results.
+  const rawEntries = (entries as Array<{ id: string; application_id: string; priority_tier: number }>).map(
+    (e) => ({ id: e.id, application_id: e.application_id, priority_tier: e.priority_tier ?? 0 })
+  );
+
+  // ── Step 1: Generate seed and store it BEFORE computing results ──────────
   const seed = generateLotterySeed();
 
   const { error: seedError } = await supabase
     .from("lottery_run")
-    .update({
-      random_seed: seed,
-      updated_at: new Date().toISOString(),
-    })
+    .update({ random_seed: seed, updated_at: new Date().toISOString() })
     .eq("id", runId);
 
   if (seedError) {
@@ -352,88 +557,115 @@ export async function runLotteryPreview(
     return { data: null, error: "Failed to initialize lottery run." };
   }
 
-  // ── Step 2: Run the deterministic lottery algorithm ────────────────────────
-  const serviceEntries = (entries as Array<{ id: string; priority_tier: number }>).map((e) => ({
-    id: e.id,
-    priority_tier: e.priority_tier ?? 0,
-  }));
+  // ── Step 2: Draw ─────────────────────────────────────────────────────────
+  const binding = await resolveRunPolicy(supabase, runId);
 
-  const { ranked } = runDeterministicLottery(seed, serviceEntries, run.total_seats as number);
-
-  // ── Step 3: Batch update all entries in one operation ─────────────────────
-  // The original code did N individual .update() calls — one per entry.
-  // This replaces them with upsert on the full set.
+  let upsertRows: Array<Record<string, unknown>>;
+  let summary: Record<string, unknown> | null = null;
   const now = new Date().toISOString();
-  const entryUpdates = ranked.map((entry) => ({
-    id: entry.id,
-    lottery_run_id: runId,
-    application_id: "", // populated from existing record — upsert key is id
-    priority_tier: entry.priority_tier,
-    random_number: entry.random_number,
-    final_rank: entry.final_rank,
-    is_selected: entry.is_selected,
-    updated_at: now,
-  }));
 
-  // Fetch existing application_id values to complete the upsert payload
-  const appIdMap = new Map(
-    (entries as Array<{ id: string; application_id?: string }>)
-      .map((e) => [e.id, e.application_id ?? ""])
-  );
+  if (binding.config) {
+    const preference = siblingAbsolutePreference(binding.config);
+    const built = await buildPolicyDrawEntries(
+      supabase,
+      runId,
+      run.campus_id as string,
+      binding.config,
+      rawEntries
+    );
 
-  const upsertRows = entryUpdates.map((row) => ({
-    ...row,
-    application_id: appIdMap.get(row.id) ?? "",
-  }));
+    const result = runPolicyDraw(seed, built.entries, run.total_seats as number, {
+      siblingAutoOffer: preference?.autoOfferBeforeDraw ?? false,
+      siblingOverflowPriority: preference?.overflowToPriorityWaitlist ?? false,
+      linkedSiblingActivation: binding.config.linkedSiblingActivation,
+    });
 
-  // Re-fetch with application_id to build complete upsert rows
-  const { data: fullEntries } = await supabase
-    .from("lottery_entry")
-    .select("id, application_id, priority_tier")
-    .eq("lottery_run_id", runId);
+    summary = {
+      ...built.summary,
+      governed: true,
+      total_seats: result.totalSeats,
+      total_applicants: result.totalApplicants,
+      weighted_pool_entries: result.totalPoolEntries,
+      selected: result.selectedCount,
+      sibling_auto_placed: result.siblingAutoPlaced,
+      sibling_priority_waitlisted: result.siblingPriorityWaitlisted,
+      linked_sibling_activated: result.linkedSiblingActivated,
+      drawn_at: now,
+    };
 
-  const fullAppIdMap = new Map(
-    (fullEntries ?? []).map((e: Record<string, unknown>) => [
-      e.id as string,
-      e.application_id as string,
-    ])
-  );
+    upsertRows = result.ranked.map((entry) => ({
+      id: entry.id,
+      lottery_run_id: runId,
+      application_id: entry.applicationId,
+      priority_tier: entry.priority_tier,
+      random_number: entry.random_number,
+      final_rank: entry.final_rank,
+      is_selected: entry.is_selected,
+      updated_at: now,
+    }));
+  } else {
+    // Legacy path — unchanged behavior for ungoverned runs.
+    const { ranked } = runDeterministicLottery(
+      seed,
+      rawEntries.map((e) => ({ id: e.id, priority_tier: e.priority_tier })),
+      run.total_seats as number
+    );
+    const appIdByEntry = new Map(rawEntries.map((e) => [e.id, e.application_id]));
+    upsertRows = ranked.map((entry) => ({
+      id: entry.id,
+      lottery_run_id: runId,
+      application_id: appIdByEntry.get(entry.id) ?? "",
+      priority_tier: entry.priority_tier,
+      random_number: entry.random_number,
+      final_rank: entry.final_rank,
+      is_selected: entry.is_selected,
+      updated_at: now,
+    }));
+    summary = {
+      governed: false,
+      note: binding.legacySchema
+        ? "Lottery policy tables are not present in this database. This draw used the legacy rule-set ordering."
+        : `${NO_ADOPTED_POLICY_MESSAGE} This draw used the legacy rule-set ordering and cannot be finalized as official.`,
+      total_seats: run.total_seats,
+      total_applicants: rawEntries.length,
+      drawn_at: now,
+    };
+  }
 
-  const finalUpsertRows = ranked.map((entry) => ({
-    id: entry.id,
-    lottery_run_id: runId,
-    application_id: fullAppIdMap.get(entry.id) ?? "",
-    priority_tier: entry.priority_tier,
-    random_number: entry.random_number,
-    final_rank: entry.final_rank,
-    is_selected: entry.is_selected,
-    updated_at: now,
-  }));
-
+  // ── Step 3: Batch update all entries in one operation ────────────────────
   const { error: upsertError } = await supabase
     .from("lottery_entry")
-    .upsert(finalUpsertRows, { onConflict: "id" });
+    .upsert(upsertRows, { onConflict: "id" });
 
   if (upsertError) {
     console.error("[runLotteryPreview] entry upsert", upsertError.message);
     return { data: null, error: "Failed to save lottery results." };
   }
 
-  // ── Step 4: Update run status to preview ──────────────────────────────────
-  const { error: runUpdateError } = await supabase
+  // ── Step 4: Update run status to preview ────────────────────────────────
+  const runUpdate: Record<string, unknown> = {
+    status: "preview",
+    total_applicants: rawEntries.length,
+    updated_at: now,
+    draw_summary: summary,
+  };
+
+  let { error: runUpdateError } = await supabase
     .from("lottery_run")
-    .update({
-      status: "preview",
-      total_applicants: entries.length,
-      updated_at: now,
-    })
+    .update(runUpdate)
     .eq("id", runId);
+
+  if (runUpdateError && isMissingRelation(runUpdateError)) {
+    delete runUpdate.draw_summary;
+    const retry = await supabase.from("lottery_run").update(runUpdate).eq("id", runId);
+    runUpdateError = retry.error;
+  }
 
   if (runUpdateError) {
     return { data: null, error: "Failed to update run status." };
   }
 
-  // ── Step 5: Write audit event ─────────────────────────────────────────────
+  // ── Step 5: Write audit event ───────────────────────────────────────────
   await logAuditEvent({
     table_name: "lottery_run",
     record_id: runId,
@@ -441,25 +673,30 @@ export async function runLotteryPreview(
     actor_id: user?.id ?? null,
     campus_id: run.campus_id as string,
     old_data: { status: run.status },
-    new_data: { status: "preview", random_seed: seed, total_applicants: entries.length },
+    new_data: { status: "preview", random_seed: seed, total_applicants: rawEntries.length },
     metadata: {
-      total_entries: entries.length,
+      total_entries: rawEntries.length,
       total_seats: run.total_seats,
-      selected: ranked.filter((e) => e.is_selected).length,
+      selected: upsertRows.filter((r) => r.is_selected === true).length,
+      governed: !!binding.config,
+      policy_id: binding.policyId,
     },
   });
 
-  return { data: null, error: null };
+  return { data: { governed: !!binding.config, summary }, error: null };
 }
 
 // ─── Simulate (Read-Only What-If) ──────────────────────
 //
-// Seats fill strictly in tier order, so per-tier outcomes are a function of
-// tier counts and seat count alone — the random seed only decides WHICH
-// individuals sit at the boundary tier. That means a simulation can be exact
-// about tier-level results without running (or writing) anything: staff see
-// "tier 1: all 8 seated; tier 2: 12 of 30 seated, 18 waitlisted" before
-// committing to a preview or official run.
+// Seats fill strictly in band order, so per-band outcomes are a function of
+// band counts and seat count alone — the random seed only decides WHICH
+// individuals sit at the boundary. A simulation can therefore be exact about
+// band-level results without running (or writing) anything.
+//
+// Simulate is NOT a rehearsal. It answers "how do the seats divide up", using
+// whatever bands the entries already carry. It does not run the sibling
+// pre-pass, does not apply weighting, and does not produce a ranked roster.
+// For a full dress rehearsal, create a run with is_rehearsal and preview it.
 
 export interface TierSimulation {
   tier: number;
@@ -475,7 +712,15 @@ export interface LotterySimulation {
   selected_total: number;
   waitlisted_total: number;
   tiers: TierSimulation[];
+  /** Governing policy label, or null when the run is ungoverned. */
+  governed_by: string | null;
 }
+
+const GOVERNED_BAND_LABELS: Record<number, string> = {
+  [TIER_SIBLING_ABSOLUTE]: "Sibling of a currently enrolled student",
+  [TIER_LINKED_SIBLING]: "Sibling pulled in by the linked-sibling rule",
+  [TIER_GENERAL]: "General weighted pool",
+};
 
 export async function simulateLotteryRun(
   runId: string,
@@ -502,16 +747,23 @@ export async function simulateLotteryRun(
     return { data: null, error: "No entries found for this lottery run." };
   }
 
+  const service = createServiceRoleClient();
+  const binding = await resolveRunPolicy(service, runId);
+
   const { tiers } = await resolvePriorityTiers(
     supabase,
     run.campus_id as string,
     (run.lottery_rule_set_id as string | null) ?? undefined
   );
-  const labelFor = (tier: number) => tiers[tier]?.label ?? "General pool";
+
+  const labelFor = (tier: number) => {
+    if (binding.config) return GOVERNED_BAND_LABELS[tier] ?? "General weighted pool";
+    return tiers[tier]?.label ?? "General pool";
+  };
 
   const totalSeats = seatsOverride ?? (run.total_seats as number);
 
-  // Count entries per tier, then fill seats in tier order.
+  // Count entries per band, then fill seats in band order.
   const countByTier = new Map<number, number>();
   for (const e of entries) {
     const tier = ((e as Record<string, unknown>).priority_tier as number) ?? 0;
@@ -542,28 +794,49 @@ export async function simulateLotteryRun(
       selected_total: selectedTotal,
       waitlisted_total: entries.length - selectedTotal,
       tiers: tierResults,
+      governed_by: binding.config ? binding.config.sourceDocument : null,
     },
     error: null,
   };
 }
 
 // ─── Finalize as Official ──────────────────────────────
+//
+// COMMIT ORDER AND WHY IT IS SAFE
+//
+// The Supabase JS client cannot open a multi-statement transaction, so this
+// cannot be one atomic BEGIN/COMMIT. Instead the sequence is ordered so that
+// every prefix of it is a consistent state, and every step is idempotent:
+//
+//   1. SNAPSHOT   — insert lottery_entry_snapshot rows. Guarded by the unique
+//                   index idx_lottery_snapshot_unique_entry, and skipped
+//                   outright when snapshots already exist for the run. A crash
+//                   here leaves the run in `preview` with snapshots present;
+//                   retrying finalize detects them and moves on.
+//   2. RESULTS    — nothing to write. lottery_entry already holds the ranked
+//                   results from preview; they are read into the snapshot in
+//                   step 1 and are not mutated here. This is why the order is
+//                   safe: the results exist before the snapshot, and the
+//                   snapshot exists before the status.
+//   3. STATUS     — flip lottery_run to `official`. This is the single
+//                   observable commit point: every downstream action (send
+//                   offers, waitlist non-selected, the report) requires
+//                   status = official, so a crash before this step leaves a
+//                   run that is simply still in preview.
+//
+// NO family notification happens here, and none happens as a side effect of
+// the status flip. Notifications are a separate, resumable, ledgered fan-out
+// (see sendOffersFromLottery / completeLotteryResults / resumeLotteryNotifications).
 
 export async function finalizeLotteryRun(
   runId: string,
   executedBy: string
 ): Promise<MutationResult> {
-  // Service role on purpose: staff-only action (staffFinalizeLottery gates on
-  // requireRoleOnCampus for the run's campus). Joins lottery_entry ->
-  // application -> student, which trips the same latent RLS recursion
-  // (application policy -> guardian policy -> application policy) documented
-  // in lib/queries/recruitment-intel.ts.
   const supabase = createServiceRoleClient();
 
-  // Verify run is in preview status
   const { data: run, error: fetchError } = await supabase
     .from("lottery_run")
-    .select("id, status, total_seats, campus_id")
+    .select("id, status, total_seats, campus_id, is_rehearsal")
     .eq("id", runId)
     .single();
 
@@ -571,63 +844,97 @@ export async function finalizeLotteryRun(
     return { data: null, error: "Lottery run not found." };
   }
 
+  if (run.is_rehearsal === true) {
+    return {
+      data: null,
+      error:
+        "This is a test rehearsal and can never become the official record. Create a fresh run to hold the official lottery.",
+    };
+  }
+
   if (run.status !== "preview") {
     return { data: null, error: `Cannot finalize — status is ${run.status}, must be preview.` };
   }
 
-  // Fetch all entries with application data for snapshots
-  const { data: entries, error: entriesError } = await supabase
-    .from("lottery_entry")
-    .select(`
-      id, priority_tier, random_number, final_rank, is_selected,
-      application:application_id (
-        id,
-        student:student_id (first_name, last_name),
-        grade_level:grade_level_id (grade)
-      )
-    `)
-    .eq("lottery_run_id", runId)
-    .order("final_rank", { ascending: true });
-
-  if (entriesError || !entries) {
-    return { data: null, error: "Failed to fetch lottery entries." };
+  // GOVERNANCE GATE. An official lottery is a legal act taken under rules a
+  // board adopted. Without an adopted policy behind the run, there is nothing
+  // to take it under.
+  const binding = await resolveRunPolicy(supabase, runId);
+  if (!binding.config) {
+    return { data: null, error: NO_ADOPTED_POLICY_MESSAGE };
   }
 
-  // Create immutable snapshots
-  const snapshots = entries.map((entry: Record<string, unknown>) => {
-    const app = entry.application as Record<string, unknown> | null;
-    const student = app?.student as Record<string, string> | null;
-    const grade = app?.grade_level as Record<string, string> | null;
+  // ── Step 1: SNAPSHOT ─────────────────────────────────────────────────────
+  // Idempotent: if a previous finalize attempt crashed after writing
+  // snapshots, they are already correct and are not rewritten.
+  const { data: existingSnapshots, error: existingError } = await supabase
+    .from("lottery_entry_snapshot")
+    .select("id")
+    .eq("lottery_run_id", runId)
+    .limit(1);
 
-    return {
-      lottery_run_id: runId,
-      lottery_entry_id: entry.id as string,
-      application_id: (app?.id as string) ?? "",
-      student_name: student ? `${student.first_name} ${student.last_name}` : "Unknown",
-      grade: grade?.grade ?? "",
-      priority_tier: entry.priority_tier as number,
-      random_number: entry.random_number as number,
-      final_rank: entry.final_rank as number,
-      is_selected: entry.is_selected as boolean,
-      snapshot_data: {
-        entry_id: entry.id,
+  if (existingError) {
+    console.error("[finalizeLotteryRun] snapshot check", existingError.message);
+    return { data: null, error: "Failed to check existing lottery snapshots." };
+  }
+
+  let snapshotsWritten = 0;
+
+  if ((existingSnapshots ?? []).length === 0) {
+    const { data: entries, error: entriesError } = await supabase
+      .from("lottery_entry")
+      .select(`
+        id, priority_tier, random_number, final_rank, is_selected,
+        application:application_id (
+          id,
+          student:student_id (first_name, last_name),
+          grade_level:grade_level_id (grade)
+        )
+      `)
+      .eq("lottery_run_id", runId)
+      .order("final_rank", { ascending: true });
+
+    if (entriesError || !entries) {
+      return { data: null, error: "Failed to fetch lottery entries." };
+    }
+
+    const snapshots = entries.map((entry: Record<string, unknown>) => {
+      const app = entry.application as Record<string, unknown> | null;
+      const student = app?.student as Record<string, string> | null;
+      const grade = app?.grade_level as Record<string, string> | null;
+
+      return {
+        lottery_run_id: runId,
+        lottery_entry_id: entry.id as string,
         application_id: (app?.id as string) ?? "",
-      },
-    };
-  });
+        student_name: student ? `${student.first_name} ${student.last_name}` : "Unknown",
+        grade: grade?.grade ?? "",
+        priority_tier: entry.priority_tier as number,
+        random_number: entry.random_number as number,
+        final_rank: entry.final_rank as number,
+        is_selected: entry.is_selected as boolean,
+        snapshot_data: {
+          entry_id: entry.id,
+          application_id: (app?.id as string) ?? "",
+          policy_id: binding.policyId,
+        },
+      };
+    });
 
-  if (snapshots.length > 0) {
-    const { error: snapError } = await supabase
-      .from("lottery_entry_snapshot")
-      .insert(snapshots);
+    if (snapshots.length > 0) {
+      const { error: snapError } = await supabase
+        .from("lottery_entry_snapshot")
+        .insert(snapshots);
 
-    if (snapError) {
-      console.error("[finalizeLotteryRun] snapshots", snapError.message);
-      return { data: null, error: "Failed to create lottery snapshots." };
+      if (snapError) {
+        console.error("[finalizeLotteryRun] snapshots", snapError.message);
+        return { data: null, error: "Failed to create lottery snapshots." };
+      }
+      snapshotsWritten = snapshots.length;
     }
   }
 
-  // Update run status to official
+  // ── Step 3: STATUS (the commit point) ───────────────────────────────────
   const now = new Date().toISOString();
   const { error: runUpdateError } = await supabase
     .from("lottery_run")
@@ -638,13 +945,13 @@ export async function finalizeLotteryRun(
       finalized_at: now,
       updated_at: now,
     })
-    .eq("id", runId);
+    .eq("id", runId)
+    .eq("status", "preview");
 
   if (runUpdateError) {
     return { data: null, error: "Failed to finalize lottery run." };
   }
 
-  // Audit: lottery officially finalized — this is the most sensitive action
   await logAuditEvent({
     table_name: "lottery_run",
     record_id: runId,
@@ -655,7 +962,9 @@ export async function finalizeLotteryRun(
     new_data: { status: "official", finalized_at: now },
     metadata: {
       total_seats: run.total_seats,
-      snapshots_written: snapshots.length,
+      snapshots_written: snapshotsWritten,
+      snapshots_already_present: (existingSnapshots ?? []).length > 0,
+      policy_id: binding.policyId,
     },
   });
 
@@ -685,24 +994,198 @@ export async function archiveLotteryRun(
   return { data: null, error: null };
 }
 
+// ─── Notification ledger ───────────────────────────────
+//
+// Every family notification a lottery produces gets a ledger row written in
+// the same operation that commits the underlying record. The fan-out then
+// walks pending rows. Because the ledger is keyed UNIQUE on
+// (lottery_run_id, application_id, kind), a resume after a crashed fan-out
+// sends exactly the families who were not reached and no one else.
+
+type ServiceClient = ReturnType<typeof createServiceRoleClient>;
+
+interface LedgerRow {
+  lottery_run_id: string;
+  application_id: string;
+  kind: "offer" | "waitlist";
+  status: "pending";
+  offer_id?: string | null;
+  position_number?: number | null;
+  student_name?: string | null;
+  expires_at?: string | null;
+}
+
+/**
+ * Write ledger rows. Returns false when the ledger table is absent, which
+ * tells the caller to fall back to the legacy inline notification path.
+ */
+async function writeLedgerRows(supabase: ServiceClient, rows: LedgerRow[]): Promise<boolean> {
+  if (rows.length === 0) return true;
+  const { error } = await supabase
+    .from("lottery_notification")
+    .upsert(rows, { onConflict: "lottery_run_id,application_id,kind", ignoreDuplicates: true });
+
+  if (error) {
+    if (isMissingRelation(error)) {
+      console.warn(
+        "[writeLedgerRows] lottery_notification table absent — falling back to inline notification. Apply supabase/migrations/00047_lottery_policy.sql to make the fan-out resumable."
+      );
+      return false;
+    }
+    console.error("[writeLedgerRows]", error.message);
+    return false;
+  }
+  return true;
+}
+
+export interface FanOutResult {
+  attempted: number;
+  sent: number;
+  failed: number;
+}
+
+/**
+ * Send every pending notification for a run, marking each row as it goes.
+ * Safe to call repeatedly: a row already marked 'sent' is never revisited.
+ */
+export async function runNotificationFanOut(
+  supabase: ServiceClient,
+  runId: string,
+  campusId: string
+): Promise<FanOutResult> {
+  const result: FanOutResult = { attempted: 0, sent: 0, failed: 0 };
+
+  const { data, error } = await supabase
+    .from("lottery_notification")
+    .select("id, application_id, kind, offer_id, position_number, student_name, expires_at, attempts")
+    .eq("lottery_run_id", runId)
+    .in("status", ["pending", "failed"]);
+
+  if (error) {
+    if (!isMissingRelation(error)) {
+      console.error("[runNotificationFanOut]", error.message);
+    }
+    return result;
+  }
+
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+
+  for (const row of rows) {
+    result.attempted++;
+    const applicationId = row.application_id as string;
+    const attempts = ((row.attempts as number) ?? 0) + 1;
+
+    try {
+      if (row.kind === "offer") {
+        await notifyFamilyOfOffer({
+          applicationId,
+          offerId: (row.offer_id as string) ?? "",
+          expiresAt: (row.expires_at as string) ?? "",
+          campusId,
+          studentName: (row.student_name as string) ?? undefined,
+        });
+      } else {
+        await notifyFamilyApplicationWaitlisted({
+          applicationId,
+          campusId,
+          studentName: (row.student_name as string) ?? "your student",
+          position: (row.position_number as number) ?? 0,
+        });
+      }
+
+      await supabase
+        .from("lottery_notification")
+        .update({
+          status: "sent",
+          sent_at: new Date().toISOString(),
+          attempts,
+          last_error: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", row.id as string);
+
+      result.sent++;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[runNotificationFanOut] notify failed", { applicationId, message });
+      await supabase
+        .from("lottery_notification")
+        .update({
+          status: "failed",
+          attempts,
+          last_error: message.slice(0, 500),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", row.id as string);
+      result.failed++;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Resume an interrupted fan-out. This is the "Resume" action behind the
+ * "notifications: X of Y sent" state on the run page.
+ */
+export async function resumeLotteryNotifications(
+  runId: string,
+  actorId: string
+): Promise<MutationResult<FanOutResult>> {
+  const supabase = createServiceRoleClient();
+
+  const { data: run, error } = await supabase
+    .from("lottery_run")
+    .select("id, campus_id, status")
+    .eq("id", runId)
+    .single();
+
+  if (error || !run) {
+    return { data: null, error: "Lottery run not found." };
+  }
+
+  if (run.status !== "official") {
+    return {
+      data: null,
+      error: "Only an official run has family notifications to resume.",
+    };
+  }
+
+  const result = await runNotificationFanOut(supabase, runId, run.campus_id as string);
+
+  await logAuditEvent({
+    table_name: "lottery_run",
+    record_id: runId,
+    action: AuditAction.Update,
+    actor_id: actorId,
+    campus_id: run.campus_id as string,
+    new_data: { notifications_resumed: result.sent },
+    metadata: { ...result },
+  });
+
+  return { data: result, error: null };
+}
+
 // ─── Send Offers From Lottery ──────────────────────────
+//
+// Two phases, deliberately separated:
+//   COMMIT   — create every offer, move every application to `offered`, and
+//              write a pending ledger row for each. No family is contacted.
+//   FAN-OUT  — walk the ledger and notify. Crash-safe and resumable.
+//
+// The offer response deadline defaults to the governing policy's acceptance
+// window (RSV: 14 days) rather than to a number typed into a dialog.
 
 export async function sendOffersFromLottery(
   runId: string,
-  expiresAt: string,
+  expiresAt: string | null,
   offeredBy: string
-): Promise<MutationResult<{ offersCreated: number }>> {
-  // Service role on purpose: staff-only action (staffSendLotteryOffers gates
-  // on requireRoleOnCampus for the run's campus). Joins lottery_entry ->
-  // application -> student and updates `application` directly, which trips
-  // the same latent RLS recursion (application policy -> guardian policy ->
-  // application policy) documented in lib/queries/recruitment-intel.ts.
+): Promise<MutationResult<{ offersCreated: number; notifications: FanOutResult }>> {
   const supabase = createServiceRoleClient();
 
-  // Get the run details
   const { data: run, error: runError } = await supabase
     .from("lottery_run")
-    .select("id, status, campus_id, grade_level_id")
+    .select("id, status, campus_id, grade_level_id, is_rehearsal")
     .eq("id", runId)
     .single();
 
@@ -710,12 +1193,32 @@ export async function sendOffersFromLottery(
     return { data: null, error: "Lottery run not found." };
   }
 
+  if (run.is_rehearsal === true) {
+    return {
+      data: null,
+      error: "This is a test rehearsal. Rehearsals never send offers to families.",
+    };
+  }
+
   if (run.status !== "official") {
     return { data: null, error: "Can only send offers from an official lottery run." };
   }
 
-  // Get selected entries (those who won the lottery). The student join gives
-  // the winner notification a real name rather than "your student".
+  // Policy-driven deadline. An explicit expiresAt from the caller still wins,
+  // so staff can shorten or extend a window with their eyes open.
+  const binding = await resolveRunPolicy(supabase, runId);
+  let resolvedExpiresAt = expiresAt;
+  if (!resolvedExpiresAt) {
+    if (!binding.config) {
+      return {
+        data: null,
+        error:
+          "No response deadline was given and this run has no governing policy to take one from. Choose a deadline explicitly.",
+      };
+    }
+    resolvedExpiresAt = acceptanceExpiryFrom(binding.config);
+  }
+
   const { data: selectedEntries, error: entriesError } = await supabase
     .from("lottery_entry")
     .select("id, application_id, application:application_id (student:student_id (first_name, last_name))")
@@ -728,13 +1231,21 @@ export async function sendOffersFromLottery(
 
   let offersCreated = 0;
   const now = new Date().toISOString();
+  const ledgerRows: LedgerRow[] = [];
+  const legacyNotifications: Array<{ applicationId: string; offerId: string; studentName?: string }> = [];
 
   for (const entry of selectedEntries) {
     const entryRow = entry as unknown as Record<string, unknown>;
     const appId = entryRow.application_id as string;
     const entryId = entryRow.id as string;
 
-    // Check if offer already exists for this application
+    const app = entryRow.application as
+      | { student?: { first_name?: string; last_name?: string } | null }
+      | null;
+    const studentName = app?.student
+      ? [app.student.first_name, app.student.last_name].filter(Boolean).join(" ") || undefined
+      : undefined;
+
     const { data: existingOffer } = await supabase
       .from("offer")
       .select("id")
@@ -742,9 +1253,22 @@ export async function sendOffersFromLottery(
       .in("status", ["pending", "accepted"])
       .limit(1);
 
-    if (existingOffer && existingOffer.length > 0) continue; // Skip if already offered
+    if (existingOffer && existingOffer.length > 0) {
+      // Already offered. Still ensure a ledger row exists so a family whose
+      // offer was created but whose notification never went out is reachable
+      // by Resume rather than silently skipped forever.
+      ledgerRows.push({
+        lottery_run_id: runId,
+        application_id: appId,
+        kind: "offer",
+        status: "pending",
+        offer_id: (existingOffer[0] as Record<string, string>).id,
+        student_name: studentName ?? null,
+        expires_at: resolvedExpiresAt,
+      });
+      continue;
+    }
 
-    // Create offer
     const { data: newOffer, error: offerError } = await supabase
       .from("offer")
       .insert({
@@ -754,7 +1278,7 @@ export async function sendOffersFromLottery(
         lottery_entry_id: entryId,
         status: "pending",
         offered_at: now,
-        expires_at: expiresAt,
+        expires_at: resolvedExpiresAt,
         offered_by: offeredBy,
       })
       .select("id")
@@ -765,67 +1289,91 @@ export async function sendOffersFromLottery(
       continue;
     }
 
-    // Update application status
     await supabase
       .from("application")
       .update({ status: "offered", updated_at: now })
       .eq("id", appId);
 
-    // Tell the family they won. Without this the seat offer exists only in
-    // the staff console — the losing families are notified by
-    // completeLotteryResults, so the winners must hear too. Never-throw per
-    // offer: a notification failure must not skip the remaining winners or
-    // undo the offer that was just written.
-    const app = entryRow.application as
-      | { student?: { first_name?: string; last_name?: string } | null }
-      | null;
-    const studentName = app?.student
-      ? [app.student.first_name, app.student.last_name].filter(Boolean).join(" ") || undefined
-      : undefined;
-
-    await notifyFamilyOfOffer({
+    ledgerRows.push({
+      lottery_run_id: runId,
+      application_id: appId,
+      kind: "offer",
+      status: "pending",
+      offer_id: newOffer.id as string,
+      student_name: studentName ?? null,
+      expires_at: resolvedExpiresAt,
+    });
+    legacyNotifications.push({
       applicationId: appId,
       offerId: newOffer.id as string,
-      expiresAt,
-      campusId: run.campus_id as string,
       studentName,
-    }).catch((err) => console.error(`[sendOffersFromLottery] notify ${appId}`, err));
+    });
 
     offersCreated++;
   }
 
-  return { data: { offersCreated }, error: null };
+  // ── Fan-out, only after every offer is committed ─────────────────────────
+  const ledgered = await writeLedgerRows(supabase, ledgerRows);
+
+  let notifications: FanOutResult = { attempted: 0, sent: 0, failed: 0 };
+
+  if (ledgered) {
+    notifications = await runNotificationFanOut(supabase, runId, run.campus_id as string);
+  } else {
+    // Legacy fallback: no ledger table, so notify inline and never throw per
+    // family. Not resumable — the warning above says so.
+    for (const item of legacyNotifications) {
+      notifications.attempted++;
+      try {
+        await notifyFamilyOfOffer({
+          applicationId: item.applicationId,
+          offerId: item.offerId,
+          expiresAt: resolvedExpiresAt,
+          campusId: run.campus_id as string,
+          studentName: item.studentName,
+        });
+        notifications.sent++;
+      } catch (err) {
+        notifications.failed++;
+        console.error(`[sendOffersFromLottery] notify ${item.applicationId}`, err);
+      }
+    }
+  }
+
+  return { data: { offersCreated, notifications }, error: null };
 }
 
 // ─── Complete Lottery Results (Waitlist Non-Selected) ──
 //
 // Closes the loop finalizeLotteryRun leaves open: everyone NOT selected sits
 // at `lottery_assigned` with no waitlist entry and no notification until
-// staff run this. Reuses ensureWaitlist/addToWaitlist (lib/mutations/
-// waitlist.ts) rather than writing waitlist_position rows directly, so
-// waitlist semantics (application status, audit logging) stay in one place.
+// staff run this. Same two-phase shape as sendOffersFromLottery — every
+// waitlist position is committed first, then the ledgered fan-out runs.
 //
 // Idempotent: safe to click twice. Applications that already have an active
-// waitlist_position OR a pending/accepted offer are skipped rather than
-// double-added or re-notified.
+// waitlist_position OR a pending/accepted offer are skipped.
 
 export async function completeLotteryResults(
   runId: string,
   actorId: string
-): Promise<MutationResult<{ waitlisted: number }>> {
-  const supabase = await createServerClient();
+): Promise<MutationResult<{ waitlisted: number; notifications: FanOutResult }>> {
+  const supabase = createServiceRoleClient();
 
-  // The run carries campus_id/grade_level_id directly, but school_year_id
-  // lives one hop away on enrollment_window (see supabase/migrations/
-  // 00004_applications.sql: enrollment_window.school_year_id).
   const { data: run, error: runError } = await supabase
     .from("lottery_run")
-    .select("id, status, campus_id, grade_level_id, enrollment_window_id")
+    .select("id, status, campus_id, grade_level_id, enrollment_window_id, is_rehearsal")
     .eq("id", runId)
     .single();
 
   if (runError || !run) {
     return { data: null, error: "Lottery run not found." };
+  }
+
+  if (run.is_rehearsal === true) {
+    return {
+      data: null,
+      error: "This is a test rehearsal. Rehearsals never place families on a waitlist.",
+    };
   }
 
   if (run.status !== "official") {
@@ -856,8 +1404,6 @@ export async function completeLotteryResults(
 
   const waitlistId = waitlistResult.data.id;
 
-  // Non-selected snapshots, in lottery-rank order. The snapshot already
-  // carries student_name, so no application/student join is needed here.
   const { data: snapshots, error: snapshotError } = await supabase
     .from("lottery_entry_snapshot")
     .select("application_id, final_rank, student_name")
@@ -877,13 +1423,11 @@ export async function completeLotteryResults(
   }>;
 
   if (rows.length === 0) {
-    return { data: { waitlisted: 0 }, error: null };
+    return { data: { waitlisted: 0, notifications: { attempted: 0, sent: 0, failed: 0 } }, error: null };
   }
 
   const appIds = rows.map((r) => r.application_id);
 
-  // Idempotency check, batched: an application already on an active waitlist
-  // or already holding a pending/accepted offer is skipped.
   const [{ data: existingPositions }, { data: existingOffers }] = await Promise.all([
     supabase
       .from("waitlist_position")
@@ -903,12 +1447,10 @@ export async function completeLotteryResults(
   ]);
 
   let waitlisted = 0;
-  // Sequential 1-based position among the families we actually add. This
-  // matches both the rest of the waitlist system (positions start at 1, not
-  // at seats+1) and what getWaitlistStandings will show the family on their
-  // dashboard — so the "#N" in the email never disagrees with the portal.
-  // Rows are already sorted by final_rank, so sequential order == lottery order.
+  // Sequential 1-based position among the families we actually add — matches
+  // the rest of the waitlist system and what the family sees on their portal.
   let position = 0;
+  const ledgerRows: LedgerRow[] = [];
 
   for (const row of rows) {
     if (skip.has(row.application_id)) continue;
@@ -929,19 +1471,40 @@ export async function completeLotteryResults(
     }
 
     waitlisted++;
+    ledgerRows.push({
+      lottery_run_id: runId,
+      application_id: row.application_id,
+      kind: "waitlist",
+      status: "pending",
+      position_number: position,
+      student_name: row.student_name,
+    });
+  }
 
-    // Guarded so one family's notification failure never aborts the batch.
-    try {
-      await notifyFamilyApplicationWaitlisted({
-        applicationId: row.application_id,
-        campusId: run.campus_id as string,
-        studentName: row.student_name,
-        position,
-      });
-    } catch (err) {
-      console.error("[completeLotteryResults] notify failed", err, {
-        applicationId: row.application_id,
-      });
+  // ── Fan-out, only after every position is committed ──────────────────────
+  const ledgered = await writeLedgerRows(supabase, ledgerRows);
+
+  let notifications: FanOutResult = { attempted: 0, sent: 0, failed: 0 };
+
+  if (ledgered) {
+    notifications = await runNotificationFanOut(supabase, runId, run.campus_id as string);
+  } else {
+    for (const item of ledgerRows) {
+      notifications.attempted++;
+      try {
+        await notifyFamilyApplicationWaitlisted({
+          applicationId: item.application_id,
+          campusId: run.campus_id as string,
+          studentName: item.student_name ?? "your student",
+          position: item.position_number ?? 0,
+        });
+        notifications.sent++;
+      } catch (err) {
+        notifications.failed++;
+        console.error("[completeLotteryResults] notify failed", err, {
+          applicationId: item.application_id,
+        });
+      }
     }
   }
 
@@ -956,8 +1519,10 @@ export async function completeLotteryResults(
       total_non_selected: rows.length,
       waitlisted,
       skipped: rows.length - waitlisted,
+      notifications_sent: notifications.sent,
+      notifications_failed: notifications.failed,
     },
   });
 
-  return { data: { waitlisted }, error: null };
+  return { data: { waitlisted, notifications }, error: null };
 }

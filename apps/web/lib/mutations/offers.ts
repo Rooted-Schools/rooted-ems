@@ -7,6 +7,8 @@ import { AuditAction, logAuditEvent } from "@/lib/audit";
 import type { DeclineReason } from "@/lib/decline-reasons";
 import { notifyFamilyOfOffer, notifyStaffOfferAccepted, notifyStaffOfferDeclined } from "@/lib/notify";
 import { requireStaffSession } from "@/lib/auth/get-session";
+import { getAdoptedPolicyForCampus } from "@/lib/queries/lottery-policy";
+import { waitlistOfferExpiryFrom } from "@/lib/lottery-policy";
 
 // ─── Shared helper ─────────────────────────────────────────────────────────
 
@@ -64,8 +66,25 @@ async function promoteNextWaitlistCandidate(
     return;
   }
 
-  // Give the promoted candidate 7 days to respond
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  // The response window comes from the campus's adopted lottery policy, which
+  // is where the board actually set it. Under the Rooted School Vancouver
+  // Enrollment Policy (adopted 2023-01-25, revised 2024-08-20) a waitlist offer
+  // runs for two days before passing to the next family. The previous
+  // hardcoded 7 days quietly gave every waitlisted family a different deadline
+  // from the one the board adopted and the family was told about.
+  //
+  // Falls back to 7 days only where a campus has no adopted policy, with a log
+  // saying so rather than a silent substitution.
+  const adopted = await getAdoptedPolicyForCampus(campusId);
+  if (!adopted) {
+    console.warn(
+      "[promoteNextWaitlistCandidate] no adopted lottery policy for campus — falling back to a 7 day response window",
+      { campusId }
+    );
+  }
+  const expiresAt = adopted
+    ? waitlistOfferExpiryFrom(adopted.config)
+    : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const result = await promoteFromWaitlist(nextPositionId, "system", expiresAt);
   if (result.error) {

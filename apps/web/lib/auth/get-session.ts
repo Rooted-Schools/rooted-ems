@@ -266,3 +266,33 @@ export async function requireRoleOnCampus(
   }
   return session;
 }
+
+/**
+ * True when a session reads as org-wide / CMO-level access under this app's
+ * existing convention: zero rows in user_campus_role. That empty map is not
+ * "no access" — it's the established signal (already load-bearing across
+ * app/staff/pipeline, /today, /recruitment, /applications, /equity, /funnel:
+ * see each page's `accessibleIds.length === 0 || accessibleIds.includes(...)`
+ * campus-filter bypass) that this staff member isn't scoped to any single
+ * campus and therefore sees everything. A scoped staff member — even a
+ * system_admin on their one campus — has at least one row and reads false
+ * here.
+ */
+export function hasNetworkAccess(session: AuthSession): boolean {
+  return getAccessibleCampusIds(session).length === 0;
+}
+
+/**
+ * Require org-wide / CMO-level access (see hasNetworkAccess), or redirect.
+ * Same quiet-banner pattern as requireMinRole / requireCMOAccess: an
+ * authenticated, scoped staff member hitting a network-level page is not an
+ * auth failure, just the wrong door — send them back to Today with the
+ * banner rather than bouncing to login.
+ */
+export async function requireNetworkAccess(): Promise<AuthSession> {
+  const session = await requireStaffSession();
+  if (!hasNetworkAccess(session)) {
+    redirect("/staff/today?denied=1");
+  }
+  return session;
+}

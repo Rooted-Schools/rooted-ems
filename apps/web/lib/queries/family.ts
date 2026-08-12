@@ -100,6 +100,13 @@ export interface FamilyJourneyCard {
   waitlist_standing: WaitlistStanding | null;
   /** Campus contact number, when set (campus.phone) — powers the family-facing help line. */
   campus_phone: string | null;
+  /** The window this application was submitted into (application.enrollment_window_id
+   *  is NOT NULL, so this is only null if the row's window was hard-deleted).
+   *  open_date/close_date are TIMESTAMPTZ stored as UTC midnight — format with
+   *  timeZone: "UTC" (see app/(public)/landing-client.tsx formatDate). No
+   *  lottery-date column exists yet, so only these two real dates are ever
+   *  derivable here — never invent a lottery date. */
+  enrollment_window: { open_date: string; close_date: string } | null;
 }
 
 /**
@@ -318,7 +325,8 @@ export async function getFamilyJourneyCards(): Promise<FamilyJourneyCard[]> {
       id, status, submitted_at, updated_at,
       student:student_id (first_name, last_name),
       campus:campus_id (name, phone),
-      grade_level:grade_level_id (grade)
+      grade_level:grade_level_id (grade),
+      enrollment_window:enrollment_window_id (open_date, close_date)
     `
     )
     .order("updated_at", { ascending: false })
@@ -367,6 +375,7 @@ export async function getFamilyJourneyCards(): Promise<FamilyJourneyCard[]> {
     const student = row.student as Record<string, string> | null;
     const campus = row.campus as Record<string, string> | null;
     const grade = row.grade_level as Record<string, string> | null;
+    const window = row.enrollment_window as Record<string, string> | null;
     const status = row.status as string;
 
     return {
@@ -383,6 +392,9 @@ export async function getFamilyJourneyCards(): Promise<FamilyJourneyCard[]> {
       registration_complete: status === "registered" || status === "enrolled",
       waitlist_standing: standings.get(row.id as string) ?? null,
       campus_phone: (campus?.phone as string | undefined) ?? null,
+      enrollment_window: window
+        ? { open_date: window.open_date as string, close_date: window.close_date as string }
+        : null,
     };
   });
 }

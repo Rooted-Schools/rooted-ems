@@ -1,6 +1,6 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { LocaleProvider } from "@/lib/i18n/locale-context";
-import { getLocale } from "@/lib/i18n/get-locale";
+import { getLocaleCookie } from "@/lib/i18n/get-locale";
 import { LotteryExplainerClient, type ExplainerCampus } from "./explainer-client";
 
 export const metadata = {
@@ -30,7 +30,7 @@ function extractTierLabels(raw: unknown): string[] {
 }
 
 export default async function HowTheLotteryWorksPage() {
-  const initialLocale = await getLocale();
+  const initialLocale = await getLocaleCookie();
 
   // Service role: campus, lottery_rule_set, and enrollment_window rows are
   // RLS-visible to authenticated users only, and this page is public.

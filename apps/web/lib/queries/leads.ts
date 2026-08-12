@@ -1,4 +1,11 @@
-import { createServerClient } from "@rooted-ems/database/server";
+import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
+import { bodyHasOutcome } from "@/lib/lead-call-outcomes";
+
+// Re-exported for existing importers — the vocabulary itself now lives in
+// lib/lead-call-outcomes.ts (dependency-free, so "use client" components can
+// import it directly without pulling in next/headers via this module's
+// createServerClient/createServiceRoleClient imports).
+export { CALL_OUTCOMES, buildCallOutcomeBody, bodyHasOutcome, type CallOutcomeKey } from "@/lib/lead-call-outcomes";
 
 /**
  * Lead (CRM) queries. All use the user-scoped client: lead RLS restricts
@@ -25,6 +32,10 @@ export interface LeadRow {
   next_follow_up_at: string | null;
   last_contact_at: string | null;
   created_at: string;
+  /** True when the due next_follow_up_at was set by the structured "Call
+   *  back later" outcome (see CALL_OUTCOMES below), not a generic manual
+   *  follow-up date — only ever populated by getFollowUpQueue. */
+  is_callback?: boolean;
 }
 
 export interface LeadDetail extends LeadRow {
@@ -153,7 +164,34 @@ export async function getFollowUpQueue(campusId?: string): Promise<LeadRow[]> {
     console.error("[getFollowUpQueue]", error.message);
     return [];
   }
-  return (data ?? []).map((row: Record<string, unknown>) => toLeadRow(row));
+  const rows = (data ?? []).map((row: Record<string, unknown>) => toLeadRow(row));
+  if (rows.length === 0) return rows;
+
+  // A due follow-up is specifically a "callback" when it was set by the
+  // structured "Call back later" outcome — derived from each lead's most
+  // recent call activity body, one batch query (no N+1), never a second
+  // column that could drift from what was actually logged.
+  const { data: callActivities, error: callError } = await supabase
+    .from("lead_activity")
+    .select("lead_id, body, created_at")
+    .in("lead_id", rows.map((r) => r.id))
+    .eq("activity_type", "call")
+    .order("created_at", { ascending: false });
+
+  if (callError) {
+    console.error("[getFollowUpQueue] call activities", callError.message);
+    return rows;
+  }
+
+  const latestCallBodyByLead = new Map<string, string | null>();
+  for (const a of (callActivities ?? []) as { lead_id: string; body: string | null }[]) {
+    if (!latestCallBodyByLead.has(a.lead_id)) latestCallBodyByLead.set(a.lead_id, a.body);
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    is_callback: bodyHasOutcome(latestCallBodyByLead.get(r.id), "callback"),
+  }));
 }
 
 const ALL_STAGES = ["new", "contacted", "engaged", "applied", "closed"] as const;
@@ -250,6 +288,49 @@ export async function getCampaigns(campusId?: string, limit = 10): Promise<Campa
       campus_name: campus?.name ?? "",
     };
   });
+}
+
+export interface LeaderStripStats {
+  newFamiliesThisWeek: number;
+  contactsLoggedThisWeek: number;
+}
+
+/**
+ * Today leader strip stats (staff/today/page.tsx) — real trailing-7-day
+ * counts, scoped to campusIds (empty/undefined = org-wide). Uses the service
+ * role client like the rest of Today's ad hoc stats, since this is a
+ * leadership overview rather than an RLS-scoped list view.
+ */
+export async function getLeaderStripStats(campusIds?: string[]): Promise<LeaderStripStats> {
+  const supabase = createServiceRoleClient();
+  const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  let leadsQuery = supabase
+    .from("lead")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", sevenDaysAgoIso);
+  if (campusIds && campusIds.length > 0) leadsQuery = leadsQuery.in("campus_id", campusIds);
+
+  // lead_activity has no campus_id of its own — !inner join to lead makes the
+  // joined campus_id filterable (same pattern as getRegistrationCompletion in
+  // lib/queries/melt.ts). actor_id IS NOT NULL restricts to touches a staff
+  // member actually logged, excluding automated drip sends and system notes.
+  let contactsQuery = supabase
+    .from("lead_activity")
+    .select("id, lead:lead_id!inner (campus_id)", { count: "exact", head: true })
+    .in("activity_type", ["call", "email", "note"])
+    .not("actor_id", "is", null)
+    .gte("created_at", sevenDaysAgoIso);
+  if (campusIds && campusIds.length > 0) contactsQuery = contactsQuery.in("lead.campus_id", campusIds);
+
+  const [leadsResult, contactsResult] = await Promise.all([leadsQuery, contactsQuery]);
+  if (leadsResult.error) console.error("[getLeaderStripStats] leads", leadsResult.error.message);
+  if (contactsResult.error) console.error("[getLeaderStripStats] contacts", contactsResult.error.message);
+
+  return {
+    newFamiliesThisWeek: leadsResult.count ?? 0,
+    contactsLoggedThisWeek: contactsResult.count ?? 0,
+  };
 }
 
 export interface JourneyStat {

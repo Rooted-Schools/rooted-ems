@@ -44,6 +44,7 @@ interface SavedView {
   search?: string;
   campus?: string;
   staleDays?: string;
+  grade?: string;
 }
 
 /** Presets always shown first, per the Phase 3 design handoff. */
@@ -152,6 +153,9 @@ interface PipelineClientProps {
   initialSearch?: string;
   initialCampus?: string;
   initialStaleDays?: string;
+  initialGrade?: string;
+  /** Real grades offered at the scoped campuses — not a hardcoded 6-12 list. */
+  availableGrades: string[];
 }
 
 export function PipelineClient({
@@ -165,6 +169,8 @@ export function PipelineClient({
   initialSearch = "",
   initialCampus = "all",
   initialStaleDays = "",
+  initialGrade = "all",
+  availableGrades,
 }: PipelineClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -174,6 +180,7 @@ export function PipelineClient({
 
   const [search, setSearch] = useState(initialSearch);
   const [campusFilter, setCampusFilter] = useState(initialCampus);
+  const [gradeFilter, setGradeFilter] = useState(initialGrade);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [newViewName, setNewViewName] = useState("");
@@ -189,12 +196,13 @@ export function PipelineClient({
   }, []);
 
   const pushFilters = useCallback(
-    (overrides: { stage?: string; search?: string; campus?: string; staleDays?: string | null }) => {
+    (overrides: { stage?: string; search?: string; campus?: string; staleDays?: string | null; grade?: string }) => {
       const params = new URLSearchParams(currentParams.toString());
       const stage = overrides.stage ?? initialStage;
       const q = overrides.search ?? search;
       const campus = overrides.campus ?? campusFilter;
       const staleDays = overrides.staleDays !== undefined ? overrides.staleDays : currentParams.get("staleDays");
+      const grade = overrides.grade ?? gradeFilter;
 
       params.set("stage", stage);
       if (q) params.set("search", q);
@@ -203,11 +211,13 @@ export function PipelineClient({
       else params.delete("campus");
       if (staleDays) params.set("staleDays", staleDays);
       else params.delete("staleDays");
+      if (grade && grade !== "all") params.set("grade", grade);
+      else params.delete("grade");
       params.delete("page");
 
       router.push(`${pathname}?${params.toString()}`);
     },
-    [router, pathname, currentParams, initialStage, search, campusFilter]
+    [router, pathname, currentParams, initialStage, search, campusFilter, gradeFilter]
   );
 
   const goToPage = useCallback(
@@ -227,6 +237,7 @@ export function PipelineClient({
       search: view.search ?? "",
       campus: view.campus ?? "all",
       staleDays: view.staleDays ?? null,
+      grade: view.grade ?? "all",
     });
   }
 
@@ -240,6 +251,7 @@ export function PipelineClient({
       search: search || undefined,
       campus: campusFilter !== "all" ? campusFilter : undefined,
       staleDays: currentParams.get("staleDays") ?? undefined,
+      grade: gradeFilter !== "all" ? gradeFilter : undefined,
     };
     const next = [...savedViews, view];
     setSavedViews(next);
@@ -533,6 +545,25 @@ export function PipelineClient({
             ))}
           </Select>
         )}
+        {availableGrades.length > 0 && (
+          <Select
+            value={gradeFilter}
+            onChange={(e) => {
+              const v = e.target.value;
+              setGradeFilter(v);
+              pushFilters({ grade: v });
+            }}
+            className="w-full sm:w-40"
+            aria-label="Filter by grade"
+          >
+            <option value="all">All grades</option>
+            {availableGrades.map((g) => (
+              <option key={g} value={g}>
+                {getGradeLabel(g)}
+              </option>
+            ))}
+          </Select>
+        )}
       </div>
 
       {/* Table */}
@@ -546,7 +577,7 @@ export function PipelineClient({
           <EmptyState
             icon={<IconClipboardList size={40} />}
             title="No applications in this stage"
-            description={search || campusFilter !== "all" ? "Try adjusting your search or filters." : "Nothing is sitting in this stage right now — applications will land here automatically as they move through review."}
+            description={search || campusFilter !== "all" || gradeFilter !== "all" ? "Try adjusting your search or filters." : "Nothing is sitting in this stage right now — applications will land here automatically as they move through review."}
           />
         ) : (
           <Table>

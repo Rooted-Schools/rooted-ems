@@ -3,6 +3,7 @@ import {
   getPipelineStageCounts,
   getPipelineNeeds,
   getCampuses,
+  getGradesForCampuses,
 } from "@/lib/queries";
 import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
 import { statusesForStage, DEFAULT_PIPELINE_STAGE, PIPELINE_STAGES } from "@/lib/application-helpers";
@@ -15,7 +16,7 @@ const PAGE_SIZE = 50;
 export default async function PipelinePage({
   searchParams,
 }: {
-  searchParams: { campus?: string; stage?: string; search?: string; page?: string; staleDays?: string };
+  searchParams: { campus?: string; stage?: string; search?: string; page?: string; staleDays?: string; grade?: string };
 }) {
   const session = await requireStaffSession();
   const accessibleIds = getAccessibleCampusIds(session);
@@ -35,16 +36,27 @@ export default async function PipelinePage({
   const parsedStaleDays = Number.parseInt(searchParams?.staleDays ?? "", 10);
   const staleDays = Number.isFinite(parsedStaleDays) && parsedStaleDays > 0 ? parsedStaleDays : undefined;
 
+  // Grade options are the real grades offered at the scoped campuses (not a
+  // hardcoded 6-12 list) — a campus that only offers 9-12 shouldn't show 6-8
+  // as selectable. Validate the incoming param against that real set so a
+  // stale/bookmarked grade for a since-changed campus scope silently falls
+  // back to "All grades" instead of returning an honestly-empty table.
+  const availableGrades = await getGradesForCampuses(scopedCampusIds);
+  const grade = searchParams?.grade && availableGrades.includes(searchParams.grade)
+    ? searchParams.grade
+    : undefined;
+
   const [{ rows: applications, totalCount }, stageCounts, allCampuses] = await Promise.all([
     getStaffApplications({
       campusIds: scopedCampusIds,
       statuses,
       search: searchParam,
       staleDays,
+      grade,
       page,
       pageSize: PAGE_SIZE,
     }),
-    getPipelineStageCounts(scopedCampusIds),
+    getPipelineStageCounts(scopedCampusIds, grade),
     getCampuses(),
   ]);
 
@@ -77,6 +89,8 @@ export default async function PipelinePage({
       initialSearch={searchParams?.search ?? ""}
       initialCampus={searchParams?.campus ?? "all"}
       initialStaleDays={searchParams?.staleDays ?? ""}
+      initialGrade={grade ?? "all"}
+      availableGrades={availableGrades}
     />
   );
 }

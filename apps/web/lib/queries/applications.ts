@@ -96,6 +96,8 @@ export async function getStaffApplications(opts?: {
   status?: string;
   /** Multi-status filter (Pipeline stage tabs) — takes precedence over `status` when non-empty. */
   statuses?: string[];
+  /** Grade level code ("6".."12") — filters via the grade_level join. */
+  grade?: string;
   search?: string;
   /** Only rows whose updated_at is at least this many days old — powers the
    *  "Stalled 5+ days" saved view. Real filter, not a client-side illusion. */
@@ -109,7 +111,10 @@ export async function getStaffApplications(opts?: {
   const page = Math.max(1, opts?.page ?? 1);
   const offset = (page - 1) * pageSize;
 
-  // Build query — joins application with student, guardian, campus, grade_level
+  // Build query — joins application with student, guardian, campus, grade_level.
+  // grade_level uses !inner so a `grade` filter can be applied on the joined
+  // column (same pattern as lib/queries/melt.ts getRegistrationCompletion) —
+  // application.grade_level_id is NOT NULL so !inner never drops real rows.
   let query = supabase
     .from("application")
     .select(
@@ -122,7 +127,7 @@ export async function getStaffApplications(opts?: {
       student:student_id (first_name, last_name),
       guardian:guardian_id (first_name, last_name),
       campus:campus_id (name),
-      grade_level:grade_level_id (grade)
+      grade_level:grade_level_id!inner (grade)
     `,
       { count: "exact" }
     )
@@ -139,6 +144,10 @@ export async function getStaffApplications(opts?: {
     query = query.in("status", opts.statuses);
   } else if (opts?.status && opts.status !== "all") {
     query = query.eq("status", opts.status);
+  }
+
+  if (opts?.grade) {
+    query = query.eq("grade_level.grade", opts.grade);
   }
 
   if (opts?.staleDays && opts.staleDays > 0) {
@@ -202,6 +211,32 @@ export async function getStaffApplications(opts?: {
   });
 
   return { rows, totalCount: count ?? 0 };
+}
+
+const GRADE_ORDER = ["6", "7", "8", "9", "10", "11", "12"];
+
+/**
+ * Real grade levels offered at the scoped campuses (from grade_level, the
+ * same table that backs every application's grade_level_id) — not the
+ * static 6-12 set, so a single-grade-band campus like RSV (9-12) doesn't
+ * show grades it has never offered. Empty campusIds means org-wide, so every
+ * grade any campus offers comes back.
+ */
+export async function getGradesForCampuses(campusIds?: string[]): Promise<string[]> {
+  const supabase = createServiceRoleClient();
+  let query = supabase.from("grade_level").select("grade");
+  if (campusIds && campusIds.length > 0) {
+    query = query.in("campus_id", campusIds);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("[getGradesForCampuses]", error.message);
+    return [];
+  }
+
+  const present = new Set((data ?? []).map((r: Record<string, unknown>) => r.grade as string));
+  return GRADE_ORDER.filter((g) => present.has(g));
 }
 
 /**

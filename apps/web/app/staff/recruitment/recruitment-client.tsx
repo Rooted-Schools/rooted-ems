@@ -81,6 +81,19 @@ function pastContactStandard(lead: LeadRow): boolean {
   return hours > 24;
 }
 
+/** True when a due date (ISO) falls on today's calendar date, local time —
+ *  used to keep the "Callback due today" chip honest instead of applying it
+ *  to callbacks that are actually several days overdue. */
+function isDueToday(dateStr: string): boolean {
+  const due = new Date(dateStr);
+  const now = new Date();
+  return (
+    due.getFullYear() === now.getFullYear() &&
+    due.getMonth() === now.getMonth() &&
+    due.getDate() === now.getDate()
+  );
+}
+
 /* ─── Component ─── */
 
 interface RecruitmentClientProps {
@@ -119,6 +132,15 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
   const [shareOpen, setShareOpen] = useState(false);
   const [newLead, setNewLead] = useState({ ...EMPTY_LEAD });
   const [error, setError] = useState<string | null>(null);
+
+  // Scheduled "Call back later" outcomes surface first — a promised callback
+  // is a harder commitment than a generic follow-up date. Stable sort keeps
+  // the server's due-date-ascending order within each group.
+  const sortedQueue = useMemo(
+    () => [...queue].sort((a, b) => Number(b.is_callback ?? false) - Number(a.is_callback ?? false)),
+    [queue]
+  );
+  const callbacksDueCount = useMemo(() => queue.filter((l) => l.is_callback).length, [queue]);
 
   function cancelCampaign(campaignId: string) {
     startTransition(async () => {
@@ -246,10 +268,12 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
             </CardTitle>
             <CardDescription>
               Fast follow-up wins families — these leads are due (or overdue) for a touch.
+              {callbacksDueCount > 0 &&
+                ` ${callbacksDueCount} ${callbacksDueCount === 1 ? "is" : "are"} a promised callback.`}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {queue.slice(0, 8).map((lead) => {
+            {sortedQueue.slice(0, 8).map((lead) => {
               const cfg = STAGE_CONFIG[lead.stage] ?? STAGE_CONFIG.new;
               return (
                 <Link
@@ -271,6 +295,13 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                    {lead.is_callback && (
+                      <span className="inline-flex items-center gap-1 rounded-[6px] bg-amber-200 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 whitespace-nowrap">
+                        {lead.next_follow_up_at && isDueToday(lead.next_follow_up_at)
+                          ? "Callback due today"
+                          : "Callback overdue"}
+                      </span>
+                    )}
                     {pastContactStandard(lead) && (
                       <span className="inline-flex items-center gap-1 rounded-[6px] border border-warn/30 bg-warn/10 px-1.5 py-0.5 text-[10px] font-medium text-warn-text whitespace-nowrap">
                         <IconAlertTriangle size={11} /> past 24h standard

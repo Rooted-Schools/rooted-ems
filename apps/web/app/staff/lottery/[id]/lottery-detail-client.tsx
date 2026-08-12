@@ -30,8 +30,11 @@ import {
   staffSendLotteryOffers,
   staffSimulateLottery,
   staffCompleteLotteryResults,
+  staffResumeLotteryNotifications,
 } from "../actions";
 import type { LotterySimulation } from "@/lib/mutations";
+import type { PreflightReport, PreflightStatus } from "@/lib/lottery-preflight";
+import type { LotteryNotificationProgress } from "@/lib/queries";
 
 /* ─── Status Config ─── */
 const statusVariants: Record<string, { label: string; variant: "default" | "secondary" | "success" | "warning" }> = {
@@ -77,15 +80,45 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+const preflightChip: Record<PreflightStatus, string> = {
+  green: "border-rooted-green/30 bg-rooted-green/10 text-deep-green",
+  amber: "border-warn/30 bg-warn/10 text-warn-text",
+  red: "border-error/30 bg-error/10 text-error",
+};
+
+const preflightWord: Record<PreflightStatus, string> = {
+  green: "Ready",
+  amber: "Check",
+  red: "Blocked",
+};
+
+function numberFrom(summary: Record<string, unknown> | null, key: string): number | null {
+  const value = summary?.[key];
+  return typeof value === "number" ? value : null;
+}
+
 /* ─── Component ─── */
 export function StaffLotteryDetailClient({
   run,
   entrants,
   staffUserId,
+  governedBy = null,
+  isRehearsal = false,
+  drawSummary = null,
+  acceptanceWindowDays = null,
+  preflight = null,
+  notifications = null,
 }: {
   run: LotteryRunDetail | null;
   entrants: LotteryEntrant[];
   staffUserId: string;
+  /** "Policy name vN (adopted YYYY-MM-DD)", or null when the run is ungoverned. */
+  governedBy?: string | null;
+  isRehearsal?: boolean;
+  drawSummary?: Record<string, unknown> | null;
+  acceptanceWindowDays?: number | null;
+  preflight?: PreflightReport | null;
+  notifications?: LotteryNotificationProgress | null;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -99,6 +132,10 @@ export function StaffLotteryDetailClient({
   const [simulation, setSimulation] = useState<LotterySimulation | null>(null);
   const [completeResultsDialogOpen, setCompleteResultsDialogOpen] = useState(false);
   const [rerunPreviewDialogOpen, setRerunPreviewDialogOpen] = useState(false);
+
+  // Offer deadline defaults to the governing policy's acceptance window rather
+  // than to a number someone typed once. "" means "use the policy default".
+  const [useOfferPolicyDefault, setUseOfferPolicyDefault] = useState(true);
 
   /* ─── Action Handlers ─── */
 
@@ -172,7 +209,8 @@ export function StaffLotteryDetailClient({
 
   function handleSendOffers() {
     if (!run) return;
-    setOfferExpiresIn("14");
+    setOfferExpiresIn(acceptanceWindowDays ? String(acceptanceWindowDays) : "14");
+    setUseOfferPolicyDefault(acceptanceWindowDays !== null);
     setSendOffersDialogOpen(true);
   }
 
@@ -180,16 +218,47 @@ export function StaffLotteryDetailClient({
     if (!run) return;
     setSendOffersDialogOpen(false);
     setFeedback(null);
-    const expiresAt = new Date(Date.now() + parseInt(offerExpiresIn, 10) * 24 * 60 * 60 * 1000).toISOString();
+    // Null asks the server to apply the governing policy's acceptance window,
+    // so the deadline in the family's email is the one the board adopted.
+    const expiresAt = useOfferPolicyDefault
+      ? null
+      : new Date(Date.now() + parseInt(offerExpiresIn, 10) * 24 * 60 * 60 * 1000).toISOString();
     startTransition(async () => {
       const result = await staffSendLotteryOffers(run.id, expiresAt, staffUserId);
       if (result.error) {
         setFeedback({ type: "error", message: result.error });
       } else {
         const count = result.data?.offersCreated ?? 0;
+        const sent = result.data?.notifications?.sent ?? 0;
+        const failed = result.data?.notifications?.failed ?? 0;
         setFeedback({
-          type: "success",
-          message: `${count} offer${count !== 1 ? "s" : ""} sent successfully. Families will be notified.`,
+          type: failed > 0 ? "error" : "success",
+          message:
+            failed > 0
+              ? `${count} offer${count !== 1 ? "s" : ""} created. ${sent} families notified, ${failed} failed. Use Resume notifications to retry the ones that failed.`
+              : `${count} offer${count !== 1 ? "s" : ""} created and ${sent} famil${sent === 1 ? "y" : "ies"} notified.`,
+        });
+        router.refresh();
+      }
+    });
+  }
+
+  function doResumeNotifications() {
+    if (!run) return;
+    setFeedback(null);
+    startTransition(async () => {
+      const result = await staffResumeLotteryNotifications(run.id);
+      if (result.error) {
+        setFeedback({ type: "error", message: result.error });
+      } else {
+        const sent = result.data?.sent ?? 0;
+        const failed = result.data?.failed ?? 0;
+        setFeedback({
+          type: failed > 0 ? "error" : "success",
+          message:
+            failed > 0
+              ? `${sent} notifications sent, ${failed} still failing.`
+              : `${sent} outstanding notification${sent === 1 ? "" : "s"} sent.`,
         });
         router.refresh();
       }
@@ -211,9 +280,13 @@ export function StaffLotteryDetailClient({
         setFeedback({ type: "error", message: result.error });
       } else {
         const count = result.data?.waitlisted ?? 0;
+        const failed = result.data?.notifications?.failed ?? 0;
         setFeedback({
-          type: "success",
-          message: `${count} famil${count === 1 ? "y" : "ies"} waitlisted and notified.`,
+          type: failed > 0 ? "error" : "success",
+          message:
+            failed > 0
+              ? `${count} famil${count === 1 ? "y" : "ies"} waitlisted, but ${failed} notification${failed === 1 ? "" : "s"} failed. Use Resume notifications to retry.`
+              : `${count} famil${count === 1 ? "y" : "ies"} waitlisted and notified.`,
         });
         router.refresh();
       }
@@ -273,6 +346,8 @@ export function StaffLotteryDetailClient({
   const offeredCount = entrants.filter((e) => e.result === "offered").length;
   const waitlistedCount = entrants.filter((e) => e.result === "waitlisted").length;
 
+  const finalizeBlocked = preflight?.blocked ?? false;
+
   /* ─── Status-specific action buttons ─── */
   function getActionButtons() {
     switch (run!.status) {
@@ -283,7 +358,7 @@ export function StaffLotteryDetailClient({
               {isPending ? "Working..." : "Simulate"}
             </Button>
             <Button onClick={() => handleActionClick("Run Preview")} disabled={isPending}>
-              {isPending ? "Running..." : "Run Preview"}
+              {isPending ? "Running..." : isRehearsal ? "Run Rehearsal" : "Run Preview"}
             </Button>
           </>
         );
@@ -294,11 +369,25 @@ export function StaffLotteryDetailClient({
               {isPending ? "Working..." : "Simulate"}
             </Button>
             <Button variant="outline" onClick={handleReRunPreviewClick} disabled={isPending}>
-              {isPending ? "Running..." : "Re-run Preview"}
+              {isPending ? "Running..." : isRehearsal ? "Re-run Rehearsal" : "Re-run Preview"}
             </Button>
-            <Button onClick={() => handleActionClick("Finalize as Official")} disabled={isPending}>
-              {isPending ? "Finalizing..." : "Finalize as Official"}
-            </Button>
+            {isRehearsal ? (
+              <Link href={`/staff/lottery/${run!.id}/report`}>
+                <Button variant="outline">View rehearsal report</Button>
+              </Link>
+            ) : (
+              <Button
+                onClick={() => handleActionClick("Finalize as Official")}
+                disabled={isPending || finalizeBlocked}
+                title={
+                  finalizeBlocked
+                    ? "Preflight checks must pass before this lottery can be made official."
+                    : undefined
+                }
+              >
+                {isPending ? "Finalizing..." : "Finalize as Official"}
+              </Button>
+            )}
           </>
         );
       case "official":
@@ -341,6 +430,80 @@ export function StaffLotteryDetailClient({
         >
           {feedback.message}
         </div>
+      )}
+
+      {/* Test rehearsal stamp — every surface of a rehearsal says so */}
+      {isRehearsal && (
+        <div className="rounded-[6px] border border-warn/30 bg-warn/10 px-4 py-3">
+          <p className="text-sm font-semibold uppercase tracking-wider text-warn-text">
+            Test rehearsal
+          </p>
+          <p className="mt-1 text-sm text-warn-text">
+            This run executes the complete lottery against the real applicant pool and produces a
+            full report. No family is affected: no application status changes, no offers, no
+            waitlist placements, and no notifications of any kind. Repeat it as often as you like.
+            It can never be finalized as official; the official lottery is always a fresh run.
+          </p>
+        </div>
+      )}
+
+      {/* Notification fan-out progress — visible whenever it is incomplete */}
+      {notifications && !notifications.unavailable && notifications.total > 0 && (
+        <div
+          className={
+            notifications.pending + notifications.failed > 0
+              ? "flex flex-wrap items-center justify-between gap-3 rounded-[6px] border border-warn/30 bg-warn/10 px-4 py-3"
+              : "rounded-[6px] border border-rooted-green/30 bg-rooted-green/10 px-4 py-3"
+          }
+        >
+          <p
+            className={
+              notifications.pending + notifications.failed > 0
+                ? "text-sm text-warn-text"
+                : "text-sm text-deep-green"
+            }
+          >
+            Notifications: {notifications.sent} of {notifications.total} sent
+            {notifications.failed > 0 ? `, ${notifications.failed} failed` : ""}
+            {notifications.pending > 0 ? `, ${notifications.pending} not yet attempted` : ""}.
+          </p>
+          {notifications.pending + notifications.failed > 0 && (
+            <Button variant="outline" onClick={doResumeNotifications} disabled={isPending}>
+              {isPending ? "Sending..." : "Resume notifications"}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Preflight readiness — evaluated against live data on every render */}
+      {preflight && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Preflight readiness</CardTitle>
+            <CardDescription>
+              {preflight.blocked
+                ? "This lottery cannot be finalized as official until every blocking condition is cleared."
+                : "Every blocking condition is clear. Items marked Check are warnings, not blockers."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y divide-line">
+              {preflight.checks.map((check) => (
+                <li key={check.key} className="flex items-start gap-3 py-2.5">
+                  <span
+                    className={`inline-flex shrink-0 items-center rounded-[6px] border px-2 py-1 text-xs font-medium ${preflightChip[check.status]}`}
+                  >
+                    {preflightWord[check.status]}
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-ink">{check.label}</p>
+                    <p className="text-sm text-stone-text">{check.message}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
       )}
 
       {/* Simulation Results — read-only what-if, nothing is written */}
@@ -396,9 +559,13 @@ export function StaffLotteryDetailClient({
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-ink">{run.name}</h1>
             <Badge variant={s.variant}>{s.label}</Badge>
+            {isRehearsal && <Badge variant="warning">Test rehearsal</Badge>}
           </div>
           <p className="text-sm text-stone mt-1">
             {run.campus} &middot; {run.grade}
+          </p>
+          <p className={`text-xs mt-1 ${governedBy ? "text-stone" : "text-warn-text"}`}>
+            {governedBy ? `Governed by: ${governedBy}` : "No adopted policy"}
           </p>
         </div>
         <div className="flex gap-2">
@@ -494,9 +661,72 @@ export function StaffLotteryDetailClient({
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Lottery Rules</CardTitle>
-            <CardDescription>{run.ruleSet.name}</CardDescription>
+            <CardDescription>{governedBy ?? run.ruleSet.name}</CardDescription>
           </CardHeader>
           <CardContent>
+            <DetailRow label="Governed by" value={governedBy ?? "No adopted policy"} />
+            {acceptanceWindowDays !== null && (
+              <DetailRow
+                label="Acceptance window"
+                value={`${acceptanceWindowDays} days`}
+              />
+            )}
+            {drawSummary && (
+              <>
+                <DetailRow
+                  label="Sibling preference placed"
+                  value={
+                    numberFrom(drawSummary, "sibling_auto_placed") === null
+                      ? "Not yet drawn"
+                      : `${numberFrom(drawSummary, "sibling_auto_placed")} auto-placed, ${
+                          numberFrom(drawSummary, "sibling_priority_waitlisted") ?? 0
+                        } on the sibling-priority waitlist`
+                  }
+                />
+                {(numberFrom(drawSummary, "sibling_claimed_unverified") ?? 0) > 0 && (
+                  <DetailRow
+                    label="Unverified sibling claims"
+                    value={`${numberFrom(drawSummary, "sibling_claimed_unverified")} claimed, no enrollment record found`}
+                  />
+                )}
+                <DetailRow
+                  label="Linked siblings pulled in"
+                  value={String(numberFrom(drawSummary, "linked_sibling_activated") ?? 0)}
+                />
+                <DetailRow
+                  label="Weighted pool entries"
+                  value={
+                    numberFrom(drawSummary, "weighted_pool_entries") === null
+                      ? "Not yet drawn"
+                      : String(numberFrom(drawSummary, "weighted_pool_entries"))
+                  }
+                />
+              </>
+            )}
+            {Array.isArray(drawSummary?.tier_counts) &&
+              (drawSummary!.tier_counts as Array<Record<string, unknown>>).length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs font-medium text-stone uppercase tracking-wider mb-2">
+                    Weighted Entry Tiers
+                  </p>
+                  <div className="space-y-1.5">
+                    {(drawSummary!.tier_counts as Array<Record<string, unknown>>).map((tier) => (
+                      <div key={String(tier.key)} className="text-sm text-ink/70">
+                        {String(tier.label)}: {String(tier.applicants)} applicant
+                        {tier.applicants === 1 ? "" : "s"} at {String(tier.weight)}:1 ={" "}
+                        {String(tier.entries)} entries
+                        {tier.unsourced === true && (
+                          <span className="text-warn-text">
+                            {" "}
+                            — the application does not collect {String(tier.source_field)}, so no
+                            applicant can qualify
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             <DetailRow label="Sibling Preference" value={run.ruleSet.siblingPreference ? "Enabled" : "Disabled"} />
             {run.ruleSet.priorityTiers.length > 0 && (
               <div className="mt-3">
@@ -699,10 +929,24 @@ export function StaffLotteryDetailClient({
             </p>
             <div>
               <label className="block text-sm font-medium text-ink/70 mb-1">Response Deadline</label>
+              {acceptanceWindowDays !== null && (
+                <label className="flex min-h-[44px] items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useOfferPolicyDefault}
+                    onChange={(e) => setUseOfferPolicyDefault(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm text-ink">
+                    Use the adopted policy: {acceptanceWindowDays} days
+                  </span>
+                </label>
+              )}
               <select
                 value={offerExpiresIn}
                 onChange={(e) => setOfferExpiresIn(e.target.value)}
-                className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                disabled={useOfferPolicyDefault && acceptanceWindowDays !== null}
+                className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 disabled:bg-sunken disabled:text-stone"
               >
                 <option value="7">7 days</option>
                 <option value="10">10 days</option>
@@ -712,11 +956,23 @@ export function StaffLotteryDetailClient({
               </select>
               <p className="text-xs text-stone mt-1">
                 Offers will expire on{" "}
-                {new Date(Date.now() + parseInt(offerExpiresIn, 10) * 24 * 60 * 60 * 1000).toLocaleDateString("en-US", {
+                {new Date(
+                  Date.now() +
+                    (useOfferPolicyDefault && acceptanceWindowDays !== null
+                      ? acceptanceWindowDays
+                      : parseInt(offerExpiresIn, 10)) *
+                      24 *
+                      60 *
+                      60 *
+                      1000
+                ).toLocaleDateString("en-US", {
                   month: "long",
                   day: "numeric",
                   year: "numeric",
                 })}
+                {acceptanceWindowDays !== null && !useOfferPolicyDefault
+                  ? `. This differs from the ${acceptanceWindowDays}-day window in the adopted policy.`
+                  : ""}
               </p>
             </div>
           </div>

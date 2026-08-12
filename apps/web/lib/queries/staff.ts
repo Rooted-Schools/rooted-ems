@@ -2094,13 +2094,20 @@ export async function getDuplicateSuspects(campusIds?: string[]): Promise<Duplic
  * numbers, a stage with zero matching applications just returns 0.
  */
 export async function getPipelineStageCounts(
-  campusIds?: string[]
+  campusIds?: string[],
+  grade?: string
 ): Promise<Record<string, number>> {
   const supabase = createServiceRoleClient();
 
-  let query = supabase.from("application").select("status");
+  // grade_level joined with !inner so an optional grade filter can apply to
+  // the joined column (application.grade_level_id is NOT NULL, so the inner
+  // join never drops a real row when no grade filter is set).
+  let query = supabase.from("application").select("status, grade_level:grade_level_id!inner (grade)");
   if (campusIds && campusIds.length > 0) {
     query = query.in("campus_id", campusIds);
+  }
+  if (grade) {
+    query = query.eq("grade_level.grade", grade);
   }
 
   const { data, error } = await query;

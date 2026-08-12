@@ -11,6 +11,7 @@ export {
   getApplicationDetail,
   getDraftApplicationForEdit,
   getFamilyApplications,
+  getGradesForCampuses,
   type ApplicationRow,
   type ApplicationDetail,
   type ApplicationStats,
@@ -24,7 +25,9 @@ export {
 // Staff dashboard queries
 export {
   getUpcomingDeadlines,
+  getNextUpcomingWindowOpen,
   type UpcomingDeadline,
+  type NextWindowOpen,
 } from "./dashboard";
 
 // Campus queries
@@ -64,6 +67,23 @@ export {
   type WaitlistHistoryEntry,
   type ExistingHouseholdInfo,
 } from "./family";
+
+// Lottery policy governance queries
+export {
+  getAdoptedPolicyForCampus,
+  getPolicyVersionsForCampus,
+  getRunGovernance,
+  getRunGovernanceBatch,
+  getLotteryNotificationProgress,
+  getRehearsalReportEntrants,
+  isMissingRelation,
+  type RehearsalEntrant,
+  type LotteryPolicyRow,
+  type AdoptedPolicy,
+  type RunGovernance,
+  type RunGovernanceSummary,
+  type LotteryNotificationProgress,
+} from "./lottery-policy";
 
 // Staff management queries (lottery, offers, waitlist, enrollment, comms, settings)
 export {
@@ -141,12 +161,14 @@ export {
   getLeadDetail,
   getCampaigns,
   getJourneyStats,
+  getLeaderStripStats,
   type LeadRow,
   type LeadDetail,
   type LeadActivityRow,
   type LeadPipelineSummary,
   type CampaignRow,
   type JourneyStat,
+  type LeaderStripStats,
 } from "./leads";
 
 // Events + RSVP
@@ -155,10 +177,12 @@ export {
   getEventDetail,
   getUpcomingPublicEvents,
   getPublicEvent,
+  getNextUpcomingEvent,
   type EventRow,
   type EventDetail,
   type RsvpRow,
   type PublicEvent,
+  type NextEventRow,
 } from "./events";
 
 // Recruitment funnel analytics
