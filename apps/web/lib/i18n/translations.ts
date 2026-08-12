@@ -964,6 +964,12 @@ const dict = {
   "public.familyPortal":     { en: "Family Portal",         es: "Portal Familiar" },
   "public.staffPortal":      { en: "Staff Portal",          es: "Portal del Personal" },
 
+  // ─── Per-campus landing page (app/(public)/[campusSlug]) ──────────────────
+  "public.contact":          { en: "Contact",               es: "Contacto" },
+  "public.address":          { en: "Address",               es: "Dirección" },
+  "public.phoneLabel":       { en: "Phone",                 es: "Teléfono" },
+  "public.emailLabel":       { en: "Email",                 es: "Correo electrónico" },
+
   // ─── Application form: edit-specific ──────────────────────────────────────
   "appForm.untitled":        { en: "Untitled",              es: "Sin título" },
 

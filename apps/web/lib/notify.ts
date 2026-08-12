@@ -20,6 +20,7 @@ import * as emailTemplates from "@/lib/email-templates";
 import type { EmailTemplate } from "@/lib/email-templates";
 import { recordWaitlistPositionHistory } from "@/lib/mutations/waitlist-history";
 import { registrationNudgeSubject, registrationNudgeBody, registrationNudgeSms } from "@/lib/nudge-copy";
+import { getCampusLogoAbsoluteUrl } from "@/lib/campus-identity";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -151,14 +152,36 @@ interface CampusInfo {
   name: string;
   /** Campus inbox — used as the email Reply-To so family replies reach the school, not RSF central. */
   email: string | null;
+  /**
+   * Absolute URL to the campus's logo (lib/campus-identity.ts), for the
+   * email header. Undefined when the campus has no known short_code /
+   * identity — callers pass it straight through as `campusLogoUrl`, and the
+   * email header degrades to its current text-only look, never a broken
+   * image.
+   */
+  logoUrl: string | undefined;
 }
 
+/**
+ * The single place notify.ts resolves a campusId into the name/email/logo
+ * every notification and email needs. Every call site below goes through
+ * this function — see the module-level comment for why that matters for
+ * threading the campus logo into email headers.
+ */
 async function resolveCampus(campusId?: string): Promise<CampusInfo> {
-  if (!campusId) return { name: "your school", email: null };
+  if (!campusId) return { name: "your school", email: null, logoUrl: undefined };
   const supabase = createServiceRoleClient();
-  const { data } = await supabase.from("campus").select("name, email").eq("id", campusId).single();
+  const { data } = await supabase
+    .from("campus")
+    .select("name, email, short_code")
+    .eq("id", campusId)
+    .single();
   const row = data as unknown as Record<string, string | null> | null;
-  return { name: row?.name ?? "your school", email: row?.email ?? null };
+  return {
+    name: row?.name ?? "your school",
+    email: row?.email ?? null,
+    logoUrl: getCampusLogoAbsoluteUrl(row?.short_code, APP_LINK),
+  };
 }
 
 async function notify(params: {
@@ -194,7 +217,7 @@ export async function notifyFamilyApplicationReceived({
 }): Promise<void> {
   const { userId, email } = await getGuardianContact(applicationId);
   if (!userId && !email) return;
-  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const { name: campusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
   await Promise.all([
     userId
       ? notify({
@@ -208,7 +231,7 @@ export async function notifyFamilyApplicationReceived({
       : Promise.resolve(),
     emailGuardian(
       email,
-      emailTemplates.applicationReceived({ studentFirstName: firstNameOf(studentName), campusName }),
+      emailTemplates.applicationReceived({ studentFirstName: firstNameOf(studentName), campusName, campusLogoUrl }),
       "notifyFamilyApplicationReceived",
       campusEmail
     ),
@@ -284,7 +307,7 @@ export async function notifyFamilyApplicationWaitlisted({
   const contact = await getGuardianContact(applicationId);
   const { userId, email } = contact;
   if (!userId && !email) return;
-  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const { name: campusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
   const studentFirstName = firstNameOf(studentName);
   const positionSuffix = position != null ? ` — currently #${position}` : "";
   await Promise.all([
@@ -300,7 +323,7 @@ export async function notifyFamilyApplicationWaitlisted({
       : Promise.resolve(),
     emailGuardian(
       email,
-      emailTemplates.lotteryResultWaitlisted({ studentFirstName, campusName, position }),
+      emailTemplates.lotteryResultWaitlisted({ studentFirstName, campusName, position, campusLogoUrl }),
       "notifyFamilyApplicationWaitlisted",
       campusEmail
     ),
@@ -390,7 +413,7 @@ export async function notifyWaitlistMovement({
     const appById = new Map(
       (apps ?? []).map((a: Record<string, unknown>) => [a.id as string, a])
     );
-    const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+    const { name: campusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
     const total = rows.length;
 
     for (const row of improved) {
@@ -418,6 +441,7 @@ export async function notifyWaitlistMovement({
             studentFirstName: studentFirst,
             campusName,
             position: row.rank,
+            campusLogoUrl,
           }),
           "notifyWaitlistMovement",
           campusEmail
@@ -456,7 +480,7 @@ export async function notifyFamilyOfOffer({
   const contact = await getGuardianContact(applicationId);
   const { userId, email } = contact;
   if (!userId && !email) return;
-  const { name: resolvedCampusName, email: campusEmail } = await resolveCampus(campusId);
+  const { name: resolvedCampusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
   const campusName = campusNameProp ?? resolvedCampusName;
   const deadline = new Date(expiresAt).toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric",
@@ -466,8 +490,8 @@ export async function notifyFamilyOfOffer({
   });
   const studentFirstName = firstNameOf(studentName);
   const template = viaWaitlist
-    ? emailTemplates.waitlistPromoted({ studentFirstName, campusName })
-    : emailTemplates.offerExtended({ studentFirstName, campusName, expiresAt });
+    ? emailTemplates.waitlistPromoted({ studentFirstName, campusName, campusLogoUrl })
+    : emailTemplates.offerExtended({ studentFirstName, campusName, expiresAt, campusLogoUrl });
   await Promise.all([
     userId
       ? notify({
@@ -508,7 +532,7 @@ export async function notifyFamilyOfferExpiringSoon({
   const contact = await getGuardianContact(applicationId);
   const { userId, email } = contact;
   if (!userId && !email) return;
-  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const { name: campusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
   const deadline = new Date(expiresAt).toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric",
   });
@@ -528,7 +552,7 @@ export async function notifyFamilyOfferExpiringSoon({
       : Promise.resolve(),
     emailGuardian(
       email,
-      emailTemplates.offerExpiringSoon({ studentFirstName: firstNameOf(studentName), campusName, expiresAt }),
+      emailTemplates.offerExpiringSoon({ studentFirstName: firstNameOf(studentName), campusName, expiresAt, campusLogoUrl }),
       "notifyFamilyOfferExpiringSoon",
       campusEmail
     ),
@@ -616,7 +640,7 @@ export async function notifyFamilyRegistrationReady({
 }): Promise<void> {
   const { userId, email } = await getGuardianContact(applicationId);
   if (!userId && !email) return;
-  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const { name: campusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
   await Promise.all([
     userId
       ? notify({
@@ -630,7 +654,7 @@ export async function notifyFamilyRegistrationReady({
       : Promise.resolve(),
     emailGuardian(
       email,
-      emailTemplates.offerAccepted({ studentFirstName: firstNameOf(studentName), campusName }),
+      emailTemplates.offerAccepted({ studentFirstName: firstNameOf(studentName), campusName, campusLogoUrl }),
       "notifyFamilyRegistrationReady",
       campusEmail
     ),
@@ -673,7 +697,7 @@ export async function notifyFamilyRegistrationComplete({
   const contact = await getGuardianContactByEnrollment(enrollmentId);
   const { userId, email } = contact;
   if (!userId && !email) return;
-  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const { name: campusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
   const studentFirstName = firstNameOf(studentName);
   await Promise.all([
     userId
@@ -688,7 +712,7 @@ export async function notifyFamilyRegistrationComplete({
       : Promise.resolve(),
     emailGuardian(
       email,
-      emailTemplates.registrationComplete({ studentFirstName, campusName }),
+      emailTemplates.registrationComplete({ studentFirstName, campusName, campusLogoUrl }),
       "notifyFamilyRegistrationComplete",
       campusEmail
     ),
@@ -719,7 +743,7 @@ export async function notifyFamilyRegistrationNudge({
   const contact = await getGuardianContact(applicationId);
   const { userId, email } = contact;
   if (!userId && !email) return;
-  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const { name: campusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
   const studentFirstName = firstNameOf(studentName);
   const count = missingNames.length;
   // Copy lives in lib/nudge-copy.ts (pure module) so the staff preview on
@@ -737,7 +761,7 @@ export async function notifyFamilyRegistrationNudge({
       : Promise.resolve(),
     emailGuardian(
       email,
-      emailTemplates.registrationNudge({ studentFirstName, campusName, missingNames }),
+      emailTemplates.registrationNudge({ studentFirstName, campusName, missingNames, campusLogoUrl }),
       "notifyFamilyRegistrationNudge",
       campusEmail
     ),
@@ -772,7 +796,7 @@ export async function notifyFamilyKeepTheSeat({
   const contact = await getGuardianContactByEnrollment(enrollmentId);
   const { userId, email } = contact;
   if (!userId && !email) return;
-  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const { name: campusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
   const studentFirstName = firstNameOf(studentName);
   await Promise.all([
     userId
@@ -789,7 +813,7 @@ export async function notifyFamilyKeepTheSeat({
       : Promise.resolve(),
     emailGuardian(
       email,
-      emailTemplates.keepTheSeat({ studentFirstName, campusName, startDate }),
+      emailTemplates.keepTheSeat({ studentFirstName, campusName, startDate, campusLogoUrl }),
       "notifyFamilyKeepTheSeat",
       campusEmail
     ),
@@ -824,7 +848,7 @@ export async function notifyFamilyReenrollmentPulse({
   const contact = await getGuardianContactByEnrollment(enrollmentId);
   const { userId, email } = contact;
   if (!userId && !email && !contact.phone) return;
-  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const { name: campusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
   const studentFirstName = firstNameOf(studentName);
   await Promise.all([
     userId
@@ -843,7 +867,7 @@ export async function notifyFamilyReenrollmentPulse({
       : Promise.resolve(),
     emailGuardian(
       email,
-      emailTemplates.reenrollmentPulse({ studentFirstName, campusName, nextSchoolYearName }),
+      emailTemplates.reenrollmentPulse({ studentFirstName, campusName, nextSchoolYearName, campusLogoUrl }),
       "notifyFamilyReenrollmentPulse",
       campusEmail
     ),
@@ -887,7 +911,7 @@ export async function notifyFamilyReenrollmentOffer({
   const contact = await getGuardianContact(applicationId);
   const { userId, email } = contact;
   if (!userId && !email && !contact.phone) return;
-  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const { name: campusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
   const studentFirstName = firstNameOf(studentName);
   const yearEn = nextSchoolYearName ? ` for ${nextSchoolYearName}` : " for next year";
   const yearEs = nextSchoolYearName ? ` para ${nextSchoolYearName}` : " para el próximo año";
@@ -906,7 +930,7 @@ export async function notifyFamilyReenrollmentOffer({
       : Promise.resolve(),
     emailGuardian(
       email,
-      emailTemplates.reenrollmentPulse({ studentFirstName, campusName, nextSchoolYearName }),
+      emailTemplates.reenrollmentPulse({ studentFirstName, campusName, nextSchoolYearName, campusLogoUrl }),
       "notifyFamilyReenrollmentOffer",
       campusEmail
     ),
@@ -948,11 +972,11 @@ export async function notifyLeadWelcome({
    *  staff can always answer "who got the welcome, and when". */
   leadId?: string;
 }): Promise<void> {
-  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const { name: campusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
   const [emailSent, smsSent] = await Promise.all([
     emailGuardian(
       lead.email,
-      emailTemplates.inquiryWelcome({ guardianFirstName: lead.first_name, campusName }),
+      emailTemplates.inquiryWelcome({ guardianFirstName: lead.first_name, campusName, campusLogoUrl }),
       "notifyLeadWelcome",
       campusEmail,
       leadId ? { leadId, kind: "welcome" } : undefined
@@ -1017,10 +1041,11 @@ export async function notifyLeadReengagement({
   /** 00045 engagement tracking — when provided, the send is recorded in email_event (kind: "reengagement"). */
   leadId?: string;
 }): Promise<void> {
-  const { name: campusName, email: campusEmail } = await resolveCampus(campusId);
+  const { name: campusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
   const template = emailTemplates.leadReengagement({
     guardianFirstName: lead.first_name,
     campusName,
+    campusLogoUrl,
   });
   const { unsubscribeUrl } = await import("@/lib/email-compliance");
   const unsub = unsubscribeToken ? unsubscribeUrl(unsubscribeToken) : `${APP_LINK}/unsubscribe`;

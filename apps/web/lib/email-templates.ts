@@ -65,9 +65,25 @@ interface Section {
 }
 
 /**
+ * Campus mark for the email header. Optional — most callers have no campus
+ * logo on file (unknown short_code, or no campusId at all), and the header
+ * stays exactly as it was: just the green top rule, no image. `campusName`
+ * is required alongside `campusLogoUrl` because an <img> with no accessible
+ * text next to it is a worse header than none at all.
+ */
+interface EmailHeaderOptions {
+  campusLogoUrl?: string;
+  campusName?: string;
+}
+
+/**
  * Render the shared bilingual layout: English block, divider, Spanish block.
  */
-function renderEmail(en: Section, es: Section): { html: string; text: string } {
+function renderEmail(
+  en: Section,
+  es: Section,
+  header?: EmailHeaderOptions
+): { html: string; text: string } {
   const renderSection = (s: Section) => `
     <p style="margin:0 0 16px 0;">${escapeHtml(s.greeting)}</p>
     ${s.paragraphs.map((p) => `<p style="margin:0 0 16px 0;">${escapeHtml(p)}</p>`).join("\n")}
@@ -81,9 +97,24 @@ function renderEmail(en: Section, es: Section): { html: string; text: string } {
     }
     <p style="margin:0;">${escapeHtml(s.closing)}</p>`;
 
+  // Campus mark, shown only when a logo URL was resolved (see resolveCampus
+  // in lib/notify.ts) — a campus with no known logo gets the plain rule,
+  // same as before this option existed.
+  const headerMarkHtml = header?.campusLogoUrl
+    ? `<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+        <img src="${header.campusLogoUrl}" alt="${escapeHtml(header.campusName ?? "")}" height="40" style="height:40px;width:auto;display:block;border:0;" />
+        ${
+          header.campusName
+            ? `<span style="font-size:15px;font-weight:bold;color:${TEXT_COLOR};">${escapeHtml(header.campusName)}</span>`
+            : ""
+        }
+      </div>`
+    : "";
+
   const html = `
 <div style="margin:0 auto;max-width:600px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:${TEXT_COLOR};padding:24px;">
   <div style="border-top:4px solid ${BRAND_GREEN};padding-top:24px;">
+    ${headerMarkHtml}
     ${renderSection(en)}
   </div>
   <hr style="border:none;border-top:1px solid #dddddd;margin:32px 0;" />
@@ -163,9 +194,11 @@ function studentEs(studentFirstName?: string): string {
 export function applicationReceived({
   studentFirstName,
   campusName,
+  campusLogoUrl,
 }: {
   studentFirstName?: string;
   campusName: string;
+  campusLogoUrl?: string;
 }): EmailTemplate {
   const { html, text } = renderEmail(
     {
@@ -185,7 +218,8 @@ export function applicationReceived({
       ],
       cta: { label: "Ver su solicitud", url: `${APP_URL}/family/applications` },
       closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
-    }
+    },
+    { campusLogoUrl, campusName }
   );
   return {
     subject: `Application received for ${studentEn(studentFirstName)} / Solicitud recibida`,
@@ -198,10 +232,12 @@ export function offerExtended({
   studentFirstName,
   campusName,
   expiresAt,
+  campusLogoUrl,
 }: {
   studentFirstName?: string;
   campusName: string;
   expiresAt: string;
+  campusLogoUrl?: string;
 }): EmailTemplate {
   const deadlineEn = formatDateEn(expiresAt);
   const deadlineEs = formatDateEs(expiresAt);
@@ -223,7 +259,8 @@ export function offerExtended({
       ],
       cta: { label: "Responder a su oferta", url: `${APP_URL}/family/offers` },
       closing: "¡Esperamos darle la bienvenida pronto! — el Equipo de Inscripción de Rooted Schools",
-    }
+    },
+    { campusLogoUrl, campusName }
   );
   return {
     subject: "You have an enrollment offer / Tiene una oferta de inscripción",
@@ -236,10 +273,12 @@ export function offerExpiringSoon({
   studentFirstName,
   campusName,
   expiresAt,
+  campusLogoUrl,
 }: {
   studentFirstName?: string;
   campusName: string;
   expiresAt: string;
+  campusLogoUrl?: string;
 }): EmailTemplate {
   const deadlineEn = formatDateEn(expiresAt);
   const deadlineEs = formatDateEs(expiresAt);
@@ -261,7 +300,8 @@ export function offerExpiringSoon({
       ],
       cta: { label: "Responder a su oferta", url: `${APP_URL}/family/offers` },
       closing: "Estamos aquí si tiene preguntas. — el Equipo de Inscripción de Rooted Schools",
-    }
+    },
+    { campusLogoUrl, campusName }
   );
   return {
     subject: "Your enrollment offer expires soon / Su oferta de inscripción vence pronto",
@@ -273,9 +313,11 @@ export function offerExpiringSoon({
 export function offerAccepted({
   studentFirstName,
   campusName,
+  campusLogoUrl,
 }: {
   studentFirstName?: string;
   campusName: string;
+  campusLogoUrl?: string;
 }): EmailTemplate {
   const { html, text } = renderEmail(
     {
@@ -295,7 +337,8 @@ export function offerAccepted({
       ],
       cta: { label: "Comenzar la inscripción", url: `${APP_URL}/family/registration` },
       closing: "¡Bienvenidos a la familia de Rooted Schools! — el Equipo de Inscripción",
-    }
+    },
+    { campusLogoUrl, campusName }
   );
   return {
     subject: "Next step: complete registration / Próximo paso: complete la inscripción",
@@ -307,9 +350,11 @@ export function offerAccepted({
 export function registrationComplete({
   studentFirstName,
   campusName,
+  campusLogoUrl,
 }: {
   studentFirstName?: string;
   campusName: string;
+  campusLogoUrl?: string;
 }): EmailTemplate {
   const { html, text } = renderEmail(
     {
@@ -329,7 +374,8 @@ export function registrationComplete({
       ],
       cta: { label: "Ver detalles de inscripción", url: `${APP_URL}/family/registration` },
       closing: "¡Nos vemos pronto! — el Equipo de Inscripción de Rooted Schools",
-    }
+    },
+    { campusLogoUrl, campusName }
   );
   return {
     subject: "Enrollment complete! / ¡Inscripción completa!",
@@ -341,9 +387,11 @@ export function registrationComplete({
 export function waitlistPromoted({
   studentFirstName,
   campusName,
+  campusLogoUrl,
 }: {
   studentFirstName?: string;
   campusName: string;
+  campusLogoUrl?: string;
 }): EmailTemplate {
   const { html, text } = renderEmail(
     {
@@ -363,7 +411,8 @@ export function waitlistPromoted({
       ],
       cta: { label: "Ver sus ofertas", url: `${APP_URL}/family/offers` },
       closing: "¡Esperamos darle la bienvenida pronto! — el Equipo de Inscripción de Rooted Schools",
-    }
+    },
+    { campusLogoUrl, campusName }
   );
   return {
     subject: "A seat has opened! / ¡Se ha abierto un cupo!",
@@ -382,10 +431,12 @@ export function lotteryResultWaitlisted({
   studentFirstName,
   campusName,
   position,
+  campusLogoUrl,
 }: {
   studentFirstName?: string;
   campusName: string;
   position?: number;
+  campusLogoUrl?: string;
 }): EmailTemplate {
   const positionEn = position != null ? `currently #${position} on the waitlist` : "on the waitlist";
   const positionEs =
@@ -409,7 +460,8 @@ export function lotteryResultWaitlisted({
       cta: { label: "Ver su panel", url: `${APP_URL}/family/dashboard` },
       closing:
         "Sabemos que esperar es difícil, y esperamos que se abra un cupo pronto. — el Equipo de Inscripción de Rooted Schools",
-    }
+    },
+    { campusLogoUrl, campusName }
   );
   return {
     subject: `Lottery result for ${studentEn(studentFirstName)} / Resultado del sorteo`,
@@ -822,9 +874,11 @@ export function eventFollowupNoShow({
 export function inquiryWelcome({
   guardianFirstName,
   campusName,
+  campusLogoUrl,
 }: {
   guardianFirstName?: string;
   campusName: string;
+  campusLogoUrl?: string;
 }): EmailTemplate {
   const { html, text } = renderEmail(
     {
@@ -844,7 +898,8 @@ export function inquiryWelcome({
       ],
       cta: { label: "Iniciar una solicitud", url: `${APP_URL}/login` },
       closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
-    }
+    },
+    { campusLogoUrl, campusName }
   );
   return {
     subject: `Great to meet you! / ¡Un gusto conocerle! — ${campusName}`,
@@ -856,9 +911,11 @@ export function inquiryWelcome({
 export function leadReengagement({
   guardianFirstName,
   campusName,
+  campusLogoUrl,
 }: {
   guardianFirstName?: string;
   campusName: string;
+  campusLogoUrl?: string;
 }): EmailTemplate {
   const { html, text } = renderEmail(
     {
@@ -878,7 +935,8 @@ export function leadReengagement({
       ],
       cta: { label: "Iniciar una solicitud", url: `${APP_URL}/login` },
       closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
-    }
+    },
+    { campusLogoUrl, campusName }
   );
   return withCampaignFooter({
     subject: `Still thinking about ${campusName}? We're here / ¿Aún considerando ${campusName}?`,
@@ -891,11 +949,13 @@ export function registrationNudge({
   studentFirstName,
   campusName,
   missingNames,
+  campusLogoUrl,
 }: {
   studentFirstName?: string;
   campusName: string;
   /** Names of required items still incomplete (shown as-is in both languages). */
   missingNames: string[];
+  campusLogoUrl?: string;
 }): EmailTemplate {
   const shown = missingNames.slice(0, 4);
   const more = missingNames.length - shown.length;
@@ -919,7 +979,8 @@ export function registrationNudge({
       ],
       cta: { label: "Terminar la inscripción", url: `${APP_URL}/family/registration` },
       closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
-    }
+    },
+    { campusLogoUrl, campusName }
   );
   return {
     subject: `Almost done — a few registration items remain / Faltan algunos pasos de inscripción`,
@@ -939,11 +1000,13 @@ export function keepTheSeat({
   studentFirstName,
   campusName,
   startDate,
+  campusLogoUrl,
 }: {
   studentFirstName?: string;
   campusName: string;
   /** ISO date string for the school year's first day, when known. */
   startDate?: string;
+  campusLogoUrl?: string;
 }): EmailTemplate {
   const startEn = startDate ? formatDateEn(startDate) : undefined;
   const startEs = startDate ? formatDateEs(startDate) : undefined;
@@ -969,7 +1032,8 @@ export function keepTheSeat({
       ],
       cta: { label: "Ver su inscripción", url: `${APP_URL}/family/registration` },
       closing: "Esperamos darle la bienvenida este otoño. — el Equipo de Inscripción de Rooted Schools",
-    }
+    },
+    { campusLogoUrl, campusName }
   );
   return {
     subject: `You're all set at ${campusName} — here's what's next / Ya está todo listo`,
@@ -988,11 +1052,13 @@ export function reenrollmentPulse({
   studentFirstName,
   campusName,
   nextSchoolYearName,
+  campusLogoUrl,
 }: {
   studentFirstName?: string;
   campusName: string;
   /** Name of the upcoming school year, when a next-year window already exists. */
   nextSchoolYearName?: string;
+  campusLogoUrl?: string;
 }): EmailTemplate {
   const yearEn = nextSchoolYearName ? ` for ${nextSchoolYearName}` : " next year";
   const yearEs = nextSchoolYearName ? ` para ${nextSchoolYearName}` : " el próximo año";
@@ -1014,7 +1080,8 @@ export function reenrollmentPulse({
       ],
       cta: { label: "Responder ahora", url: `${APP_URL}/family/reenrollment` },
       closing: "Gracias por ayudarnos a planificar con anticipación. — el Equipo de Inscripción de Rooted Schools",
-    }
+    },
+    { campusLogoUrl, campusName }
   );
   return {
     subject: `Is ${studentFirstName ?? "your student"} returning to ${campusName}? / ¿Regresa el próximo año?`,
@@ -1027,10 +1094,12 @@ export function waitlistPositionImproved({
   studentFirstName,
   campusName,
   position,
+  campusLogoUrl,
 }: {
   studentFirstName?: string;
   campusName: string;
   position: number;
+  campusLogoUrl?: string;
 }): EmailTemplate {
   const { html, text } = renderEmail(
     {
@@ -1050,7 +1119,8 @@ export function waitlistPositionImproved({
       ],
       cta: { label: "Ver su panel", url: `${APP_URL}/family/dashboard` },
       closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
-    }
+    },
+    { campusLogoUrl, campusName }
   );
   return {
     subject: `Waitlist update: now #${position} in line / Actualización de la lista de espera`,

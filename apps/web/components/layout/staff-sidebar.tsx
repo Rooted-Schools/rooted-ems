@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import type { CampusIdentity } from "@/lib/campus-identity";
 
 /* ------------------------------------------------------------------ */
 /*  Role hierarchy — higher number = more access                      */
@@ -252,6 +254,15 @@ interface StaffSidebarProps {
    * the layout computes this and passes it down.
    */
   showNetwork?: boolean;
+  /**
+   * Set only when the viewer's accessible campuses resolve to exactly one
+   * (app/staff/layout.tsx computes this from accessibleIds + the campus
+   * list it already fetches). When present, the brand block shows that
+   * campus's logo and name with "Rooted EMS" demoted to the subtitle line.
+   * Org-level users and staff spanning multiple campuses get undefined here
+   * and keep the network mark.
+   */
+  campusIdentity?: CampusIdentity;
 }
 
 export function StaffSidebar({
@@ -259,6 +270,7 @@ export function StaffSidebar({
   todayCount,
   messagesUnreadCount,
   showNetwork = false,
+  campusIdentity,
 }: StaffSidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -343,34 +355,58 @@ export function StaffSidebar({
           href={buildHref("/staff/today")}
           className="inline-flex items-center gap-2.5 no-underline hover:opacity-90 transition-opacity"
         >
-          {/* Tree icon */}
-          <div className="w-8 h-8 bg-rooted-green/10 rounded-lg flex items-center justify-center">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              className="text-rooted-green"
-            >
-              <path
-                d="M12 2C8 2 4 6 4 10c0 2.5 1.5 4.5 3 6h2c-1.5-1.5-3-3.5-3-6 0-3 3-6 6-6s6 3 6 6c0 2.5-1.5 4.5-3 6h2c1.5-1.5 3-3.5 3-6 0-4-4-8-8-8z"
-                fill="currentColor"
-                opacity="0.6"
-              />
-              <path
-                d="M12 8c-2.2 0-4 2-4 4.5 0 1.5.8 2.8 1.5 3.5H11v6h2v-6h1.5c.7-.7 1.5-2 1.5-3.5 0-2.5-1.8-4.5-4-4.5z"
-                fill="currentColor"
-              />
-            </svg>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold text-ink leading-tight">
-              Rooted EMS
-            </span>
-            <span className="text-[10px] text-stone tracking-wide">
-              Enrollment Management
-            </span>
-          </div>
+          {campusIdentity ? (
+            <>
+              <div className="relative w-8 h-8 shrink-0">
+                <Image
+                  src={campusIdentity.logoPath}
+                  alt=""
+                  fill
+                  className="object-contain"
+                  sizes="32px"
+                />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-sm font-semibold text-ink leading-tight truncate">
+                  {campusIdentity.displayName}
+                </span>
+                <span className="text-[10px] text-stone tracking-wide">
+                  Rooted EMS
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Tree icon */}
+              <div className="w-8 h-8 bg-rooted-green/10 rounded-lg flex items-center justify-center">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="text-rooted-green"
+                >
+                  <path
+                    d="M12 2C8 2 4 6 4 10c0 2.5 1.5 4.5 3 6h2c-1.5-1.5-3-3.5-3-6 0-3 3-6 6-6s6 3 6 6c0 2.5-1.5 4.5-3 6h2c1.5-1.5 3-3.5 3-6 0-4-4-8-8-8z"
+                    fill="currentColor"
+                    opacity="0.6"
+                  />
+                  <path
+                    d="M12 8c-2.2 0-4 2-4 4.5 0 1.5.8 2.8 1.5 3.5H11v6h2v-6h1.5c.7-.7 1.5-2 1.5-3.5 0-2.5-1.8-4.5-4-4.5z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold text-ink leading-tight">
+                  Rooted EMS
+                </span>
+                <span className="text-[10px] text-stone tracking-wide">
+                  Enrollment Management
+                </span>
+              </div>
+            </>
+          )}
         </Link>
       </div>
 

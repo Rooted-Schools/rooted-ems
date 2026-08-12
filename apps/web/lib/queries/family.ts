@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { formatRelativeTime } from "./utils";
 import { getGradeLabel } from "@/lib/application-helpers";
@@ -39,6 +40,46 @@ export interface FamilyNotification {
   read: boolean;
   type: string;
 }
+
+export interface FamilyPrimaryCampus {
+  shortCode: string;
+  name: string;
+}
+
+/**
+ * The family's "home" campus, resolved from their most recent application
+ * (by created_at). A family with applications at more than one campus is
+ * resolved to whichever they applied to last — the family header
+ * (components/layout/family-header.tsx) uses this to show that campus's
+ * logo instead of the generic network wordmark. Returns null when the
+ * family has no application yet, so the header falls back to the network
+ * wordmark instead of guessing. Service-role (cheap, single-row lookup) and
+ * wrapped in React.cache so a request that reads it more than once — the
+ * layout today, potentially more surfaces later — only queries once.
+ */
+export const getFamilyPrimaryCampus = cache(
+  async (userId: string): Promise<FamilyPrimaryCampus | null> => {
+    const supabase = createServiceRoleClient();
+    const { data, error } = await supabase
+      .from("application")
+      .select("created_at, campus:campus_id (name, short_code), guardian:guardian_id!inner (user_id)")
+      .eq("guardian.user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[getFamilyPrimaryCampus]", error.message);
+      return null;
+    }
+    if (!data) return null;
+
+    const campus = (data as Record<string, unknown>).campus as Record<string, string> | null;
+    if (!campus?.short_code) return null;
+
+    return { shortCode: campus.short_code, name: campus.name ?? "" };
+  }
+);
 
 export interface EnrollmentWindowInfo {
   id: string;
