@@ -6,6 +6,7 @@ import {
   getAccessibleCampusIds,
   resolveActiveCampus,
 } from "@/lib/auth/get-session";
+import { getCampusLensId } from "@/lib/campus-lens";
 import { createServerClient } from "@rooted-ems/database/server";
 import { getCampaigns, getFollowUpQueue, getLeadPipelineSummary, getLeads } from "@/lib/queries";
 import { getJourneys } from "@/lib/queries/journeys";
@@ -24,8 +25,8 @@ export default async function StaffRecruitmentPage({
   }
 
   const accessibleIds = getAccessibleCampusIds(session);
-  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
-
+  const lensCampusId = await getCampusLensId(accessibleIds);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus, lensCampusId);
   const supabase = await createServerClient();
   const [queue, summary, leads, campaigns, journeys, { data: campusRows }] = await Promise.all([
     getFollowUpQueue(activeCampus),

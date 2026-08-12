@@ -121,10 +121,17 @@ export function isCMOAdmin(session: AuthSession): boolean {
  * Filter a selected campus ID against accessible campuses.
  * Returns undefined if "all" or if the user has CMO-level access.
  * Returns the specific campus ID if user only has single-campus access.
+ *
+ * `lensCampusId` (see lib/campus-lens.ts) supplies the default when the
+ * caller has no explicit `selectedCampusId` — the sidebar campus lens
+ * becoming a page's default filter. It runs through the exact same
+ * accessible-list check below as an explicit selection, so a stale or
+ * tampered lens cookie can narrow what this returns but never widen it.
  */
 export function resolveActiveCampus(
   session: AuthSession,
-  selectedCampusId?: string
+  selectedCampusId?: string,
+  lensCampusId?: string | null
 ): string | undefined {
   const accessible = getAccessibleCampusIds(session);
 
@@ -137,6 +144,13 @@ export function resolveActiveCampus(
     // scoped staff can only select campuses in their accessible list.
     if (accessible.length === 0 || accessible.includes(selectedCampusId)) {
       return selectedCampusId;
+    }
+  }
+
+  // No explicit selection: fall back to the campus lens default, same check.
+  if (!selectedCampusId && lensCampusId) {
+    if (accessible.length === 0 || accessible.includes(lensCampusId)) {
+      return lensCampusId;
     }
   }
 

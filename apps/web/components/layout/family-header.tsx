@@ -52,7 +52,7 @@ export function FamilyHeader({ unreadMessageCount = 0, campusIdentity }: FamilyH
   return (
     <header
       className={`border-b border-line bg-white${
-        campusIdentity ? ` border-t-2 ${campusIdentity.accent.topBorder}` : ""
+        campusIdentity ? ` border-t-[3px] ${campusIdentity.accent.topBorder}` : ""
       }`}
     >
       <div className="max-w-5xl mx-auto flex items-center justify-between px-4 h-14">

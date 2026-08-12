@@ -6,6 +6,7 @@ import { getReenrollmentStats, getReenrollmentFollowUpQueue } from "@/lib/querie
 import { EnrollmentClient } from "./enrollment-client";
 import { ReenrollmentPanel } from "./reenrollment-panel-client";
 import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { getCampusLensId } from "@/lib/campus-lens";
 
 export default async function StaffEnrollmentPage({
   searchParams,
@@ -14,7 +15,8 @@ export default async function StaffEnrollmentPage({
 }) {
   const session = await requireStaffSession();
   const accessibleIds = getAccessibleCampusIds(session);
-  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const lensCampusId = await getCampusLensId(accessibleIds);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus, lensCampusId);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
 
   const [{ enrollments, stats }, reenrollmentStats, reenrollmentFollowUp] = await Promise.all([

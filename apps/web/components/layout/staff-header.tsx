@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useTransition } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@rooted-ems/database";
 import { Select } from "@/components/ui/select";
@@ -24,6 +24,10 @@ interface StaffHeaderProps {
   recentNotifications?: FamilyMessageRow[];
   /** The user's highest role across all campuses (drives mobile nav filtering) */
   highestRole?: string;
+  /** campus.id of the active campus lens (lib/campus-lens.ts), or null for "All campuses". */
+  lensCampusId?: string | null;
+  /** setCampusLens server action — the campus select persists its pick as the lens cookie. */
+  setCampusLensAction?: (campusId: string | null) => Promise<void>;
 }
 
 export function StaffHeader({
@@ -32,16 +36,23 @@ export function StaffHeader({
   unreadNotificationCount = 0,
   recentNotifications = [],
   highestRole = "compliance_auditor",
+  lensCampusId = null,
+  setCampusLensAction,
 }: StaffHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [, startTransition] = useTransition();
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Read current campus from URL, fall back to "all"
-  const selectedCampus = searchParams.get("campus") ?? "";
+  // Effective campus context: an explicit ?campus= wins, then the persistent
+  // campus lens, then "" (All Campuses). "all" is the explicit all-campuses
+  // sentinel some page filters write; the select renders it as "".
+  const campusParam = searchParams.get("campus");
+  const selectedCampus =
+    campusParam === "all" ? "" : campusParam ?? lensCampusId ?? "";
 
   const supabase = useMemo(() => createBrowserClient(), []);
 
@@ -89,9 +100,12 @@ export function StaffHeader({
     return () => window.removeEventListener(OPEN_STAFF_SEARCH_EVENT, onOpenSearch);
   }, []);
 
-  // Preserve campus selection across navigation (mirrors staff-sidebar)
+  // Preserve an explicit ?campus= across navigation (mirrors staff-sidebar).
+  // Deliberately the raw param, not selectedCampus: the lens cookie already
+  // persists the lens across navigation, so links should not bake it into
+  // every URL.
   function buildHref(base: string) {
-    return selectedCampus ? `${base}?campus=${selectedCampus}` : base;
+    return campusParam ? `${base}?campus=${campusParam}` : base;
   }
 
   const userLevel = ROLE_LEVEL[highestRole] ?? 1;
@@ -109,7 +123,15 @@ export function StaffHeader({
       params.delete("campus");
     }
     const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname);
+    // Persist the pick as the campus lens FIRST, then navigate — the pushed
+    // render must see the new cookie so the shell theme, sidebar identity,
+    // and every page's default filter change together. Clearing to All
+    // Campuses must clear the cookie too, or the lens would snap the user
+    // back to a campus on their next navigation.
+    startTransition(async () => {
+      if (setCampusLensAction) await setCampusLensAction(campusId || null);
+      router.push(qs ? `${pathname}?${qs}` : pathname);
+    });
   }
 
   // Single-campus staff never see "All Campuses" — their one campus is the

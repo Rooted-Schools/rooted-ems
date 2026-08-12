@@ -208,6 +208,10 @@ export function PipelineClient({
       if (q) params.set("search", q);
       else params.delete("search");
       if (campus && campus !== "all") params.set("campus", campus);
+      // A deliberate All-campuses pick must write the explicit "all"
+      // sentinel: an absent param now falls back to the campus lens
+      // (lib/campus-lens.ts), which would silently undo the pick.
+      else if (overrides.campus === "all") params.set("campus", "all");
       else params.delete("campus");
       if (staleDays) params.set("staleDays", staleDays);
       else params.delete("staleDays");

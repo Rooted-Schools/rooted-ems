@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { ReportsClient } from "./reports-client";
 import { requireMinRole, hasMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { getCampusLensId } from "@/lib/campus-lens";
 import { SectionTabs } from "@/components/layout/section-tabs";
 import { INSIGHTS_TABS } from "@/lib/section-tabs";
 import { getReenrollmentStats } from "@/lib/queries/reenrollment";
@@ -55,7 +56,8 @@ export default async function StaffReportsPage({
   // not the is_staff floor a compliance auditor also clears.
   const session = await requireMinRole("enrollment_manager");
   const accessibleIds = getAccessibleCampusIds(session);
-  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const lensCampusId = await getCampusLensId(accessibleIds);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus, lensCampusId);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
 
   const supabase = createServiceRoleClient();

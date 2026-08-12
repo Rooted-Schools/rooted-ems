@@ -2,6 +2,7 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { getCampusLensId } from "@/lib/campus-lens";
 import {
   getStaffCommunications,
   getStaffMessageTemplates,
@@ -17,7 +18,8 @@ export default async function StaffCommunicationsPage({
 }) {
   const session = await requireStaffSession();
   const accessibleIds = getAccessibleCampusIds(session);
-  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const lensCampusId = await getCampusLensId(accessibleIds);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus, lensCampusId);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
 
   const [

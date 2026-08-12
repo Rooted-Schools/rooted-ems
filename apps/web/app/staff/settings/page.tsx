@@ -5,6 +5,7 @@ import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { getStaffEnrollmentWindows, getStaffUsers, getCampuses, getStaffPacketRequirements } from "@/lib/queries";
 import { SettingsClient } from "./settings-client";
 import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus, hasMinRole } from "@/lib/auth/get-session";
+import { getCampusLensId } from "@/lib/campus-lens";
 import { isSmsConfigured } from "@/lib/sms";
 import { isEmailConfigured } from "@/lib/email";
 import { ChannelStatus } from "./_components/channel-status";
@@ -20,7 +21,8 @@ export default async function StaffSettingsPage({
 }) {
   const session = await requireMinRole("enrollment_manager");
   const accessibleIds = getAccessibleCampusIds(session);
-  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const lensCampusId = await getCampusLensId(accessibleIds);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus, lensCampusId);
   const supabase = createServiceRoleClient();
 
   // Capacity plans, scoped to accessible campuses — feeds the Settings

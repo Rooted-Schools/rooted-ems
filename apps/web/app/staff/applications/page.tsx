@@ -3,6 +3,7 @@ export const runtime = "edge";
 import { getStaffApplications, getApplicationStats, getCampuses } from "@/lib/queries";
 import { StaffApplicationsClient } from "./applications-client";
 import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { getCampusLensId } from "@/lib/campus-lens";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,8 @@ export default async function StaffApplicationsPage({
 }) {
   const session = await requireStaffSession();
   const accessibleIds = getAccessibleCampusIds(session);
-  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const lensCampusId = await getCampusLensId(accessibleIds);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus, lensCampusId);
   const statusParam = searchParams?.status && searchParams.status !== "all" ? searchParams.status : undefined;
   const searchParam = searchParams?.search || undefined;
   const parsedPage = Number.parseInt(searchParams?.page ?? "1", 10);
@@ -48,7 +50,7 @@ export default async function StaffApplicationsPage({
       campuses={campuses}
       initialStatus={searchParams?.status ?? "all"}
       initialSearch={searchParams?.search ?? ""}
-      initialCampus={searchParams?.campus ?? "all"}
+      initialCampus={searchParams?.campus ?? lensCampusId ?? "all"}
     />
   );
 }
