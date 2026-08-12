@@ -3,10 +3,10 @@ import { StaffSidebar } from "@/components/layout/staff-sidebar";
 import { StaffHeader } from "@/components/layout/staff-header";
 import { StaffMobileNav } from "@/components/layout/staff-mobile-nav";
 import { requireStaffSession, getAccessibleCampusIds, getHighestRole } from "@/lib/auth/get-session";
-import { getCampusIdentityByShortCode, NEUTRAL_LENS_THEME } from "@/lib/campus-identity";
+import { NEUTRAL_LENS_THEME } from "@/lib/campus-identity";
 import { getCampusLens } from "@/lib/campus-lens";
 import { setCampusLens } from "@/app/staff/lens-actions";
-import type { CampusLensSwitcherOption } from "@/components/layout/campus-lens-switcher";
+import { LensSync } from "@/components/layout/lens-sync";
 import {
   getCampuses,
   getFamilyMessages,
@@ -80,24 +80,13 @@ export default async function StaffLayout({
   const highestRole = getHighestRole(session);
 
   // Campus lens (lib/campus-lens.ts): forced to the one accessible campus for
-  // single-campus staff (Tim, Lalah); a multi-campus/org-wide viewer's own
-  // switcher pick otherwise; null for "All campuses" (the neutral default).
-  // Drives both the shell theme below and the sidebar brand block — a single
-  // logo would misrepresent whose console this is when no lens is active.
+  // single-campus staff (Tim, Lalah); a multi-campus/org-wide viewer's pick
+  // in the header campus select otherwise (persisted as a cookie); null for
+  // "All campuses" (the neutral default). Drives the shell theme below, the
+  // sidebar brand block, and — via getCampusLensId in each page — the
+  // default ?campus= filter, so color, identity, and data always agree.
   const lens = await getCampusLens(campuses);
   const lensTheme = lens?.identity.theme ?? NEUTRAL_LENS_THEME;
-
-  // Switcher renders only for staff with more than one campus to choose
-  // between — org-wide (empty accessible list) or explicitly multi-campus.
-  const showCampusSwitcher = accessibleIds.length === 0 || accessibleIds.length > 1;
-  const campusSwitcherOptions: CampusLensSwitcherOption[] = showCampusSwitcher
-    ? campuses
-        .map((c) => {
-          const identity = getCampusIdentityByShortCode(c.short_code);
-          return identity ? { id: c.id, identity } : null;
-        })
-        .filter((o): o is CampusLensSwitcherOption => o !== null)
-    : [];
 
   // CSS custom properties consumed via Tailwind arbitrary values
   // (bg-[var(--lens-accent)], text-[var(--lens-accent-text)], ...) by the
@@ -125,9 +114,6 @@ export default async function StaffLayout({
             messagesUnreadCount={unreadNotificationCount}
             showNetwork={accessibleIds.length === 0}
             lensIdentity={lens?.identity}
-            campusSwitcherOptions={campusSwitcherOptions}
-            activeLensCampusId={lens?.campusId ?? null}
-            setCampusLens={setCampusLens}
           />
         </Suspense>
         <div className="flex-1 flex flex-col">
@@ -138,6 +124,8 @@ export default async function StaffLayout({
               unreadNotificationCount={unreadNotificationCount}
               recentNotifications={recentNotifications}
               highestRole={highestRole}
+              lensCampusId={lens?.campusId ?? null}
+              setCampusLensAction={setCampusLens}
             />
           </Suspense>
           {/* pb-[72px] keeps content clear of the fixed phone bottom tab bar
@@ -146,6 +134,16 @@ export default async function StaffLayout({
         </div>
         <Suspense fallback={null}>
           <StaffMobileNav highestRole={highestRole} todayCount={todayCount} />
+        </Suspense>
+        {/* Converges the lens cookie onto explicit ?campus= selections made
+            outside the header select (in-page filters, shared links) so the
+            shell can never wear one campus's color over another's data. */}
+        <Suspense fallback={null}>
+          <LensSync
+            validCampusIds={campuses.map((c) => c.id)}
+            lensCampusId={lens?.campusId ?? null}
+            setCampusLensAction={setCampusLens}
+          />
         </Suspense>
       </div>
     </div>

@@ -5,7 +5,6 @@ import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { CampusIdentity } from "@/lib/campus-identity";
-import { CampusLensSwitcher, type CampusLensSwitcherOption } from "@/components/layout/campus-lens-switcher";
 
 /* ------------------------------------------------------------------ */
 /*  Role hierarchy — higher number = more access                      */
@@ -258,24 +257,14 @@ interface StaffSidebarProps {
   /**
    * The active campus lens (app/staff/layout.tsx resolves this via
    * lib/campus-lens.ts — either the viewer's one accessible campus forced
-   * for single-campus staff, or a multi-campus/org-wide viewer's switcher
-   * pick). When present, the brand block shows that campus's logo and name
+   * for single-campus staff, or a multi-campus/org-wide viewer's pick in
+   * the header campus select, which persists it as the lens cookie).
+   * When present, the brand block shows that campus's logo and name
    * with "Rooted EMS" demoted to the subtitle line, plus a left ring in the
    * campus's accent. Undefined when no lens is active ("All campuses") —
    * brand block keeps the network mark.
    */
   lensIdentity?: CampusIdentity;
-  /**
-   * Campus switcher options — only passed for multi-campus/org-wide staff
-   * (app/staff/layout.tsx gates on accessibleIds.length === 0 || > 1).
-   * Undefined/empty ⇒ no switcher renders, matching single-campus staff who
-   * have nothing to switch between.
-   */
-  campusSwitcherOptions?: CampusLensSwitcherOption[];
-  /** campus.id (uuid) of the active lens, or null for "All campuses" — drives which switcher option reads as selected. */
-  activeLensCampusId?: string | null;
-  /** setCampusLens server action, threaded down so the switcher can call it. */
-  setCampusLens?: (campusId: string | null) => Promise<void>;
 }
 
 export function StaffSidebar({
@@ -284,9 +273,6 @@ export function StaffSidebar({
   messagesUnreadCount,
   showNetwork = false,
   lensIdentity,
-  campusSwitcherOptions,
-  activeLensCampusId = null,
-  setCampusLens,
 }: StaffSidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -430,15 +416,6 @@ export function StaffSidebar({
           )}
         </Link>
       </div>
-
-      {/* Campus lens switcher — multi-campus/network staff only */}
-      {campusSwitcherOptions && campusSwitcherOptions.length > 0 && setCampusLens && (
-        <CampusLensSwitcher
-          options={campusSwitcherOptions}
-          activeCampusId={activeLensCampusId}
-          setCampusLens={setCampusLens}
-        />
-      )}
 
       {/* Navigation */}
       <nav className="flex-1 py-2 overflow-y-auto">

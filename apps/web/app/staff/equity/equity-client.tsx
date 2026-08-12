@@ -155,6 +155,10 @@ export function EquityClient({
       const params = new URLSearchParams(currentParams.toString());
       const campus = overrides.campus ?? campusFilter;
       if (campus && campus !== "all") params.set("campus", campus);
+      // A deliberate All-campuses pick must write the explicit "all"
+      // sentinel: an absent param now falls back to the campus lens
+      // (lib/campus-lens.ts), which would silently undo the pick.
+      else if (overrides.campus === "all") params.set("campus", "all");
       else params.delete("campus");
       router.push(`${pathname}?${params.toString()}`);
     },
