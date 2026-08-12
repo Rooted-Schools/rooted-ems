@@ -4,6 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { LocaleProvider, useLocale } from "@/lib/i18n/locale-context";
 import { LanguageToggle } from "@/components/ui/language-toggle";
+import { HowEnrollmentWorksSection } from "@/components/public/how-enrollment-works";
+import { CAMPUS_ACCENT_BY_MATCH_KEY } from "@/lib/campus-identity";
 import type { Locale } from "@/lib/i18n/translations";
 
 /* ───────────── props ───────────── */
@@ -32,44 +34,15 @@ interface LandingClientProps {
   schools: LandingSchool[];
 }
 
-/* Campus accent color classes keyed by matchKey */
-const campusAccent: Record<string, {
-  topBorder: string;
-  border: string;
-  hoverBorder: string;
-  badgeBg: string;
-  badgeBorder: string;
-  badgeText: string;
-  dot: string;
-}> = {
-  vancouver: {
-    topBorder: "border-t-rooted-green",
-    border: "border-rooted-green/30",
-    hoverBorder: "hover:border-rooted-green/60",
-    badgeBg: "bg-rooted-green/10",
-    badgeBorder: "border-rooted-green/30",
-    badgeText: "text-rooted-green",
-    dot: "bg-rooted-green",
-  },
-  neal: {
-    topBorder: "border-t-amber-500",
-    border: "border-amber-300/60",
-    hoverBorder: "hover:border-amber-400",
-    badgeBg: "bg-amber-50",
-    badgeBorder: "border-amber-300",
-    badgeText: "text-amber-700",
-    dot: "bg-amber-500",
-  },
-  cleveland: {
-    topBorder: "border-t-blue-500",
-    border: "border-blue-300/60",
-    hoverBorder: "hover:border-blue-400",
-    badgeBg: "bg-blue-50",
-    badgeBorder: "border-blue-300",
-    badgeText: "text-blue-700",
-    dot: "bg-blue-500",
-  },
-};
+/**
+ * Campus accent color classes keyed by matchKey. This used to be a local
+ * literal; it now reads from lib/campus-identity.ts, the single source of
+ * truth shared with the per-campus landing pages, family header, staff
+ * sidebar, and transactional email. Kept as a local alias (rather than
+ * inlining the import everywhere below) so the diff against the prior
+ * version stays readable.
+ */
+const campusAccent = CAMPUS_ACCENT_BY_MATCH_KEY;
 
 function formatDate(iso: string, locale: Locale): string {
   // Window dates are stored as UTC midnight; format in UTC so "Oct 26
@@ -99,14 +72,6 @@ export function LandingClient({ schools }: LandingClientProps) {
 function LandingContent({ schools }: LandingClientProps) {
   const { t, locale } = useLocale();
   const anyOpen = schools.some((s) => s.isOpen);
-
-  const steps = [
-    { step: 1, title: t("public.step1Title"), desc: t("public.step1Desc") },
-    { step: 2, title: t("public.step2Title"), desc: t("public.step2Desc") },
-    { step: 3, title: t("public.step3Title"), desc: t("public.step3Desc") },
-    { step: 4, title: t("public.step4Title"), desc: t("public.step4Desc") },
-    { step: 5, title: t("public.step5Title"), desc: t("public.step5Desc") },
-  ];
 
   return (
     <div className="min-h-screen bg-warm-white">
@@ -285,26 +250,7 @@ function LandingContent({ schools }: LandingClientProps) {
       </section>
 
       {/* ─── How It Works ─── */}
-      <section className="py-16 bg-rooted-gray-light">
-        <div className="max-w-4xl mx-auto px-6">
-          <h2 className="text-2xl font-bold text-ink text-center mb-10">
-            {t("public.howItWorks")}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            {steps.map((s) => (
-              <div key={s.step} className="text-center">
-                <div className="w-10 h-10 rounded-full bg-deep-green text-white flex items-center justify-center text-sm font-bold mx-auto mb-3">
-                  {s.step}
-                </div>
-                <p className="text-sm font-semibold text-ink">
-                  {s.title}
-                </p>
-                <p className="text-xs text-stone-text mt-1">{s.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <HowEnrollmentWorksSection />
 
       {/* ─── Footer ─── */}
       <footer className="py-8 bg-deep-green">

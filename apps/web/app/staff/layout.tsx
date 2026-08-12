@@ -3,6 +3,7 @@ import { StaffSidebar } from "@/components/layout/staff-sidebar";
 import { StaffHeader } from "@/components/layout/staff-header";
 import { StaffMobileNav } from "@/components/layout/staff-mobile-nav";
 import { requireStaffSession, getAccessibleCampusIds, getHighestRole } from "@/lib/auth/get-session";
+import { getCampusIdentityByShortCode } from "@/lib/campus-identity";
 import {
   getCampuses,
   getFamilyMessages,
@@ -75,6 +76,16 @@ export default async function StaffLayout({
   // Compute the user's highest role across all campuses for nav filtering
   const highestRole = getHighestRole(session);
 
+  // Campus-scoped staff (accessible campuses resolve to exactly one) get
+  // that campus's logo in the sidebar brand block instead of the generic
+  // network mark. Org-level accounts (empty accessible list, i.e. showNetwork
+  // below) or staff spanning multiple campuses keep the network mark — a
+  // single logo would misrepresent whose console this is for them.
+  const singleCampus = accessibleIds.length === 1 ? campuses[0] : undefined;
+  const campusIdentity = singleCampus
+    ? getCampusIdentityByShortCode(singleCampus.short_code)
+    : undefined;
+
   return (
     <ToastProvider>
     <div className="flex min-h-screen bg-rooted-gray">
@@ -84,6 +95,7 @@ export default async function StaffLayout({
           todayCount={todayCount}
           messagesUnreadCount={unreadNotificationCount}
           showNetwork={accessibleIds.length === 0}
+          campusIdentity={campusIdentity}
         />
       </Suspense>
       <div className="flex-1 flex flex-col">

@@ -54,6 +54,8 @@ export {
   getLotteryOutcome,
   getWaitlistHistory,
   getExistingHouseholdForUser,
+  getFamilyPrimaryCampus,
+  type FamilyPrimaryCampus,
   type FamilyNotification,
   type EnrollmentWindowInfo,
   type FamilyAppSummary,

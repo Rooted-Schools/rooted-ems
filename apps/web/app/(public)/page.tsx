@@ -1,5 +1,6 @@
 import { createServiceClient } from "@rooted-ems/database/service";
 import { LandingClient, type LandingSchool } from "./landing-client";
+import { CAMPUS_IDENTITY_LIST } from "@/lib/campus-identity";
 
 export const revalidate = 300; // revalidate every 5 minutes
 
@@ -89,30 +90,16 @@ export default async function HomePage() {
   ]);
 
   // Static school data with match keys to link to DB enrollment windows.
+  // Sourced from lib/campus-identity.ts (single source of truth, shared with
+  // the per-campus landing pages, family header, staff sidebar, and email).
   // Names are proper nouns and intentionally not translated.
-  const schoolDefs = [
-    {
-      name: "rootedschools vancouver",
-      location: "Vancouver, WA",
-      gradesRange: "9-12",
-      logo: "/logos/rooted-vancouver.png",
-      matchKey: "vancouver",
-    },
-    {
-      name: "C.R. Neal Academy",
-      location: "Columbia, SC",
-      gradesRange: "6-12",
-      logo: "/logos/cr-neal-academy.png",
-      matchKey: "neal",
-    },
-    {
-      name: "rootedschools cleveland",
-      location: "Cleveland, OH",
-      gradesRange: "6-12",
-      logo: "/logos/rooted-cleveland.png",
-      matchKey: "cleveland",
-    },
-  ];
+  const schoolDefs = CAMPUS_IDENTITY_LIST.map((c) => ({
+    name: c.displayName,
+    location: c.location,
+    gradesRange: c.gradesRange,
+    logo: c.logoPath,
+    matchKey: c.matchKey,
+  }));
 
   // Match each school to its enrollment window status. Windows are ordered
   // ascending by open_date, so the first match per campus is its earliest
