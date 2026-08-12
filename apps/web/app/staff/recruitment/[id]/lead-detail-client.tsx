@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import {
   IconSprout,
@@ -26,8 +27,10 @@ import {
   IconCheckCircle,
   IconClipboardList,
   IconBan,
+  IconAlertTriangle,
 } from "@/components/ui/icons";
 import type { LeadDetail } from "@/lib/queries/leads";
+import { CALL_OUTCOMES, buildCallOutcomeBody, bodyHasOutcome } from "@/lib/lead-call-outcomes";
 import { formatRelativeTime } from "@/lib/queries/utils";
 import { staffDeleteLead, staffGetReferralLink, staffLogLeadActivity, staffUpdateLead } from "../actions";
 import { PATHWAY_LABELS, SOURCE_LABELS, STAGE_CONFIG } from "../recruitment-client";
@@ -64,6 +67,8 @@ export function LeadDetailClient({
   const [logType, setLogType] = useState<"call" | "note">("call");
   const [logBody, setLogBody] = useState("");
   const [logFollowUpDays, setLogFollowUpDays] = useState<number | null>(3);
+  const [logOutcome, setLogOutcome] = useState<string>(CALL_OUTCOMES[0].key);
+  const [logCallbackDate, setLogCallbackDate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -99,34 +104,67 @@ export function LeadDetailClient({
 
   const cfg = STAGE_CONFIG[lead.stage] ?? STAGE_CONFIG.new;
 
+  // "Wrong number" flag — derived from the most recent call activity, never
+  // a separate column, so it can't drift from what was actually logged.
+  const latestCall = lead.activities.find((a) => a.activity_type === "call");
+  const phoneMayBeWrong = Boolean(latestCall && bodyHasOutcome(latestCall.body, "wrong_number"));
+
   function openLog(type: "call" | "note") {
     setLogType(type);
     setLogBody("");
     setLogFollowUpDays(type === "call" ? 3 : null);
+    setLogOutcome(CALL_OUTCOMES[0].key);
+    setLogCallbackDate("");
     setError(null);
     setLogOpen(true);
   }
 
   function submitLog() {
     if (!lead) return;
-    if (!logBody.trim()) {
-      setError("Add a quick note about what happened.");
+
+    if (logType === "note") {
+      if (!logBody.trim()) {
+        setError("Add a quick note about what happened.");
+        return;
+      }
+      setError(null);
+      startTransition(async () => {
+        const result = await staffLogLeadActivity(lead.id, "note", logBody.trim(), staffUserId);
+        if (result.error) {
+          setError(result.error);
+          return;
+        }
+        if (logFollowUpDays !== undefined) {
+          const next =
+            logFollowUpDays === null
+              ? null
+              : new Date(Date.now() + logFollowUpDays * 24 * 60 * 60 * 1000).toISOString();
+          await staffUpdateLead(lead.id, { next_follow_up_at: next }, staffUserId);
+        }
+        setLogOpen(false);
+        router.refresh();
+      });
+      return;
+    }
+
+    // Structured call outcome — "Call back later" requires a real date.
+    if (logOutcome === "callback" && !logCallbackDate) {
+      setError("Pick a date to call back.");
       return;
     }
     setError(null);
+    const body = buildCallOutcomeBody(logOutcome, logBody);
     startTransition(async () => {
-      const result = await staffLogLeadActivity(lead.id, logType, logBody.trim(), staffUserId);
+      const result = await staffLogLeadActivity(lead.id, "call", body, staffUserId);
       if (result.error) {
         setError(result.error);
         return;
       }
-      if (logFollowUpDays !== undefined) {
-        const next =
-          logFollowUpDays === null
-            ? null
-            : new Date(Date.now() + logFollowUpDays * 24 * 60 * 60 * 1000).toISOString();
-        await staffUpdateLead(lead.id, { next_follow_up_at: next }, staffUserId);
-      }
+      // Reaching the family — any outcome — resolves whatever follow-up was
+      // pending; "Call back later" then schedules a fresh, specific one.
+      const next =
+        logOutcome === "callback" ? new Date(`${logCallbackDate}T09:00:00`).toISOString() : null;
+      await staffUpdateLead(lead.id, { next_follow_up_at: next }, staffUserId);
       setLogOpen(false);
       router.refresh();
     });
@@ -234,9 +272,16 @@ export function LeadDetailClient({
                 <p className="text-ink/60">No email</p>
               )}
               {lead.phone ? (
-                <a href={`tel:${lead.phone}`} className="text-rooted-green hover:underline block">
-                  {lead.phone}
-                </a>
+                <>
+                  <a href={`tel:${lead.phone}`} className="text-rooted-green hover:underline block">
+                    {lead.phone}
+                  </a>
+                  {phoneMayBeWrong && (
+                    <span className="inline-flex items-center gap-1 mt-0.5 text-[11px] font-medium text-warn-text">
+                      <IconAlertTriangle size={12} /> Number may be wrong — last call couldn&apos;t reach it
+                    </span>
+                  )}
+                </>
               ) : (
                 <p className="text-ink/60">No phone</p>
               )}
@@ -289,8 +334,13 @@ export function LeadDetailClient({
             )}
             <div>
               <p className="text-xs text-stone">Next follow-up</p>
-              <p className="text-ink">
+              <p className="text-ink flex items-center gap-1.5">
                 {lead.next_follow_up_at ? formatRelativeTime(lead.next_follow_up_at) : "None scheduled"}
+                {lead.next_follow_up_at && latestCall && bodyHasOutcome(latestCall.body, "callback") && (
+                  <span className="rounded-[6px] bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+                    Callback
+                  </span>
+                )}
               </p>
             </div>
             {lead.referred_by_name && (
@@ -432,37 +482,82 @@ export function LeadDetailClient({
             <DialogTitle>{logType === "call" ? "Log a call" : "Add a note"}</DialogTitle>
             <DialogDescription>
               {logType === "call"
-                ? "What did you talk about? Calls automatically mark this family as contacted."
+                ? "Calls automatically mark this family as contacted."
                 : "Anything worth remembering for the next conversation."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <textarea
-              value={logBody}
-              onChange={(e) => setLogBody(e.target.value)}
-              rows={3}
-              autoFocus
-              className="w-full rounded-md border border-stone/30 px-3 py-2 text-sm focus:border-rooted-green focus:outline-none focus:ring-1 focus:ring-rooted-green"
-              placeholder={logType === "call" ? "Spoke with mom — very interested in healthcare pathway, worried about bus routes…" : "…"}
-            />
-            <div>
-              <label htmlFor="follow-up-select" className="block text-sm font-medium text-ink/70 mb-1">
-                Follow up again…
-              </label>
-              <Select
-                id="follow-up-select"
-                value={String(logFollowUpDays)}
-                onChange={(e) =>
-                  setLogFollowUpDays(e.target.value === "null" ? null : Number(e.target.value))
-                }
-              >
-                {FOLLOW_UP_OPTIONS.map((opt) => (
-                  <option key={opt.label} value={String(opt.days)}>
-                    {opt.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
+            {logType === "call" ? (
+              <>
+                <div>
+                  <label htmlFor="call-outcome-select" className="block text-sm font-medium text-ink/70 mb-1">
+                    Outcome
+                  </label>
+                  <Select
+                    id="call-outcome-select"
+                    value={logOutcome}
+                    onChange={(e) => setLogOutcome(e.target.value)}
+                  >
+                    {CALL_OUTCOMES.map((o) => (
+                      <option key={o.key} value={o.key}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <textarea
+                  value={logBody}
+                  onChange={(e) => setLogBody(e.target.value)}
+                  rows={3}
+                  autoFocus
+                  className="w-full rounded-md border border-stone/30 px-3 py-2 text-sm focus:border-rooted-green focus:outline-none focus:ring-1 focus:ring-rooted-green"
+                  placeholder="Optional note — spoke with mom, very interested in healthcare pathway…"
+                />
+                {logOutcome === "callback" && (
+                  <div>
+                    <label htmlFor="callback-date" className="block text-sm font-medium text-ink/70 mb-1">
+                      Call back on
+                    </label>
+                    <Input
+                      id="callback-date"
+                      type="date"
+                      value={logCallbackDate}
+                      min={new Date().toISOString().split("T")[0]}
+                      onChange={(e) => setLogCallbackDate(e.target.value)}
+                    />
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <textarea
+                  value={logBody}
+                  onChange={(e) => setLogBody(e.target.value)}
+                  rows={3}
+                  autoFocus
+                  className="w-full rounded-md border border-stone/30 px-3 py-2 text-sm focus:border-rooted-green focus:outline-none focus:ring-1 focus:ring-rooted-green"
+                  placeholder="…"
+                />
+                <div>
+                  <label htmlFor="follow-up-select" className="block text-sm font-medium text-ink/70 mb-1">
+                    Follow up again…
+                  </label>
+                  <Select
+                    id="follow-up-select"
+                    value={String(logFollowUpDays)}
+                    onChange={(e) =>
+                      setLogFollowUpDays(e.target.value === "null" ? null : Number(e.target.value))
+                    }
+                  >
+                    {FOLLOW_UP_OPTIONS.map((opt) => (
+                      <option key={opt.label} value={String(opt.days)}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              </>
+            )}
             {error && (
               <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>
             )}

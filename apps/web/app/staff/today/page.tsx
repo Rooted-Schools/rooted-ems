@@ -6,12 +6,16 @@ import {
   getReleasableSeats,
   getDuplicateSuspects,
   getUpcomingDeadlines,
+  getNextUpcomingWindowOpen,
+  getLeaderStripStats,
+  getNextUpcomingEvent,
 } from "@/lib/queries";
 import { getRegistrationCompletion, getCallEscalationQueue, getMeltRiskQueue } from "@/lib/queries/melt";
 import {
   requireStaffSession,
   getAccessibleCampusIds,
   resolveActiveCampus,
+  hasMinRole,
 } from "@/lib/auth/get-session";
 import { TodayClient, type ExceptionRow, type SeatProgressGroup } from "./today-client";
 
@@ -52,6 +56,9 @@ export default async function StaffTodayPage({
     registrationCompletion,
     callEscalation,
     meltRisk,
+    leaderStripStats,
+    nextEvent,
+    nextWindowOpen,
   ] = await Promise.all([
     supabase.from("user_profile").select("first_name, full_name").eq("id", session.user_id).maybeSingle(),
     supabase.from("school_year").select("id, name").eq("is_current", true).maybeSingle(),
@@ -64,7 +71,14 @@ export default async function StaffTodayPage({
     getRegistrationCompletion(scopedCampusIds),
     getCallEscalationQueue(scopedCampusIds),
     getMeltRiskQueue(scopedCampusIds),
+    getLeaderStripStats(scopedCampusIds),
+    getNextUpcomingEvent(scopedCampusIds),
+    getNextUpcomingWindowOpen(scopedCampusIds),
   ]);
+
+  // Leader strip is gated to enrollment_manager+ — a compact overview row,
+  // not something every enrollment_staff login needs cluttering their queue.
+  const isLeader = hasMinRole(session, "enrollment_manager");
 
   let capacityRows: Record<string, unknown>[] = [];
   if (currentSY?.id) {
@@ -258,6 +272,10 @@ export default async function StaffTodayPage({
       meltRiskQueue={meltRisk.rows}
       meltRiskAvailable={meltRisk.available}
       denied={searchParams?.denied === "1"}
+      showLeaderStrip={isLeader}
+      leaderStripStats={leaderStripStats}
+      nextEvent={nextEvent}
+      nextWindowOpen={nextWindowOpen}
     />
   );
 }

@@ -3,10 +3,9 @@ import { getUnreadNotificationCount } from "@/lib/queries";
 import { FamilyHeader } from "@/components/layout/family-header";
 import { FamilyTabBar } from "@/components/layout/family-tabbar";
 import { LocaleProvider } from "@/lib/i18n/locale-context";
+import { getLocaleCookie } from "@/lib/i18n/get-locale";
 import { ToastProvider } from "@/components/ui/toast";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import type { Locale } from "@/lib/i18n/translations";
 
 export const metadata = {
   title: "Family Portal | Rooted EMS",
@@ -30,8 +29,10 @@ export default async function FamilyLayout({
   // header nav and the phone bottom tab bar. Family context only, so a
   // dual-role user's staff-console notifications don't inflate this badge.
   const unreadCount = await getUnreadNotificationCount(user.id, "family");
-  const cookieStore = await cookies();
-  const initialLocale = (cookieStore.get("NEXT_LOCALE")?.value as Locale | undefined) ?? "en";
+  // Undefined (no "?? en" default) when no cookie has ever been set, so
+  // LocaleProvider falls back to detecting the browser's language instead
+  // of silently defaulting to English for a first-time family visitor.
+  const initialLocale = await getLocaleCookie();
 
   return (
     <LocaleProvider initialLocale={initialLocale}>

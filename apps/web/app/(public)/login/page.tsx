@@ -1,7 +1,7 @@
 import { FamilyLoginForm } from "@/components/auth/family-login-form";
 import { LanguageToggle } from "@/components/ui/language-toggle";
 import { LocaleProvider } from "@/lib/i18n/locale-context";
-import { getLocale } from "@/lib/i18n/get-locale";
+import { getLocaleCookie } from "@/lib/i18n/get-locale";
 
 export const dynamic = "force-dynamic";
 export const runtime = "edge";
@@ -12,8 +12,9 @@ export const metadata = {
 
 export default async function LoginPage() {
   // Single provider wraps both the toggle and the form so switching
-  // language re-renders the login form immediately.
-  const initialLocale = await getLocale();
+  // language re-renders the login form immediately. Undefined (no cookie
+  // yet) lets LocaleProvider detect the browser's language on first visit.
+  const initialLocale = await getLocaleCookie();
 
   return (
     <LocaleProvider initialLocale={initialLocale}>

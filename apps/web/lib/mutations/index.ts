@@ -74,11 +74,22 @@ export {
   sendOffersFromLottery,
   simulateLotteryRun,
   completeLotteryResults,
+  resumeLotteryNotifications,
+  runNotificationFanOut,
   type CreateLotteryRunInput,
   type PriorityTierDef,
   type LotterySimulation,
   type TierSimulation,
+  type FanOutResult,
 } from "./lottery";
+
+// Lottery policy governance mutations
+export {
+  saveDraftPolicyVersion,
+  adoptPolicyVersion,
+  type SaveDraftPolicyInput,
+  type AdoptPolicyInput,
+} from "./lottery-policy";
 
 // Lead (CRM) mutations
 export {

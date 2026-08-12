@@ -11,8 +11,10 @@ import {
   sendOffersFromLottery,
   simulateLotteryRun,
   completeLotteryResults,
+  resumeLotteryNotifications,
   type CreateLotteryRunInput,
 } from "@/lib/mutations";
+import { getPreflightReport } from "@/lib/lottery-preflight";
 
 /**
  * Lottery actions decide who gets a seat, so they carry the same gate as the
@@ -79,6 +81,19 @@ export async function staffRunLotteryPreview(runId: string) {
 
 export async function staffFinalizeLottery(runId: string, _executedBy?: string) {
   const session = await requireRoleOnCampus(await resolveLotteryRunCampus(runId), "enrollment_manager");
+
+  // Preflight is re-evaluated server side, not trusted from the panel the
+  // staff member was looking at. The page may have been open for an hour, and
+  // "the button was enabled when I clicked it" is not a defense for an
+  // official lottery run on stale conditions.
+  const preflight = await getPreflightReport(runId);
+  if (preflight?.blocked) {
+    return {
+      data: null,
+      error: `This lottery is not ready to be made official. ${preflight.reasons.join(" ")}`,
+    };
+  }
+
   const result = await finalizeLotteryRun(runId, session.user_id);
 
   if (!result.error) {
@@ -109,7 +124,8 @@ export async function staffArchiveLottery(runId: string) {
 
 export async function staffSendLotteryOffers(
   runId: string,
-  expiresAt: string,
+  /** Null means "use the governing policy's acceptance window." */
+  expiresAt: string | null,
   _offeredBy?: string
 ) {
   const session = await requireRoleOnCampus(await resolveLotteryRunCampus(runId), "enrollment_manager");
@@ -122,6 +138,23 @@ export async function staffSendLotteryOffers(
     revalidatePath("/staff/applications");
     revalidatePath("/staff/dashboard");
     revalidatePath("/staff/today");
+  }
+
+  return result;
+}
+
+// ─── Resume an interrupted notification fan-out ───────
+
+export async function staffResumeLotteryNotifications(runId: string) {
+  const session = await requireRoleOnCampus(
+    await resolveLotteryRunCampus(runId),
+    "enrollment_manager"
+  );
+  const result = await resumeLotteryNotifications(runId, session.user_id);
+
+  if (!result.error) {
+    revalidatePath(`/staff/lottery/${runId}`);
+    revalidatePath("/staff/lottery");
   }
 
   return result;

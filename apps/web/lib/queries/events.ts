@@ -196,6 +196,48 @@ export async function getEventDetail(eventId: string): Promise<EventDetail | nul
   };
 }
 
+export interface NextEventRow {
+  id: string;
+  title: string;
+  starts_at: string;
+  campus_name: string;
+}
+
+/**
+ * The single nearest upcoming event across the scoped campuses — powers the
+ * Today leader strip's "Next event" chip. Any staff-visible event counts
+ * (not just is_published, which only gates the public events page) since
+ * this is an internal surface. Empty campusIds means org-wide.
+ */
+export async function getNextUpcomingEvent(campusIds?: string[]): Promise<NextEventRow | null> {
+  const supabase = await createServerClient();
+  const nowIso = new Date().toISOString();
+
+  let query = supabase
+    .from("event")
+    .select("id, title, starts_at, campus:campus_id (name)")
+    .gte("starts_at", nowIso)
+    .order("starts_at", { ascending: true })
+    .limit(1);
+  if (campusIds && campusIds.length > 0) query = query.in("campus_id", campusIds);
+
+  const { data, error } = await query.maybeSingle();
+  if (error) {
+    console.error("[getNextUpcomingEvent]", error.message);
+    return null;
+  }
+  if (!data) return null;
+
+  const row = data as Record<string, unknown>;
+  const campus = row.campus as Record<string, string> | null;
+  return {
+    id: row.id as string,
+    title: row.title as string,
+    starts_at: row.starts_at as string,
+    campus_name: campus?.name ?? "",
+  };
+}
+
 // ─── Public (service role — unauthenticated pages) ─────
 
 export async function getUpcomingPublicEvents(): Promise<PublicEvent[]> {

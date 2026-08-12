@@ -9,6 +9,9 @@ export const SEATS_LOTTERY_TABS: SectionTab[] = [
   { label: "Lottery", href: "/staff/lottery" },
   { label: "Seats", href: "/staff/seats" },
   { label: "Offers & Waitlist", href: "/staff/offers" },
+  // Policy sits last because it is read far less often than it is relied on:
+  // the rules a lottery runs under, versioned and board-adopted.
+  { label: "Policy", href: "/staff/policy" },
 ];
 
 export const INSIGHTS_TABS: SectionTab[] = [

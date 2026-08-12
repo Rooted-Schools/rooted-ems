@@ -7,7 +7,14 @@ import { createBrowserClient } from "@rooted-ems/database";
 import { Select } from "@/components/ui/select";
 import { NAV_SECTIONS, ROLE_LEVEL } from "@/components/layout/staff-sidebar";
 import { StaffNotificationBell } from "@/components/layout/staff-notification-bell";
+import { GlobalSearch } from "@/components/staff/global-search";
+import { IconSearch } from "@/components/ui/icons";
 import type { FamilyMessageRow } from "@/lib/queries";
+
+/** Custom event name the staff mobile nav's Search tab dispatches to open
+ *  the same palette this header owns — keeps a single GlobalSearch instance
+ *  (and a single ⌘K listener) mounted, rather than two competing ones. */
+export const OPEN_STAFF_SEARCH_EVENT = "staff:open-search";
 
 interface StaffHeaderProps {
   userEmail?: string | null;
@@ -30,6 +37,7 @@ export function StaffHeader({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Read current campus from URL, fall back to "all"
@@ -55,6 +63,31 @@ export function StaffHeader({
       document.removeEventListener("pointerdown", onPointerDown);
     };
   }, [mobileOpen]);
+
+  // Global ⌘K / Ctrl+K opens the search palette from anywhere in the staff
+  // console — registered once here (the header client), not per-page.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // The bottom mobile nav's Search tab lives outside this component's DOM
+  // subtree (components/layout/staff-mobile-nav.tsx), so it opens the same
+  // palette via a plain window event rather than duplicating a second
+  // GlobalSearch instance.
+  useEffect(() => {
+    function onOpenSearch() {
+      setSearchOpen(true);
+    }
+    window.addEventListener(OPEN_STAFF_SEARCH_EVENT, onOpenSearch);
+    return () => window.removeEventListener(OPEN_STAFF_SEARCH_EVENT, onOpenSearch);
+  }, []);
 
   // Preserve campus selection across navigation (mirrors staff-sidebar)
   function buildHref(base: string) {
@@ -165,38 +198,23 @@ export function StaffHeader({
             notifications={recentNotifications}
           />
 
-          {/* Search */}
-          <form
-            className="relative"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const input = (e.target as HTMLFormElement).elements.namedItem("q") as HTMLInputElement;
-              const q = input?.value?.trim();
-              if (q) router.push(`/staff/students?search=${encodeURIComponent(q)}`);
-            }}
+          {/* Search — opens the global palette (leads, families, students),
+              not a route-specific search box anymore; ⌘K does the same. */}
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            className="flex h-8 w-40 items-center gap-2 rounded-[6px] border border-stone/20 bg-rooted-gray-light px-3 text-sm text-stone transition-colors hover:border-rooted-green/40 hover:text-ink sm:w-56"
           >
-            <input
-              name="q"
-              type="search"
-              placeholder="Search students..."
-              className="h-8 w-40 sm:w-56 rounded-lg border border-stone/20 bg-rooted-gray-light px-3 pr-8 text-sm text-ink placeholder:text-stone focus:outline-none focus:ring-2 focus:ring-rooted-green/30 focus:border-rooted-green"
-            />
-            <svg
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          </form>
+            <IconSearch size={14} className="shrink-0" />
+            <span className="flex-1 truncate text-left">Search families</span>
+            <span className="hidden shrink-0 rounded border border-stone/30 px-1 text-[10px] font-medium text-stone md:inline">
+              ⌘K
+            </span>
+          </button>
         </div>
       </header>
+
+      <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
 
       {/* Mobile dropdown menu */}
       {mobileOpen && (

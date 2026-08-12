@@ -115,6 +115,7 @@ const dict = {
   "dashboard.whereIs":                     { en: "Where {name} is",                           es: "Dónde está {name}" },
   "dashboard.appliedOn":                   { en: "Applied {date}",                            es: "Solicitó el {date}" },
   "dashboard.updatedOn":                   { en: "Updated {date}",                            es: "Actualizado el {date}" },
+  "dashboard.window.closesOn":             { en: "Applications close {date}",                 es: "Las solicitudes cierran el {date}" },
   "dashboard.view":                        { en: "View",                                      es: "Ver" },
   "dashboard.otherNote.nothingNeeded":     { en: "nothing needed",                            es: "no se necesita nada" },
   "dashboard.otherNote.notStarted":        { en: "not started",                               es: "no iniciada" },

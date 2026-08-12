@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { StaffSidebar } from "@/components/layout/staff-sidebar";
 import { StaffHeader } from "@/components/layout/staff-header";
+import { StaffMobileNav } from "@/components/layout/staff-mobile-nav";
 import { requireStaffSession, getAccessibleCampusIds, getHighestRole } from "@/lib/auth/get-session";
 import {
   getCampuses,
@@ -78,7 +79,12 @@ export default async function StaffLayout({
     <ToastProvider>
     <div className="flex min-h-screen bg-rooted-gray">
       <Suspense fallback={<aside className="hidden md:block w-64 bg-white border-r border-stone/20 min-h-screen" />}>
-        <StaffSidebar highestRole={highestRole} todayCount={todayCount} messagesUnreadCount={unreadNotificationCount} />
+        <StaffSidebar
+          highestRole={highestRole}
+          todayCount={todayCount}
+          messagesUnreadCount={unreadNotificationCount}
+          showNetwork={accessibleIds.length === 0}
+        />
       </Suspense>
       <div className="flex-1 flex flex-col">
         <Suspense fallback={<div className="h-[5.5rem]" />}>
@@ -90,8 +96,13 @@ export default async function StaffLayout({
             highestRole={highestRole}
           />
         </Suspense>
-        <main className="flex-1 p-6">{children}</main>
+        {/* pb-[72px] keeps content clear of the fixed phone bottom tab bar
+            below md, same convention as app/family/layout.tsx's main. */}
+        <main className="flex-1 p-6 pb-[72px] md:pb-6">{children}</main>
       </div>
+      <Suspense fallback={null}>
+        <StaffMobileNav highestRole={highestRole} todayCount={todayCount} />
+      </Suspense>
     </div>
     </ToastProvider>
   );

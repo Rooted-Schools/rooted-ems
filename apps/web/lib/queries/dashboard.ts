@@ -10,6 +10,14 @@ export interface UpcomingDeadline {
   daysLeft: number;
 }
 
+export interface NextWindowOpen {
+  campus_id: string;
+  campus_name: string;
+  /** Raw ISO date — format with timeZone: "UTC" (window dates are stored as
+   *  UTC midnight; see app/(public)/landing-client.tsx formatDate). */
+  open_date: string;
+}
+
 // ─── Queries ─────────────────────────────────────────────
 
 /**
@@ -66,4 +74,41 @@ export async function getUpcomingDeadlines(
       daysLeft: Math.max(0, daysLeft),
     };
   });
+}
+
+/**
+ * Nearest upcoming enrollment window (by open_date) across the scoped
+ * campuses — same "any status, including draft" query shape as the public
+ * landing page's getUpcomingEnrollmentWindows (app/(public)/page.tsx),
+ * since pre-season windows are drafted well before staff flips them open.
+ * Multi-campus scope returns the single nearest one across all of them.
+ * Empty/undefined campusIds means org-wide. Null when nothing is upcoming —
+ * callers must omit the countdown entirely rather than invent one.
+ */
+export async function getNextUpcomingWindowOpen(campusIds?: string[]): Promise<NextWindowOpen | null> {
+  const supabase = createServiceRoleClient();
+  const nowIso = new Date().toISOString();
+
+  let query = supabase
+    .from("enrollment_window")
+    .select("campus_id, open_date, campus:campus_id (name)")
+    .gt("open_date", nowIso)
+    .order("open_date", { ascending: true })
+    .limit(1);
+  if (campusIds && campusIds.length > 0) query = query.in("campus_id", campusIds);
+
+  const { data, error } = await query.maybeSingle();
+  if (error) {
+    console.error("[getNextUpcomingWindowOpen]", error.message);
+    return null;
+  }
+  if (!data) return null;
+
+  const row = data as Record<string, unknown>;
+  const campus = row.campus as Record<string, string> | null;
+  return {
+    campus_id: row.campus_id as string,
+    campus_name: campus?.name ?? "",
+    open_date: row.open_date as string,
+  };
 }

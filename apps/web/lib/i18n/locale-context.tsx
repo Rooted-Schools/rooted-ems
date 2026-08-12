@@ -31,6 +31,17 @@ function readClientLocale(): Locale | null {
   return null;
 }
 
+/**
+ * First-touch fallback when nothing has ever recorded a preference (no
+ * NEXT_LOCALE cookie, nothing saved locally): read the browser's own
+ * language setting. Only ever consulted after readClientLocale() comes back
+ * empty — an explicit past choice always wins over this guess.
+ */
+function detectBrowserLocale(): Locale {
+  if (typeof navigator === "undefined") return "en";
+  return navigator.language?.toLowerCase().startsWith("es") ? "es" : "en";
+}
+
 interface LocaleContextValue {
   locale: Locale;
   setLocale: (l: Locale) => void;
@@ -59,9 +70,17 @@ export function LocaleProvider({
   const [locale, setLocaleState] = useState<Locale>(initialLocale ?? "en");
 
   useEffect(() => {
-    if (initialLocale !== undefined) return; // server already seeded the locale
-    const detected = readClientLocale();
-    if (detected) setLocaleState(detected);
+    if (initialLocale !== undefined) return; // server already seeded the locale (a cookie exists)
+    const saved = readClientLocale();
+    if (saved) {
+      setLocaleState(saved);
+      return;
+    }
+    // No cookie and nothing saved locally — this is a first-time visitor.
+    // Read the browser's language and make it stick, the same way an
+    // explicit toggle click does, so it persists (cookie + localStorage)
+    // instead of re-guessing on every page load.
+    setLocale(detectBrowserLocale());
   }, [initialLocale]);
 
   function setLocale(l: Locale) {

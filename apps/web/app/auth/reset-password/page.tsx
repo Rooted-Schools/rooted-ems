@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { ResetPasswordForm } from "./reset-password-form";
 import { LocaleProvider } from "@/lib/i18n/locale-context";
-import { getLocale } from "@/lib/i18n/get-locale";
+import { getLocaleCookie } from "@/lib/i18n/get-locale";
 
 export const dynamic = "force-dynamic";
 export const runtime = "edge";
@@ -18,7 +18,7 @@ export const metadata = {
  * the NEXT_LOCALE cookie.
  */
 export default async function ResetPasswordPage() {
-  const initialLocale = await getLocale();
+  const initialLocale = await getLocaleCookie();
 
   return (
     <LocaleProvider initialLocale={initialLocale}>

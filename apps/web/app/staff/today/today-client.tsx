@@ -5,13 +5,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn, displayClass } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
-import { IconPhone, IconInfo, IconX, IconAlertTriangle } from "@/components/ui/icons";
+import { IconPhone, IconInfo, IconX, IconAlertTriangle, IconUsers, IconCalendar, IconClock } from "@/components/ui/icons";
 // From the leaf module, NOT the "@/lib/queries" barrel: the barrel re-exports
 // server-only queries that reach next/headers, which fails the client build.
 import { formatRelativeTime } from "@/lib/queries/utils";
 import { textExpiringOffers, sendRegistrationNudges, releaseSeats, markRegistrationContacted } from "./actions";
 import { registrationNudgeSubject, registrationNudgeBody, registrationNudgeSms } from "@/lib/nudge-copy";
 import type { RegistrationCompletionStats, CallEscalationRow, MeltRiskRow } from "@/lib/queries/melt";
+import type { LeaderStripStats } from "@/lib/queries/leads";
+import type { NextEventRow } from "@/lib/queries/events";
+import type { NextWindowOpen } from "@/lib/queries/dashboard";
 
 /* ------------------------------------------------------------------ */
 /*  Types shared with the server component                             */
@@ -58,6 +61,11 @@ interface TodayClientProps {
   callEscalationAvailable: boolean;
   /** True when the user landed here via requireMinRole/requireCMOAccess bouncing them off a page they don't have access to. */
   denied?: boolean;
+  /** enrollment_manager+ only — the leader strip is a leadership overview row. */
+  showLeaderStrip: boolean;
+  leaderStripStats: LeaderStripStats;
+  nextEvent: NextEventRow | null;
+  nextWindowOpen: NextWindowOpen | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -272,6 +280,83 @@ function ExceptionRowCard({
 /* ------------------------------------------------------------------ */
 /*  Headline stat strip — registration completion                      */
 /* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+/*  Leader strip — compact single-row overview for enrollment_manager+ */
+/* ------------------------------------------------------------------ */
+
+/** Window dates are stored as UTC midnight — format in UTC so a viewer west
+ *  of Greenwich never sees the date shift back a day (see
+ *  app/(public)/landing-client.tsx formatDate for the same fix). */
+function formatUtcDate(iso: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(iso));
+}
+
+function daysUntilUtc(iso: string): number {
+  const target = new Date(iso);
+  const targetUtcMidnight = Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), target.getUTCDate());
+  const now = new Date();
+  const nowUtcMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.round((targetUtcMidnight - nowUtcMidnight) / (1000 * 60 * 60 * 24));
+}
+
+function LeaderStrip({
+  stats,
+  nextEvent,
+  nextWindowOpen,
+}: {
+  stats: LeaderStripStats;
+  nextEvent: NextEventRow | null;
+  nextWindowOpen: NextWindowOpen | null;
+}) {
+  const daysUntilOpen = nextWindowOpen ? daysUntilUtc(nextWindowOpen.open_date) : null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-[10px] border border-line bg-white px-3 py-2.5 sm:px-4">
+      <span className="inline-flex items-center gap-1.5 text-sm text-ink">
+        <IconUsers size={15} className="text-stone" aria-hidden="true" />
+        <strong className="font-semibold">{stats.newFamiliesThisWeek}</strong>
+        <span className="text-stone">new famil{stats.newFamiliesThisWeek === 1 ? "y" : "ies"} this week</span>
+      </span>
+      <span className="h-4 w-px bg-line" aria-hidden="true" />
+      <span className="inline-flex items-center gap-1.5 text-sm text-ink">
+        <IconPhone size={15} className="text-stone" aria-hidden="true" />
+        <strong className="font-semibold">{stats.contactsLoggedThisWeek}</strong>
+        <span className="text-stone">contact{stats.contactsLoggedThisWeek === 1 ? "" : "s"} logged this week</span>
+      </span>
+      <span className="h-4 w-px bg-line" aria-hidden="true" />
+      <span className="inline-flex items-center gap-1.5 text-sm text-ink">
+        <IconCalendar size={15} className="text-stone" aria-hidden="true" />
+        {nextEvent ? (
+          <span>
+            <span className="font-medium">{nextEvent.title}</span>
+            <span className="text-stone"> &middot; {formatUtcDate(nextEvent.starts_at)}</span>
+          </span>
+        ) : (
+          <span className="text-stone">No event scheduled</span>
+        )}
+      </span>
+      {daysUntilOpen !== null && (
+        <>
+          <span className="h-4 w-px bg-line" aria-hidden="true" />
+          <span className="inline-flex items-center gap-1.5 text-sm text-ink">
+            <IconClock size={15} className="text-stone" aria-hidden="true" />
+            <strong className="font-semibold">{Math.max(0, daysUntilOpen)}</strong>
+            <span className="text-stone">
+              day{Math.max(0, daysUntilOpen) === 1 ? "" : "s"} until applications open
+              {nextWindowOpen && nextWindowOpen.campus_name ? ` (${nextWindowOpen.campus_name})` : ""}
+            </span>
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
 
 function RegistrationCompletionStrip({ stat }: { stat: RegistrationCompletionStats }) {
   return (
@@ -622,6 +707,10 @@ export function TodayClient({
   meltRiskQueue,
   meltRiskAvailable,
   denied = false,
+  showLeaderStrip,
+  leaderStripStats,
+  nextEvent,
+  nextWindowOpen,
 }: TodayClientProps) {
   const [rows, setRows] = useState(initialRows);
   const [callQueue, setCallQueue] = useState(initialCallEscalationQueue);
@@ -701,6 +790,11 @@ export function TodayClient({
               }`}
         </p>
       </div>
+
+      {/* Leader strip — compact overview row, enrollment_manager+ only */}
+      {showLeaderStrip && (
+        <LeaderStrip stats={leaderStripStats} nextEvent={nextEvent} nextWindowOpen={nextWindowOpen} />
+      )}
 
       {/* Headline stat strip */}
       <RegistrationCompletionStrip stat={registrationCompletion} />

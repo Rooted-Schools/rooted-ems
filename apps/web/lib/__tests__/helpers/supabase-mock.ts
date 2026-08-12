@@ -24,7 +24,8 @@ import { vi } from "vitest";
 
 export interface TableResult {
   data: unknown;
-  error: { message: string } | null;
+  /** `code` is optional — most callers only check `.message`, but Postgres/PostgREST error codes (e.g. 42P01) matter to relation-missing detection. */
+  error: { message: string; code?: string } | null;
 }
 
 export interface RecordedOp {
@@ -37,7 +38,7 @@ export interface RecordedOp {
 }
 
 const WRITE_METHODS = ["insert", "update", "upsert", "delete"] as const;
-const FILTER_METHODS = ["select", "eq", "neq", "is", "in", "order", "limit"] as const;
+const FILTER_METHODS = ["select", "eq", "neq", "gte", "lte", "like", "is", "in", "order", "limit"] as const;
 
 export class SupabaseMock {
   /** The user returned by auth.getUser(). null = unauthenticated. */

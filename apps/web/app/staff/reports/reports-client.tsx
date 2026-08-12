@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -69,7 +70,14 @@ const STATUS_COLORS: Record<string, string> = {
   declined: "bg-red-300",
 };
 
-export function ReportsClient({ data }: { data: ReportData }) {
+export function ReportsClient({
+  data,
+  showNetworkLink = false,
+}: {
+  data: ReportData;
+  /** True only for org-wide access (see reports/page.tsx) — a scoped campus admin never sees this. */
+  showNetworkLink?: boolean;
+}) {
   const [previewId, setPreviewId] = useState<string | null>(null);
 
   const reports: ReportConfig[] = [
@@ -196,6 +204,14 @@ export function ReportsClient({ data }: { data: ReportData }) {
             Analytics, compliance exports, and audit trail.
           </p>
         </div>
+        {showNetworkLink && (
+          <Link
+            href="/staff/network"
+            className="text-sm text-stone hover:text-ink transition-colors whitespace-nowrap"
+          >
+            Network view &rarr;
+          </Link>
+        )}
       </div>
 
       {/* KPI Summary Row */}

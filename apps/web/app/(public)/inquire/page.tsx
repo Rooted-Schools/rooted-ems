@@ -1,6 +1,6 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { LocaleProvider } from "@/lib/i18n/locale-context";
-import { getLocale } from "@/lib/i18n/get-locale";
+import { getLocaleCookie } from "@/lib/i18n/get-locale";
 import { InquiryForm } from "./inquiry-form";
 
 export const metadata = {
@@ -18,7 +18,7 @@ export default async function InquirePage({
   // Provider wraps the form so the language toggle actually re-renders it —
   // without it, useLocale() falls back to the default context and the page
   // is stuck in English (the landing and login pages follow this same pattern).
-  const initialLocale = await getLocale();
+  const initialLocale = await getLocaleCookie();
 
   // Service role: campus rows are RLS-visible to authenticated users only,
   // and this page is public. Read-only, names and ids only.

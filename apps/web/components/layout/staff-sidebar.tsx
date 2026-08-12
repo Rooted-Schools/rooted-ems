@@ -17,13 +17,14 @@ export const ROLE_LEVEL: Record<string, number> = {
 type MinRole = "compliance_auditor" | "enrollment_staff" | "enrollment_manager" | "system_admin";
 
 /** Icon keys — each maps to an inline 2px-stroke SVG in <NavIcon>. No emoji. */
-type IconName =
+export type IconName =
   | "today"
   | "pipeline"
   | "seats-lottery"
   | "recruitment"
   | "messages"
   | "insights"
+  | "network"
   | "settings"
   | "team"
   | "feedback";
@@ -59,10 +60,18 @@ export interface NavSection {
  * land in later phases. No route is removed — every absorbed page keeps
  * working and stays reachable by deep link.
  */
+// Order follows the family journey on purpose, not alphabetical or
+// role-based grouping: Today (the staff home base / daily work queue) comes
+// first, then Recruitment -> Pipeline -> Seats & Lottery -> Insights walks
+// the same path a family actually takes from first inquiry through
+// enrollment, ending in the network-level strategy view. This is
+// deliberate information architecture — do not reorder without re-checking
+// this rationale still holds.
 export const NAV_SECTIONS: NavSection[] = [
   {
     items: [
       { label: "Today", href: "/staff/today", icon: "today", badgeKey: "today" },
+      { label: "Recruitment", href: "/staff/recruitment", icon: "recruitment" },
       {
         label: "Pipeline",
         href: "/staff/pipeline",
@@ -74,10 +83,8 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/staff/lottery",
         icon: "seats-lottery",
         minRole: "enrollment_manager",
-        activePaths: ["/staff/seats", "/staff/offers", "/staff/waitlist"],
+        activePaths: ["/staff/seats", "/staff/offers", "/staff/waitlist", "/staff/policy"],
       },
-      { label: "Recruitment", href: "/staff/recruitment", icon: "recruitment" },
-      { label: "Notifications", href: "/staff/messages", icon: "messages", badgeKey: "messages" },
       {
         label: "Insights",
         href: "/staff/reports",
@@ -90,8 +97,15 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-/** Settings + Team stay pinned at the bottom of the rail, visually separated. */
+/**
+ * Notifications + Pilot feedback + Team + Settings stay pinned at the
+ * bottom of the rail, visually separated from the funnel-order nav above.
+ * Notifications lives here (not in the main section) because it's a cross-
+ * cutting inbox rather than a stop on the family journey — same reasoning
+ * that already applied to Settings/Team.
+ */
 export const PINNED_NAV_ITEMS: NavItem[] = [
+  { label: "Notifications", href: "/staff/messages", icon: "messages", badgeKey: "messages" },
   { label: "Pilot feedback", href: "/staff/feedback", icon: "feedback" },
   { label: "Team", href: "/staff/team", icon: "team", minRole: "system_admin" },
   { label: "Settings", href: "/staff/settings", icon: "settings", minRole: "enrollment_manager" },
@@ -100,7 +114,9 @@ export const PINNED_NAV_ITEMS: NavItem[] = [
 /* ------------------------------------------------------------------ */
 /*  Icons — inline 2px-stroke SVGs, 20px, stroke=currentColor          */
 /* ------------------------------------------------------------------ */
-function NavIcon({ name }: { name: IconName }) {
+/** Exported so components/layout/staff-mobile-nav.tsx renders the exact same
+ *  glyphs for the same destinations instead of duplicating the SVG set. */
+export function NavIcon({ name }: { name: IconName }) {
   const common = {
     width: 20,
     height: 20,
@@ -200,6 +216,15 @@ function NavIcon({ name }: { name: IconName }) {
           <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
       );
+    case "network":
+      // Globe — the CMO's cross-campus view
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="10" />
+          <path d="M2 12h20" />
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+        </svg>
+      );
     case "feedback":
       // Message square with a plus — pilot feedback
       return (
@@ -221,12 +246,19 @@ interface StaffSidebarProps {
   todayCount?: number;
   /** Unread count for the "Messages" badge (red pill). Omitted when not available. */
   messagesUnreadCount?: number;
+  /**
+   * Org-level accounts only (accessible campus list empty): shows the
+   * cross-campus Network view. Role level can't express "org-scoped", so
+   * the layout computes this and passes it down.
+   */
+  showNetwork?: boolean;
 }
 
 export function StaffSidebar({
   highestRole = "none",
   todayCount,
   messagesUnreadCount,
+  showNetwork = false,
 }: StaffSidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -241,6 +273,12 @@ export function StaffSidebar({
   // the compliance_auditor floor: an unranked role must not see a rail it was
   // never granted (see NO_ROLE in lib/auth/get-session.ts).
   const userLevel = ROLE_LEVEL[highestRole] ?? 0;
+
+  // Org-level accounts get the cross-campus Network view at the end of the
+  // funnel rail: the funnel ends, the network answers for it.
+  const networkItem: NavItem | null = showNetwork
+    ? { label: "Network", href: "/staff/network", icon: "network" }
+    : null;
 
   const badgeCounts: Partial<Record<BadgeKey, number | undefined>> = {
     today: todayCount,
@@ -355,7 +393,10 @@ export function StaffSidebar({
                   </span>
                 </div>
               )}
-              <div className="px-2 space-y-0.5">{visibleItems.map(renderLink)}</div>
+              <div className="px-2 space-y-0.5">
+                {visibleItems.map(renderLink)}
+                {sIdx === NAV_SECTIONS.length - 1 && networkItem && renderLink(networkItem)}
+              </div>
             </div>
           );
         })}
