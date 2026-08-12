@@ -10,7 +10,9 @@
  *    CAMPUS_ACCENT_BY_MATCH_KEY (see the comment on that map for why it
  *    still keys by matchKey rather than shortCode)
  *  - components/layout/family-header.tsx — family's campus logo + name
- *  - components/layout/staff-sidebar.tsx — single-campus staff brand block
+ *  - components/layout/staff-sidebar.tsx — campus lens brand block
+ *  - components/layout/campus-lens-switcher.tsx — switcher option dots
+ *  - lib/campus-lens.ts — staff campus lens theme resolution
  *  - lib/notify.ts (resolveCampus) — campus logo in transactional email
  *
  * Pure data module — no server-only imports — so it is safe to import from
@@ -27,6 +29,27 @@ export interface CampusAccent {
   badgeBorder: string;
   badgeText: string;
   dot: string;
+}
+
+/**
+ * Raw hex accent values for the staff "campus lens" (app/staff/layout.tsx +
+ * lib/campus-lens.ts). Kept separate from `CampusAccent` because the lens
+ * paints via CSS custom properties set once at the shell root (--lens-accent
+ * etc.), and a custom property needs a real hex value, not a Tailwind class
+ * name — a class list can't be assigned to `style`. Values mirror the same
+ * hue family and opacity levels `CampusAccent` already uses for each campus
+ * (accentSoft/accentBorder are the same tints the /10 and /30 opacity
+ * modifiers on the Tailwind classes already produce against white).
+ */
+export interface CampusTheme {
+  /** Strong accent — hairline bar, switcher dot, active-nav base color. */
+  accent: string;
+  /** ~700-level, text-safe on white — active nav text, brand-block emphasis. */
+  accentText: string;
+  /** ~50-level tint — active nav background and other subtle lens surfaces. */
+  accentSoft: string;
+  /** ~300-level — borders, rings. */
+  accentBorder: string;
 }
 
 export interface CampusIdentity {
@@ -48,7 +71,22 @@ export interface CampusIdentity {
   gradesRange: string;
   logoPath: string;
   accent: CampusAccent;
+  theme: CampusTheme;
 }
+
+/**
+ * Neutral ("All campuses") staff-shell theme — the rooted-green family, same
+ * hue RSV's own accent already uses. app/staff/layout.tsx falls back to this
+ * when no campus lens is active, so --lens-accent etc. are always set to
+ * *something* and components can use the vars unconditionally instead of
+ * branching on whether a lens is active.
+ */
+export const NEUTRAL_LENS_THEME: CampusTheme = {
+  accent: "#81A780", // tailwind.config.ts rooted.green
+  accentText: "#3D6B4E", // tailwind.config.ts deep-green
+  accentSoft: "#F2F6F2", // ~10% rooted-green over white, matches existing bg-rooted-green/10 usage
+  accentBorder: "#D9E5D9", // ~30% rooted-green over white, matches existing border-rooted-green/30 usage
+};
 
 export const CAMPUS_IDENTITIES: Record<CampusShortCode, CampusIdentity> = {
   RSV: {
@@ -68,6 +106,7 @@ export const CAMPUS_IDENTITIES: Record<CampusShortCode, CampusIdentity> = {
       badgeText: "text-rooted-green",
       dot: "bg-rooted-green",
     },
+    theme: { ...NEUTRAL_LENS_THEME },
   },
   CRN: {
     shortCode: "CRN",
@@ -86,6 +125,12 @@ export const CAMPUS_IDENTITIES: Record<CampusShortCode, CampusIdentity> = {
       badgeText: "text-amber-700",
       dot: "bg-amber-500",
     },
+    theme: {
+      accent: "#D97706", // amber-600
+      accentText: "#B45309", // amber-700 — matches accent.badgeText above
+      accentSoft: "#FFFBEB", // amber-50 — matches accent.badgeBg above
+      accentBorder: "#FCD34D", // amber-300 — matches accent.badgeBorder above
+    },
   },
   RSC: {
     shortCode: "RSC",
@@ -103,6 +148,12 @@ export const CAMPUS_IDENTITIES: Record<CampusShortCode, CampusIdentity> = {
       badgeBorder: "border-blue-300",
       badgeText: "text-blue-700",
       dot: "bg-blue-500",
+    },
+    theme: {
+      accent: "#2563EB", // blue-600
+      accentText: "#1D4ED8", // blue-700 — matches accent.badgeText above
+      accentSoft: "#EFF6FF", // blue-50 — matches accent.badgeBg above
+      accentBorder: "#93C5FD", // blue-300 — matches accent.badgeBorder above
     },
   },
 };

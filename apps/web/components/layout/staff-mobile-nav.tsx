@@ -107,7 +107,7 @@ export function StaffMobileNav({ highestRole = "none", todayCount }: StaffMobile
               aria-current={active ? "page" : undefined}
               className={cn(
                 "relative flex-1 min-h-[58px] flex flex-col items-center justify-center gap-1 transition-colors",
-                active ? "text-deep-green" : "text-stone"
+                active ? "text-[var(--lens-accent-text)]" : "text-stone"
               )}
             >
               <span className="relative">

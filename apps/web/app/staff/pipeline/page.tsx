@@ -6,6 +6,7 @@ import {
   getGradesForCampuses,
 } from "@/lib/queries";
 import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { getCampusLensId } from "@/lib/campus-lens";
 import { statusesForStage, DEFAULT_PIPELINE_STAGE, PIPELINE_STAGES } from "@/lib/application-helpers";
 import { PipelineClient } from "./pipeline-client";
 
@@ -20,7 +21,8 @@ export default async function PipelinePage({
 }) {
   const session = await requireStaffSession();
   const accessibleIds = getAccessibleCampusIds(session);
-  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const lensCampusId = await getCampusLensId(accessibleIds);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus, lensCampusId);
   // Same scoping shape as staff/today: an explicit campus selection narrows
   // to just that campus; otherwise scope to everything this staff member can
   // access (empty array = true org-wide admin, no filter applied downstream).
@@ -87,7 +89,7 @@ export default async function PipelinePage({
       campuses={campuses}
       initialStage={stage}
       initialSearch={searchParams?.search ?? ""}
-      initialCampus={searchParams?.campus ?? "all"}
+      initialCampus={searchParams?.campus ?? lensCampusId ?? "all"}
       initialStaleDays={searchParams?.staleDays ?? ""}
       initialGrade={grade ?? "all"}
       availableGrades={availableGrades}

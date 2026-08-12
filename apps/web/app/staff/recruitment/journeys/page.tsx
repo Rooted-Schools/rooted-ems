@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
 import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { getCampusLensId } from "@/lib/campus-lens";
 import { createServerClient } from "@rooted-ems/database/server";
 import { getJourneys } from "@/lib/queries/journeys";
 import { JourneysClient } from "./journeys-client";
@@ -24,8 +25,8 @@ export default async function JourneysListPage({
   }
 
   const accessibleIds = getAccessibleCampusIds(session);
-  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
-
+  const lensCampusId = await getCampusLensId(accessibleIds);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus, lensCampusId);
   const supabase = await createServerClient();
   const [journeys, { data: campusRows }] = await Promise.all([
     getJourneys(activeCampus),

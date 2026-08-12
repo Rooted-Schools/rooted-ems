@@ -6,6 +6,7 @@ import {
   getAccessibleCampusIds,
   resolveActiveCampus,
 } from "@/lib/auth/get-session";
+import { getCampusLensId } from "@/lib/campus-lens";
 import { createServerClient } from "@rooted-ems/database/server";
 import { getStaffEvents } from "@/lib/queries";
 import { EventsClient } from "./events-client";
@@ -23,8 +24,8 @@ export default async function StaffEventsPage({
   }
 
   const accessibleIds = getAccessibleCampusIds(session);
-  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
-
+  const lensCampusId = await getCampusLensId(accessibleIds);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus, lensCampusId);
   const supabase = await createServerClient();
   const [events, { data: campusRows }] = await Promise.all([
     getStaffEvents(activeCampus),

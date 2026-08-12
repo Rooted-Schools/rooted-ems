@@ -17,6 +17,7 @@ import {
   resolveActiveCampus,
   hasMinRole,
 } from "@/lib/auth/get-session";
+import { getCampusLensId } from "@/lib/campus-lens";
 import { TodayClient, type ExceptionRow, type SeatProgressGroup } from "./today-client";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +40,8 @@ export default async function StaffTodayPage({
 }) {
   const session = await requireStaffSession();
   const accessibleIds = getAccessibleCampusIds(session);
-  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const lensCampusId = await getCampusLensId(accessibleIds);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus, lensCampusId);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
 
   const supabase = createServiceRoleClient();

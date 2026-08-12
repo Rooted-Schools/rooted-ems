@@ -3,7 +3,10 @@ import { StaffSidebar } from "@/components/layout/staff-sidebar";
 import { StaffHeader } from "@/components/layout/staff-header";
 import { StaffMobileNav } from "@/components/layout/staff-mobile-nav";
 import { requireStaffSession, getAccessibleCampusIds, getHighestRole } from "@/lib/auth/get-session";
-import { getCampusIdentityByShortCode } from "@/lib/campus-identity";
+import { getCampusIdentityByShortCode, NEUTRAL_LENS_THEME } from "@/lib/campus-identity";
+import { getCampusLens } from "@/lib/campus-lens";
+import { setCampusLens } from "@/app/staff/lens-actions";
+import type { CampusLensSwitcherOption } from "@/components/layout/campus-lens-switcher";
 import {
   getCampuses,
   getFamilyMessages,
@@ -76,45 +79,75 @@ export default async function StaffLayout({
   // Compute the user's highest role across all campuses for nav filtering
   const highestRole = getHighestRole(session);
 
-  // Campus-scoped staff (accessible campuses resolve to exactly one) get
-  // that campus's logo in the sidebar brand block instead of the generic
-  // network mark. Org-level accounts (empty accessible list, i.e. showNetwork
-  // below) or staff spanning multiple campuses keep the network mark — a
-  // single logo would misrepresent whose console this is for them.
-  const singleCampus = accessibleIds.length === 1 ? campuses[0] : undefined;
-  const campusIdentity = singleCampus
-    ? getCampusIdentityByShortCode(singleCampus.short_code)
-    : undefined;
+  // Campus lens (lib/campus-lens.ts): forced to the one accessible campus for
+  // single-campus staff (Tim, Lalah); a multi-campus/org-wide viewer's own
+  // switcher pick otherwise; null for "All campuses" (the neutral default).
+  // Drives both the shell theme below and the sidebar brand block — a single
+  // logo would misrepresent whose console this is when no lens is active.
+  const lens = await getCampusLens(campuses);
+  const lensTheme = lens?.identity.theme ?? NEUTRAL_LENS_THEME;
+
+  // Switcher renders only for staff with more than one campus to choose
+  // between — org-wide (empty accessible list) or explicitly multi-campus.
+  const showCampusSwitcher = accessibleIds.length === 0 || accessibleIds.length > 1;
+  const campusSwitcherOptions: CampusLensSwitcherOption[] = showCampusSwitcher
+    ? campuses
+        .map((c) => {
+          const identity = getCampusIdentityByShortCode(c.short_code);
+          return identity ? { id: c.id, identity } : null;
+        })
+        .filter((o): o is CampusLensSwitcherOption => o !== null)
+    : [];
+
+  // CSS custom properties consumed via Tailwind arbitrary values
+  // (bg-[var(--lens-accent)], text-[var(--lens-accent-text)], ...) by the
+  // sidebar, mobile nav, and the hairline bar below. Set once here so every
+  // descendant can use the vars unconditionally instead of each branching on
+  // whether a lens is active.
+  const lensStyle = {
+    "--lens-accent": lensTheme.accent,
+    "--lens-accent-text": lensTheme.accentText,
+    "--lens-accent-soft": lensTheme.accentSoft,
+    "--lens-accent-border": lensTheme.accentBorder,
+  } as React.CSSProperties;
 
   return (
     <ToastProvider>
-    <div className="flex min-h-screen bg-rooted-gray">
-      <Suspense fallback={<aside className="hidden md:block w-64 bg-white border-r border-stone/20 min-h-screen" />}>
-        <StaffSidebar
-          highestRole={highestRole}
-          todayCount={todayCount}
-          messagesUnreadCount={unreadNotificationCount}
-          showNetwork={accessibleIds.length === 0}
-          campusIdentity={campusIdentity}
-        />
-      </Suspense>
-      <div className="flex-1 flex flex-col">
-        <Suspense fallback={<div className="h-[5.5rem]" />}>
-          <StaffHeader
-            userEmail={session.email}
-            campuses={headerCampuses}
-            unreadNotificationCount={unreadNotificationCount}
-            recentNotifications={recentNotifications}
+    <div className="min-h-screen bg-rooted-gray" style={lensStyle}>
+      {/* Campus lens hairline — 3px, always mounted (neutral = rooted-green
+          default via NEUTRAL_LENS_THEME above, not conditionally rendered). */}
+      <div className="h-[3px] w-full bg-[var(--lens-accent)]" aria-hidden="true" />
+      <div className="flex">
+        <Suspense fallback={<aside className="hidden md:block w-64 bg-white border-r border-stone/20 min-h-screen" />}>
+          <StaffSidebar
             highestRole={highestRole}
+            todayCount={todayCount}
+            messagesUnreadCount={unreadNotificationCount}
+            showNetwork={accessibleIds.length === 0}
+            lensIdentity={lens?.identity}
+            campusSwitcherOptions={campusSwitcherOptions}
+            activeLensCampusId={lens?.campusId ?? null}
+            setCampusLens={setCampusLens}
           />
         </Suspense>
-        {/* pb-[72px] keeps content clear of the fixed phone bottom tab bar
-            below md, same convention as app/family/layout.tsx's main. */}
-        <main className="flex-1 p-6 pb-[72px] md:pb-6">{children}</main>
+        <div className="flex-1 flex flex-col">
+          <Suspense fallback={<div className="h-[5.5rem]" />}>
+            <StaffHeader
+              userEmail={session.email}
+              campuses={headerCampuses}
+              unreadNotificationCount={unreadNotificationCount}
+              recentNotifications={recentNotifications}
+              highestRole={highestRole}
+            />
+          </Suspense>
+          {/* pb-[72px] keeps content clear of the fixed phone bottom tab bar
+              below md, same convention as app/family/layout.tsx's main. */}
+          <main className="flex-1 p-6 pb-[72px] md:pb-6">{children}</main>
+        </div>
+        <Suspense fallback={null}>
+          <StaffMobileNav highestRole={highestRole} todayCount={todayCount} />
+        </Suspense>
       </div>
-      <Suspense fallback={null}>
-        <StaffMobileNav highestRole={highestRole} todayCount={todayCount} />
-      </Suspense>
     </div>
     </ToastProvider>
   );

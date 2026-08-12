@@ -7,6 +7,7 @@ import {
   resolveActiveCampus,
   hasRoleOnCampus,
 } from "@/lib/auth/get-session";
+import { getCampusLensId } from "@/lib/campus-lens";
 import { SectionTabs } from "@/components/layout/section-tabs";
 import { SEATS_LOTTERY_TABS } from "@/lib/section-tabs";
 import { getCampuses, getPolicyVersionsForCampus } from "@/lib/queries";
@@ -19,8 +20,8 @@ export default async function StaffPolicyPage({
 }) {
   const session = await requireMinRole("enrollment_manager");
   const accessibleIds = getAccessibleCampusIds(session);
-  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
-
+  const lensCampusId = await getCampusLensId(accessibleIds);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus, lensCampusId);
   const campuses = await getCampuses();
   const visibleCampuses = campuses.filter(
     (c) => accessibleIds.length === 0 || accessibleIds.includes(c.id)

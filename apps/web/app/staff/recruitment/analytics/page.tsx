@@ -6,6 +6,7 @@ import {
   getAccessibleCampusIds,
   resolveActiveCampus,
 } from "@/lib/auth/get-session";
+import { getCampusLensId } from "@/lib/campus-lens";
 import { createServerClient } from "@rooted-ems/database/server";
 import { getRecruitmentFunnel } from "@/lib/queries";
 import { getGradeFunnelTable, getSpeedToFirstContactByCampus } from "@/lib/queries/recruitment-intel";
@@ -24,7 +25,8 @@ export default async function RecruitmentAnalyticsPage({
   }
 
   const accessibleIds = getAccessibleCampusIds(session);
-  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const lensCampusId = await getCampusLensId(accessibleIds);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus, lensCampusId);
   // An explicit campus selection narrows EVERY section on this page, not just
   // the funnel — an org-admin viewing "Cleveland" must never see other
   // campuses' rows here. No selection: role scope (undefined = org-wide).

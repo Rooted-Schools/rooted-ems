@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { requireMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { getCampusLensId } from "@/lib/campus-lens";
 import { SectionTabs } from "@/components/layout/section-tabs";
 import { SEATS_LOTTERY_TABS } from "@/lib/section-tabs";
 import { getOfferAcceptHistory, offerHistoryKey } from "@/lib/queries/offer-history";
@@ -15,7 +16,8 @@ export default async function SeatManagementPage({
 }) {
   const session = await requireMinRole("enrollment_manager");
   const accessibleIds = getAccessibleCampusIds(session);
-  const activeCampus = resolveActiveCampus(session, searchParams?.campus);
+  const lensCampusId = await getCampusLensId(accessibleIds);
+  const activeCampus = resolveActiveCampus(session, searchParams?.campus, lensCampusId);
   const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
   const supabase = createServiceRoleClient();
 
