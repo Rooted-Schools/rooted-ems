@@ -1,7 +1,10 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { NextResponse, type NextRequest } from "next/server";
 import { recordCronRun } from "@/lib/cron-heartbeat";
-import { expireOffer, promoteFromWaitlist } from "@/lib/mutations";
+import { expireOffer } from "@/lib/mutations";
+// Imported directly rather than through the barrel: the barrel is shared and
+// this is the one caller outside lib/mutations that needs it.
+import { promoteNextWaitlistCandidate } from "@/lib/mutations/waitlist";
 
 /**
  * Cron endpoint to expire pending offers that are past their deadline,
@@ -43,7 +46,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // Heartbeat on every return path, including this one. A no-op run is still a
+  // run, and the preflight panel reads the absence of a heartbeat as "the
+  // automation has never run" — which then reported a healthy cron as missing
+  // on any day nothing happened to expire.
   if (!expiredOffers || expiredOffers.length === 0) {
+    await recordCronRun("expire-offers", { expired: 0, promoted: 0 });
     return NextResponse.json({ expired: 0, promoted: 0 });
   }
 
@@ -61,48 +69,18 @@ export async function GET(request: NextRequest) {
 
     expiredCount++;
 
-    // Find the waitlist for this specific campus+grade, then fetch the
-    // top-ranked unserved position. Scoped at the DB layer so we never
-    // miss a candidate because of an unrelated global limit.
-    const { data: waitlistRows } = await supabase
-      .from("waitlist")
-      .select("id")
-      .eq("campus_id", offer.campus_id)
-      .eq("grade_level_id", offer.grade_level_id)
-      .limit(1);
-
-    const waitlistId = waitlistRows?.[0]?.id as string | undefined;
-
-    let nextPosition: { id: string } | null = null;
-    if (waitlistId) {
-      const { data: posRows } = await supabase
-        .from("waitlist_position")
-        .select("id")
-        .eq("waitlist_id", waitlistId)
-        .is("removed_at", null)
-        .is("promoted_at", null)
-        .order("position_number", { ascending: true })
-        .limit(1);
-      nextPosition = posRows?.[0] ?? null;
-    }
-
-    if (nextPosition) {
-      // Give the promoted student 7 days to respond
-      const sevenDays = new Date(
-        Date.now() + 7 * 24 * 60 * 60 * 1000
-      ).toISOString();
-
-      // offered_by is a UUID column: an auto-promotion has no real user
-      // behind it, so it stays null rather than carrying a sentinel string.
-      const promoteResult = await promoteFromWaitlist(
-        nextPosition.id as string,
-        null,
-        sevenDays
-      );
-
-      if (!promoteResult.error && promoteResult.data) {
-        promotedCount++;
-      }
+    // One shared promotion path for the cron, the inline decline/revoke path,
+    // and enrollment withdrawals. It resolves the waitlist by campus, grade
+    // AND school year (never campus + grade alone, which reaches the wrong
+    // year's waitlist as soon as two years are live), and takes the response
+    // deadline from the campus's adopted policy rather than a hardcoded week.
+    if (offer.campus_id && offer.grade_level_id) {
+      const promoted = await promoteNextWaitlistCandidate({
+        campusId: offer.campus_id as string,
+        gradeLevelId: offer.grade_level_id as string,
+        vacatedApplicationId: (offer.application_id as string | null) ?? null,
+      });
+      if (promoted) promotedCount++;
     }
   }
 

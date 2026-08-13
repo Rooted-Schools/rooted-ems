@@ -148,10 +148,34 @@ async function emailGuardian(
   return result.ok;
 }
 
+/**
+ * What actually reached the family, per channel. Callers that record a
+ * "notified" state (the lottery notification ledger) must read this rather
+ * than treating "did not throw" as delivery: these functions never throw, and
+ * a guardian with no email and no portal account produces zero channels.
+ */
+export interface NotificationDelivery {
+  inApp: boolean;
+  email: boolean;
+  sms: boolean;
+}
+
+const NO_DELIVERY: NotificationDelivery = { inApp: false, email: false, sms: false };
+
+/** True when at least one channel actually delivered. */
+export function anyChannelDelivered(delivery: NotificationDelivery): boolean {
+  return delivery.inApp || delivery.email || delivery.sms;
+}
+
 interface CampusInfo {
   name: string;
   /** Campus inbox — used as the email Reply-To so family replies reach the school, not RSF central. */
   email: string | null;
+  /**
+   * IANA timezone for the campus (campus.timezone). Deadlines are rendered in
+   * it, so "respond by Friday" means the family's Friday and not the server's.
+   */
+  timezone: string | null;
   /**
    * Absolute URL to the campus's logo (lib/campus-identity.ts), for the
    * email header. Undefined when the campus has no known short_code /
@@ -169,21 +193,47 @@ interface CampusInfo {
  * threading the campus logo into email headers.
  */
 async function resolveCampus(campusId?: string): Promise<CampusInfo> {
-  if (!campusId) return { name: "your school", email: null, logoUrl: undefined };
+  if (!campusId) return { name: "your school", email: null, timezone: null, logoUrl: undefined };
   const supabase = createServiceRoleClient();
   const { data } = await supabase
     .from("campus")
-    .select("name, email, short_code")
+    .select("name, email, short_code, timezone")
     .eq("id", campusId)
     .single();
   const row = data as unknown as Record<string, string | null> | null;
   return {
     name: row?.name ?? "your school",
     email: row?.email ?? null,
+    timezone: row?.timezone ?? null,
     logoUrl: getCampusLogoAbsoluteUrl(row?.short_code, APP_LINK),
   };
 }
 
+/**
+ * Render a deadline in the campus's own timezone. A 16:00 Pacific cutoff
+ * stored as UTC renders as the NEXT day for a server in UTC, which is how a
+ * family ends up told the wrong date for the day their seat expires.
+ */
+function formatDeadline(expiresAt: string, locale: string, timezone: string | null): string {
+  const options: Intl.DateTimeFormatOptions = {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  };
+  if (timezone) options.timeZone = timezone;
+  try {
+    return new Date(expiresAt).toLocaleDateString(locale, options);
+  } catch {
+    // An unrecognized timezone must never take down a notification.
+    return new Date(expiresAt).toLocaleDateString(locale, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    });
+  }
+}
+
+/** Returns true only when the in-app notification was actually recorded. */
 async function notify(params: {
   userId: string;
   subject: string;
@@ -191,7 +241,7 @@ async function notify(params: {
   link: string;
   campusId?: string;
   logTag: string;
-}): Promise<void> {
+}): Promise<boolean> {
   const result = await sendNotification({
     recipientUserIds: [params.userId],
     campusId: params.campusId,
@@ -200,7 +250,11 @@ async function notify(params: {
     body: params.body,
     link: params.link,
   });
-  if (result.error) console.error(`[${params.logTag}]`, result.error);
+  if (result.error) {
+    console.error(`[${params.logTag}]`, result.error);
+    return false;
+  }
+  return true;
 }
 
 // ─── Application notifications ────────────────────────────────────────────────
@@ -303,14 +357,14 @@ export async function notifyFamilyApplicationWaitlisted({
   studentName?: string;
   campusId?: string;
   position?: number;
-}): Promise<void> {
+}): Promise<NotificationDelivery> {
   const contact = await getGuardianContact(applicationId);
   const { userId, email } = contact;
-  if (!userId && !email) return;
+  if (!userId && !email) return { ...NO_DELIVERY };
   const { name: campusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
   const studentFirstName = firstNameOf(studentName);
   const positionSuffix = position != null ? ` — currently #${position}` : "";
-  await Promise.all([
+  const [inApp, emailed, texted] = await Promise.all([
     userId
       ? notify({
           userId,
@@ -320,7 +374,7 @@ export async function notifyFamilyApplicationWaitlisted({
           campusId,
           logTag: "notifyFamilyApplicationWaitlisted",
         })
-      : Promise.resolve(),
+      : Promise.resolve(false),
     emailGuardian(
       email,
       emailTemplates.lotteryResultWaitlisted({ studentFirstName, campusName, position, campusLogoUrl }),
@@ -337,6 +391,8 @@ export async function notifyFamilyApplicationWaitlisted({
       "notifyFamilyApplicationWaitlisted"
     ),
   ]);
+
+  return { inApp: inApp === true, email: emailed === true, sms: texted === true };
 }
 
 /**
@@ -476,23 +532,24 @@ export async function notifyFamilyOfOffer({
   expiresAt: string;
   campusId?: string;
   viaWaitlist?: boolean;
-}): Promise<void> {
+}): Promise<NotificationDelivery> {
   const contact = await getGuardianContact(applicationId);
   const { userId, email } = contact;
-  if (!userId && !email) return;
-  const { name: resolvedCampusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
+  if (!userId && !email) return { ...NO_DELIVERY };
+  const {
+    name: resolvedCampusName,
+    email: campusEmail,
+    timezone: campusTimezone,
+    logoUrl: campusLogoUrl,
+  } = await resolveCampus(campusId);
   const campusName = campusNameProp ?? resolvedCampusName;
-  const deadline = new Date(expiresAt).toLocaleDateString("en-US", {
-    weekday: "long", month: "long", day: "numeric",
-  });
-  const deadlineEs = new Date(expiresAt).toLocaleDateString("es-US", {
-    weekday: "long", month: "long", day: "numeric",
-  });
+  const deadline = formatDeadline(expiresAt, "en-US", campusTimezone);
+  const deadlineEs = formatDeadline(expiresAt, "es-US", campusTimezone);
   const studentFirstName = firstNameOf(studentName);
   const template = viaWaitlist
     ? emailTemplates.waitlistPromoted({ studentFirstName, campusName, campusLogoUrl })
     : emailTemplates.offerExtended({ studentFirstName, campusName, expiresAt, campusLogoUrl });
-  await Promise.all([
+  const [inApp, emailed, texted] = await Promise.all([
     userId
       ? notify({
           userId,
@@ -502,7 +559,7 @@ export async function notifyFamilyOfOffer({
           campusId,
           logTag: "notifyFamilyOfOffer",
         })
-      : Promise.resolve(),
+      : Promise.resolve(false),
     emailGuardian(email, template, "notifyFamilyOfOffer", campusEmail),
     smsGuardian(
       contact,
@@ -510,6 +567,8 @@ export async function notifyFamilyOfOffer({
       "notifyFamilyOfOffer"
     ),
   ]);
+
+  return { inApp: inApp === true, email: emailed === true, sms: texted === true };
 }
 
 /**
@@ -532,13 +591,14 @@ export async function notifyFamilyOfferExpiringSoon({
   const contact = await getGuardianContact(applicationId);
   const { userId, email } = contact;
   if (!userId && !email) return;
-  const { name: campusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
-  const deadline = new Date(expiresAt).toLocaleDateString("en-US", {
-    weekday: "long", month: "long", day: "numeric",
-  });
-  const deadlineEs = new Date(expiresAt).toLocaleDateString("es-US", {
-    weekday: "long", month: "long", day: "numeric",
-  });
+  const {
+    name: campusName,
+    email: campusEmail,
+    timezone: campusTimezone,
+    logoUrl: campusLogoUrl,
+  } = await resolveCampus(campusId);
+  const deadline = formatDeadline(expiresAt, "en-US", campusTimezone);
+  const deadlineEs = formatDeadline(expiresAt, "es-US", campusTimezone);
   await Promise.all([
     userId
       ? notify({
@@ -703,8 +763,12 @@ export async function notifyFamilyRegistrationComplete({
     userId
       ? notify({
           userId,
-          subject: `Enrollment complete${studentName ? ` for ${studentName}` : ""}!`,
-          body: `All registration items have been verified. ${studentName ? `${studentName} is` : "Your student is"} officially enrolled at ${campusName}. Welcome to the Rooted Schools family — we're proud to have you with us.`,
+          // Completing the packet moves the application to placement_review,
+          // not enrolled. Saying "officially enrolled" here told families
+          // something that had not happened yet; the real enrollment message
+          // is notifyFamilyStudentEnrolled, sent when staff finish placement.
+          subject: `Registration complete${studentName ? ` for ${studentName}` : ""}`,
+          body: `All registration items have been verified. Our team at ${campusName} is finishing a final placement review. Nothing more is needed from you right now, and we will let you know as soon as enrollment is confirmed.`,
           link: `/family/registration`,
           campusId,
           logTag: "notifyFamilyRegistrationComplete",
@@ -718,7 +782,7 @@ export async function notifyFamilyRegistrationComplete({
     ),
     smsGuardian(
       contact,
-      `Rooted Schools: ${studentFirstName ?? "Your student"} is officially enrolled at ${campusName}! Welcome to the family.\n¡${studentFirstName ?? "Su estudiante"} está oficialmente inscrito/a en ${campusName}! Bienvenidos.`,
+      `Rooted Schools: registration is complete for ${studentFirstName ?? "your student"} at ${campusName}. We are finishing a final placement review and will confirm enrollment soon. Nothing is needed from you now.\nRooted Schools: la inscripcion esta completa para ${studentFirstName ?? "su estudiante"} en ${campusName}. Estamos terminando una revision final de colocacion y le confirmaremos pronto. No necesita hacer nada ahora.`,
       "notifyFamilyRegistrationComplete"
     ),
   ]);
@@ -819,9 +883,9 @@ export async function notifyFamilyKeepTheSeat({
     ),
     smsGuardian(
       contact,
-      `Rooted Schools: ${studentFirstName ?? "Your student"}'s seat at ${campusName} is all set! Watch for orientation details this summer.\n¡El cupo de ${
+      `Rooted Schools: registration is complete for ${studentFirstName ?? "your student"} at ${campusName}. Watch for orientation details this summer.\nRooted Schools: la inscripcion esta completa para ${
         studentFirstName ?? "su estudiante"
-      } en ${campusName} está listo! Esté atento(a) a los detalles de orientación este verano.`,
+      } en ${campusName}. Este atento(a) a los detalles de orientacion este verano.`,
       "notifyFamilyKeepTheSeat"
     ),
   ]);

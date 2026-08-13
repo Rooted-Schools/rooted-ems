@@ -4,6 +4,8 @@ export const dynamic = "force-dynamic";
 import { createServerClient } from "@rooted-ems/database/server";
 import { redirect } from "next/navigation";
 import { getActiveEnrollmentWindows, getCampuses, getExistingHouseholdForUser } from "@/lib/queries";
+import { getAdoptedPolicyForCampus } from "@/lib/queries/lottery-policy";
+import { policyQuestionFlags, type PolicyQuestionFlags } from "@/lib/lottery-policy";
 import { NewApplicationForm } from "./new-application-form";
 
 export default async function NewApplicationPage({
@@ -46,6 +48,19 @@ export default async function NewApplicationPage({
     campus_id: g.campus_id as string,
   }));
 
+  // Which extra lottery questions each campus asks. Driven entirely by that
+  // campus's board-ADOPTED policy: a weighted tier sourced from an
+  // application_answer key is the school's own instruction to collect it. A
+  // draft policy is not an adopted one, so a campus whose board has not acted
+  // stays dormant and its families are asked nothing extra.
+  const policyQuestions: Record<string, PolicyQuestionFlags> = {};
+  const adoptedPolicies = await Promise.all(
+    campuses.map(async (c) => [c.id, await getAdoptedPolicyForCampus(c.id)] as const)
+  );
+  for (const [campusId, adopted] of adoptedPolicies) {
+    policyQuestions[campusId] = policyQuestionFlags(adopted?.config ?? null);
+  }
+
   // Item 9: if dashboard passed ?campus=RSV, pre-select that campus.
   // Try short_code first, then fall back to partial name match so the pre-selection
   // is resilient to DB short_code mismatches.
@@ -68,6 +83,7 @@ export default async function NewApplicationPage({
       gradeLevels={grades}
       initialCampusId={preselectedCampus?.id}
       existingHousehold={existingHousehold}
+      policyQuestions={policyQuestions}
     />
   );
 }

@@ -538,7 +538,7 @@ export function ReportsClient({
                           {row.sis_id}
                         </code>
                       ) : (
-                        <span className="text-stone">\u2014</span>
+                        <span className="text-stone">{"\u2014"}</span>
                       )}
                     </TableCell>
                   </TableRow>

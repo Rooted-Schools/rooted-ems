@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,17 +38,35 @@ export interface CampusPolicyLabel {
   label: string | null;
 }
 
+/**
+ * Seats a campus/grade/window actually has left, computed on the server from
+ * the capacity plan minus what is already committed. Free-typing a seat count
+ * was the single number that decides how many children get in, with nothing
+ * anchoring it to the plan.
+ */
+export interface SeatAvailability {
+  campus_id: string;
+  grade_level_id: string;
+  enrollment_window_id: string;
+  total: number;
+  accepted: number;
+  pendingOffers: number;
+  remaining: number;
+}
+
 /* ─── Component ─── */
 export function NewLotteryRunDialog({
   campuses,
   gradeLevels,
   windows,
   policyLabels = [],
+  seatAvailability = [],
 }: {
   campuses: CampusOption[];
   gradeLevels: GradeLevelOption[];
   windows: WindowOption[];
   policyLabels?: CampusPolicyLabel[];
+  seatAvailability?: SeatAvailability[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -60,11 +78,31 @@ export function NewLotteryRunDialog({
   const [gradeId, setGradeId] = useState("");
   const [windowId, setWindowId] = useState("");
   const [totalSeats, setTotalSeats] = useState("");
+  const [seatsEdited, setSeatsEdited] = useState(false);
   const [isRehearsal, setIsRehearsal] = useState(false);
 
   const policyLabel = campusId
     ? (policyLabels.find((p) => p.campus_id === campusId)?.label ?? null)
     : null;
+
+  const availability =
+    campusId && gradeId && windowId
+      ? (seatAvailability.find(
+          (a) =>
+            a.campus_id === campusId &&
+            a.grade_level_id === gradeId &&
+            a.enrollment_window_id === windowId
+        ) ?? null)
+      : null;
+
+  // Default the seat count to what the capacity plan actually leaves open.
+  // Staff can still override it — the number is theirs to set — but the
+  // starting point is now the plan rather than a blank box.
+  useEffect(() => {
+    if (!availability) return;
+    if (seatsEdited) return;
+    setTotalSeats(String(Math.max(0, availability.remaining)));
+  }, [availability, seatsEdited]);
 
   // Filter grade levels and windows by selected campus
   const filteredGrades = campusId

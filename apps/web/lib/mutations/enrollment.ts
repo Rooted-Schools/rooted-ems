@@ -2,6 +2,7 @@ import { createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
 import { requireStaffSession } from "@/lib/auth/get-session";
+import { promoteNextWaitlistCandidate } from "./waitlist";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -17,8 +18,14 @@ export interface CreateEnrollmentInput {
 // ─── Mutations ─────────────────────────────────────────
 
 /**
- * Create an enrollment record (final step in the pipeline).
- * Transitions application status to "registered".
+ * Create an enrollment record.
+ *
+ * The application stays at "accepted". It does NOT move to "registered" here:
+ * accepting a seat is not the same as having completed a registration packet,
+ * and flipping the status at acceptance made every accepted family read as
+ * registered on the pipeline, in the counts, and in the nudge logic — so
+ * nobody was chased for a packet they had not started. The flip to
+ * "registered" belongs to packet submission.
  */
 export async function createEnrollment(
   input: CreateEnrollmentInput
@@ -43,14 +50,6 @@ export async function createEnrollment(
   if (error) {
     console.error("[createEnrollment]", error.message);
     return { data: null, error: "Failed to create enrollment." };
-  }
-
-  // Update application status to registered
-  if (input.application_id) {
-    await supabase
-      .from("application")
-      .update({ status: "registered", updated_at: new Date().toISOString() })
-      .eq("id", input.application_id);
   }
 
   await logAuditEvent({
@@ -86,10 +85,11 @@ export async function withdrawEnrollment(
   await requireStaffSession();
   const supabase = createServiceRoleClient();
 
-  // Fetch the enrollment to get the linked application_id and campus
+  // Fetch the enrollment to get the linked application_id, campus, grade, and
+  // school year — the last two are what a waitlist is keyed on.
   const { data: enrollment, error: fetchError } = await supabase
     .from("enrollment")
-    .select("application_id, campus_id, student_id")
+    .select("application_id, campus_id, student_id, grade_level_id, school_year_id")
     .eq("id", enrollmentId)
     .single();
 
@@ -137,6 +137,22 @@ export async function withdrawEnrollment(
       student_id: enrollment.student_id ?? null,
     },
   });
+
+  // A withdrawal vacates a real seat, exactly like a declined or revoked
+  // offer. Without this the seat sat empty while families waited on the
+  // waitlist for it. Promotion failure never fails the withdrawal.
+  if (enrollment.campus_id && enrollment.grade_level_id) {
+    try {
+      await promoteNextWaitlistCandidate({
+        campusId: enrollment.campus_id as string,
+        gradeLevelId: enrollment.grade_level_id as string,
+        schoolYearId: (enrollment.school_year_id as string | null) ?? null,
+        vacatedApplicationId: (enrollment.application_id as string | null) ?? null,
+      });
+    } catch (err) {
+      console.error("[withdrawEnrollment] waitlist promotion failed", err, { enrollmentId });
+    }
+  }
 
   return { data: null, error: null };
 }

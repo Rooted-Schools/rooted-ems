@@ -22,7 +22,7 @@ Recruitment → open the lead to log a call or add a note. Logging a call stops 
 
 Recruitment → Events for a specific event: check families in from the roster, or use walk-in quick-add for anyone unregistered.
 
-Recruitment → Analytics for speed-to-first-contact and seats-versus-leads-versus-applications by grade, a good weekly check on pace.
+Recruitment → the "Funnel" button for speed-to-first-contact and seats-versus-leads-versus-applications by grade, a good weekly check on pace. Its page title is "Recruitment Funnel." Note there is a second, different screen also called "Funnel," under Insights → Funnel: that one is the network-level enrollment funnel view, not this recruitment-pace view. Same name, two different screens, so confirm which one a colleague means before you go looking.
 
 ## How a family moves to the next stage
 

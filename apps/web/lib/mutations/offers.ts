@@ -2,95 +2,11 @@ import { createServerClient, createServiceRoleClient } from "@rooted-ems/databas
 import type { MutationResult } from "./applications";
 import { createEnrollment } from "./enrollment";
 import { initializeRegistrationPacket } from "./registration";
-import { promoteFromWaitlist } from "./waitlist";
+import { promoteNextWaitlistCandidate } from "./waitlist";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
 import type { DeclineReason } from "@/lib/decline-reasons";
 import { notifyFamilyOfOffer, notifyStaffOfferAccepted, notifyStaffOfferDeclined } from "@/lib/notify";
 import { requireStaffSession } from "@/lib/auth/get-session";
-import { getAdoptedPolicyForCampus } from "@/lib/queries/lottery-policy";
-import { waitlistOfferExpiryFrom } from "@/lib/lottery-policy";
-
-// ─── Shared helper ─────────────────────────────────────────────────────────
-
-/**
- * After a seat is vacated (offer declined, revoked, or expired) attempt to
- * immediately promote the next eligible waitlist candidate for the same
- * campus + grade.  Called synchronously so the family hears within minutes
- * rather than waiting for the nightly cron job.
- *
- * Failures are logged but never propagated — the primary operation has
- * already succeeded and must not be rolled back over a waitlist issue.
- */
-async function promoteNextWaitlistCandidate(
-  campusId: string,
-  gradeLevelId: string
-): Promise<void> {
-  const supabase = createServiceRoleClient();
-
-  // Resolve the waitlist for this campus + grade
-  const { data: waitlistRows } = await supabase
-    .from("waitlist")
-    .select("id")
-    .eq("campus_id", campusId)
-    .eq("grade_level_id", gradeLevelId)
-    .limit(1);
-
-  const waitlistId = waitlistRows?.[0]?.id as string | undefined;
-  if (!waitlistId) return;
-
-  const { data: posRows } = await supabase
-    .from("waitlist_position")
-    .select("id")
-    .eq("waitlist_id", waitlistId)
-    .is("removed_at", null)
-    .is("promoted_at", null)
-    .order("position_number", { ascending: true })
-    .limit(1);
-
-  const nextPositionId = posRows?.[0]?.id as string | undefined;
-  if (!nextPositionId) return;
-
-  // Atomically claim this position before promoting — prevents two concurrent
-  // callers (e.g. inline decline + nightly cron) from both promoting the same
-  // candidate.  Only the process that wins the UPDATE proceeds.
-  const { data: claimed, error: claimError } = await supabase
-    .from("waitlist_position")
-    .update({ promoted_at: new Date().toISOString() })
-    .eq("id", nextPositionId)
-    .is("promoted_at", null) // only claim if not already promoted
-    .select("id")
-    .single();
-
-  if (claimError || !claimed) {
-    // Another process already claimed this position — skip silently
-    return;
-  }
-
-  // The response window comes from the campus's adopted lottery policy, which
-  // is where the board actually set it. Under the Rooted School Vancouver
-  // Enrollment Policy (adopted 2023-01-25, revised 2024-08-20) a waitlist offer
-  // runs for two days before passing to the next family. The previous
-  // hardcoded 7 days quietly gave every waitlisted family a different deadline
-  // from the one the board adopted and the family was told about.
-  //
-  // Falls back to 7 days only where a campus has no adopted policy, with a log
-  // saying so rather than a silent substitution.
-  const adopted = await getAdoptedPolicyForCampus(campusId);
-  if (!adopted) {
-    console.warn(
-      "[promoteNextWaitlistCandidate] no adopted lottery policy for campus — falling back to a 7 day response window",
-      { campusId }
-    );
-  }
-  const expiresAt = adopted
-    ? waitlistOfferExpiryFrom(adopted.config)
-    : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-  const result = await promoteFromWaitlist(nextPositionId, "system", expiresAt);
-  if (result.error) {
-    console.error("[promoteNextWaitlistCandidate]", result.error);
-  }
-}
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -187,31 +103,75 @@ export async function sendOffer(
   return { data: { id: offer.id }, error: null };
 }
 
+export interface OfferActorOptions {
+  /**
+   * The staff member acting on a family's behalf. Set ONLY by the staff server
+   * actions in app/staff/offers/actions.ts, after requireRoleOnCampus has
+   * gated the offer's real campus. Its presence switches off the family
+   * ownership check, which a staff user can never satisfy — that check is why
+   * accept-on-behalf and decline-on-behalf failed for every staff member.
+   *
+   * It never changes WHO is recorded as accepting: acceptance.accepted_by is
+   * always the guardian on the offer. It only records who did the clicking.
+   */
+  actingStaffUserId?: string;
+}
+
+/** The guardian attached to an offer, read from the offer itself. */
+interface OfferGuardian {
+  id: string;
+  user_id: string | null;
+}
+
+async function getOfferGuardian(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  offerId: string
+): Promise<OfferGuardian | null> {
+  const { data } = await supabase
+    .from("offer")
+    .select("id, application:application_id (guardian:guardian_id (id, user_id))")
+    .eq("id", offerId)
+    .single();
+  const guardian =
+    (data?.application as unknown as { guardian: OfferGuardian | null } | null)?.guardian ?? null;
+  return guardian?.id ? guardian : null;
+}
+
 /**
  * Accept an offer (called by family or staff on behalf of family).
  * Creates an acceptance record, transitions app status to "accepted",
  * then auto-creates enrollment + registration packet.
+ *
+ * `guardianId` is accepted for signature compatibility and is IGNORED. The
+ * guardian recorded on the acceptance is derived from the offer itself, so a
+ * client cannot name someone else as the person who accepted a seat.
  */
 export async function acceptOffer(
   offerId: string,
-  guardianId: string
+  guardianId?: string,
+  options?: OfferActorOptions
 ): Promise<MutationResult> {
-  // Auth check
-  const authClient = await createServerClient();
-  const { data: { user } } = await authClient.auth.getUser();
-  if (!user) return { data: null, error: "Not authenticated" };
-
-  // Ownership check — verify the offer belongs to this user's guardian
   const ownerCheck = createServiceRoleClient();
-  const { data: offerCheck } = await ownerCheck
-    .from("offer")
-    .select("id, application:application_id (guardian:guardian_id (user_id))")
-    .eq("id", offerId)
-    .single();
-  const offerGuardian = (offerCheck?.application as unknown as { guardian: { user_id: string } } | null)?.guardian ?? null;
-  if (!offerGuardian || offerGuardian.user_id !== user.id) {
+
+  const offerGuardian = await getOfferGuardian(ownerCheck, offerId);
+  if (!offerGuardian) {
     return { data: null, error: "Not authorized" };
   }
+
+  const actingStaffUserId = options?.actingStaffUserId ?? null;
+
+  if (!actingStaffUserId) {
+    // Family path: the signed-in user must be the guardian on the offer.
+    const authClient = await createServerClient();
+    const { data: { user } } = await authClient.auth.getUser();
+    if (!user) return { data: null, error: "Not authenticated" };
+    if (!offerGuardian.user_id || offerGuardian.user_id !== user.id) {
+      return { data: null, error: "Not authorized" };
+    }
+  }
+
+  // Derived, never taken from the caller. See the note on `guardianId`.
+  const acceptingGuardianId = offerGuardian.id;
 
   const supabase = ownerCheck;
 
@@ -254,7 +214,7 @@ export async function acceptOffer(
     .insert({
       offer_id: offerId,
       application_id: offer.application_id,
-      accepted_by: guardianId,
+      accepted_by: acceptingGuardianId,
       accepted_at: new Date().toISOString(),
     })
     .select("id")
@@ -318,13 +278,17 @@ export async function acceptOffer(
     table_name: "offer",
     record_id: offerId,
     action: AuditAction.StatusChange,
-    actor_id: guardianId,
+    // Who performed the action. A staff acceptance on a family's behalf is
+    // recorded as that staff member, not as the family.
+    actor_id: actingStaffUserId ?? acceptingGuardianId,
     campus_id: offer.campus_id,
     old_data: { status: "pending" },
     new_data: { status: "accepted" },
     metadata: {
       application_id: offer.application_id,
       acceptance_id: acceptance?.id ?? null,
+      accepted_by_guardian_id: acceptingGuardianId,
+      on_behalf_of_family: !!actingStaffUserId,
     },
   });
 
@@ -355,6 +319,11 @@ export interface DeclineOptions {
   reason?: DeclineReason;
   /** Free text alongside the reason. Never required. */
   note?: string;
+  /**
+   * The staff member declining on a family's behalf. Set ONLY by the staff
+   * server actions after requireRoleOnCampus. See OfferActorOptions.
+   */
+  actingStaffUserId?: string;
 }
 
 /**
@@ -365,21 +334,23 @@ export async function declineOffer(
   declinedBy?: string,
   options?: DeclineOptions
 ): Promise<MutationResult> {
-  // Auth check
-  const authClient = await createServerClient();
-  const { data: { user } } = await authClient.auth.getUser();
-  if (!user) return { data: null, error: "Not authenticated" };
-
-  // Ownership check — verify the offer belongs to this user's guardian
   const ownerCheck = createServiceRoleClient();
-  const { data: offerCheck } = await ownerCheck
-    .from("offer")
-    .select("id, application:application_id (guardian:guardian_id (user_id))")
-    .eq("id", offerId)
-    .single();
-  const offerGuardian = (offerCheck?.application as unknown as { guardian: { user_id: string } } | null)?.guardian ?? null;
-  if (!offerGuardian || offerGuardian.user_id !== user.id) {
+
+  const offerGuardian = await getOfferGuardian(ownerCheck, offerId);
+  if (!offerGuardian) {
     return { data: null, error: "Not authorized" };
+  }
+
+  const actingStaffUserId = options?.actingStaffUserId ?? null;
+
+  if (!actingStaffUserId) {
+    // Family path: the signed-in user must be the guardian on the offer.
+    const authClient = await createServerClient();
+    const { data: { user } } = await authClient.auth.getUser();
+    if (!user) return { data: null, error: "Not authenticated" };
+    if (!offerGuardian.user_id || offerGuardian.user_id !== user.id) {
+      return { data: null, error: "Not authorized" };
+    }
   }
 
   const supabase = ownerCheck;
@@ -425,20 +396,27 @@ export async function declineOffer(
     table_name: "offer",
     record_id: offerId,
     action: AuditAction.StatusChange,
-    actor_id: declinedBy ?? null,
+    actor_id: actingStaffUserId ?? declinedBy ?? offerGuardian.id,
     campus_id: offer.campus_id ?? null,
     old_data: { status: "pending" },
     new_data: { status: "declined" },
     metadata: {
       application_id: offer.application_id,
       decline_reason: options?.reason ?? null,
+      on_behalf_of_family: !!actingStaffUserId,
     },
   });
 
   // Seat is now available — immediately promote the next waitlist candidate
   // so families don't wait until the nightly cron to hear the good news.
+  // Scoped to the school year this offer belonged to, never campus + grade
+  // alone.
   if (offer.campus_id && offer.grade_level_id) {
-    await promoteNextWaitlistCandidate(offer.campus_id, offer.grade_level_id);
+    await promoteNextWaitlistCandidate({
+      campusId: offer.campus_id,
+      gradeLevelId: offer.grade_level_id,
+      vacatedApplicationId: offer.application_id,
+    });
   }
 
   if (offer.campus_id && offer.application_id) {
@@ -522,9 +500,14 @@ export async function revokeOffer(
     },
   });
 
-  // Seat is now available — immediately promote next waitlist candidate
+  // Seat is now available — immediately promote next waitlist candidate,
+  // scoped to this offer's school year.
   if (offer.campus_id && offer.grade_level_id) {
-    await promoteNextWaitlistCandidate(offer.campus_id, offer.grade_level_id);
+    await promoteNextWaitlistCandidate({
+      campusId: offer.campus_id,
+      gradeLevelId: offer.grade_level_id,
+      vacatedApplicationId: offer.application_id,
+    });
   }
 
   return { data: null, error: null };

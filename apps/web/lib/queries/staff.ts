@@ -1263,15 +1263,22 @@ export async function getStaffEnrollmentWindows(
     return {
       id: row.id as string,
       name: (row.name as string) ?? "",
+      // open_date / close_date are DATE columns, so `new Date("2026-10-26")`
+      // parses as UTC midnight. Formatting without timeZone: "UTC" renders it
+      // in the server's local zone, which is behind UTC for every US campus —
+      // Settings showed every enrollment window opening and closing a day
+      // early. Format in UTC to get the date that is actually stored.
       open_date: new Date(row.open_date as string).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
         year: "numeric",
+        timeZone: "UTC",
       }),
       close_date: new Date(row.close_date as string).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
         year: "numeric",
+        timeZone: "UTC",
       }),
       open_date_iso: row.open_date as string,
       close_date_iso: row.close_date as string,

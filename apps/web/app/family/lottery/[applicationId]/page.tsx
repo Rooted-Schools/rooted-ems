@@ -18,10 +18,11 @@ export default async function LotteryResultPage({ params }: Props) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // getLotteryOutcome proves ownership itself (RLS user client) before ever
-  // touching service-role data — returns null when the application doesn't
-  // exist or doesn't belong to this family.
-  const outcome = await getLotteryOutcome(applicationId);
+  // getLotteryOutcome proves ownership itself — an explicit guardian walk on
+  // this user id, backed by the RLS user client — before ever touching
+  // service-role data. Returns null when the application doesn't exist or
+  // doesn't belong to this family.
+  const outcome = await getLotteryOutcome(applicationId, user.id);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 py-4">

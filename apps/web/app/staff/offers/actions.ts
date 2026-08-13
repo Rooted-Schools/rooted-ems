@@ -119,9 +119,18 @@ export async function staffExpireOffer(offerId: string) {
   return result;
 }
 
+/**
+ * Accept on a family's behalf. acceptOffer's default path requires the signed
+ * in user to BE the guardian on the offer, which no staff member ever is — so
+ * every staff acceptance failed "Not authorized" until the acting-staff flag
+ * below was passed. requireRoleOnCampus above is the gate that earns it.
+ *
+ * The guardian recorded on the acceptance is derived from the offer inside
+ * acceptOffer; `guardianId` here is vestigial and ignored.
+ */
 export async function staffAcceptOfferOnBehalf(
   offerId: string,
-  guardianId: string
+  guardianId?: string
 ) {
   const supabase = createServiceRoleClient();
   const { data: offer } = await supabase
@@ -130,8 +139,13 @@ export async function staffAcceptOfferOnBehalf(
     .eq("id", offerId)
     .single();
 
-  await requireRoleOnCampus(offer?.campus_id as string | undefined, "enrollment_manager");
-  const result = await acceptOffer(offerId, guardianId);
+  const session = await requireRoleOnCampus(
+    offer?.campus_id as string | undefined,
+    "enrollment_manager"
+  );
+  const result = await acceptOffer(offerId, guardianId, {
+    actingStaffUserId: session.user_id,
+  });
 
   if (!result.error) {
     revalidatePath("/staff/offers");
@@ -157,12 +171,16 @@ export async function staffDeclineOfferOnBehalf(
     .eq("id", offerId)
     .single();
 
-  await requireRoleOnCampus(offer?.campus_id as string | undefined, "enrollment_manager");
+  const session = await requireRoleOnCampus(
+    offer?.campus_id as string | undefined,
+    "enrollment_manager"
+  );
   // Staff record most declines by phone, so this is the path where a reason is
   // most likely known and least likely captured. Still optional.
   const result = await declineOffer(offerId, undefined, {
     reason: isDeclineReason(reason) ? reason : undefined,
     note,
+    actingStaffUserId: session.user_id,
   });
 
   if (!result.error) {

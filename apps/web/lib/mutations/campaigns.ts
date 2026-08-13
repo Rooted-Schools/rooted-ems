@@ -120,12 +120,27 @@ export async function createCampaign(
   return { data: { id: campaign.id, recipients: leads.length }, error: null };
 }
 
-/** Stop a campaign — pending recipients are never sent. Sent emails are sent. */
+/**
+ * Stop a campaign — pending recipients are never sent. Sent emails are sent.
+ *
+ * `actorId` is the audit trail for the cancellation and must come from the
+ * caller's session (see app/staff/recruitment/actions.ts), never from client
+ * input.
+ */
 export async function cancelCampaign(
   campaignId: string,
   actorId: string
 ): Promise<MutationResult> {
   const supabase = await createServerClient();
+
+  // Read the campus before the write so the audit row is filed against the
+  // campus that owns the campaign rather than against nothing.
+  const { data: campaign } = await supabase
+    .from("lead_campaign")
+    .select("campus_id")
+    .eq("id", campaignId)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("lead_campaign")
     .update({ status: "cancelled", completed_at: new Date().toISOString() })
@@ -140,7 +155,7 @@ export async function cancelCampaign(
     record_id: campaignId,
     action: AuditAction.StatusChange,
     actor_id: actorId,
-    campus_id: null,
+    campus_id: (campaign?.campus_id as string | null) ?? null,
     new_data: { status: "cancelled" },
   });
   return { data: null, error: null };

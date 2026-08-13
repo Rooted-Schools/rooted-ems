@@ -57,6 +57,7 @@ vi.mock("@/lib/mutations/registration", () => ({
 
 vi.mock("@/lib/mutations/waitlist", () => ({
   promoteFromWaitlist: vi.fn(async () => ({ data: null, error: null })),
+  promoteNextWaitlistCandidate: vi.fn(async () => true),
 }));
 
 vi.mock("@/lib/audit", () => ({
@@ -83,9 +84,15 @@ const GUARDIAN_ID = "guardian-1";
 const FUTURE = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 const PAST = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-/** Result of the ownership-guard select on `offer`. */
+/**
+ * Result of the ownership-guard select on `offer` — the nested
+ * application → guardian shape that getOfferGuardian() reads. The guardian
+ * row must carry its own `id` (not just `user_id`); acceptOffer/declineOffer
+ * derive the accepting/declining guardian from this id, never from a
+ * client-supplied guardianId.
+ */
 const ownershipRow = (ownerUserId: string) => ({
-  data: { id: OFFER_ID, application: { guardian: { user_id: ownerUserId } } },
+  data: { id: OFFER_ID, application: { guardian: { id: GUARDIAN_ID, user_id: ownerUserId } } },
   error: null,
 });
 
@@ -112,12 +119,70 @@ beforeEach(() => {
 describe("acceptOffer", () => {
   it("rejects unauthenticated users and performs no write", async () => {
     supabaseMock.setUser(null);
+    // No "offer" result queued — the guardian-lookup select (which now runs
+    // BEFORE the auth check) finds nothing, so the failure is "Not
+    // authorized", not "Not authenticated". See getOfferGuardian in offers.ts.
+
+    const result = await acceptOffer(OFFER_ID, GUARDIAN_ID);
+
+    expect(result.error).toBe("Not authorized");
+    expect(supabaseMock.writes()).toHaveLength(0);
+    expect(createEnrollmentMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unauthenticated user even when the offer's guardian resolves (ordering check)", async () => {
+    supabaseMock.setUser(null);
+    supabaseMock.queueResult("offer", ownershipRow(OWNER.id));
 
     const result = await acceptOffer(OFFER_ID, GUARDIAN_ID);
 
     expect(result.error).toBe("Not authenticated");
     expect(supabaseMock.writes()).toHaveLength(0);
     expect(createEnrollmentMock).not.toHaveBeenCalled();
+  });
+
+  it("allows a valid staff actingStaffUserId to accept on behalf of the family without a family session", async () => {
+    // No family session at all — the staff-on-behalf branch must skip the
+    // family ownership check entirely.
+    supabaseMock.setUser(null);
+    supabaseMock.queueResult(
+      "offer",
+      ownershipRow(OWNER.id),
+      pendingOfferRow(),
+      { data: null, error: null } // offer update
+    );
+    supabaseMock.queueResult("acceptance", { data: { id: "acc-1" }, error: null });
+    supabaseMock.queueResult(
+      "application",
+      { data: null, error: null }, // status update
+      {
+        data: { student_id: "stu-1", enrollment_window: { school_year_id: "sy-1" } },
+        error: null,
+      }
+    );
+    createEnrollmentMock.mockResolvedValue({ data: { id: "enr-1" }, error: null });
+    initPacketMock.mockResolvedValue({ data: null, error: null });
+
+    const result = await acceptOffer(OFFER_ID, GUARDIAN_ID, { actingStaffUserId: "staff-1" });
+
+    expect(result.error).toBeNull();
+    const offerWrites = supabaseMock.writes("offer");
+    expect(offerWrites).toHaveLength(1);
+    expect(offerWrites[0].payload).toMatchObject({ status: "accepted" });
+    expect(createEnrollmentMock).toHaveBeenCalledWith(
+      expect.objectContaining({ student_id: "stu-1", school_year_id: "sy-1" })
+    );
+    // Acceptance is still recorded against the guardian on the offer, not
+    // the staff member who clicked.
+    expect(logAuditEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actor_id: "staff-1",
+        metadata: expect.objectContaining({
+          accepted_by_guardian_id: GUARDIAN_ID,
+          on_behalf_of_family: true,
+        }),
+      })
+    );
   });
 
   it("rejects a user who does not own the offer and performs no write", async () => {
@@ -247,10 +312,12 @@ describe("acceptOffer", () => {
 describe("declineOffer", () => {
   it("rejects unauthenticated users and performs no write", async () => {
     supabaseMock.setUser(null);
+    // No "offer" result queued — the guardian lookup fails first, so this
+    // now surfaces as "Not authorized" rather than "Not authenticated".
 
     const result = await declineOffer(OFFER_ID);
 
-    expect(result.error).toBe("Not authenticated");
+    expect(result.error).toBe("Not authorized");
     expect(supabaseMock.writes()).toHaveLength(0);
   });
 

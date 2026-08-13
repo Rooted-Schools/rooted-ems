@@ -31,9 +31,16 @@ interface InquiryFormProps {
   sourceTag?: string;
   /** LG-1: ?campus= preselection (still editable by the family). */
   preselectedCampusId?: string;
+  /**
+   * Real entering grades per campus id, for whichever school-year cycle is
+   * currently open (or next upcoming). A campus missing from this map has no
+   * resolvable cycle yet — the grade dropdown falls back to the full list
+   * rather than fabricating a narrower one.
+   */
+  gradesByCampus?: Record<string, string[]>;
 }
 
-export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCampusId, sourceTag, preselectedCampusId }: InquiryFormProps) {
+export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCampusId, sourceTag, preselectedCampusId, gradesByCampus }: InquiryFormProps) {
   const { t, locale } = useLocale();
 
   // ── Step 1: the only required screen. Creates the lead immediately on
@@ -55,6 +62,16 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
   });
 
   const update = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
+
+  // Filter the grade dropdown to what the selected campus is actually
+  // enrolling for. No campus chosen yet, or no real data for the chosen
+  // campus (cycle not resolvable) — keep the full K-12 list rather than
+  // showing an empty dropdown or fabricating a narrower one.
+  const campusGrades = form.campus_id ? gradesByCampus?.[form.campus_id] : undefined;
+  const gradeOptions =
+    campusGrades && campusGrades.length > 0
+      ? [...campusGrades].sort((a, b) => Number(a) - Number(b))
+      : GRADE_OPTIONS;
 
   // ── Step 2: optional "help us get to know you," offered right after the
   // lead exists. Guarded by a per-lead token so it can only ever complete
@@ -250,7 +267,7 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
                 </div>
 
                 {detailsError && (
-                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                  <p className="text-sm text-error bg-error/10 border border-error/30 rounded-[6px] px-3 py-2">
                     {detailsError}
                   </p>
                 )}
@@ -278,7 +295,7 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
   }
 
   const fieldError = (missing: boolean) =>
-    showValidation && missing ? "border-red-400" : undefined;
+    showValidation && missing ? "border-error" : undefined;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-rooted-green/5 to-warm-white py-8 px-4">
@@ -328,7 +345,7 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
 
               <div>
                 <label htmlFor="inq-first" className="block text-sm font-medium text-ink/70 mb-1">
-                  {t("inquiry.firstName")} <span className="text-red-500">*</span>
+                  {t("inquiry.firstName")} <span className="text-error">*</span>
                 </label>
                 <Input
                   id="inq-first"
@@ -340,7 +357,7 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
               </div>
               <div>
                 <label htmlFor="inq-last" className="block text-sm font-medium text-ink/70 mb-1">
-                  {t("inquiry.lastName")} <span className="text-red-500">*</span>
+                  {t("inquiry.lastName")} <span className="text-error">*</span>
                 </label>
                 <Input
                   id="inq-last"
@@ -353,7 +370,7 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
 
               <div>
                 <label htmlFor="inq-phone" className="block text-sm font-medium text-ink/70 mb-1">
-                  {t("inquiry.phone")} <span className="text-red-500">*</span>
+                  {t("inquiry.phone")} <span className="text-error">*</span>
                 </label>
                 <Input
                   id="inq-phone"
@@ -366,7 +383,7 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
                   inputMode="tel"
                 />
                 {showValidation && !form.phone.trim() && (
-                  <p className="text-xs text-red-600 mt-1">{t("inquiry.contactRequired")}</p>
+                  <p className="text-xs text-error mt-1">{t("inquiry.contactRequired")}</p>
                 )}
               </div>
 
@@ -403,13 +420,13 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
 
               <div>
                 <label htmlFor="inq-campus" className="block text-sm font-medium text-ink/70 mb-1">
-                  {t("inquiry.campus")} <span className="text-red-500">*</span>
+                  {t("inquiry.campus")} <span className="text-error">*</span>
                 </label>
                 <Select
                   id="inq-campus"
                   className={cn("h-11", fieldError(!form.campus_id))}
                   value={form.campus_id}
-                  onChange={(e) => update({ campus_id: e.target.value })}
+                  onChange={(e) => update({ campus_id: e.target.value, entry_grade: "" })}
                 >
                   <option value="">{t("inquiry.selectCampus")}</option>
                   {campuses.map((c) => (
@@ -422,7 +439,7 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
 
               <div>
                 <label htmlFor="inq-grade" className="block text-sm font-medium text-ink/70 mb-1">
-                  {t("inquiry.grade")} <span className="text-red-500">*</span>
+                  {t("inquiry.grade")} <span className="text-error">*</span>
                 </label>
                 <Select
                   id="inq-grade"
@@ -431,7 +448,7 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
                   onChange={(e) => update({ entry_grade: e.target.value })}
                 >
                   <option value="">—</option>
-                  {GRADE_OPTIONS.map((g) => (
+                  {gradeOptions.map((g) => (
                     <option key={g} value={g}>
                       {g === "K" ? t("inquiry.kindergarten") : `${t("inquiry.gradePrefix")} ${g}`}
                     </option>
@@ -440,7 +457,7 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
               </div>
 
               {error && (
-                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                <p className="text-sm text-error bg-error/10 border border-error/30 rounded-[6px] px-3 py-2">
                   {error}
                 </p>
               )}

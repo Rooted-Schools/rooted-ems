@@ -82,14 +82,13 @@ export async function addTeamMember(
     };
   }
 
-  // ── Upsert user_profile with is_staff = true ──
-  const { error: profileError } = await supabase
-    .from("user_profile")
-    .upsert({ id: userId, email: email.toLowerCase(), is_staff: true }, { onConflict: "id" });
-
-  if (profileError) return { error: "Failed to create staff profile: " + profileError.message };
-
-  // ── Insert campus role assignments ──
+  // ── Insert campus role assignments FIRST, then flip is_staff ──
+  // Order matters. A staff account with is_staff = true and zero campus role
+  // rows is the half-provisioned state the session layer must reject, so it
+  // must never exist even transiently: if the role insert fails after
+  // is_staff was already set, the account is left stranded at exactly that
+  // shape. Writing the roles first means the worst failure leaves orphaned
+  // role rows on a non-staff profile, which grants nothing.
   const rows = campusAssignments.map(({ campusId, role }) => ({
     user_id: userId as string,
     campus_id: campusId,
@@ -101,6 +100,13 @@ export async function addTeamMember(
     .upsert(rows, { onConflict: "user_id,campus_id,role", ignoreDuplicates: true });
 
   if (roleError) return { error: "Failed to assign campus roles: " + roleError.message };
+
+  // ── Upsert user_profile with is_staff = true ──
+  const { error: profileError } = await supabase
+    .from("user_profile")
+    .upsert({ id: userId, email: email.toLowerCase(), is_staff: true }, { onConflict: "id" });
+
+  if (profileError) return { error: "Failed to create staff profile: " + profileError.message };
 
   revalidatePath("/staff/team");
   return { error: null };
@@ -243,17 +249,11 @@ export async function inviteStaffMember(
     return { error: "This person already has that role on the selected campus(es)." };
   }
 
-  // ── Upsert user_profile with is_staff = true ──
-  const { error: profileError } = await supabase
-    .from("user_profile")
-    .upsert(
-      { id: userId, email, first_name: firstName, last_name: lastName, is_staff: true },
-      { onConflict: "id" }
-    );
-
-  if (profileError) return { error: "Failed to create staff profile: " + profileError.message };
-
-  // ── Insert campus role assignments ──
+  // ── Insert campus role assignments FIRST, then flip is_staff ──
+  // Same ordering invariant as addTeamMember: is_staff = true with zero
+  // campus role rows is the half-provisioned state the session layer rejects,
+  // so it must never be written, not even transiently. Roles land first; if
+  // that insert fails we return without ever touching is_staff.
   if (newAssignments.length > 0) {
     const rows = newAssignments.map(({ campusId, role }) => ({
       user_id: userId,
@@ -270,6 +270,32 @@ export async function inviteStaffMember(
 
     if (roleError) return { error: "Failed to assign campus roles: " + roleError.message };
   }
+
+  // Confirm at least one role row now exists before granting staff status.
+  // newAssignments can be empty only for an existing account that already
+  // holds every requested role (the early return above covers that), but the
+  // check is cheap and it is the exact invariant being protected.
+  const { count: roleCount, error: roleCountError } = await supabase
+    .from("user_campus_role")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId);
+
+  if (roleCountError) {
+    return { error: "Failed to confirm campus roles: " + roleCountError.message };
+  }
+  if ((roleCount ?? 0) === 0) {
+    return { error: "No campus roles were assigned, so staff access was not granted." };
+  }
+
+  // ── Upsert user_profile with is_staff = true ──
+  const { error: profileError } = await supabase
+    .from("user_profile")
+    .upsert(
+      { id: userId, email, first_name: firstName, last_name: lastName, is_staff: true },
+      { onConflict: "id" }
+    );
+
+  if (profileError) return { error: "Failed to create staff profile: " + profileError.message };
 
   revalidatePath("/staff/team");
   return { error: null, outcome };
@@ -351,10 +377,22 @@ export async function removeCampusFromMember(
     .eq("user_id", userId);
 
   if (count === 0) {
-    await supabase
+    // This write is the deprovision. Swallowing its error would leave the
+    // account at is_staff = true with zero campus roles — the exact
+    // half-deprovisioned shape requireStaffSession now has to slam the door
+    // on — while telling the admin the removal succeeded.
+    const { error: revokeError } = await supabase
       .from("user_profile")
       .update({ is_staff: false, updated_at: new Date().toISOString() })
       .eq("id", userId);
+
+    if (revokeError) {
+      return {
+        error:
+          "The campus assignment was removed, but staff access could not be revoked: " +
+          revokeError.message,
+      };
+    }
   }
 
   revalidatePath("/staff/team");

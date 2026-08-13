@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
+import {
+  requireStaffSession,
+  requireMinRole,
+  getAccessibleCampusIds,
+} from "@/lib/auth/get-session";
 import {
   sendNotification,
   createMessageTemplate,
@@ -39,11 +43,27 @@ function normalizeFamilyLink(link: string | undefined): string | undefined {
   return undefined;
 }
 
+/**
+ * This is the enforcement boundary for the compose box, mirroring
+ * staffSendOneOffEmail below: the session is resolved here and the caller's
+ * accessible campuses are handed to sendNotification, which resolves each
+ * recipient's own campus and skips anyone outside that list rather than
+ * messaging them. Both the recipient list and the campus stamped on
+ * communication_log used to come straight from the client.
+ *
+ * Email and SMS carry a higher gate than in-app: an outbound message to a
+ * family's inbox or phone is not something a compliance auditor with
+ * read-oriented access should be able to send.
+ */
 export async function staffSendNotification(input: SendNotificationInput) {
-  await requireStaffSession();
+  const session =
+    input.channel === "in_app"
+      ? await requireStaffSession()
+      : await requireMinRole("enrollment_staff");
   const result = await sendNotification({
     ...input,
     link: normalizeFamilyLink(input.link),
+    accessibleCampusIds: getAccessibleCampusIds(session),
   });
   if (!result.error) {
     revalidatePath("/staff/communications");
@@ -51,6 +71,11 @@ export async function staffSendNotification(input: SendNotificationInput) {
   return result;
 }
 
+/**
+ * Template mutations gate on the template's OWN campus (enrollment_manager),
+ * resolved inside the mutation from the row — see lib/mutations/
+ * communications.ts. requireStaffSession here only fails non-staff fast.
+ */
 export async function staffCreateTemplate(input: CreateTemplateInput) {
   await requireStaffSession();
   const result = await createMessageTemplate(input);

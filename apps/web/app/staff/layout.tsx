@@ -2,7 +2,12 @@ import { Suspense } from "react";
 import { StaffSidebar } from "@/components/layout/staff-sidebar";
 import { StaffHeader } from "@/components/layout/staff-header";
 import { StaffMobileNav } from "@/components/layout/staff-mobile-nav";
-import { requireStaffSession, getAccessibleCampusIds, getHighestRole } from "@/lib/auth/get-session";
+import {
+  requireStaffSession,
+  getAccessibleCampusIds,
+  getHighestRole,
+  hasNetworkAccess,
+} from "@/lib/auth/get-session";
 import { NEUTRAL_LENS_THEME } from "@/lib/campus-identity";
 import { getCampusLens } from "@/lib/campus-lens";
 import { setCampusLens } from "@/app/staff/lens-actions";
@@ -112,7 +117,7 @@ export default async function StaffLayout({
             highestRole={highestRole}
             todayCount={todayCount}
             messagesUnreadCount={unreadNotificationCount}
-            showNetwork={accessibleIds.length === 0}
+            showNetwork={hasNetworkAccess(session)}
             lensIdentity={lens?.identity}
           />
         </Suspense>

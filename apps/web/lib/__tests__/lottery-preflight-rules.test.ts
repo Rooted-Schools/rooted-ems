@@ -238,7 +238,7 @@ describe("evaluatePreflight — offer expiry automation", () => {
 });
 
 describe("evaluatePreflight — weighted entry data", () => {
-  it("warns, without blocking, when a weighted tier's source field is not collected", () => {
+  it("blocks when a weighted tier's source field is not collected — a silently unapplied board preference is exactly the failure an authorizer challenge is made of", () => {
     const facts = readyFacts({
       unsourcedTierLabels: [
         "Child of contracted full-time staff",
@@ -246,12 +246,11 @@ describe("evaluatePreflight — weighted entry data", () => {
       ],
     });
     const check = statusOf(facts, "tier_sources");
-    expect(check.status).toBe("amber");
-    expect(check.message).toMatch(
-      /Child of contracted full-time staff and Economically disadvantaged/
-    );
+    expect(check.status).toBe("red");
+    expect(check.message).toMatch(/Child of contracted full-time staff/);
+    expect(check.message).toMatch(/Economically disadvantaged/);
     expect(check.message).toMatch(/drawn at the default weight/);
-    expect(preflightBlocks(evaluatePreflight(facts))).toBe(false);
+    expect(preflightBlocks(evaluatePreflight(facts))).toBe(true);
   });
 });
 
@@ -263,16 +262,19 @@ describe("preflightBlocks and preflightBlockingReasons", () => {
       capacitySeats: 0,
       emailConfigured: false,
       smsConfigured: false, // amber, must not appear
-      unsourcedTierLabels: ["Something"], // amber, must not appear
+      unsourcedTierLabels: ["Something"], // now RED — must appear
     });
     const checks = evaluatePreflight(facts);
     const reasons = preflightBlockingReasons(checks);
 
     expect(preflightBlocks(checks)).toBe(true);
-    expect(reasons).toHaveLength(3);
+    expect(reasons).toHaveLength(4);
     expect(reasons.join(" ")).toMatch(/No adopted lottery policy/);
     expect(reasons.join(" ")).toMatch(/zero seats/);
     expect(reasons.join(" ")).toMatch(/Email delivery is not configured/);
+    expect(reasons.join(" ")).toMatch(
+      /The policy weights these tiers but the application collects nothing they can read/
+    );
     expect(reasons.join(" ")).not.toMatch(/Text messaging/);
   });
 

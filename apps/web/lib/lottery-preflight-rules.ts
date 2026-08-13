@@ -39,6 +39,15 @@ export interface PreflightFacts {
   /** total_seats on the run itself. */
   runSeats: number;
 
+  /**
+   * Seats already committed against that capacity: accepted seats and offers
+   * still pending a family answer. Optional so existing fact builders keep
+   * compiling; when either is present the run is checked against REMAINING
+   * capacity rather than against the total, which is the number that matters.
+   */
+  seatsAccepted?: number | null;
+  pendingOfferCount?: number | null;
+
   entryCount: number;
   /** Entries whose application is not in an eligible status. */
   ineligibleEntryCount: number;
@@ -60,6 +69,19 @@ export interface PreflightFacts {
 
   /** Weighted tiers whose declared source field nothing collects. */
   unsourcedTierLabels: string[];
+  /**
+   * The same tiers with the exact field key each one needs, so the blocking
+   * message can tell staff what to add rather than only what is wrong.
+   * Optional; when absent the labels above are used on their own.
+   */
+  unsourcedTierFields?: Array<{ label: string; fieldKey: string }>;
+  /**
+   * Tiers whose field IS collected but where some applications in this run
+   * carry no answer for it — typically applications submitted before the
+   * question was added. That is a warning, not a block: the tier works, it
+   * just cannot reach those applicants.
+   */
+  tiersMissingAnswers?: Array<{ label: string; fieldKey: string; applicationsMissing: number }>;
 }
 
 // ─── The gating logic (pure) ───────────────────────────────────────────────
@@ -115,20 +137,42 @@ export function evaluatePreflight(facts: PreflightFacts): PreflightCheck[] {
       status: "red",
       message: "The capacity plan for this grade is set to zero seats. There is nothing to award.",
     });
-  } else if (facts.capacitySeats !== facts.runSeats) {
-    checks.push({
-      key: "capacity_plan",
-      label: "Capacity plan",
-      status: "amber",
-      message: `This run offers ${facts.runSeats} seats but the capacity plan for this grade is ${facts.capacitySeats}. Confirm which number is right before finalizing.`,
-    });
   } else {
-    checks.push({
-      key: "capacity_plan",
-      label: "Capacity plan",
-      status: "green",
-      message: `Capacity plan set to ${facts.capacitySeats} seats, matching this run.`,
-    });
+    // Remaining capacity, not total capacity, is what this run can award.
+    // Seats already accepted, and offers still awaiting a family's answer, are
+    // spoken for. Awarding more than remain means telling a family they have a
+    // seat that does not exist, so this blocks rather than warns.
+    const committedKnown =
+      facts.seatsAccepted !== undefined && facts.seatsAccepted !== null
+        ? true
+        : facts.pendingOfferCount !== undefined && facts.pendingOfferCount !== null;
+    const committed = (facts.seatsAccepted ?? 0) + (facts.pendingOfferCount ?? 0);
+    const remaining = facts.capacitySeats - committed;
+
+    if (committedKnown && facts.runSeats > remaining) {
+      checks.push({
+        key: "capacity_plan",
+        label: "Capacity plan",
+        status: "red",
+        message: `This run awards ${facts.runSeats} seats but only ${remaining} of the ${facts.capacitySeats} planned seats are still open (${facts.seatsAccepted ?? 0} accepted, ${facts.pendingOfferCount ?? 0} offered and awaiting an answer). Lower the run's seat count or free the committed seats first.`,
+      });
+    } else if (facts.capacitySeats !== facts.runSeats) {
+      checks.push({
+        key: "capacity_plan",
+        label: "Capacity plan",
+        status: "amber",
+        message: committedKnown
+          ? `This run offers ${facts.runSeats} seats. The capacity plan for this grade is ${facts.capacitySeats}, of which ${remaining} are still open. Confirm which number is right before finalizing.`
+          : `This run offers ${facts.runSeats} seats but the capacity plan for this grade is ${facts.capacitySeats}. Confirm which number is right before finalizing.`,
+      });
+    } else {
+      checks.push({
+        key: "capacity_plan",
+        label: "Capacity plan",
+        status: "green",
+        message: `Capacity plan set to ${facts.capacitySeats} seats, matching this run.`,
+      });
+    }
   }
 
   // 3. Entries present and eligible
@@ -274,12 +318,34 @@ export function evaluatePreflight(facts: PreflightFacts): PreflightCheck[] {
   }
 
   // 9. Weighted tier sources
+  //
+  // RED, not amber. An enabled weighted tier whose source field is collected
+  // nowhere means the board adopted a preference that the draw silently did
+  // not apply: every applicant who should have had five entries got one, and
+  // the result reads as a lawful weighted lottery. That is the exact failure
+  // an authorizer challenge is made of, so it blocks Finalize as Official.
   if (facts.unsourcedTierLabels.length > 0) {
+    const named =
+      facts.unsourcedTierFields && facts.unsourcedTierFields.length > 0
+        ? facts.unsourcedTierFields
+            .map((t) => `${t.label} (needs the field "${t.fieldKey}")`)
+            .join("; ")
+        : facts.unsourcedTierLabels.join("; ");
+    checks.push({
+      key: "tier_sources",
+      label: "Weighted entry data",
+      status: "red",
+      message: `The policy weights these tiers but the application collects nothing they can read: ${named}. Every applicant would be drawn at the default weight, so the lottery would not be the one the board adopted. Add the field to the application, or disable the tier in the policy, before finalizing.`,
+    });
+  } else if (facts.tiersMissingAnswers && facts.tiersMissingAnswers.length > 0) {
+    const named = facts.tiersMissingAnswers
+      .map((t) => `${t.label} (${t.applicationsMissing} applications carry no answer for "${t.fieldKey}")`)
+      .join("; ");
     checks.push({
       key: "tier_sources",
       label: "Weighted entry data",
       status: "amber",
-      message: `The policy weights ${facts.unsourcedTierLabels.join(" and ")}, but the application does not collect the field each one depends on. No applicant can qualify for those weights until the application captures them; every applicant is drawn at the default weight.`,
+      message: `Every weighted tier reads a field the application collects, but some applications in this run predate the question: ${named}. Those applicants are drawn at the default weight.`,
     });
   } else {
     checks.push({

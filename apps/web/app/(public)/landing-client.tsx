@@ -91,7 +91,7 @@ function LandingContent({ schools }: LandingClientProps) {
             </Link>
             <Link
               href="/staff-login"
-              className="text-sm font-medium text-white bg-rooted-green hover:bg-deep-green transition-colors px-4 py-2 rounded-lg"
+              className="inline-flex min-h-[44px] items-center justify-center text-sm font-medium text-white bg-rooted-green hover:bg-deep-green transition-colors px-4 rounded-[6px]"
             >
               {t("public.staffLogin")}
             </Link>
@@ -206,7 +206,7 @@ function LandingContent({ schools }: LandingClientProps) {
                     <p className="text-[11px] text-stone-text mt-1.5">
                       {t("public.closes")} {formatDate(school.closeDate, locale)}
                       {school.daysRemaining !== null && school.daysRemaining <= 14 && (
-                        <span className="text-amber-600 font-semibold">
+                        <span className="text-warn-text font-semibold">
                           {" "}({school.daysRemaining}{" "}
                           {school.daysRemaining === 1 ? t("public.dayLeft") : t("public.daysLeft")})
                         </span>
@@ -226,7 +226,7 @@ function LandingContent({ schools }: LandingClientProps) {
                     <div className="mt-4 flex gap-2">
                       <Link
                         href={school.campusId ? `/login?campus=${school.campusId}` : "/login"}
-                        className="inline-flex items-center text-sm font-medium text-white bg-rooted-green hover:bg-deep-green px-4 py-2 rounded-lg transition-colors"
+                        className="inline-flex min-h-[44px] items-center justify-center text-sm font-medium text-white bg-rooted-green hover:bg-deep-green px-4 rounded-[6px] transition-colors"
                       >
                         {t("public.applyNow")}
                       </Link>

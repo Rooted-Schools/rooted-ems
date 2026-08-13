@@ -402,11 +402,44 @@ describe("matchWeightedTiers", () => {
     authorityNote: "Test citation.",
   };
 
-  it("reports a tier as unsourced when the application does not collect its field", async () => {
+  it("matches staff_child as SOURCED, because the family form now collects is_staff_child for campuses whose policy declares it", async () => {
+    // POLICY_COLLECTED_ANSWER_KEYS now includes "is_staff_child" — a campus
+    // whose board adopted this tier collects the question on the family
+    // application form, so the field is no longer unsourced.
+    supabaseMock.queueResult("application_answer", {
+      data: [{ application_id: "app-1", value: "true" }],
+      error: null,
+    });
+
     const result = await matchWeightedTiers(client(), ["app-1", "app-2"], [staffTier], 1);
 
-    expect(result.unsourcedTierKeys).toEqual(["staff_child"]);
-    expect(result.matchedCountByTier.get("staff_child")).toBe(0);
+    expect(result.unsourcedTierKeys).toEqual([]);
+    expect(result.matchedCountByTier.get("staff_child")).toBe(1);
+    expect(result.weightByApplication.get("app-1")).toBe(5);
+    expect(result.weightByApplication.get("app-2")).toBe(1);
+  });
+
+  it("still reports a tier as unsourced when it declares a field the application genuinely does not collect", async () => {
+    const uncollectedFieldTier: LotteryPolicyWeightedTier = {
+      key: "military_family",
+      label: "Child of an active-duty service member",
+      weight: 2,
+      enabled: true,
+      optional: false,
+      // Not in POLICY_COLLECTED_ANSWER_KEYS — no form on any campus asks this.
+      source: { kind: "application_answer", field: "is_military_family" },
+      authorityNote: "Test citation.",
+    };
+
+    const result = await matchWeightedTiers(
+      client(),
+      ["app-1", "app-2"],
+      [uncollectedFieldTier],
+      1
+    );
+
+    expect(result.unsourcedTierKeys).toEqual(["military_family"]);
+    expect(result.matchedCountByTier.get("military_family")).toBe(0);
     // And crucially: no query was issued pretending to look for it.
     expect(supabaseMock.ops.some((o) => o.table === "application_answer")).toBe(false);
     // Everyone stays at the default weight.

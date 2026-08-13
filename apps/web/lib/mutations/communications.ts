@@ -3,6 +3,7 @@
  */
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
+import { isCMOAdmin, requireRoleOnCampus, requireStaffSession } from "@/lib/auth/get-session";
 import { sendSms, isSmsConfigured } from "@/lib/sms";
 import { sendEmail, isEmailConfigured } from "@/lib/email";
 import { staffComposedEmail } from "@/lib/email-templates";
@@ -15,7 +16,11 @@ import { createNote } from "./notes";
 export interface SendNotificationInput {
   /** Target user IDs (guardians / families) */
   recipientUserIds: string[];
-  /** Campus scope */
+  /**
+   * Fallback campus for the communication_log row. Only used for recipients
+   * whose real campus cannot be resolved (staff recipients on system
+   * notifications). It is never used to decide who may be messaged.
+   */
   campusId?: string;
   /** Message channel */
   channel: "email" | "sms" | "in_app";
@@ -27,6 +32,18 @@ export interface SendNotificationInput {
   link?: string;
   /** Optional message template used */
   templateId?: string;
+  /**
+   * Campus scope of the staff member who triggered this send, resolved from
+   * their session by the server action (getAccessibleCampusIds). When
+   * present, recipients whose campus falls outside it are skipped and
+   * reported rather than messaged.
+   *
+   * Omitted by the system paths (lib/notify.ts, inbound email/SMS), which
+   * have no staff session and address recipients the app itself chose.
+   * `undefined` and `[]` both mean "no restriction" — the empty list is the
+   * org-wide convention from getAccessibleCampusIds.
+   */
+  accessibleCampusIds?: string[];
 }
 
 export interface CreateTemplateInput {
@@ -36,6 +53,8 @@ export interface CreateTemplateInput {
   body: string;
   channel: "email" | "sms" | "in_app";
   mergeFields?: string[];
+  /** Kept for call-site compatibility and ignored — authorship comes from
+   *  the session, so it cannot be attributed to someone else. */
   createdBy?: string;
 }
 
@@ -63,22 +82,144 @@ export interface SendNotificationResult {
   configured: boolean;
 }
 
+/** Reported for recipients the caller may not message. */
+const OUT_OF_SCOPE = "Not on a campus you can access.";
+
+interface RecipientInfo {
+  name: string;
+  email: string | null;
+  phone: string | null;
+  smsConsent: boolean;
+  /** Campus resolved from the recipient's own application, never from input. */
+  campusId: string | null;
+}
+
+/**
+ * Resolve each recipient's contact details AND the campus they actually
+ * belong to, walking guardian → application. Recipients with no guardian row
+ * (staff receiving a system notification) resolve to a null campus, which
+ * callers treat as "fall back to the input campus for logging only".
+ *
+ * A guardian with applications at more than one campus resolves to whichever
+ * of those the caller can access, so a legitimate cross-campus family is not
+ * skipped on the strength of an arbitrary row order.
+ */
+async function resolveRecipients(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  recipientUserIds: string[],
+  accessibleCampusIds?: string[]
+): Promise<Map<string, RecipientInfo>> {
+  const byUser = new Map<string, RecipientInfo>();
+
+  const { data: guardians, error } = await supabase
+    .from("guardian")
+    .select("id, user_id, first_name, last_name, email, phone, sms_consent")
+    .in("user_id", recipientUserIds);
+
+  if (error) {
+    console.error("[resolveRecipients]", error.message);
+    return byUser;
+  }
+
+  const rows = (guardians ?? []) as Array<Record<string, unknown>>;
+  const guardianIdToUserId = new Map<string, string>();
+  for (const g of rows) {
+    const userId = g.user_id as string;
+    guardianIdToUserId.set(g.id as string, userId);
+    byUser.set(userId, {
+      name: `${g.first_name ?? ""} ${g.last_name ?? ""}`.toString().trim() || "Unknown family",
+      email: (g.email as string | null) ?? null,
+      phone: (g.phone as string | null) ?? null,
+      smsConsent: g.sms_consent === true,
+      campusId: null,
+    });
+  }
+
+  if (guardianIdToUserId.size === 0) return byUser;
+
+  const { data: apps, error: appError } = await supabase
+    .from("application")
+    .select("guardian_id, campus_id")
+    .in("guardian_id", [...guardianIdToUserId.keys()]);
+
+  if (appError) {
+    console.error("[resolveRecipients] applications", appError.message);
+    return byUser;
+  }
+
+  const scoped = accessibleCampusIds && accessibleCampusIds.length > 0 ? accessibleCampusIds : null;
+  for (const row of (apps ?? []) as Array<Record<string, unknown>>) {
+    const userId = guardianIdToUserId.get(row.guardian_id as string);
+    if (!userId) continue;
+    const info = byUser.get(userId);
+    if (!info) continue;
+    const campusId = (row.campus_id as string | null) ?? null;
+    if (!campusId) continue;
+    // Prefer a campus the caller can act on; otherwise keep the first seen.
+    if (info.campusId === null || (scoped && !scoped.includes(info.campusId) && scoped.includes(campusId))) {
+      info.campusId = campusId;
+    }
+  }
+
+  return byUser;
+}
+
 export async function sendNotification(
   input: SendNotificationInput
 ): Promise<MutationResult<SendNotificationResult>> {
   const supabase = createServiceRoleClient();
 
-  const { recipientUserIds, campusId, channel, subject, body, link, templateId } = input;
+  const {
+    recipientUserIds,
+    campusId,
+    channel,
+    subject,
+    body,
+    link,
+    templateId,
+    accessibleCampusIds,
+  } = input;
 
   if (recipientUserIds.length === 0) {
     return { data: null, error: "No recipients selected." };
   }
 
+  // Campus resolution runs for every channel: the recipient list arrives from
+  // the client, and the campus stamped on communication_log used to come from
+  // the same place, so a staff member could message another campus's families
+  // and file the record under a campus of their choosing. The campus is now
+  // the recipient's own, and when the caller passed a scope, recipients
+  // outside it never receive anything.
+  const byUser = await resolveRecipients(supabase, recipientUserIds, accessibleCampusIds);
+  const scoped = accessibleCampusIds && accessibleCampusIds.length > 0 ? accessibleCampusIds : null;
+
+  const skipped: { name: string; reason: string }[] = [];
+  let targets = recipientUserIds;
+  if (scoped) {
+    targets = [];
+    for (const userId of recipientUserIds) {
+      const info = byUser.get(userId);
+      if (!info?.campusId || !scoped.includes(info.campusId)) {
+        skipped.push({ name: info?.name ?? "Unknown family", reason: OUT_OF_SCOPE });
+        continue;
+      }
+      targets.push(userId);
+    }
+    if (targets.length === 0) {
+      return { data: { sentCount: 0, skipped, configured: true }, error: null };
+    }
+  }
+
+  /** Log campus: the recipient's own, falling back to the caller's only when
+   *  the recipient has no application (system notifications to staff). */
+  const logCampusFor = (userId: string): string | null =>
+    byUser.get(userId)?.campusId ?? campusId ?? null;
+
   if (channel === "in_app") {
     // In-app has no external provider — always "configured" and always
     // reaches every recipient (a notification row is enough; whether the
     // family later reads it is a separate concern from delivery).
-    const notificationRows = recipientUserIds.map((userId) => ({
+    const notificationRows = targets.map((userId) => ({
       user_id: userId,
       title: subject,
       body,
@@ -94,8 +235,8 @@ export async function sendNotification(
       return { data: null, error: `Failed to create notifications: ${notifError.message}` };
     }
 
-    const logRows = recipientUserIds.map((userId) => ({
-      campus_id: campusId ?? null,
+    const logRows = targets.map((userId) => ({
+      campus_id: logCampusFor(userId),
       template_id: templateId ?? null,
       recipient_user_id: userId,
       recipient_address: "in-app",
@@ -114,36 +255,13 @@ export async function sendNotification(
       console.error("[sendNotification] log error:", logError.message);
     }
 
-    return { data: { sentCount: recipientUserIds.length, skipped: [], configured: true }, error: null };
+    return { data: { sentCount: targets.length, skipped, configured: true }, error: null };
   }
 
-  // Email / SMS — resolve real contact info per recipient and actually send,
-  // rather than only logging a "queued" row that nothing ever advances.
-  const { data: guardians, error: guardianError } = await supabase
-    .from("guardian")
-    .select("user_id, first_name, last_name, email, phone, sms_consent")
-    .in("user_id", recipientUserIds);
-
-  if (guardianError) {
-    return { data: null, error: `Failed to load recipient contact info: ${guardianError.message}` };
-  }
-
-  const byUser = new Map(
-    (guardians ?? []).map((g) => [
-      g.user_id as string,
-      {
-        name: `${g.first_name ?? ""} ${g.last_name ?? ""}`.trim() || "Unknown family",
-        email: g.email as string | null,
-        phone: g.phone as string | null,
-        smsConsent: g.sms_consent === true,
-      },
-    ])
-  );
-
+  // Email / SMS — contact info came back with the campus resolution above.
   const configured = channel === "email" ? isEmailConfigured() : isSmsConfigured();
 
   let sentCount = 0;
-  const skipped: { name: string; reason: string }[] = [];
   const logRows: Array<{
     campus_id: string | null;
     template_id: string | null;
@@ -158,7 +276,7 @@ export async function sendNotification(
     error_message: string | null;
   }> = [];
 
-  for (const userId of recipientUserIds) {
+  for (const userId of targets) {
     const contact = byUser.get(userId);
     const name = contact?.name ?? "Unknown family";
 
@@ -168,7 +286,7 @@ export async function sendNotification(
         reason: channel === "email" ? "Email isn't connected in this environment." : "Texting isn't connected in this environment.",
       });
       logRows.push({
-        campus_id: campusId ?? null,
+        campus_id: logCampusFor(userId),
         template_id: templateId ?? null,
         recipient_user_id: userId,
         recipient_address: channel === "email" ? "pending-email" : "pending-sms",
@@ -192,7 +310,7 @@ export async function sendNotification(
       if (result.ok) {
         sentCount += 1;
         logRows.push({
-          campus_id: campusId ?? null,
+          campus_id: logCampusFor(userId),
           template_id: templateId ?? null,
           recipient_user_id: userId,
           recipient_address: contact.email,
@@ -208,7 +326,7 @@ export async function sendNotification(
         const reason = result.error ?? "Delivery failed.";
         skipped.push({ name, reason });
         logRows.push({
-          campus_id: campusId ?? null,
+          campus_id: logCampusFor(userId),
           template_id: templateId ?? null,
           recipient_user_id: userId,
           recipient_address: contact.email,
@@ -237,7 +355,7 @@ export async function sendNotification(
       if (result.ok) {
         sentCount += 1;
         logRows.push({
-          campus_id: campusId ?? null,
+          campus_id: logCampusFor(userId),
           template_id: templateId ?? null,
           recipient_user_id: userId,
           recipient_address: contact.phone,
@@ -253,7 +371,7 @@ export async function sendNotification(
         const reason = result.error ?? "Delivery failed.";
         skipped.push({ name, reason });
         logRows.push({
-          campus_id: campusId ?? null,
+          campus_id: logCampusFor(userId),
           template_id: templateId ?? null,
           recipient_user_id: userId,
           recipient_address: contact.phone,
@@ -284,9 +402,41 @@ export async function sendNotification(
 
 // ─── Message Templates ──────────────────────────────────
 
+/**
+ * Templates are campus property: they carry a campus's voice, and the
+ * automated sends read from them. All three mutations ran on the service-role
+ * client behind requireStaffSession alone, so any staff account could rewrite
+ * or soft-delete another campus's template by id.
+ *
+ * A template with a NULL campus_id is a network-level template shared by every
+ * campus, and changing one changes messaging everywhere. There is no
+ * org-wide-mutation guard in lib/auth/get-session for this shape (
+ * requireNetworkAccess keys on having zero campus rows, which is a different
+ * population), so the check here is isCMOAdmin: system_admin on 2+ campuses.
+ * It returns an error rather than redirecting, because the caller is a valid
+ * staff member on a legitimate page who simply cannot edit this row.
+ */
+const NETWORK_TEMPLATE_DENIED =
+  "Network templates can only be changed by a network administrator.";
+
+async function authorizeTemplate(
+  campusId: string | null | undefined
+): Promise<{ userId: string } | { error: string }> {
+  if (!campusId) {
+    const session = await requireStaffSession();
+    if (!isCMOAdmin(session)) return { error: NETWORK_TEMPLATE_DENIED };
+    return { userId: session.user_id };
+  }
+  const session = await requireRoleOnCampus(campusId, "enrollment_manager");
+  return { userId: session.user_id };
+}
+
 export async function createMessageTemplate(
   input: CreateTemplateInput
 ): Promise<MutationResult<{ id: string }>> {
+  const auth = await authorizeTemplate(input.campusId);
+  if ("error" in auth) return { data: null, error: auth.error };
+
   const supabase = createServiceRoleClient();
 
   const { data, error } = await supabase
@@ -299,7 +449,8 @@ export async function createMessageTemplate(
       channel: input.channel,
       merge_fields: input.mergeFields ?? [],
       is_active: true,
-      created_by: input.createdBy ?? null,
+      // Authorship is an audit field — from the session, never the payload.
+      created_by: auth.userId,
     })
     .select("id")
     .single();
@@ -315,6 +466,16 @@ export async function updateMessageTemplate(
   input: UpdateTemplateInput
 ): Promise<MutationResult> {
   const supabase = createServiceRoleClient();
+
+  const { data: template } = await supabase
+    .from("message_template")
+    .select("campus_id")
+    .eq("id", input.id)
+    .single();
+  if (!template) return { data: null, error: "Template not found." };
+
+  const auth = await authorizeTemplate(template.campus_id as string | null);
+  if ("error" in auth) return { data: null, error: auth.error };
 
   const updates: Record<string, unknown> = {};
   if (input.name !== undefined) updates.name = input.name;
@@ -340,6 +501,16 @@ export async function deleteMessageTemplate(
   templateId: string
 ): Promise<MutationResult> {
   const supabase = createServiceRoleClient();
+
+  const { data: template } = await supabase
+    .from("message_template")
+    .select("campus_id")
+    .eq("id", templateId)
+    .single();
+  if (!template) return { data: null, error: "Template not found." };
+
+  const auth = await authorizeTemplate(template.campus_id as string | null);
+  if ("error" in auth) return { data: null, error: auth.error };
 
   // Soft-delete: set is_active to false
   const { error } = await supabase

@@ -13,7 +13,11 @@ import {
 // ─── EAV Answer Key Allowlist ───────────────────────────
 // Only these keys may be written to application_answer. Any key not present
 // here is silently dropped before the insert/upsert to prevent EAV flooding.
-const ALLOWED_ANSWER_KEYS = new Set([
+//
+// Keep this in step with POLICY_COLLECTED_ANSWER_KEYS in lib/lottery-policy.ts:
+// a key a board-adopted weighted tier reads but this list drops is a tier that
+// silently matches nobody.
+export const ALLOWED_ANSWER_KEYS = new Set([
   "has_sibling_at_school",
   "sibling_name",
   "data_sharing_consent",
@@ -21,7 +25,23 @@ const ALLOWED_ANSWER_KEYS = new Set([
   "e_signature_name",
   "e_signature_date",
   "guardian_relationship_other",
+  // Declared by board-adopted weighted tiers (RSV). Collected only on a campus
+  // whose adopted policy declares them — see policyQuestionFlags.
+  "is_staff_child",
+  "is_frl_qualifying",
 ]);
+
+/**
+ * application_answer.value is JSONB, and supabase-js already serializes the
+ * JavaScript value it is handed. JSON.stringify-ing first stored the value
+ * TWICE: `true` became the JSONB string "true", and "Ada" became "\"Ada\"".
+ * The read path then compared the string "true" against a boolean and lost a
+ * family's sibling claim and both consent checkboxes every time a draft was
+ * reopened. Pass the raw value; let the driver encode it once.
+ */
+function answerRow(applicationId: string, field_key: string, value: unknown) {
+  return { application_id: applicationId, field_key, value };
+}
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -75,8 +95,10 @@ export interface CreateApplicationInput {
   has_sibling_enrolled?: boolean;
   sibling_name?: string;
   source?: string;
-  // Application answers (EAV for fields without DB columns)
-  answers?: Record<string, string | boolean>;
+  // Application answers (EAV for fields without DB columns). Values are stored
+  // as-is into a JSONB column, so a boolean stays a boolean and a string stays
+  // a string. Never JSON.stringify before writing.
+  answers?: Record<string, unknown>;
 }
 
 export interface UpdateApplicationInput {
@@ -126,8 +148,10 @@ export interface UpdateApplicationInput {
   has_sibling_enrolled?: boolean;
   sibling_name?: string;
   source?: string;
-  // Application answers (EAV for fields without DB columns)
-  answers?: Record<string, string | boolean>;
+  // Application answers (EAV for fields without DB columns). Values are stored
+  // as-is into a JSONB column, so a boolean stays a boolean and a string stays
+  // a string. Never JSON.stringify before writing.
+  answers?: Record<string, unknown>;
 }
 
 // ─── Create Application (Draft) ────────────────────────
@@ -341,7 +365,7 @@ export async function createApplication(
   }
 
   // 7. Save application answers (EAV fields)
-  const answers = input.answers ?? {};
+  const answers = { ...(input.answers ?? {}) };
   if (input.sibling_name) answers.sibling_name = input.sibling_name;
 
   const safeAnswers = Object.entries(answers)
@@ -351,14 +375,17 @@ export async function createApplication(
     return { data: null, error: "Too many answer fields." };
   }
 
-  const answerRows = safeAnswers.map(([key, value]) => ({
-    application_id: app.id,
-    field_key: key,
-    value: JSON.stringify(value),
-  }));
+  const answerRows = safeAnswers.map(([key, value]) => answerRow(app.id, key, value));
 
   if (answerRows.length > 0) {
-    await supabase.from("application_answer").insert(answerRows);
+    const { error: answerErr } = await supabase.from("application_answer").insert(answerRows);
+    if (answerErr) {
+      // Logged, not returned: the application row already exists, and failing
+      // the call here would leave the caller without an id and mint a second
+      // draft on retry. The autosave/submit path upserts these same answers
+      // through updateApplication, which does propagate a write failure.
+      console.error("[createApplication] answers", answerErr.message);
+    }
   }
 
   return { data: { id: app.id }, error: null };
@@ -533,14 +560,18 @@ export async function updateApplication(
     appUpdates.enrollment_window_id = input.enrollment_window_id;
 
   if (Object.keys(appUpdates).length > 0) {
-    await supabase
+    const { error: appErrUpdate } = await supabase
       .from("application")
       .update(appUpdates)
       .eq("id", input.application_id);
+    if (appErrUpdate) {
+      console.error("[updateApplication] application", appErrUpdate.message);
+      return { data: null, error: "Failed to update application" };
+    }
   }
 
   // Upsert application answers (EAV fields)
-  const answers = input.answers ?? {};
+  const answers = { ...(input.answers ?? {}) };
   if (input.sibling_name !== undefined) answers.sibling_name = input.sibling_name;
 
   const safeAnswers = Object.entries(answers)
@@ -550,16 +581,20 @@ export async function updateApplication(
     return { data: null, error: "Too many answer fields." };
   }
 
-  const answerRows = safeAnswers.map(([key, value]) => ({
-    application_id: input.application_id,
-    field_key: key,
-    value: JSON.stringify(value),
-  }));
+  const answerRows = safeAnswers.map(([key, value]) =>
+    answerRow(input.application_id, key, value)
+  );
 
   if (answerRows.length > 0) {
-    await supabase
+    // A dropped write here is a family's consent, sibling claim, or lottery
+    // preference answer silently not saved. Never report that as a clean save.
+    const { error: answerErr } = await supabase
       .from("application_answer")
       .upsert(answerRows, { onConflict: "application_id,field_key" });
+    if (answerErr) {
+      console.error("[updateApplication] answers", answerErr.message);
+      return { data: null, error: "Failed to save your answers" };
+    }
   }
 
   return { data: null, error: null };
@@ -748,6 +783,52 @@ export async function withdrawApplication(
   return { data: null, error: null };
 }
 
+// ─── Placement integrity (staff-supplied ids) ──────────
+
+/**
+ * Confirm an enrollment window and a grade level both belong to the campus the
+ * caller named. Returns an error string, or null when the trio is consistent.
+ *
+ * Fails closed: a window or grade level that cannot be read is not treated as
+ * a match. An application filed against another campus's window is an
+ * authorizer-facing record, so "we could not check" and "it checks out" are
+ * never allowed to look the same.
+ */
+async function verifyCampusPlacement(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  placement: { campus_id: string; enrollment_window_id: string; grade_level_id: string }
+): Promise<string | null> {
+  if (!placement.campus_id) return "A campus is required.";
+  if (!placement.enrollment_window_id) return "An enrollment window is required.";
+  if (!placement.grade_level_id) return "A grade level is required.";
+
+  const [windowRes, gradeRes] = await Promise.all([
+    supabase
+      .from("enrollment_window")
+      .select("id, campus_id")
+      .eq("id", placement.enrollment_window_id)
+      .maybeSingle(),
+    supabase
+      .from("grade_level")
+      .select("id, campus_id")
+      .eq("id", placement.grade_level_id)
+      .maybeSingle(),
+  ]);
+
+  const windowRow = windowRes.data as { campus_id?: string } | null;
+  const gradeRow = gradeRes.data as { campus_id?: string } | null;
+
+  if (!windowRow) return "That enrollment window could not be found.";
+  if (windowRow.campus_id !== placement.campus_id) {
+    return "That enrollment window belongs to a different campus.";
+  }
+  if (!gradeRow) return "That grade level could not be found.";
+  if (gradeRow.campus_id !== placement.campus_id) {
+    return "That grade level belongs to a different campus.";
+  }
+  return null;
+}
+
 // ─── Staff Create Application (on behalf of family) ────
 
 /**
@@ -756,11 +837,26 @@ export async function withdrawApplication(
  * No family user account required.
  */
 export async function staffCreateApplication(
-  input: CreateApplicationInput & { created_by_staff: string },
+  input: CreateApplicationInput,
   options?: { autoSubmit?: boolean }
 ): Promise<MutationResult<{ id: string; student_id: string; guardian_id: string }>> {
-  await requireStaffSession();
+  // The acting staff member is the session, never a client-supplied id. A
+  // caller that could name its own created_by_staff could attribute an
+  // application it entered to somebody else's account.
+  const session = await requireStaffSession();
   const supabase = createServiceRoleClient();
+
+  // 0. Placement integrity: the window and the grade level must belong to the
+  // campus the caller named. Without this, a staff member authorized on one
+  // campus could file an application against another campus's window or grade
+  // by supplying its id — and the campus role check in the server action is
+  // only as good as the campus_id it was handed.
+  const placementError = await verifyCampusPlacement(supabase, {
+    campus_id: input.campus_id,
+    enrollment_window_id: input.enrollment_window_id,
+    grade_level_id: input.grade_level_id,
+  });
+  if (placementError) return { data: null, error: placementError };
 
   // 1. Create household (no family user link)
   const { data: household, error: hhErr } = await supabase
@@ -865,7 +961,7 @@ export async function staffCreateApplication(
       locked_at: options?.autoSubmit ? now : null,
       has_sibling_enrolled: input.has_sibling_enrolled ?? false,
       source: input.source ?? "staff_entry",
-      assigned_staff_id: input.created_by_staff,
+      assigned_staff_id: session.user_id,
     })
     .select("id")
     .single();
@@ -876,7 +972,7 @@ export async function staffCreateApplication(
   }
 
   // 6. Save application answers (EAV fields)
-  const answers = input.answers ?? {};
+  const answers = { ...(input.answers ?? {}) };
   if (input.sibling_name) answers.sibling_name = input.sibling_name;
 
   const safeAnswers = Object.entries(answers)
@@ -886,14 +982,15 @@ export async function staffCreateApplication(
     return { data: null, error: "Too many answer fields." };
   }
 
-  const answerRows = safeAnswers.map(([key, value]) => ({
-    application_id: app.id,
-    field_key: key,
-    value: JSON.stringify(value),
-  }));
+  const answerRows = safeAnswers.map(([key, value]) => answerRow(app.id, key, value));
 
   if (answerRows.length > 0) {
-    await supabase.from("application_answer").insert(answerRows);
+    const { error: answerErr } = await supabase.from("application_answer").insert(answerRows);
+    if (answerErr) {
+      // Same reasoning as createApplication: the application exists, so the
+      // caller gets its id and this is logged rather than swallowed silently.
+      console.error("[staffCreateApplication] answers", answerErr.message);
+    }
   }
 
   return {
@@ -911,10 +1008,21 @@ export async function staffCreateApplication(
  *   offer (auto-accepted) → enrollment → registration packet.
  */
 export async function staffFastTrackEnroll(
-  input: CreateApplicationInput & { created_by_staff: string }
+  input: CreateApplicationInput
 ): Promise<MutationResult<{ application_id: string; enrollment_id: string }>> {
-  await requireStaffSession();
+  const session = await requireStaffSession();
   const supabase = createServiceRoleClient();
+
+  // Placement integrity before anything is written. staffCreateApplication
+  // re-checks it too; checking here as well keeps the offer and enrollment
+  // rows below from being built on a campus/window/grade trio this function
+  // never verified.
+  const placementError = await verifyCampusPlacement(supabase, {
+    campus_id: input.campus_id,
+    enrollment_window_id: input.enrollment_window_id,
+    grade_level_id: input.grade_level_id,
+  });
+  if (placementError) return { data: null, error: placementError };
 
   // 1. Create the application (auto-submitted)
   const appResult = await staffCreateApplication(input, { autoSubmit: true });
@@ -929,7 +1037,7 @@ export async function staffFastTrackEnroll(
     .from("application")
     .update({
       status: "verified",
-      reviewed_by: input.created_by_staff,
+      reviewed_by: session.user_id,
       reviewed_at: new Date().toISOString(),
       review_notes: "Fast-track enrollment by staff.",
     })
@@ -958,7 +1066,7 @@ export async function staffFastTrackEnroll(
       status: "accepted",
       offered_at: offerNow,
       expires_at: offerNow,
-      offered_by: input.created_by_staff,
+      offered_by: session.user_id,
       responded_at: offerNow,
     })
     .select("id")

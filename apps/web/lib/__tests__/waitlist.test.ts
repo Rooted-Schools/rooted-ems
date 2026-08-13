@@ -79,6 +79,10 @@ describe("addToWaitlist", () => {
 
 describe("promoteFromWaitlist", () => {
   it("records a 'promoted' history row at the position held before promotion", async () => {
+    // New order: fetch -> CLAIM (promoted_at set, CAS on promoted_at IS NULL)
+    // -> offer insert -> removed_at update only once the offer row exists.
+    // A failed offer insert must release the claim rather than silently
+    // deleting the family from the waitlist.
     supabaseMock.queueResult(
       "waitlist_position",
       {
@@ -91,7 +95,8 @@ describe("promoteFromWaitlist", () => {
         },
         error: null,
       }, // fetch
-      { data: null, error: null } // promoted_at/removed_at update
+      { data: { id: "wp-1" }, error: null }, // claim: promoted_at set
+      { data: null, error: null } // removed_at/removal_reason update, after the offer exists
     );
     supabaseMock.queueResult("offer", { data: { id: "offer-1" }, error: null });
     supabaseMock.queueResult("application", { data: null, error: null }); // status -> offered

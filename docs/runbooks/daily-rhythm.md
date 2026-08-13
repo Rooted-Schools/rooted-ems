@@ -4,7 +4,7 @@ Start every working day on the Today page. It answers one question: what needs a
 
 ## 1. Read the headline stat
 
-At the top of Today is your registration completion number for the campus, a quick read on whether you are keeping pace with the season.
+At the top of Today is your registration completion number for the campus, a quick read on whether you are keeping pace with the season. If you work more than one campus, check the "Campus:" selector in the header first: it remembers the campus you last chose and tints the whole screen in that campus's color (green for Vancouver, amber for C.R. Neal, blue for Cleveland), so a quick glance at the color tells you which campus you are looking at. Staff who only have access to one campus never see this selector; the system shows their campus automatically.
 
 ## 2. Work the exception queue, top to bottom
 
@@ -19,7 +19,7 @@ This is a separate list: registration packets stalled for 7 or more days. Each c
 
 Sending a nudge does not clear a family from this queue. Only a logged phone call does. The system wants a human conversation, not another automated message, for families who have gone quiet.
 
-## 4. Check the family-silence queue
+## 4. Check "Summer melt risk"
 
 Watch for enrolled families with no personal contact logged in 14 or more days. These are your melt risks: families who accepted a seat and then went quiet before the school year starts. A short call or text from a real person is the best tool you have here.
 

@@ -935,7 +935,6 @@ function StaffUsersTab({
         user_email: email.trim().toLowerCase(),
         campus_id: campusId,
         role,
-        assigned_by: staffUserId,
       });
       if (!result.error && result.data?.invited) {
         setFeedback({ type: "success", message: `Invite sent to ${email.trim().toLowerCase()}. They will receive an email to set up their account.` });
@@ -2040,6 +2039,17 @@ function PreferencesTab({ settings }: { settings: Record<string, string> }) {
 
   return (
     <div className="space-y-6">
+      {/* Every control below is read-only: none is wired to a mutation. They
+          were styled like live controls, so staff clicked a toggle, saw no
+          confirmation, and had no way to tell whether the change took. Say so
+          once, up front, rather than in fine print under each card. */}
+      <div className="rounded-[6px] border border-warn/40 bg-warn/10 px-4 py-3">
+        <p className="text-sm font-medium text-warn-text">These settings are read only</p>
+        <p className="mt-1 text-xs text-stone-text">
+          This tab shows how the system is currently configured. Changing a value here does
+          not save. Ask your system administrator to change any of these settings.
+        </p>
+      </div>
       {PREFERENCE_SECTIONS.map((section) => (
         <Card key={section.title}>
           <CardHeader>

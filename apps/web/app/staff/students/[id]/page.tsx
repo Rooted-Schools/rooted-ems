@@ -19,102 +19,114 @@ export default async function StudentDetailPage({
   const supabase = createServiceRoleClient();
   const accessibleCampusIds = getAccessibleCampusIds(session);
 
-  // Fetch student with household info
-  const { data: student, error } = await supabase
-    .from("student")
-    .select(`
-      id, first_name, middle_name, last_name, suffix, date_of_birth,
-      gender, race_ethnicity, primary_language, home_language,
-      previous_school_name, previous_school_phone,
-      has_iep, has_504, special_services_notes,
-      medical_allergies, medical_medications, medical_conditions,
-      emergency_contact_1_name, emergency_contact_1_phone, emergency_contact_1_relationship,
-      emergency_contact_2_name, emergency_contact_2_phone, emergency_contact_2_relationship,
-      created_at,
-      household:household_id (
-        id, address_line1, address_line2, city, state, zip, primary_language
-      )
-    `)
-    .eq("id", id)
-    .single();
+  // Gate group: the student record plus the campus-access counts. All three
+  // are independent queries keyed on the same student id and previously ran
+  // as three sequential round trips.
+  const isScoped = accessibleCampusIds.length > 0;
+
+  const [{ data: student, error }, accessCounts] = await Promise.all([
+    supabase
+      .from("student")
+      .select(`
+        id, first_name, middle_name, last_name, suffix, date_of_birth,
+        gender, race_ethnicity, primary_language, home_language,
+        previous_school_name, previous_school_phone,
+        has_iep, has_504, special_services_notes,
+        medical_allergies, medical_medications, medical_conditions,
+        emergency_contact_1_name, emergency_contact_1_phone, emergency_contact_1_relationship,
+        emergency_contact_2_name, emergency_contact_2_phone, emergency_contact_2_relationship,
+        created_at,
+        household:household_id (
+          id, address_line1, address_line2, city, state, zip, primary_language
+        )
+      `)
+      .eq("id", id)
+      .single(),
+    // Verify campus access: does this student have any application or
+    // enrollment at a campus the viewer can reach?
+    isScoped
+      ? Promise.all([
+          supabase
+            .from("application")
+            .select("id", { count: "exact", head: true })
+            .eq("student_id", id)
+            .in("campus_id", accessibleCampusIds),
+          supabase
+            .from("enrollment")
+            .select("id", { count: "exact", head: true })
+            .eq("student_id", id)
+            .in("campus_id", accessibleCampusIds),
+        ])
+      : null,
+  ]);
 
   if (error || !student) {
     redirect("/staff/students");
   }
 
-  // Verify campus access: check if student has any application/enrollment at an accessible campus
-  if (accessibleCampusIds.length > 0) {
-    const { count: appCount } = await supabase
-      .from("application")
-      .select("id", { count: "exact", head: true })
-      .eq("student_id", id)
-      .in("campus_id", accessibleCampusIds);
-
-    const { count: enrollCount } = await supabase
-      .from("enrollment")
-      .select("id", { count: "exact", head: true })
-      .eq("student_id", id)
-      .in("campus_id", accessibleCampusIds);
-
+  if (accessCounts) {
+    const [{ count: appCount }, { count: enrollCount }] = accessCounts;
     if ((appCount ?? 0) === 0 && (enrollCount ?? 0) === 0) {
       redirect("/staff/students");
     }
   }
 
-  // Fetch guardians
-  const { data: guardianLinks } = await supabase
-    .from("guardian_student")
-    .select(`
-      relationship, is_legal_guardian,
-      guardian:guardian_id (
-        id, first_name, last_name, relationship, email, phone, phone_secondary,
-        employer, is_primary, is_emergency_contact, sms_consent
-      )
-    `)
-    .eq("student_id", id);
-
-  // Fetch all applications
-  const { data: applications } = await supabase
-    .from("application")
-    .select(`
-      id, status, submitted_at, created_at,
-      campus:campus_id (name),
-      grade_level:grade_level_id (grade),
-      enrollment_window:enrollment_window_id (name)
-    `)
-    .eq("student_id", id)
-    .order("created_at", { ascending: false });
-
-  // Fetch documents
-  const { data: documents } = await supabase
-    .from("document")
-    .select("id, document_type, file_name, status, created_at")
-    .eq("student_id", id)
-    .order("created_at", { ascending: false });
-
-  // Fetch enrollments
-  const { data: enrollments } = await supabase
-    .from("enrollment")
-    .select(`
-      id, status, enrolled_at, sis_student_id, sis_synced_at,
-      campus:campus_id (name),
-      grade_level:grade_level_id (grade),
-      school_year:school_year_id (name)
-    `)
-    .eq("student_id", id)
-    .order("enrolled_at", { ascending: false });
-
-  // Fetch notes for this student
-  const { data: notes } = await supabase
-    .from("note")
-    .select(`
-      id, content, is_internal, created_at,
-      author:created_by (first_name, last_name)
-    `)
-    .eq("entity_type", "student")
-    .eq("entity_id", id)
-    .order("created_at", { ascending: false })
-    .limit(20);
+  // Detail group: guardians, applications, documents, enrollments, notes.
+  // Independent of one another, and deliberately not started until access is
+  // confirmed above so a denied request costs one round trip, not six.
+  const [
+    { data: guardianLinks },
+    { data: applications },
+    { data: documents },
+    { data: enrollments },
+    { data: notes },
+  ] = await Promise.all([
+    supabase
+      .from("guardian_student")
+      .select(`
+        relationship, is_legal_guardian,
+        guardian:guardian_id (
+          id, first_name, last_name, relationship, email, phone, phone_secondary,
+          employer, is_primary, is_emergency_contact, sms_consent
+        )
+      `)
+      .eq("student_id", id),
+    supabase
+      .from("application")
+      .select(`
+        id, status, submitted_at, created_at,
+        campus:campus_id (name),
+        grade_level:grade_level_id (grade),
+        enrollment_window:enrollment_window_id (name)
+      `)
+      .eq("student_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("document")
+      .select("id, document_type, file_name, status, created_at")
+      .eq("student_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("enrollment")
+      .select(`
+        id, status, enrolled_at, sis_student_id, sis_synced_at,
+        campus:campus_id (name),
+        grade_level:grade_level_id (grade),
+        school_year:school_year_id (name)
+      `)
+      .eq("student_id", id)
+      .order("enrolled_at", { ascending: false }),
+    supabase
+      .from("note")
+      .select(`
+        id, content, is_internal, created_at,
+        author:created_by (first_name, last_name)
+      `)
+      .eq("entity_type", "student")
+      .eq("entity_id", id)
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
 
   const household = student.household as unknown as Record<string, string> | null;
   const guardians = (guardianLinks ?? []).map((gl: Record<string, unknown>) => {
@@ -134,11 +146,17 @@ export default async function StudentDetailPage({
     };
   });
 
-  const studentAge = student.date_of_birth
-    ? Math.floor(
-        (Date.now() - new Date(student.date_of_birth as string).getTime()) /
-          (365.25 * 24 * 60 * 60 * 1000)
-      )
+  // date_of_birth is a DATE column, so `new Date("2011-04-03")` parses as UTC
+  // midnight and then formats to April 2 in every US time zone — the DOB, and
+  // the age derived from it on a birthday boundary, both rendered a day
+  // early. Appending T00:00:00 parses as local midnight, so the calendar date
+  // stored is the calendar date shown.
+  const dateOfBirth = student.date_of_birth
+    ? new Date(`${student.date_of_birth as string}T00:00:00`)
+    : null;
+
+  const studentAge = dateOfBirth
+    ? Math.floor((Date.now() - dateOfBirth.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
     : null;
 
   return (
@@ -161,9 +179,7 @@ export default async function StudentDetailPage({
           </h1>
           <p className="text-sm text-stone mt-1">
             {student.gender ?? "—"} &middot; Age {studentAge ?? "—"}
-            {student.date_of_birth
-              ? ` (DOB: ${new Date(student.date_of_birth as string).toLocaleDateString("en-US")})`
-              : ""}
+            {dateOfBirth ? ` (DOB: ${dateOfBirth.toLocaleDateString("en-US")})` : ""}
           </p>
         </div>
         <div className="flex gap-2">

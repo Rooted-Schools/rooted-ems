@@ -20,5 +20,8 @@ export default async function FamilyApplicationDetailPage({
   const detail = await getApplicationDetail(id, user.id);
   if (!detail) notFound();
 
-  return <FamilyApplicationDetailClient detail={detail} />;
+  // userId is the auth uid, which is what Storage's INSERT policy checks on
+  // the upload path prefix — guardian.id is a different key entirely and is
+  // rejected. See the uploadFile call in detail-client.tsx.
+  return <FamilyApplicationDetailClient detail={detail} userId={user.id} />;
 }
