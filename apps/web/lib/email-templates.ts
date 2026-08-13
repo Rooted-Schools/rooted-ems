@@ -205,7 +205,8 @@ export function applicationReceived({
       greeting: "Hello,",
       paragraphs: [
         `We've received your enrollment application for ${studentEn(studentFirstName)} at ${campusName}. Thank you for choosing us!`,
-        `Our enrollment team will review the application and reach out with next steps. You can check the status anytime in your family portal. If more families apply than we have seats, a fair random lottery decides placement — you can read exactly how it works at ${APP_URL}/how-the-lottery-works.`,
+        `Our enrollment team will review the application and reach out with next steps. You can check the status anytime in your family portal.`,
+        `If more families apply than we have seats, a fair random lottery decides placement. You can read exactly how it works at ${APP_URL}/how-the-lottery-works.`,
       ],
       cta: { label: "View your application", url: `${APP_URL}/family/applications` },
       closing: "Warmly, the Rooted Schools Enrollment Team",
@@ -214,7 +215,8 @@ export function applicationReceived({
       greeting: "Hola,",
       paragraphs: [
         `Hemos recibido su solicitud de inscripción para ${studentEs(studentFirstName)} en ${campusName}. ¡Gracias por elegirnos!`,
-        `Nuestro equipo de inscripción revisará la solicitud y se comunicará con usted con los próximos pasos. Puede consultar el estado en cualquier momento en su portal familiar. Si aplican más familias que los cupos disponibles, una lotería aleatoria y justa decide los lugares — puede leer exactamente cómo funciona en ${APP_URL}/how-the-lottery-works.`,
+        `Nuestro equipo de inscripción revisará la solicitud y se comunicará con usted con los próximos pasos. Puede consultar el estado en cualquier momento en su portal familiar.`,
+        `Si aplican más familias que los cupos disponibles, una lotería aleatoria y justa decide los lugares. Puede leer exactamente cómo funciona en ${APP_URL}/how-the-lottery-works.`,
       ],
       cta: { label: "Ver su solicitud", url: `${APP_URL}/family/applications` },
       closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
@@ -249,7 +251,7 @@ export function offerExtended({
         `Please respond by ${deadlineEn} to secure the spot. If we don't hear from you by then, the seat may be offered to another family.`,
       ],
       cta: { label: "Respond to your offer", url: `${APP_URL}/family/offers` },
-      closing: "We hope to welcome you soon! — the Rooted Schools Enrollment Team",
+      closing: "We hope to welcome you soon, the Rooted Schools Enrollment Team",
     },
     {
       greeting: "¡Felicidades!",
@@ -258,7 +260,7 @@ export function offerExtended({
         `Por favor responda antes del ${deadlineEs} para asegurar el cupo. Si no recibimos su respuesta para esa fecha, el cupo podría ofrecerse a otra familia.`,
       ],
       cta: { label: "Responder a su oferta", url: `${APP_URL}/family/offers` },
-      closing: "¡Esperamos darle la bienvenida pronto! — el Equipo de Inscripción de Rooted Schools",
+      closing: "Esperamos darle la bienvenida pronto, el Equipo de Inscripción de Rooted Schools",
     },
     { campusLogoUrl, campusName }
   );
@@ -290,7 +292,7 @@ export function offerExpiringSoon({
         "We'd love to save this spot for your family, but we need your response before the deadline. It only takes a minute to accept or decline online.",
       ],
       cta: { label: "Respond to your offer", url: `${APP_URL}/family/offers` },
-      closing: "We're here if you have questions. — the Rooted Schools Enrollment Team",
+      closing: "We're here if you have questions, the Rooted Schools Enrollment Team",
     },
     {
       greeting: "Hola,",
@@ -299,7 +301,7 @@ export function offerExpiringSoon({
         "Nos encantaría guardar este cupo para su familia, pero necesitamos su respuesta antes de la fecha límite. Solo toma un minuto aceptar o rechazar en línea.",
       ],
       cta: { label: "Responder a su oferta", url: `${APP_URL}/family/offers` },
-      closing: "Estamos aquí si tiene preguntas. — el Equipo de Inscripción de Rooted Schools",
+      closing: "Estamos aquí si tiene preguntas, el Equipo de Inscripción de Rooted Schools",
     },
     { campusLogoUrl, campusName }
   );
@@ -327,7 +329,7 @@ export function offerAccepted({
         "The next step is registration: please log in to complete the enrollment packet so everything is ready for the first day of school.",
       ],
       cta: { label: "Start registration", url: `${APP_URL}/family/registration` },
-      closing: "Welcome to the Rooted Schools family! — the Enrollment Team",
+      closing: "Welcome to the Rooted Schools family, the Enrollment Team",
     },
     {
       greeting: "¡Felicidades!",
@@ -336,7 +338,7 @@ export function offerAccepted({
         "El siguiente paso es la inscripción: por favor inicie sesión para completar el paquete de inscripción y así tener todo listo para el primer día de clases.",
       ],
       cta: { label: "Comenzar la inscripción", url: `${APP_URL}/family/registration` },
-      closing: "¡Bienvenidos a la familia de Rooted Schools! — el Equipo de Inscripción",
+      closing: "Bienvenidos a la familia de Rooted Schools, el Equipo de Inscripción",
     },
     { campusLogoUrl, campusName }
   );
@@ -360,25 +362,25 @@ export function registrationComplete({
     {
       greeting: "Wonderful news!",
       paragraphs: [
-        `All registration items have been verified, and ${studentEn(studentFirstName)} is officially enrolled at ${campusName}.`,
-        "Welcome to the Rooted Schools family — we're proud to have you with us. Keep an eye on your portal for orientation details and next steps.",
+        `All of ${studentEn(studentFirstName)}'s registration items for ${campusName} have been submitted and verified.`,
+        "Our team is now finishing a final placement review. There is nothing more you need to do right now, and we'll follow up as soon as that review is complete. Keep an eye on your portal for updates.",
       ],
-      cta: { label: "View enrollment details", url: `${APP_URL}/family/registration` },
-      closing: "See you soon! — the Rooted Schools Enrollment Team",
+      cta: { label: "Check your status", url: `${APP_URL}/family/registration` },
+      closing: "Thank you for your patience, the Rooted Schools Enrollment Team",
     },
     {
       greeting: "¡Excelentes noticias!",
       paragraphs: [
-        `Todos los requisitos de inscripción han sido verificados, y ${studentEs(studentFirstName)} está oficialmente inscrito(a) en ${campusName}.`,
-        "Bienvenidos a la familia de Rooted Schools — estamos orgullosos de tenerlos con nosotros. Esté atento(a) a su portal para detalles de orientación y próximos pasos.",
+        `Todos los requisitos de inscripción de ${studentEs(studentFirstName)} en ${campusName} han sido enviados y verificados.`,
+        "Nuestro equipo está terminando ahora una revisión final de colocación. No necesita hacer nada más por el momento, y nos pondremos en contacto tan pronto como esa revisión esté completa. Esté atento(a) a su portal para más información.",
       ],
-      cta: { label: "Ver detalles de inscripción", url: `${APP_URL}/family/registration` },
-      closing: "¡Nos vemos pronto! — el Equipo de Inscripción de Rooted Schools",
+      cta: { label: "Ver el estado de su inscripción", url: `${APP_URL}/family/registration` },
+      closing: "Gracias por su paciencia, el Equipo de Inscripción de Rooted Schools",
     },
     { campusLogoUrl, campusName }
   );
   return {
-    subject: "Enrollment complete! / ¡Inscripción completa!",
+    subject: "Registration complete! / ¡Inscripción completa!",
     html,
     text,
   };
@@ -398,19 +400,19 @@ export function waitlistPromoted({
       greeting: "Great news!",
       paragraphs: [
         `A seat has opened at ${campusName}, and ${studentEn(studentFirstName)} has been offered a spot from the waitlist.`,
-        "Please log in to review your offer and respond before the deadline — seats from the waitlist move quickly.",
+        "Please log in to review your offer and respond before the deadline. Seats from the waitlist move quickly.",
       ],
       cta: { label: "Check your offers", url: `${APP_URL}/family/offers` },
-      closing: "We hope to welcome you soon! — the Rooted Schools Enrollment Team",
+      closing: "We hope to welcome you soon, the Rooted Schools Enrollment Team",
     },
     {
       greeting: "¡Buenas noticias!",
       paragraphs: [
         `Se ha abierto un cupo en ${campusName}, y a ${studentEs(studentFirstName)} se le ha ofrecido un lugar desde la lista de espera.`,
-        "Por favor inicie sesión para revisar su oferta y responder antes de la fecha límite — los cupos de la lista de espera se asignan rápidamente.",
+        "Por favor inicie sesión para revisar su oferta y responder antes de la fecha límite. Los cupos de la lista de espera se asignan rápidamente.",
       ],
       cta: { label: "Ver sus ofertas", url: `${APP_URL}/family/offers` },
-      closing: "¡Esperamos darle la bienvenida pronto! — el Equipo de Inscripción de Rooted Schools",
+      closing: "Esperamos darle la bienvenida pronto, el Equipo de Inscripción de Rooted Schools",
     },
     { campusLogoUrl, campusName }
   );
@@ -446,20 +448,20 @@ export function lotteryResultWaitlisted({
       greeting: "The lottery results are in.",
       paragraphs: [
         `The lottery for ${campusName} has been held. ${studentEn(studentFirstName)} wasn't selected for an initial seat, but has a real place on the waitlist: ${positionEn}.`,
-        `Seats often open in the first weeks — if a seat opens and ${studentEn(studentFirstName)} is next, we'll email and text you with time to accept. You can see the live position anytime in your family portal.`,
+        `Seats often open in the first weeks. If a seat opens and ${studentEn(studentFirstName)} is next, we'll email and text you with time to accept. You can see the live position anytime in your family portal.`,
       ],
       cta: { label: "See your dashboard", url: `${APP_URL}/family/dashboard` },
-      closing: "We know waiting is hard, and we're rooting for a seat to open. — the Rooted Schools Enrollment Team",
+      closing: "We know waiting is hard, and we're rooting for a seat to open. The Rooted Schools Enrollment Team",
     },
     {
       greeting: "Ya tenemos los resultados del sorteo.",
       paragraphs: [
         `Se ha realizado el sorteo para ${campusName}. ${studentEs(studentFirstName)} no fue seleccionado(a) para un cupo inicial, pero tiene un lugar real en la lista de espera: ${positionEs}.`,
-        `Los cupos suelen abrirse en las primeras semanas — si se abre un cupo y ${studentEs(studentFirstName)} es el/la siguiente, le enviaremos un correo electrónico y un mensaje de texto con tiempo para aceptar. Puede ver la posición en vivo en cualquier momento en su portal familiar.`,
+        `Los cupos suelen abrirse en las primeras semanas. Si se abre un cupo y ${studentEs(studentFirstName)} es el/la siguiente, le enviaremos un correo electrónico y un mensaje de texto con tiempo para aceptar. Puede ver la posición en vivo en cualquier momento en su portal familiar.`,
       ],
       cta: { label: "Ver su panel", url: `${APP_URL}/family/dashboard` },
       closing:
-        "Sabemos que esperar es difícil, y esperamos que se abra un cupo pronto. — el Equipo de Inscripción de Rooted Schools",
+        "Sabemos que esperar es difícil, y esperamos que se abra un cupo pronto. El Equipo de Inscripción de Rooted Schools",
     },
     { campusLogoUrl, campusName }
   );
@@ -519,7 +521,7 @@ export interface CampaignPayload {
 export const CAMPAIGN_TEMPLATES: Record<CampaignTemplateKey, { label: string; description: string }> = {
   reintroduction: {
     label: "Reintroduction / Apply Now",
-    description: "Warm re-welcome for families who expressed interest before — applications are open, apply in five minutes.",
+    description: "Warm re-welcome for families who expressed interest before: applications are open, apply in five minutes.",
   },
   event_invite: {
     label: "Event Invitation",
@@ -531,7 +533,7 @@ export const CAMPAIGN_TEMPLATES: Record<CampaignTemplateKey, { label: string; de
   },
   custom: {
     label: "Custom Message",
-    description: "Write your own message — it's delivered inside the Rooted-branded bilingual wrapper.",
+    description: "Write your own message. It's delivered inside the Rooted-branded bilingual wrapper.",
   },
 };
 
@@ -551,7 +553,7 @@ export function renderCampaignEmail(
             `Applying takes about five minutes on your phone. There is no fee, and applying does not commit you to anything. If you have questions first, just reply to this email and a real person from our team will answer. ${OPT_OUT_EN}`,
           ],
           cta: { label: "Start your application", url: `${APP_URL}/login` },
-          closing: `We would be honored to welcome your family. — The ${campusName} Enrollment Team`,
+          closing: `We would be honored to welcome your family. The ${campusName} Enrollment Team`,
         },
         {
           greeting: "Hola,",
@@ -561,7 +563,7 @@ export function renderCampaignEmail(
             `La solicitud toma unos cinco minutos desde su teléfono. No tiene costo, y aplicar no le compromete a nada. Si primero tiene preguntas, simplemente responda a este correo y una persona real de nuestro equipo le contestará. ${OPT_OUT_ES}`,
           ],
           cta: { label: "Iniciar su solicitud", url: `${APP_URL}/login` },
-          closing: `Sería un honor darle la bienvenida a su familia. — El Equipo de Inscripción de ${campusName}`,
+          closing: `Sería un honor darle la bienvenida a su familia. El Equipo de Inscripción de ${campusName}`,
         }
       );
       return withCampaignFooter({
@@ -585,7 +587,7 @@ export function renderCampaignEmail(
             `Just reply to this email to let us know you're coming, or come as you are. ${OPT_OUT_EN}`,
           ],
           cta: { label: "Learn more and apply", url: `${APP_URL}` },
-          closing: `Hope to see you there! — The ${campusName} Team`,
+          closing: `Hope to see you there! The ${campusName} Team`,
         },
         {
           greeting: "Hola,",
@@ -595,7 +597,7 @@ export function renderCampaignEmail(
             `Simplemente responda a este correo para avisarnos que vendrá, o venga sin avisar. ${OPT_OUT_ES}`,
           ],
           cta: { label: "Conozca más y aplique", url: `${APP_URL}` },
-          closing: `¡Esperamos verle allí! — El Equipo de ${campusName}`,
+          closing: `¡Esperamos verle allí! El Equipo de ${campusName}`,
         }
       );
       return withCampaignFooter({
@@ -612,25 +614,25 @@ export function renderCampaignEmail(
           greeting: "Hello,",
           paragraphs: [
             `A quick, friendly reminder: the application window at ${campusName} closes ${deadline}.`,
-            `Applying takes about five minutes on your phone, there is no fee, and applying does not commit you to anything — it simply keeps your family's options open.`,
-            `If anything is standing in your way — questions, documents, language — reply to this email and a real person will help. ${OPT_OUT_EN}`,
+            `Applying takes about five minutes on your phone, there is no fee, and applying does not commit you to anything. It simply keeps your family's options open.`,
+            `If anything is standing in your way, whether it's questions, documents, or language, reply to this email and a real person will help. ${OPT_OUT_EN}`,
           ],
           cta: { label: "Apply before the deadline", url: `${APP_URL}/login` },
-          closing: `We're here to help. — The ${campusName} Enrollment Team`,
+          closing: `We're here to help. The ${campusName} Enrollment Team`,
         },
         {
           greeting: "Hola,",
           paragraphs: [
             `Un recordatorio rápido y amistoso: el período de solicitudes en ${campusName} cierra ${deadline}.`,
-            `La solicitud toma unos cinco minutos desde su teléfono, no tiene costo, y aplicar no le compromete a nada — simplemente mantiene abiertas las opciones de su familia.`,
-            `Si algo se lo impide — preguntas, documentos, idioma — responda a este correo y una persona real le ayudará. ${OPT_OUT_ES}`,
+            `La solicitud toma unos cinco minutos desde su teléfono, no tiene costo, y aplicar no le compromete a nada. Simplemente mantiene abiertas las opciones de su familia.`,
+            `Si algo se lo impide, ya sean preguntas, documentos o idioma, responda a este correo y una persona real le ayudará. ${OPT_OUT_ES}`,
           ],
           cta: { label: "Aplique antes de la fecha límite", url: `${APP_URL}/login` },
-          closing: `Estamos para ayudarle. — El Equipo de Inscripción de ${campusName}`,
+          closing: `Estamos para ayudarle. El Equipo de Inscripción de ${campusName}`,
         }
       );
       return withCampaignFooter({
-        subject: `Applications close ${deadline} — ${campusName} / Las solicitudes cierran pronto`,
+        subject: `Applications close ${deadline} at ${campusName} / Las solicitudes cierran pronto`,
         html,
         text,
       });
@@ -836,8 +838,8 @@ export function eventFollowupNoShow({
     ? `We'd love to see you at our next one: ${nextEvent.title} on ${nextEvent.whenText}. Registering takes less than a minute.`
     : "We'd still love to connect. Reach out anytime and we'll find a time that works, or start an application whenever you're ready.";
   const nextParagraphEs = nextEvent
-    ? `Nos encantaría verle en nuestro próximo evento — ${nextEvent.title} el ${nextEvent.whenText}. Es fácil registrarse y toma menos de un minuto.`
-    : "Nos encantaría conectar con usted — contáctenos cuando guste y buscaremos un horario que funcione, o puede iniciar una solicitud cuando esté listo(a).";
+    ? `Nos encantaría verle en nuestro próximo evento: ${nextEvent.title}, el ${nextEvent.whenText}. Es fácil registrarse y toma menos de un minuto.`
+    : "Nos encantaría conectar con usted. Contáctenos cuando guste y buscaremos un horario que funcione, o puede iniciar una solicitud cuando esté listo(a).";
   const cta = nextEvent
     ? { label: "Register for the next event", url: nextEvent.url }
     : { label: "Get in touch", url: `${APP_URL}/inquire` };
@@ -852,7 +854,7 @@ export function eventFollowupNoShow({
         nextParagraphEn,
       ],
       cta,
-      closing: `Hope to see you soon. — the ${campusName} Team`,
+      closing: `Hope to see you soon. The ${campusName} Team`,
     },
     {
       greeting: guardianFirstName ? `Hola ${guardianFirstName},` : "Hola,",
@@ -861,7 +863,7 @@ export function eventFollowupNoShow({
         nextParagraphEs,
       ],
       cta: ctaEs,
-      closing: `Esperamos verle pronto. — el Equipo de ${campusName}`,
+      closing: `Esperamos verle pronto. El Equipo de ${campusName}`,
     }
   );
   return {
@@ -884,8 +886,8 @@ export function inquiryWelcome({
     {
       greeting: guardianFirstName ? `Hello ${guardianFirstName},` : "Hello,",
       paragraphs: [
-        `Thank you for your interest in ${campusName}! We're excited to tell you more about what makes our school special — career-connected learning, real industry partnerships, and a personalized pathway for every student.`,
-        "Someone from our enrollment team will reach out personally soon. In the meantime, you can start an application anytime — it takes just a few minutes on your phone.",
+        `Thank you for your interest in ${campusName}! We're excited to tell you more about what makes our school special: career-connected learning, real industry partnerships, and a personalized pathway for every student.`,
+        "Someone from our enrollment team will reach out personally soon. In the meantime, you can start an application anytime. It takes just a few minutes on your phone.",
       ],
       cta: { label: "Start an application", url: `${APP_URL}/login` },
       closing: "Warmly, the Rooted Schools Enrollment Team",
@@ -893,8 +895,8 @@ export function inquiryWelcome({
     {
       greeting: guardianFirstName ? `Hola ${guardianFirstName},` : "Hola,",
       paragraphs: [
-        `¡Gracias por su interés en ${campusName}! Nos encantaría contarle más sobre lo que hace especial a nuestra escuela — aprendizaje conectado con carreras, alianzas reales con la industria y un camino personalizado para cada estudiante.`,
-        "Alguien de nuestro equipo de inscripción se comunicará con usted personalmente pronto. Mientras tanto, puede iniciar una solicitud en cualquier momento — toma solo unos minutos desde su teléfono.",
+        `¡Gracias por su interés en ${campusName}! Nos encantaría contarle más sobre lo que hace especial a nuestra escuela: aprendizaje conectado con carreras, alianzas reales con la industria y un camino personalizado para cada estudiante.`,
+        "Alguien de nuestro equipo de inscripción se comunicará con usted personalmente pronto. Mientras tanto, puede iniciar una solicitud en cualquier momento. Toma solo unos minutos desde su teléfono.",
       ],
       cta: { label: "Iniciar una solicitud", url: `${APP_URL}/login` },
       closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
@@ -902,7 +904,7 @@ export function inquiryWelcome({
     { campusLogoUrl, campusName }
   );
   return {
-    subject: `Great to meet you! / ¡Un gusto conocerle! — ${campusName}`,
+    subject: `Great to meet you at ${campusName}! / ¡Un gusto conocerle en ${campusName}!`,
     html,
     text,
   };
@@ -922,7 +924,7 @@ export function leadReengagement({
       greeting: guardianFirstName ? `Hello ${guardianFirstName},` : "Hello,",
       paragraphs: [
         `We haven't heard from you in a little while, and we wanted to check in. Seats at ${campusName} are filled on a rolling basis, and we'd hate for your family to miss out.`,
-        "If you have questions — about our career pathways, transportation, the lottery, anything at all — just reply to this email and a real person from our team will answer.",
+        "If you have questions about our career pathways, transportation, the lottery, or anything at all, just reply to this email and a real person from our team will answer.",
       ],
       cta: { label: "Start an application", url: `${APP_URL}/login` },
       closing: "Warmly, the Rooted Schools Enrollment Team",
@@ -931,7 +933,7 @@ export function leadReengagement({
       greeting: guardianFirstName ? `Hola ${guardianFirstName},` : "Hola,",
       paragraphs: [
         `No hemos sabido de usted en un tiempo y queríamos saludarle. Los cupos en ${campusName} se asignan de forma continua, y no quisiéramos que su familia se quede sin el suyo.`,
-        "Si tiene preguntas — sobre nuestros caminos de carrera, transporte, la lotería, lo que sea — simplemente responda a este correo y una persona real de nuestro equipo le contestará.",
+        "Si tiene preguntas sobre nuestros caminos de carrera, transporte, la lotería, o lo que sea, simplemente responda a este correo y una persona real de nuestro equipo le contestará.",
       ],
       cta: { label: "Iniciar una solicitud", url: `${APP_URL}/login` },
       closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
@@ -966,7 +968,7 @@ export function registrationNudge({
       greeting: "Hello,",
       paragraphs: [
         `You're almost done! ${studentEn(studentFirstName)}'s registration at ${campusName} is still waiting on: ${listEn}.`,
-        "Completing these items secures your student's seat. Most can be finished right from your phone in a few minutes — and we're happy to help if anything is confusing.",
+        "Completing these items secures your student's seat. Most can be finished right from your phone in a few minutes, and we're happy to help if anything is confusing.",
       ],
       cta: { label: "Finish registration", url: `${APP_URL}/family/registration` },
       closing: "Warmly, the Rooted Schools Enrollment Team",
@@ -975,7 +977,7 @@ export function registrationNudge({
       greeting: "Hola,",
       paragraphs: [
         `¡Ya casi termina! La inscripción de ${studentEs(studentFirstName)} en ${campusName} todavía está pendiente de: ${listEs}.`,
-        "Completar estos pasos asegura el cupo de su estudiante. La mayoría se pueden terminar desde su teléfono en pocos minutos — y con gusto le ayudamos si algo no está claro.",
+        "Completar estos pasos asegura el cupo de su estudiante. La mayoría se pueden terminar desde su teléfono en pocos minutos, y con gusto le ayudamos si algo no está claro.",
       ],
       cta: { label: "Terminar la inscripción", url: `${APP_URL}/family/registration` },
       closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
@@ -983,7 +985,7 @@ export function registrationNudge({
     { campusLogoUrl, campusName }
   );
   return {
-    subject: `Almost done — a few registration items remain / Faltan algunos pasos de inscripción`,
+    subject: `Almost done: a few registration items remain / Faltan algunos pasos de inscripción`,
     html,
     text,
   };
@@ -1012,31 +1014,31 @@ export function keepTheSeat({
   const startEs = startDate ? formatDateEs(startDate) : undefined;
   const { html, text } = renderEmail(
     {
-      greeting: "Congratulations — registration is done!",
+      greeting: "Congratulations, registration is done!",
       paragraphs: [
-        `${studentEn(studentFirstName)}'s seat at ${campusName} is fully secured for the coming school year. Thank you for completing every step — that was the hardest part, and it's behind you.`,
+        `${studentEn(studentFirstName)}'s registration at ${campusName} is complete and verified for the coming school year. Thank you for completing every step. That was the hardest part, and it's behind you. Our team is now finishing a final placement review, and there is nothing more you need to do right now.`,
         `Here's what's next: over the summer, watch your email and phone for orientation dates, schedule details, and a few "what to bring" reminders${
           startEn ? ` before the first day of school on ${startEn}` : ""
-        }. Nothing else is required of you right now — just keep an eye out for our updates.`,
+        }. Just keep an eye out for our updates.`,
       ],
       cta: { label: "View your enrollment", url: `${APP_URL}/family/registration` },
-      closing: "We can't wait to welcome you this fall. — the Rooted Schools Enrollment Team",
+      closing: "We can't wait to welcome you this fall. The Rooted Schools Enrollment Team",
     },
     {
-      greeting: "Felicidades — ¡la inscripción está completa!",
+      greeting: "Felicidades, ¡la inscripción está completa!",
       paragraphs: [
-        `El cupo de ${studentEs(studentFirstName)} en ${campusName} está completamente asegurado para el próximo año escolar. Gracias por completar cada paso — esa era la parte más difícil, y ya quedó atrás.`,
+        `La inscripción de ${studentEs(studentFirstName)} en ${campusName} está completa y verificada para el próximo año escolar. Gracias por completar cada paso. Esa era la parte más difícil, y ya quedó atrás. Nuestro equipo está terminando ahora una revisión final de colocación, y no necesita hacer nada más por el momento.`,
         `Esto es lo que sigue: durante el verano, esté atento(a) a su correo y teléfono para las fechas de orientación, los detalles del horario y algunos recordatorios de "qué traer"${
           startEs ? ` antes del primer día de clases el ${startEs}` : ""
-        }. No necesita hacer nada más por ahora — solo esté pendiente de nuestras actualizaciones.`,
+        }. Solo esté pendiente de nuestras actualizaciones.`,
       ],
       cta: { label: "Ver su inscripción", url: `${APP_URL}/family/registration` },
-      closing: "Esperamos darle la bienvenida este otoño. — el Equipo de Inscripción de Rooted Schools",
+      closing: "Esperamos darle la bienvenida este otoño. El Equipo de Inscripción de Rooted Schools",
     },
     { campusLogoUrl, campusName }
   );
   return {
-    subject: `You're all set at ${campusName} — here's what's next / Ya está todo listo`,
+    subject: `You're all set at ${campusName}, here's what's next / Ya está todo listo`,
     html,
     text,
   };
@@ -1067,19 +1069,19 @@ export function reenrollmentPulse({
       greeting: "Is your student coming back next year?",
       paragraphs: [
         `We're planning seats${yearEn} and want to hold ${studentEn(studentFirstName)}'s spot at ${campusName}. It only takes one tap to let us know.`,
-        `Log in to your family portal and tap "Yes, returning," "Still deciding," or "Not returning" — whichever fits right now. You can change your answer anytime before we send a formal seat offer.`,
+        `Log in to your family portal and tap "Yes, returning," "Still deciding," or "Not returning," whichever fits right now. You can change your answer anytime before we send a formal seat offer.`,
       ],
       cta: { label: "Answer now", url: `${APP_URL}/family/reenrollment` },
-      closing: "Thank you for helping us plan ahead. — the Rooted Schools Enrollment Team",
+      closing: "Thank you for helping us plan ahead. The Rooted Schools Enrollment Team",
     },
     {
       greeting: "¿Su estudiante regresará el próximo año?",
       paragraphs: [
         `Estamos planificando los cupos${yearEs} y queremos reservar el lugar de ${studentEs(studentFirstName)} en ${campusName}. Solo toma un toque para avisarnos.`,
-        `Inicie sesión en su portal familiar y toque "Sí, regresa", "Aún decidiendo" o "No regresa" — lo que corresponda en este momento. Puede cambiar su respuesta en cualquier momento antes de que enviemos una oferta formal de cupo.`,
+        `Inicie sesión en su portal familiar y toque "Sí, regresa", "Aún decidiendo" o "No regresa", lo que corresponda en este momento. Puede cambiar su respuesta en cualquier momento antes de que enviemos una oferta formal de cupo.`,
       ],
       cta: { label: "Responder ahora", url: `${APP_URL}/family/reenrollment` },
-      closing: "Gracias por ayudarnos a planificar con anticipación. — el Equipo de Inscripción de Rooted Schools",
+      closing: "Gracias por ayudarnos a planificar con anticipación. El Equipo de Inscripción de Rooted Schools",
     },
     { campusLogoUrl, campusName }
   );
@@ -1106,7 +1108,7 @@ export function waitlistPositionImproved({
       greeting: "Good news!",
       paragraphs: [
         `${studentEn(studentFirstName)} has moved up the waitlist at ${campusName} and is now #${position} in line.`,
-        "Seats can open at any time, and families near the front of the list are contacted first. You can check your position anytime in your family portal — no action is needed right now.",
+        "Seats can open at any time, and families near the front of the list are contacted first. You can check your position anytime in your family portal. No action is needed right now.",
       ],
       cta: { label: "View your dashboard", url: `${APP_URL}/family/dashboard` },
       closing: "Warmly, the Rooted Schools Enrollment Team",
@@ -1115,7 +1117,7 @@ export function waitlistPositionImproved({
       greeting: "¡Buenas noticias!",
       paragraphs: [
         `${studentEs(studentFirstName)} ha avanzado en la lista de espera en ${campusName} y ahora está en el puesto #${position}.`,
-        "Los cupos pueden abrirse en cualquier momento, y las familias al frente de la lista son contactadas primero. Puede consultar su posición en cualquier momento en su portal familiar — no se requiere ninguna acción por ahora.",
+        "Los cupos pueden abrirse en cualquier momento, y las familias al frente de la lista son contactadas primero. Puede consultar su posición en cualquier momento en su portal familiar. No se requiere ninguna acción por ahora.",
       ],
       cta: { label: "Ver su panel", url: `${APP_URL}/family/dashboard` },
       closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",

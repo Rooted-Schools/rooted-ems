@@ -8,23 +8,27 @@ Opening a new enrollment cycle is now done inside the app, from Settings. Creati
 2. **Grade levels being served.** List every grade the campus will enroll for that year, including any new grade being added or any grade being dropped.
 3. **Seats per grade.** For each grade, the number of seats you want available. Be specific rather than approximate; this becomes the number lottery runs and the Seats tab work from.
 4. **Enrollment window dates.** When applications open and close for the new cycle, by grade if your campus varies them.
-5. **Packet requirement changes.** If anything about what families must submit to complete registration is changing for the new year (a new document, a retired one, a state-specific item), write it out explicitly rather than carrying last year's list forward on assumption.
+5. **Registration requirement changes.** If anything about what families must submit to complete registration is changing for the new year (a new document, a retired one, a state-specific item), write it out explicitly rather than carrying last year's list forward on assumption.
 
 ## Building it (system administrator)
 
 All of this lives in Settings, in order:
 
-1. **Settings, School Years: create the year.** Name, start date, end date. A new recruiting year can be current at the same time as the operating year; mark both current during the transition and un-mark the old year when its season truly ends.
-2. **Settings, Grade Levels: add each grade** for the campus and the new year. Grades belong to a specific year, never reused across years.
-3. **Settings, Capacity Plans: create a plan** for each campus, new-year grade, and seat count.
-4. **Settings, Enrollment Windows: create the window** with open and close dates. Leave it in draft until opening day, then flip it to open.
-5. **Settings, Packet Requirements: confirm the new year's list.** Copy forward what stays, apply the changes gathered above.
+1. **Settings → School Years & Grades: create the year.** Name, start date, end date. A new recruiting year can be current at the same time as the operating year; mark both current during the transition and un-mark the old year when its season truly ends.
+2. **Settings → School Years & Grades: add each grade** for the campus and the new year. Grades belong to a specific year, never reused across years.
+3. **Settings → School Years & Grades: create a capacity plan** for each campus, new-year grade, and seat count. This tab now holds school years, grade levels, and capacity plans together, so all three of these steps happen on the same screen.
+4. **Settings → Enrollment Windows: create the window** with open and close dates. Leave it in draft until opening day, then flip it to open.
+5. **Settings → Registration: confirm the new year's list is not empty.** Copy forward what stays, apply the changes gathered above.
 
-Verify before opening day: the public site should show the real open date on the campus card (it reads it from the window you created), and a test look at the Seats tab should show every grade with its seat count.
+**Before any family accepts a seat for the new year, confirm the Registration list actually has items in it.** Creating a school year does not automatically carry requirement items forward, and in the past a new year has been left with an empty Registration list, that let a family's registration packet be marked complete with nothing actually collected. Check the Registration tab for the new year yourself; do not assume it copied over. If it is empty, escalate to your system administrator before opening enrollment or sending any offers for that year; this may need a developer step to resolve, not just a screen you can fill in yourself.
+
+Verify before opening day: the public site should show the real open date on the campus card (it reads it from the window you created), a test look at the Seats tab should show every grade with its seat count, and the Registration tab for the new year should show a real, non-empty list of items.
 
 ## What campus staff can do without the administrator
 
-Adjust the seat total on an existing capacity plan from the Seats tab, edit enrollment windows, and edit packet requirements. Creating the year and its grades stays with the system administrator.
+Adjust the seat total on an existing capacity plan from the Seats tab, edit enrollment windows, and edit the Registration list. Creating the year and its grades stays with the system administrator.
+
+If you are building for more than one campus, remember the "Campus:" selector in the header remembers your last choice and tints the screen in that campus's color (green for Vancouver, amber for C.R. Neal, blue for Cleveland). Check the color before you start entering numbers, so a Cleveland seat count does not accidentally land on Vancouver's plan. Staff with access to only one campus never see this selector; the system shows their campus automatically.
 
 ## Hardest questions
 

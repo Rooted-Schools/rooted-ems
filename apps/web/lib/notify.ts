@@ -883,9 +883,9 @@ export async function notifyFamilyKeepTheSeat({
     ),
     smsGuardian(
       contact,
-      `Rooted Schools: ${studentFirstName ?? "Your student"}'s seat at ${campusName} is all set! Watch for orientation details this summer.\n¡El cupo de ${
+      `Rooted Schools: registration is complete for ${studentFirstName ?? "your student"} at ${campusName}. Watch for orientation details this summer.\nRooted Schools: la inscripcion esta completa para ${
         studentFirstName ?? "su estudiante"
-      } en ${campusName} está listo! Esté atento(a) a los detalles de orientación este verano.`,
+      } en ${campusName}. Este atento(a) a los detalles de orientacion este verano.`,
       "notifyFamilyKeepTheSeat"
     ),
   ]);
