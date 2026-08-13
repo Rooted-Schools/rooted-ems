@@ -397,11 +397,23 @@ export async function stampStatusHistoryActor(input: {
 
   try {
     const supabase = createServiceRoleClient();
-    const { data, error } = await supabase
+    // Apply the watermark in Postgres, not in JavaScript. created_at is a
+    // timestamptz with microsecond precision, and Date.parse truncates to
+    // milliseconds, so a row written less than a millisecond after the
+    // watermark compared as "not newer" and was silently skipped. Verified
+    // against a branch database: three status changes in one transaction all
+    // carry a byte-identical created_at, because now() is transaction time.
+    let query = supabase
       .from("application_status_history")
       .select("id, created_at, changed_by, from_status, to_status")
       .eq("application_id", input.applicationId)
-      .is("changed_by", null)
+      .is("changed_by", null);
+
+    if (input.watermark.at !== null) {
+      query = query.gt("created_at", input.watermark.at);
+    }
+
+    const { data, error } = await query
       .order("created_at", { ascending: false })
       .limit(STAMP_CANDIDATE_LIMIT);
 
@@ -412,10 +424,15 @@ export async function stampStatusHistoryActor(input: {
       return;
     }
 
+    // `after: null` because the query above already applied the bound at full
+    // precision. Re-applying it here would reintroduce the millisecond
+    // truncation this call site exists to avoid. The pure function still does
+    // the work that matters: matching the transition and refusing to guess
+    // when two rows share an instant.
     const row = pickStampableHistoryRow((data ?? []) as StatusHistoryRow[], {
       toStatus: input.toStatus,
       fromStatus: input.fromStatus ?? null,
-      after: input.watermark.at,
+      after: null,
     });
     if (!row) return;
 
