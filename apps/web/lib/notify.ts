@@ -10,6 +10,29 @@
  * Rule: never throw.  A notification failure must never roll back the
  * primary operation that triggered it.  In-app and email delivery are fired
  * independently — one failing never blocks the other.
+ *
+ * DELIVERY RECORD: every automated email and text written by this module also
+ * writes one communication_log row per send attempt — the same table the staff
+ * one-off send writes (sendOneOffEmail in lib/mutations/communications.ts) and
+ * the same table the in-app path already writes through sendNotification. Until
+ * this existed, a family saying "we never got the offer email" met a system
+ * that had no record the message was ever attempted: the only trace of a
+ * failure was a console.error nobody keeps.
+ *
+ * Two rules govern what those rows hold:
+ *   1. The row records the ATTEMPT and its outcome, never a claim ahead of the
+ *      provider — status is `sent` only when the provider confirmed, `failed`
+ *      otherwise with the provider's own error text.
+ *   2. The row records the TEMPLATE, not the rendered message. Family message
+ *      subjects and bodies render the student's first name, and a recent pass
+ *      deliberately removed student names from stored notification subjects.
+ *      communication_log is readable by every staff member at the campus, so
+ *      the template key identifies what was sent without putting a student's
+ *      name in a field that was not already carrying one.
+ *
+ * Logging is best-effort in the strictest sense: a logging failure never
+ * breaks a notification, never blocks the other channel, and never turns a
+ * message the provider accepted into a reported failure.
  */
 
 import { createServiceRoleClient } from "@rooted-ems/database/server";
@@ -68,21 +91,140 @@ async function getGuardianContact(applicationId: string): Promise<GuardianContac
   };
 }
 
+// ─── Delivery record (communication_log) ─────────────────────────────────────
+
+/**
+ * Who a send was for and what was sent, supplied by every call site so the
+ * delivery record can answer a parent's phone call. Required, not optional:
+ * an automated family message with no recorded campus or template is exactly
+ * the un-answerable send this record exists to end.
+ */
+export interface DeliveryLogContext {
+  /** Campus the message belongs to — the scope staff filter the log by. */
+  campusId?: string | null;
+  /** Guardian's auth user id, when the family has a portal account. */
+  recipientUserId?: string | null;
+  /**
+   * The email template that was rendered (e.g. "offerExtended"), or for a
+   * text, the message this call site sends. Recorded INSTEAD of the rendered
+   * subject and body — see the note at the top of this file.
+   */
+  templateKey: string;
+  /** 00045 engagement tracking — lead-oriented flows only. */
+  leadId?: string;
+  /** 00045 send kind. Defaults to the template key. */
+  kind?: string;
+}
+
+/** One communication_log row, in the shape sendOneOffEmail already writes. */
+export interface DeliveryLogRow {
+  campus_id: string | null;
+  recipient_user_id: string | null;
+  recipient_address: string;
+  channel: "email" | "sms";
+  subject: string;
+  body: string;
+  status: "sent" | "failed";
+  sent_at: string | null;
+  delivered_at: string | null;
+  error_message: string | null;
+  external_id: string | null;
+}
+
+/**
+ * Shape the delivery record for one send attempt. Pure — no I/O — so the
+ * privacy rule (template key in, student name out) and the honesty rule
+ * (`sent` only on a confirmed provider success) are testable without a
+ * database or a provider.
+ *
+ * `delivered_at` is deliberately left null even on success: Resend accepting
+ * a message is not the mailbox receiving it, and the Resend webhook is what
+ * knows the difference. Stamping it here would tell staff a message was
+ * delivered when all we know is that it was sent.
+ */
+export function buildDeliveryLogRow(input: {
+  channel: "email" | "sms";
+  recipientAddress: string;
+  logTag: string;
+  context: DeliveryLogContext;
+  ok: boolean;
+  error?: string;
+  /** Provider message id, when the provider returned one (Resend). */
+  providerMessageId?: string;
+  at: string;
+}): DeliveryLogRow {
+  const channelWord = input.channel === "email" ? "email" : "text message";
+  return {
+    campus_id: input.context.campusId ?? null,
+    recipient_user_id: input.context.recipientUserId ?? null,
+    recipient_address: input.recipientAddress,
+    channel: input.channel,
+    // Label, not the rendered subject: family subjects name the student.
+    subject: `Automated ${channelWord}: ${input.context.templateKey}`,
+    body:
+      `Automated ${channelWord} sent by ${input.logTag} from the ` +
+      `${input.context.templateKey} template. The message text is not copied ` +
+      `here because it names the student.`,
+    status: input.ok ? "sent" : "failed",
+    sent_at: input.ok ? input.at : null,
+    delivered_at: null,
+    error_message: input.ok ? null : input.error ?? "Delivery failed.",
+    external_id: input.providerMessageId ?? null,
+  };
+}
+
+/**
+ * Write one delivery record. Swallows everything: a family that received
+ * their offer email must never be reported as a failure because an audit
+ * insert did not land, and a notification must never be blocked by one.
+ */
+async function recordDeliveryAttempt(row: DeliveryLogRow, logTag: string): Promise<void> {
+  try {
+    const supabase = createServiceRoleClient();
+    const { error } = await supabase.from("communication_log").insert(row);
+    if (error) {
+      console.error(`[${logTag}] communication_log insert failed`, error.message, {
+        channel: row.channel,
+        status: row.status,
+      });
+    }
+  } catch (err) {
+    console.error(`[${logTag}] communication_log insert threw`, err instanceof Error ? err.message : err);
+  }
+}
+
 /**
  * Text the guardian — only when they explicitly opted in AND have a phone on
  * file. The consent gate lives here, not in lib/sms.ts, so every SMS in the
  * system passes through it. Never throws.
+ *
+ * A send that never happens (no consent, no phone) writes no delivery record:
+ * the record is of attempts, and claiming a failed send for a family we were
+ * never allowed to text would misstate both the consent state and the reach.
  */
 async function smsGuardian(
   contact: Pick<GuardianContact, "phone" | "smsConsent">,
   body: string,
-  logTag: string
+  logTag: string,
+  context: DeliveryLogContext
 ): Promise<boolean> {
   if (!contact.smsConsent || !contact.phone) return false;
   const result = await sendSms({ to: contact.phone, body });
   if (!result.ok && result.error !== SMS_NOT_CONFIGURED) {
     console.error(`[${logTag}] sms failed`, result.error);
   }
+  await recordDeliveryAttempt(
+    buildDeliveryLogRow({
+      channel: "sms",
+      recipientAddress: contact.phone,
+      logTag,
+      context,
+      ok: result.ok,
+      error: result.error,
+      at: new Date().toISOString(),
+    }),
+    logTag
+  );
   return result.ok;
 }
 
@@ -120,15 +262,24 @@ function firstNameOf(studentName?: string): string | undefined {
 
 /**
  * Send a templated email to the guardian.  No-op when the guardian has no
- * email on file or when the provider is not configured.  Never throws.
+ * email on file.  Never throws.
+ *
+ * Every attempt that reaches the provider writes a delivery record, including
+ * the "email not configured" case: in an environment with no RESEND_API_KEY
+ * nothing reaches the family, and a log that quietly omitted those sends would
+ * be the same silence this record exists to end.
+ *
+ * `meta` always goes to lib/email.ts now, so a confirmed send is recorded in
+ * email_event and the Resend webhook can stamp delivered/opened/clicked
+ * against it. The template label rides along as `logSubject` so the student's
+ * name stays out of that row (see lib/email.ts).
  */
 async function emailGuardian(
   email: string | null,
   template: EmailTemplate,
   logTag: string,
-  replyTo?: string | null,
-  /** 00045 engagement tracking — omitted for flows that don't need it (most transactional email). */
-  meta?: { leadId?: string; kind?: string }
+  replyTo: string | null | undefined,
+  context: DeliveryLogContext
 ): Promise<boolean> {
   if (!email) return false;
   const result = await sendEmail({
@@ -137,11 +288,28 @@ async function emailGuardian(
     html: template.html,
     text: template.text,
     replyTo: replyTo ?? undefined,
-    meta,
+    meta: {
+      leadId: context.leadId,
+      kind: context.kind ?? context.templateKey,
+      logSubject: `Automated email: ${context.templateKey}`,
+    },
   });
   if (!result.ok && result.error !== "email not configured") {
     console.error(`[${logTag}] email failed`, result.error);
   }
+  await recordDeliveryAttempt(
+    buildDeliveryLogRow({
+      channel: "email",
+      recipientAddress: email,
+      logTag,
+      context,
+      ok: result.ok,
+      error: result.error,
+      providerMessageId: result.id,
+      at: new Date().toISOString(),
+    }),
+    logTag
+  );
   // True only when the provider confirmed the send — callers that record
   // "sent" on a timeline must never log an attempt as a delivery.
   return result.ok;
@@ -286,7 +454,8 @@ export async function notifyFamilyApplicationReceived({
       email,
       emailTemplates.applicationReceived({ studentFirstName: firstNameOf(studentName), campusName, campusLogoUrl }),
       "notifyFamilyApplicationReceived",
-      campusEmail
+      campusEmail,
+      { campusId, recipientUserId: userId, templateKey: "applicationReceived" }
     ),
   ]);
 }
@@ -378,7 +547,8 @@ export async function notifyFamilyApplicationWaitlisted({
       email,
       emailTemplates.lotteryResultWaitlisted({ studentFirstName, campusName, position, campusLogoUrl }),
       "notifyFamilyApplicationWaitlisted",
-      campusEmail
+      campusEmail,
+      { campusId, recipientUserId: userId, templateKey: "lotteryResultWaitlisted" }
     ),
     smsGuardian(
       contact,
@@ -387,7 +557,8 @@ export async function notifyFamilyApplicationWaitlisted({
       } — we'll reach out if a seat opens. See your dashboard: ${APP_LINK}/family/dashboard\nEl sorteo para ${campusName} se realizó. ${
         studentFirstName ?? "Su estudiante"
       } está en la lista de espera — le avisaremos si se abre un cupo.`,
-      "notifyFamilyApplicationWaitlisted"
+      "notifyFamilyApplicationWaitlisted",
+      { campusId, recipientUserId: userId, templateKey: "lotteryResultWaitlistedSms" }
     ),
   ]);
 
@@ -499,7 +670,12 @@ export async function notifyWaitlistMovement({
             campusLogoUrl,
           }),
           "notifyWaitlistMovement",
-          campusEmail
+          campusEmail,
+          {
+            campusId,
+            recipientUserId: guardian?.user_id ?? null,
+            templateKey: "waitlistPositionImproved",
+          }
         );
       }
     }
@@ -559,11 +735,20 @@ export async function notifyFamilyOfOffer({
           logTag: "notifyFamilyOfOffer",
         })
       : Promise.resolve(false),
-    emailGuardian(email, template, "notifyFamilyOfOffer", campusEmail),
+    emailGuardian(email, template, "notifyFamilyOfOffer", campusEmail, {
+      campusId,
+      recipientUserId: userId,
+      templateKey: viaWaitlist ? "waitlistPromoted" : "offerExtended",
+    }),
     smsGuardian(
       contact,
       `Rooted Schools: A seat has been offered${studentFirstName ? ` for ${studentFirstName}` : ""} at ${campusName}! Respond by ${deadline}: ${APP_LINK}/family/offers\nSe ofreció un cupo. Responda antes del ${deadlineEs}.`,
-      "notifyFamilyOfOffer"
+      "notifyFamilyOfOffer",
+      {
+        campusId,
+        recipientUserId: userId,
+        templateKey: viaWaitlist ? "waitlistPromotedSms" : "offerExtendedSms",
+      }
     ),
   ]);
 
@@ -613,12 +798,14 @@ export async function notifyFamilyOfferExpiringSoon({
       email,
       emailTemplates.offerExpiringSoon({ studentFirstName: firstNameOf(studentName), campusName, expiresAt, campusLogoUrl }),
       "notifyFamilyOfferExpiringSoon",
-      campusEmail
+      campusEmail,
+      { campusId, recipientUserId: userId, templateKey: "offerExpiringSoon" }
     ),
     smsGuardian(
       contact,
       `Rooted Schools: Your seat offer at ${campusName} expires ${deadline}. Respond now to keep your spot: ${APP_LINK}/family/offers\nSu oferta de cupo vence el ${deadlineEs}. Responda ahora.`,
-      "notifyFamilyOfferExpiringSoon"
+      "notifyFamilyOfferExpiringSoon",
+      { campusId, recipientUserId: userId, templateKey: "offerExpiringSoonSms" }
     ),
   ]);
 }
@@ -658,7 +845,11 @@ export async function notifyFamilyDocumentRejected({
     smsGuardian(
       contact,
       `Rooted Schools: We need a new copy of a document for your application. Upload here: ${APP_LINK}/family/documents\nNecesitamos una nueva copia de un documento para su solicitud. Súbala en el enlace.`,
-      "notifyFamilyDocumentRejected"
+      "notifyFamilyDocumentRejected",
+      // The template key stays as generic as the message: naming the document
+      // type here would put a student's disability-services status in the log
+      // for exactly the reason the SMS body avoids it.
+      { campusId, recipientUserId: userId, templateKey: "documentRejectedSms" }
     ),
   ]);
 }
@@ -720,7 +911,8 @@ export async function notifyFamilyRegistrationReady({
       email,
       emailTemplates.offerAccepted({ studentFirstName: firstNameOf(studentName), campusName, campusLogoUrl }),
       "notifyFamilyRegistrationReady",
-      campusEmail
+      campusEmail,
+      { campusId, recipientUserId: userId, templateKey: "offerAccepted" }
     ),
   ]);
 }
@@ -782,12 +974,14 @@ export async function notifyFamilyRegistrationComplete({
       email,
       emailTemplates.registrationComplete({ studentFirstName, campusName, campusLogoUrl }),
       "notifyFamilyRegistrationComplete",
-      campusEmail
+      campusEmail,
+      { campusId, recipientUserId: userId, templateKey: "registrationComplete" }
     ),
     smsGuardian(
       contact,
       `Rooted Schools: registration is complete for ${studentFirstName ?? "your student"} at ${campusName}. We are finishing a final placement review and will confirm enrollment soon. Nothing is needed from you now.\nRooted Schools: la inscripcion esta completa para ${studentFirstName ?? "su estudiante"} en ${campusName}. Estamos terminando una revision final de colocacion y le confirmaremos pronto. No necesita hacer nada ahora.`,
-      "notifyFamilyRegistrationComplete"
+      "notifyFamilyRegistrationComplete",
+      { campusId, recipientUserId: userId, templateKey: "registrationCompleteSms" }
     ),
   ]);
 }
@@ -831,12 +1025,14 @@ export async function notifyFamilyRegistrationNudge({
       email,
       emailTemplates.registrationNudge({ studentFirstName, campusName, missingNames, campusLogoUrl }),
       "notifyFamilyRegistrationNudge",
-      campusEmail
+      campusEmail,
+      { campusId, recipientUserId: userId, templateKey: "registrationNudge" }
     ),
     smsGuardian(
       contact,
       registrationNudgeSms({ studentFirstName, campusName, count }),
-      "notifyFamilyRegistrationNudge"
+      "notifyFamilyRegistrationNudge",
+      { campusId, recipientUserId: userId, templateKey: "registrationNudgeSms" }
     ),
   ]);
 }
@@ -883,14 +1079,16 @@ export async function notifyFamilyKeepTheSeat({
       email,
       emailTemplates.keepTheSeat({ studentFirstName, campusName, startDate, campusLogoUrl }),
       "notifyFamilyKeepTheSeat",
-      campusEmail
+      campusEmail,
+      { campusId, recipientUserId: userId, templateKey: "keepTheSeat" }
     ),
     smsGuardian(
       contact,
       `Rooted Schools: registration is complete for ${studentFirstName ?? "your student"} at ${campusName}. Watch for orientation details this summer.\nRooted Schools: la inscripcion esta completa para ${
         studentFirstName ?? "su estudiante"
       } en ${campusName}. Este atento(a) a los detalles de orientacion este verano.`,
-      "notifyFamilyKeepTheSeat"
+      "notifyFamilyKeepTheSeat",
+      { campusId, recipientUserId: userId, templateKey: "keepTheSeatSms" }
     ),
   ]);
 }
@@ -937,7 +1135,8 @@ export async function notifyFamilyReenrollmentPulse({
       email,
       emailTemplates.reenrollmentPulse({ studentFirstName, campusName, nextSchoolYearName, campusLogoUrl }),
       "notifyFamilyReenrollmentPulse",
-      campusEmail
+      campusEmail,
+      { campusId, recipientUserId: userId, templateKey: "reenrollmentPulse" }
     ),
     smsGuardian(
       contact,
@@ -946,7 +1145,8 @@ export async function notifyFamilyReenrollmentPulse({
       }? One tap to let us know: ${APP_LINK}/family/reenrollment\n¿${
         studentFirstName ?? "Su estudiante"
       } regresará${nextSchoolYearName ? ` para ${nextSchoolYearName}` : " el próximo año"}? Responda con un toque: ${APP_LINK}/family/reenrollment`,
-      "notifyFamilyReenrollmentPulse"
+      "notifyFamilyReenrollmentPulse",
+      { campusId, recipientUserId: userId, templateKey: "reenrollmentPulseSms" }
     ),
   ]);
 }
@@ -1000,7 +1200,8 @@ export async function notifyFamilyReenrollmentOffer({
       email,
       emailTemplates.reenrollmentPulse({ studentFirstName, campusName, nextSchoolYearName, campusLogoUrl }),
       "notifyFamilyReenrollmentOffer",
-      campusEmail
+      campusEmail,
+      { campusId, recipientUserId: userId, templateKey: "reenrollmentPulse" }
     ),
     smsGuardian(
       contact,
@@ -1009,7 +1210,8 @@ export async function notifyFamilyReenrollmentOffer({
       }'s seat at ${campusName}${yearEn}. Confirm or decline: ${APP_LINK}/family/reenrollment\nHemos reservado el cupo de ${
         studentFirstName ?? "su estudiante"
       } en ${campusName}${yearEs}. Confirme o rechace: ${APP_LINK}/family/reenrollment`,
-      "notifyFamilyReenrollmentOffer"
+      "notifyFamilyReenrollmentOffer",
+      { campusId, recipientUserId: userId, templateKey: "reenrollmentOfferSms" }
     ),
   ]);
 }
@@ -1047,12 +1249,13 @@ export async function notifyLeadWelcome({
       emailTemplates.inquiryWelcome({ guardianFirstName: lead.first_name, campusName, campusLogoUrl }),
       "notifyLeadWelcome",
       campusEmail,
-      leadId ? { leadId, kind: "welcome" } : undefined
+      { campusId, templateKey: "inquiryWelcome", leadId, kind: "welcome" }
     ),
     smsGuardian(
       { phone: lead.phone, smsConsent: lead.sms_consent },
       `Rooted Schools: Hi ${lead.first_name}! Thanks for your interest in ${campusName}. A member of our team will reach out soon. Questions? Just reply.\n¡Gracias por su interés! Nuestro equipo le contactará pronto.`,
-      "notifyLeadWelcome"
+      "notifyLeadWelcome",
+      { campusId, templateKey: "inquiryWelcomeSms", leadId }
     ),
   ]);
 
@@ -1129,16 +1332,32 @@ export async function notifyLeadReengagement({
             "List-Unsubscribe": `<${unsub}>`,
             "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
           },
-          meta: leadId ? { leadId, kind: "reengagement" } : undefined,
-        }).then((r) => {
+          meta: { leadId, kind: "reengagement", logSubject: "Automated email: leadReengagement" },
+        }).then(async (r) => {
           if (!r.ok && r.error !== "email not configured")
             console.error("[notifyLeadReengagement] email failed", r.error);
+          // Sent through sendEmail rather than emailGuardian (the unsubscribe
+          // headers), so the delivery record is written here by hand.
+          await recordDeliveryAttempt(
+            buildDeliveryLogRow({
+              channel: "email",
+              recipientAddress: lead.email as string,
+              logTag: "notifyLeadReengagement",
+              context: { campusId, templateKey: "leadReengagement", leadId },
+              ok: r.ok,
+              error: r.error,
+              providerMessageId: r.id,
+              at: new Date().toISOString(),
+            }),
+            "notifyLeadReengagement"
+          );
         })
       : Promise.resolve(),
     smsGuardian(
       { phone: lead.phone, smsConsent: lead.sms_consent },
       `Rooted Schools: Hi ${lead.first_name} — still thinking about ${campusName}? We'd love to help with any questions. Just reply, or apply here: ${APP_LINK}/login\n¿Aún considerando ${campusName}? Responda con sus preguntas.`,
-      "notifyLeadReengagement"
+      "notifyLeadReengagement",
+      { campusId, templateKey: "leadReengagementSms", leadId }
     ),
   ]);
 }

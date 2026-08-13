@@ -1,7 +1,13 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { isValidTransition, type ApplicationStatusValue } from "@rooted-ems/utils";
 import type { AuthSession } from "@rooted-ems/types";
-import { AuditAction, logAuditEvent } from "@/lib/audit";
+import {
+  AuditAction,
+  logAuditEvent,
+  readStatusHistoryWatermarks,
+  stampStatusHistoryActor,
+  type StatusHistoryWatermark,
+} from "@/lib/audit";
 import { hasRoleOnCampus, requireStaffSession } from "@/lib/auth/get-session";
 import { sendOffer } from "./offers";
 import {
@@ -97,6 +103,10 @@ function dedupeAndValidateIds(applicationIds: string[]): string[] {
  *     shape as the single-item action.
  *   - Family notifications fire per item (fire-and-forget), matching the
  *     single-item behavior for verified / needs_info / waitlisted.
+ *   - The acting staff member is stamped onto each item's
+ *     application_status_history row, which the DB trigger writes with a NULL
+ *     changed_by under the service-role client. Same helper and same
+ *     safeguards as the single-item path (lib/audit.ts).
  */
 export async function bulkChangeApplicationStatus(
   applicationIds: string[],
@@ -107,6 +117,11 @@ export async function bulkChangeApplicationStatus(
   const ids = dedupeAndValidateIds(applicationIds);
   const supabase = createServiceRoleClient();
   const accessible = accessibleCampusIds(session);
+
+  // One query for the whole selection rather than one per item — the bound
+  // each item's attribution stamp is measured against, read before any write.
+  const watermarks = await readStatusHistoryWatermarks(ids);
+  const unknownWatermark: StatusHistoryWatermark = { known: false, at: null };
 
   const results: BulkItemResult[] = [];
 
@@ -157,16 +172,42 @@ export async function bulkChangeApplicationStatus(
         if (reason) updates.review_notes = reason;
       }
 
-      const { error } = await supabase
+      // Status precondition: a row someone else moved between the read above
+      // and this write is reported, never overwritten — and never attributed
+      // to this staff member. Same compare-and-set as the single-item path.
+      const { data: changed, error } = await supabase
         .from("application")
         .update(updates)
-        .eq("id", applicationId);
+        .eq("id", applicationId)
+        .eq("status", app.status)
+        .select("id");
 
       if (error) {
         console.error("[bulkChangeApplicationStatus]", applicationId, error.message);
         results.push({ id: applicationId, ok: false, error: "Failed to update status" });
         continue;
       }
+
+      // An explicitly empty array means the precondition matched nothing. A
+      // null representation means no rows came back to inspect, which is the
+      // pre-existing behavior and is treated as a successful write.
+      if (Array.isArray(changed) && changed.length === 0) {
+        results.push({
+          id: applicationId,
+          ok: false,
+          error: "Status changed while this batch was running",
+        });
+        continue;
+      }
+
+      // ── Who changed it ────────────────────────────────────────────────────
+      await stampStatusHistoryActor({
+        applicationId,
+        actorId: session.user_id,
+        toStatus: newStatus,
+        fromStatus: app.status as string,
+        watermark: watermarks.get(applicationId) ?? unknownWatermark,
+      });
 
       // ── Audit log per item — same shape as the single-item action ─────────
       await logAuditEvent({

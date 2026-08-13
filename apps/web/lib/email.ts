@@ -89,6 +89,18 @@ export interface SendEmailInput {
     leadId?: string;
     /** 'journey_step' | 'campaign' | 'welcome' | 'reengagement' | 'one_off' */
     kind?: string;
+    /**
+     * Stored in `email_event.subject` in place of the real subject.
+     *
+     * Family milestone email renders the student's first name into its
+     * subject line ("Seat offer for Jordan at ..."). email_event is a
+     * staff-readable table that has only ever held lead-facing subjects, and
+     * a recent pass deliberately took student names back out of stored
+     * notification subjects — so the family sends pass a template label here
+     * and the name stays in the message that goes to the guardian, not in a
+     * row every staff member at the campus can read.
+     */
+    logSubject?: string;
   };
 }
 
@@ -238,7 +250,13 @@ export async function sendEmail({ to, subject, html, text, replyTo, preserveRepl
     const id = body && typeof (body as { id?: unknown }).id === "string" ? (body as { id: string }).id : undefined;
 
     if (id && meta) {
-      await recordEmailEvent({ resendId: id, to, subject, leadId: meta.leadId, kind: meta.kind });
+      await recordEmailEvent({
+        resendId: id,
+        to,
+        subject: meta.logSubject ?? subject,
+        leadId: meta.leadId,
+        kind: meta.kind,
+      });
     }
 
     return { ok: true, id };

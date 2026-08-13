@@ -1,6 +1,11 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { isValidTransition, type ApplicationStatusValue } from "@rooted-ems/utils";
-import { AuditAction, logAuditEvent } from "@/lib/audit";
+import {
+  AuditAction,
+  logAuditEvent,
+  readStatusHistoryWatermark,
+  stampStatusHistoryActor,
+} from "@/lib/audit";
 import { requireStaffSession } from "@/lib/auth/get-session";
 import {
   notifyFamilyApplicationReceived,
@@ -1193,9 +1198,21 @@ export async function familyUpdateApplicationStatus(
 }
 
 /**
+ * Message for a status change that lost a race with another one. Rare, and
+ * honest: the alternative is reporting a change that was never written.
+ */
+export const STATUS_CHANGED_UNDERNEATH =
+  "This application's status changed while you were working on it. Reload to see where it stands now.";
+
+/**
  * Shared body of the two status mutations above. Assumes the caller has
  * already been authorized — it does no auth of its own, which is why it is
  * not exported.
+ *
+ * This is also where the acting user gets stamped onto the
+ * application_status_history row the database trigger writes, so every caller
+ * of either mutation inherits real attribution instead of "System". See the
+ * status-history block comment in lib/audit.ts for how the row is identified.
  */
 async function applyApplicationStatusChange(
   applicationId: string,
@@ -1238,15 +1255,45 @@ async function applyApplicationStatusChange(
     if (reason) updates.review_notes = reason;
   }
 
-  const { error } = await supabase
+  // Read before the write: the history row this change is about to create is
+  // the one created after this timestamp (lib/audit.ts).
+  const watermark = await readStatusHistoryWatermark(applicationId);
+
+  // The status precondition makes this a compare-and-set. Without it, a change
+  // that raced another one silently overwrote it and the two were
+  // indistinguishable afterwards — and there would be no way to know whether
+  // the history row belonged to this actor or the other one.
+  const { data: changed, error } = await supabase
     .from("application")
     .update(updates)
-    .eq("id", applicationId);
+    .eq("id", applicationId)
+    .eq("status", app.status)
+    .select("id");
 
   if (error) {
     console.error("[applyApplicationStatusChange]", error.message);
     return { data: null, error: "Failed to update status" };
   }
+
+  // An explicitly empty array is PostgREST saying the precondition matched
+  // nothing. A null representation is not the same thing — it means no rows
+  // were returned to inspect — and is treated as the write having landed,
+  // which is the behavior every caller had before the precondition existed.
+  if (Array.isArray(changed) && changed.length === 0) {
+    return { data: null, error: STATUS_CHANGED_UNDERNEATH };
+  }
+
+  // ── Who changed it ────────────────────────────────────────────────────────
+  // The DB trigger records the transition but writes changed_by = auth.uid(),
+  // which is NULL under the service-role client every write here uses. Never
+  // fails the status change: an unattributed row is the state we already had.
+  await stampStatusHistoryActor({
+    applicationId,
+    actorId,
+    toStatus: newStatus,
+    fromStatus: app.status as string,
+    watermark,
+  });
 
   // ── Audit log ─────────────────────────────────────────────────────────────
   // Belt-and-suspenders: DB trigger also writes to application_status_history.

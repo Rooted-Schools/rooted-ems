@@ -58,6 +58,10 @@ vi.mock("@rooted-ems/utils", () => ({
 
 vi.mock("@/lib/audit", () => ({
   logAuditEvent: vi.fn(async () => {}),
+  // Status-history attribution (see the block comment in lib/audit.ts). Stubbed
+  // here so these tests keep asserting lottery behavior, not attribution.
+  readStatusHistoryWatermark: vi.fn(async () => ({ known: true, at: null })),
+  stampStatusHistoryActor: vi.fn(async () => {}),
   AuditAction: {
     Create: "create",
     Update: "update",

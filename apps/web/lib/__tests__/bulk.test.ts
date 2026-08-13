@@ -36,6 +36,11 @@ vi.mock("@/lib/auth/get-session", () => ({
 
 vi.mock("@/lib/audit", () => ({
   logAuditEvent: logAuditEventMock,
+  // Status-history attribution (see the block comment in lib/audit.ts). Stubbed
+  // here so these tests keep asserting bulk behavior, not attribution; the
+  // attribution rule itself is covered in status-history-attribution.test.ts.
+  readStatusHistoryWatermarks: vi.fn(async () => new Map()),
+  stampStatusHistoryActor: vi.fn(async () => {}),
   AuditAction: {
     Create: "create",
     Update: "update",

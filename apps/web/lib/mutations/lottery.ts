@@ -1,6 +1,12 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { generateLotterySeed, runDeterministicLottery } from "@rooted-ems/utils";
-import { AuditAction, logAuditEvent, type AuditEventPayload } from "@/lib/audit";
+import {
+  AuditAction,
+  logAuditEvent,
+  readStatusHistoryWatermark,
+  stampStatusHistoryActor,
+  type AuditEventPayload,
+} from "@/lib/audit";
 import {
   anyChannelDelivered,
   notifyFamilyApplicationWaitlisted,
@@ -1408,6 +1414,10 @@ export async function sendOffersFromLottery(
       continue;
     }
 
+    // Read before the status write — the bound the attribution stamp below is
+    // measured against (see the status-history note in lib/audit.ts).
+    const watermark = await readStatusHistoryWatermark(appId);
+
     // Only move an application that is still in a pre-offer state. Without the
     // precondition this overwrote whatever the application had become since
     // the draw — an accepted seat, a withdrawal — and stamped it "offered".
@@ -1425,6 +1435,17 @@ export async function sendOffersFromLottery(
         "[sendOffersFromLottery] application was not in a pre-offer status, leaving it as it is",
         { applicationId: appId, offerId: newOffer.id }
       );
+    } else {
+      // A seat award is the most consequential status change in the product,
+      // and until now the history row for it named nobody. Stamped only when
+      // the precondition above proves THIS call is what moved the row; the
+      // prior status is one of three, so the row is matched on to_status.
+      await stampStatusHistoryActor({
+        applicationId: appId,
+        actorId: offeredBy,
+        toStatus: "offered",
+        watermark,
+      });
     }
 
     // Attributable trail for THIS seat, written in the commit phase alongside
@@ -1650,6 +1671,9 @@ export async function completeLotteryResults(
     if (skip.has(row.application_id)) continue;
 
     position++;
+    // Read before addToWaitlist, which is what moves the application to
+    // "waitlisted" and fires the history trigger.
+    const watermark = await readStatusHistoryWatermark(row.application_id);
     const added = await addToWaitlist({
       waitlist_id: waitlistId,
       application_id: row.application_id,
@@ -1663,6 +1687,17 @@ export async function completeLotteryResults(
       position--; // roll back — this family wasn't actually placed
       continue;
     }
+
+    // Who put this family on the waitlist. addToWaitlist updates the status
+    // without a precondition, so an application already sitting at
+    // "waitlisted" produces no new history row — and the watermark is what
+    // keeps this from stamping today's staff member onto an older placement.
+    await stampStatusHistoryActor({
+      applicationId: row.application_id,
+      actorId,
+      toStatus: "waitlisted",
+      watermark,
+    });
 
     waitlisted++;
     ledgerRows.push({
