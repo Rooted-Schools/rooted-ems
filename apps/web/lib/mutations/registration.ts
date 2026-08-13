@@ -1,5 +1,6 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
+import { AuditAction, logAuditEvent } from "@/lib/audit";
 import {
   notifyFamilyRegistrationComplete,
   notifyFamilyRegistrationReady,
@@ -423,6 +424,32 @@ export async function submitRegistrationPacket(
 }
 
 /**
+ * The registration_item fields an audit event needs, plus the enrollment's
+ * campus so the event lands in the right campus's trail.
+ *
+ * registration_item, like verification_item, keeps current state only. A
+ * verified item that is re-verified, or one a staff member waives, overwrites
+ * verified_by and verified_at with no history behind it — so the before state
+ * has to be read before the write, not reconstructed after.
+ */
+const REGISTRATION_ITEM_AUDIT_SELECT =
+  "id, status, item_type, enrollment_id, verified_by, verified_at, enrollment:enrollment_id (campus_id)";
+
+interface RegistrationItemAuditRow {
+  id: string;
+  status: string;
+  item_type: string;
+  enrollment_id: string;
+  verified_by: string | null;
+  verified_at: string | null;
+  enrollment: { campus_id: string | null } | null;
+}
+
+function auditCampusId(row: RegistrationItemAuditRow | null): string | null {
+  return row?.enrollment?.campus_id ?? null;
+}
+
+/**
  * Verify a registration item (staff action).
  */
 export async function verifyRegistrationItem(
@@ -431,13 +458,28 @@ export async function verifyRegistrationItem(
 ): Promise<MutationResult> {
   const supabase = createServiceRoleClient();
 
+  // Read before the write: this is the only chance to capture what the item
+  // was, and it also supplies the enrollment_id the completion check needs.
+  const { data: beforeRow } = await supabase
+    .from("registration_item")
+    .select(REGISTRATION_ITEM_AUDIT_SELECT)
+    .eq("id", itemId)
+    .single();
+
+  const before = (beforeRow ?? null) as unknown as RegistrationItemAuditRow | null;
+  if (!before) {
+    return { data: null, error: "Item not found." };
+  }
+
+  const verifiedAt = new Date().toISOString();
+
   const { error } = await supabase
     .from("registration_item")
     .update({
       status: "verified",
-      verified_at: new Date().toISOString(),
+      verified_at: verifiedAt,
       verified_by: verifiedBy,
-      updated_at: new Date().toISOString(),
+      updated_at: verifiedAt,
     })
     .eq("id", itemId);
 
@@ -446,16 +488,27 @@ export async function verifyRegistrationItem(
     return { data: null, error: "Failed to verify registration item." };
   }
 
-  // Check if all items are verified — if so, mark packet as "complete"
-  const { data: item } = await supabase
-    .from("registration_item")
-    .select("enrollment_id")
-    .eq("id", itemId)
-    .single();
+  await logAuditEvent({
+    table_name: "registration_item",
+    record_id: itemId,
+    action: AuditAction.StatusChange,
+    actor_id: verifiedBy,
+    campus_id: auditCampusId(before),
+    old_data: {
+      status: before.status,
+      verified_by: before.verified_by,
+      verified_at: before.verified_at,
+    },
+    new_data: { status: "verified", verified_by: verifiedBy, verified_at: verifiedAt },
+    metadata: {
+      transition: "verify",
+      item_type: before.item_type,
+      enrollment_id: before.enrollment_id,
+    },
+  });
 
-  if (item) {
-    await finalizePacketIfComplete(item.enrollment_id as string, supabase);
-  }
+  // Check if all items are verified — if so, mark packet as "complete"
+  await finalizePacketIfComplete(before.enrollment_id, supabase);
 
   return { data: null, error: null };
 }
@@ -610,24 +663,27 @@ export async function skipRegistrationItem(
 ): Promise<MutationResult> {
   const supabase = createServiceRoleClient();
 
-  const { data: existing } = await supabase
+  const { data: existingRow } = await supabase
     .from("registration_item")
-    .select("status, enrollment_id")
+    .select(REGISTRATION_ITEM_AUDIT_SELECT)
     .eq("id", itemId)
     .single();
 
+  const existing = (existingRow ?? null) as unknown as RegistrationItemAuditRow | null;
   if (!existing) return { data: null, error: "Item not found." };
-  if ((existing as Record<string, unknown>).status !== "pending") {
+  if (existing.status !== "pending") {
     return { data: null, error: "Only pending (unsubmitted) items can be skipped." };
   }
+
+  const skippedAt = new Date().toISOString();
 
   const { error } = await supabase
     .from("registration_item")
     .update({
       status: "verified",
-      verified_at: new Date().toISOString(),
+      verified_at: skippedAt,
       verified_by: skippedBy,
-      updated_at: new Date().toISOString(),
+      updated_at: skippedAt,
     })
     .eq("id", itemId);
 
@@ -636,9 +692,36 @@ export async function skipRegistrationItem(
     return { data: null, error: "Failed to skip item." };
   }
 
+  // A waiver reaches the same "verified" status as a real verification, so
+  // without `waived` on the event the two are indistinguishable afterwards.
+  // Staff deciding a required document is not needed is precisely the judgment
+  // call an authorizer would want attributed.
+  await logAuditEvent({
+    table_name: "registration_item",
+    record_id: itemId,
+    action: AuditAction.StatusChange,
+    actor_id: skippedBy,
+    campus_id: auditCampusId(existing),
+    old_data: {
+      status: existing.status,
+      verified_by: existing.verified_by,
+      verified_at: existing.verified_at,
+    },
+    new_data: {
+      status: "verified",
+      waived: true,
+      verified_by: skippedBy,
+      verified_at: skippedAt,
+    },
+    metadata: {
+      transition: "skip",
+      item_type: existing.item_type,
+      enrollment_id: existing.enrollment_id,
+    },
+  });
+
   // Run the same completion check — skipping may complete the packet
-  const enrollmentId = (existing as Record<string, unknown>).enrollment_id as string;
-  await finalizePacketIfComplete(enrollmentId, supabase);
+  await finalizePacketIfComplete(existing.enrollment_id, supabase);
 
   return { data: null, error: null };
 }

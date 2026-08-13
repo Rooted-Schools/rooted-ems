@@ -119,12 +119,16 @@ export async function familyDeclineOffer(
   reason?: string,
   note?: string
 ) {
-  await requireSession();
+  const session = await requireSession();
   // Validate rather than trust: `reason` arrives from a client form. An
   // unrecognised value is dropped (degrading to "not captured", which is
   // honest) rather than written, which would fail the enum check and take the
   // whole decline down with it, stranding a family who only wanted to decline.
-  const result = await declineOffer(offerId, undefined, {
+  //
+  // The session's user id is passed as the declining user. Passing undefined
+  // logged every family decline as "System", which made a family's own
+  // decision indistinguishable from one a staff member recorded for them.
+  const result = await declineOffer(offerId, session.user_id, {
     reason: isDeclineReason(reason) ? reason : undefined,
     note,
   });

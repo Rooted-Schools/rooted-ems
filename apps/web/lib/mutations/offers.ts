@@ -326,6 +326,48 @@ export interface DeclineOptions {
   actingStaffUserId?: string;
 }
 
+/** Which of the two kinds of decline an audit event is recording. */
+export type DeclineActorKind = "family" | "staff_on_behalf";
+
+export interface ResolvedDeclineActor {
+  /** A user_profile id, or null when no real user could be named. */
+  actorId: string | null;
+  kind: DeclineActorKind;
+}
+
+/**
+ * Name the user behind a decline, and say which kind of decline it was.
+ *
+ * "The family declined" and "a staff member recorded a decline from a phone
+ * call" are different facts in an enrollment record, and both call sites
+ * already know which one happened — the staff action gates on
+ * requireRoleOnCampus, the family action on the guardian owning the offer. Any
+ * decline that reaches the trail as "System" has thrown that away.
+ *
+ * NOTE the ids: every candidate here is a user_profile id, because
+ * audit_event.actor_id is a foreign key to user_profile. guardian.id is NOT one
+ * — writing it fails the constraint and, since logAuditEvent never throws,
+ * loses the event entirely. The guardian is identified by user_id or not at
+ * all.
+ */
+export function resolveDeclineActor(input: {
+  actingStaffUserId?: string | null;
+  /** The authenticated user resolved by the family ownership check. */
+  authenticatedUserId?: string | null;
+  /** The caller-supplied user id, kept for existing call sites. */
+  declinedBy?: string | null;
+  /** guardian.user_id from the offer — null for a guardian with no portal account. */
+  guardianUserId?: string | null;
+}): ResolvedDeclineActor {
+  if (input.actingStaffUserId) {
+    return { actorId: input.actingStaffUserId, kind: "staff_on_behalf" };
+  }
+  return {
+    actorId: input.authenticatedUserId ?? input.declinedBy ?? input.guardianUserId ?? null,
+    kind: "family",
+  };
+}
+
 /**
  * Decline an offer (called by family, or by staff on a family's behalf).
  */
@@ -342,6 +384,7 @@ export async function declineOffer(
   }
 
   const actingStaffUserId = options?.actingStaffUserId ?? null;
+  let authenticatedUserId: string | null = null;
 
   if (!actingStaffUserId) {
     // Family path: the signed-in user must be the guardian on the offer.
@@ -351,6 +394,9 @@ export async function declineOffer(
     if (!offerGuardian.user_id || offerGuardian.user_id !== user.id) {
       return { data: null, error: "Not authorized" };
     }
+    // The check above already proved this user IS the guardian on the offer,
+    // so it is the right name to put on the decline.
+    authenticatedUserId = user.id;
   }
 
   const supabase = ownerCheck;
@@ -392,18 +438,34 @@ export async function declineOffer(
     .update({ status: "declined", updated_at: new Date().toISOString() })
     .eq("id", offer.application_id);
 
+  const declineActor = resolveDeclineActor({
+    actingStaffUserId,
+    authenticatedUserId,
+    declinedBy,
+    guardianUserId: offerGuardian.user_id,
+  });
+
   await logAuditEvent({
     table_name: "offer",
     record_id: offerId,
     action: AuditAction.StatusChange,
-    actor_id: actingStaffUserId ?? declinedBy ?? offerGuardian.id,
+    actor_id: declineActor.actorId,
     campus_id: offer.campus_id ?? null,
     old_data: { status: "pending" },
-    new_data: { status: "declined" },
+    // declined_by and decline_reason live in new_data, not metadata, because
+    // new_data is what the Audit Trail actually stores and shows. Whether the
+    // family declined or staff recorded a decline for them is the point of the
+    // record; it cannot ride in a field a reader may never see.
+    new_data: {
+      status: "declined",
+      declined_by: declineActor.kind,
+      decline_reason: options?.reason ?? null,
+    },
     metadata: {
       application_id: offer.application_id,
       decline_reason: options?.reason ?? null,
-      on_behalf_of_family: !!actingStaffUserId,
+      guardian_id: offerGuardian.id,
+      on_behalf_of_family: declineActor.kind === "staff_on_behalf",
     },
   });
 
