@@ -159,7 +159,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
     if (!storagePath) return;
     const { url, error } = await getSignedUrl(storagePath);
     if (error) {
-      toast({ variant: "error", title: t("docs.couldNotOpen"), description: error });
+      toast({ variant: "error", title: t("docs.couldNotOpen"), description: error, dismissLabel: t("common.dismiss") });
       return;
     }
     if (url) {
@@ -328,13 +328,13 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
         initialDocType={prefilledDocType}
         initialAppId={prefilledAppId}
         onUploadComplete={(message) => {
-          toast({ variant: "success", title: t("toast.docUploaded"), description: message });
+          toast({ variant: "success", title: t("toast.docUploaded"), description: message, dismissLabel: t("common.dismiss") });
           startTransition(() => {
             router.refresh();
           });
         }}
         onError={(message) => {
-          toast({ variant: "error", title: t("toast.docUploadFailed"), description: message });
+          toast({ variant: "error", title: t("toast.docUploadFailed"), description: message, dismissLabel: t("common.dismiss") });
         }}
       />
     </div>
@@ -521,7 +521,7 @@ function UploadDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent closeLabel={t("common.close")}>
         <DialogHeader>
           <DialogTitle>{initialDocType ? t("docs.reuploadTitle") : t("docs.upload")}</DialogTitle>
           <DialogDescription>

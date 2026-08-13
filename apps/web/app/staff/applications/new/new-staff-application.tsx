@@ -597,29 +597,50 @@ export function StaffNewApplicationForm({
               Home Address
             </p>
             <div className="space-y-3">
-              <Input
-                value={form.address}
-                onChange={(e) => updateField("address", e.target.value)}
-                placeholder="Street address"
-              />
+              <div>
+                <label htmlFor="new-app-address" className="block text-sm font-medium text-ink/70 mb-1">
+                  Street Address
+                </label>
+                <Input
+                  id="new-app-address"
+                  value={form.address}
+                  onChange={(e) => updateField("address", e.target.value)}
+                />
+              </div>
               <div className="grid grid-cols-3 gap-3">
-                <Input
-                  value={form.city}
-                  onChange={(e) => updateField("city", e.target.value)}
-                  placeholder="City"
-                />
-                <Input
-                  value={form.state}
-                  onChange={(e) => updateField("state", e.target.value)}
-                  placeholder="State"
-                  maxLength={2}
-                />
-                <Input
-                  value={form.zip}
-                  onChange={(e) => updateField("zip", e.target.value)}
-                  placeholder="ZIP"
-                  maxLength={10}
-                />
+                <div>
+                  <label htmlFor="new-app-city" className="block text-sm font-medium text-ink/70 mb-1">
+                    City
+                  </label>
+                  <Input
+                    id="new-app-city"
+                    value={form.city}
+                    onChange={(e) => updateField("city", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="new-app-state" className="block text-sm font-medium text-ink/70 mb-1">
+                    State
+                  </label>
+                  <Input
+                    id="new-app-state"
+                    value={form.state}
+                    onChange={(e) => updateField("state", e.target.value)}
+                    maxLength={2}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="new-app-zip" className="block text-sm font-medium text-ink/70 mb-1">
+                    ZIP
+                  </label>
+                  <Input
+                    id="new-app-zip"
+                    value={form.zip}
+                    onChange={(e) => updateField("zip", e.target.value)}
+                    placeholder="e.g. 43215"
+                    maxLength={10}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -630,28 +651,44 @@ export function StaffNewApplicationForm({
               Emergency Contact
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Input
-                value={form.emergencyContactName}
-                onChange={(e) =>
-                  updateField("emergencyContactName", e.target.value)
-                }
-                placeholder="Contact name"
-              />
-              <Input
-                type="tel"
-                value={form.emergencyContactPhone}
-                onChange={(e) =>
-                  updateField("emergencyContactPhone", e.target.value)
-                }
-                placeholder="Phone number"
-              />
-              <Input
-                value={form.emergencyContactRelationship}
-                onChange={(e) =>
-                  updateField("emergencyContactRelationship", e.target.value)
-                }
-                placeholder="Relationship"
-              />
+              <div>
+                <label htmlFor="new-app-emergency-name" className="block text-sm font-medium text-ink/70 mb-1">
+                  Contact Name
+                </label>
+                <Input
+                  id="new-app-emergency-name"
+                  value={form.emergencyContactName}
+                  onChange={(e) =>
+                    updateField("emergencyContactName", e.target.value)
+                  }
+                />
+              </div>
+              <div>
+                <label htmlFor="new-app-emergency-phone" className="block text-sm font-medium text-ink/70 mb-1">
+                  Phone Number
+                </label>
+                <Input
+                  id="new-app-emergency-phone"
+                  type="tel"
+                  value={form.emergencyContactPhone}
+                  onChange={(e) =>
+                    updateField("emergencyContactPhone", e.target.value)
+                  }
+                  placeholder="(555) 123-4567"
+                />
+              </div>
+              <div>
+                <label htmlFor="new-app-emergency-relationship" className="block text-sm font-medium text-ink/70 mb-1">
+                  Relationship
+                </label>
+                <Input
+                  id="new-app-emergency-relationship"
+                  value={form.emergencyContactRelationship}
+                  onChange={(e) =>
+                    updateField("emergencyContactRelationship", e.target.value)
+                  }
+                />
+              </div>
             </div>
           </div>
         </CardContent>

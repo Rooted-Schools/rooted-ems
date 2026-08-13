@@ -1086,7 +1086,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
               if (!open) setCompletionError(null);
             }}
           >
-            <DialogContent>
+            <DialogContent closeLabel={t("common.close")}>
               <DialogHeader>
                 <DialogTitle>{t(config.titleKey)}</DialogTitle>
                 <DialogDescription>{t(config.descKey)}</DialogDescription>
