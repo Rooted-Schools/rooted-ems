@@ -359,27 +359,27 @@ export function StaffApplicationsClient({
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-t-4 border-t-blue-500">
+        <Card className="border-t-4 border-t-info">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Submitted
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-blue-600">
+            <p className="text-2xl font-bold text-info">
               {stats.submitted}
             </p>
             <p className="text-xs text-stone mt-1">awaiting review</p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-amber-500">
+        <Card className="border-t-4 border-t-warn">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Needs Info
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-amber-600">
+            <p className="text-2xl font-bold text-warn">
               {stats.needs_info}
             </p>
             <p className="text-xs text-stone mt-1">
@@ -387,14 +387,14 @@ export function StaffApplicationsClient({
             </p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-emerald-500">
+        <Card className="border-t-4 border-t-rooted-green">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Verified
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-emerald-600">
+            <p className="text-2xl font-bold text-rooted-green">
               {stats.verified}
             </p>
             <p className="text-xs text-stone mt-1">ready for lottery</p>

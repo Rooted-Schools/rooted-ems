@@ -62,6 +62,7 @@ export function DocumentQueueClient({ initialRows, stats, campusOptions }: Props
 
   // Approval state
   const [approveTarget, setApproveTarget] = useState<PendingDocumentRow | null>(null);
+  const [approveError, setApproveError] = useState<string | null>(null);
 
   // Rejection state
   const [rejectTarget, setRejectTarget] = useState<PendingDocumentRow | null>(null);
@@ -76,9 +77,12 @@ export function DocumentQueueClient({ initialRows, stats, campusOptions }: Props
 
   // ── Approve handler ──────────────────────────────────────────────────────
   const handleApprove = (doc: PendingDocumentRow) => {
+    setApproveError(null);
     startTransition(async () => {
       const result = await staffApproveDocument(doc.id);
-      if (!result.error) {
+      if (result.error) {
+        setApproveError(result.error);
+      } else {
         setRows((prev) => prev.filter((r) => r.id !== doc.id));
         setApproveTarget(null);
       }
@@ -129,7 +133,7 @@ export function DocumentQueueClient({ initialRows, stats, campusOptions }: Props
         </Card>
         <Card>
           <CardContent className="py-4 text-center">
-            <p className={`text-2xl font-bold ${stats.oldest_pending_days != null && stats.oldest_pending_days > 3 ? "text-amber-600" : "text-ink"}`}>
+            <p className={`text-2xl font-bold ${stats.oldest_pending_days != null && stats.oldest_pending_days > 3 ? "text-warn-text" : "text-ink"}`}>
               {stats.oldest_pending_days != null ? `${stats.oldest_pending_days}d` : "—"}
             </p>
             <p className="text-xs text-stone mt-0.5">Oldest Pending</p>
@@ -230,7 +234,10 @@ export function DocumentQueueClient({ initialRows, stats, campusOptions }: Props
                     <Button
                       size="sm"
                       className="bg-rooted-green hover:bg-rooted-green/90 text-white"
-                      onClick={() => setApproveTarget(doc)}
+                      onClick={() => {
+                        setApproveTarget(doc);
+                        setApproveError(null);
+                      }}
                       disabled={isPending}
                     >
                       Approve
@@ -238,7 +245,7 @@ export function DocumentQueueClient({ initialRows, stats, campusOptions }: Props
                     <Button
                       size="sm"
                       variant="outline"
-                      className="text-red-600 border-red-200 hover:bg-red-50"
+                      className="text-error border-error/30 hover:bg-error/10"
                       onClick={() => {
                         setRejectTarget(doc);
                         setRejectReason("");
@@ -257,7 +264,13 @@ export function DocumentQueueClient({ initialRows, stats, campusOptions }: Props
       )}
 
       {/* ── Approve confirmation dialog ── */}
-      <Dialog open={!!approveTarget} onOpenChange={() => setApproveTarget(null)}>
+      <Dialog
+        open={!!approveTarget}
+        onOpenChange={() => {
+          setApproveTarget(null);
+          setApproveError(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Approve Document?</DialogTitle>
@@ -267,8 +280,18 @@ export function DocumentQueueClient({ initialRows, stats, campusOptions }: Props
               document as verified and notifies the family.
             </DialogDescription>
           </DialogHeader>
+          {approveError && (
+            <p className="text-xs text-error">{approveError}</p>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setApproveTarget(null)} disabled={isPending}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setApproveTarget(null);
+                setApproveError(null);
+              }}
+              disabled={isPending}
+            >
               Cancel
             </Button>
             <Button
@@ -302,7 +325,7 @@ export function DocumentQueueClient({ initialRows, stats, campusOptions }: Props
           </DialogHeader>
           <div className="space-y-2 py-2">
             <label className="text-sm font-medium text-ink">
-              Reason for rejection <span className="text-red-500">*</span>
+              Reason for rejection <span className="text-error">*</span>
             </label>
             <Input
               placeholder="e.g. Document is blurry, wrong document type, expired…"
@@ -314,7 +337,7 @@ export function DocumentQueueClient({ initialRows, stats, campusOptions }: Props
               disabled={isPending}
             />
             {rejectError && (
-              <p className="text-xs text-red-600">{rejectError}</p>
+              <p className="text-xs text-error">{rejectError}</p>
             )}
           </div>
           <DialogFooter>

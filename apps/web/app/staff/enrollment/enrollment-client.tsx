@@ -128,7 +128,7 @@ export function EnrollmentClient({
       </div>
 
       {error && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</div>
+        <div className="rounded-md bg-error/10 p-3 text-sm text-error">{error}</div>
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -143,25 +143,25 @@ export function EnrollmentClient({
             <p className="text-xs text-stone mt-1">all time</p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-emerald-500">
+        <Card className="border-t-4 border-t-rooted-green">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Active
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-emerald-600">{stats.active}</p>
+            <p className="text-2xl font-bold text-rooted-green">{stats.active}</p>
             <p className="text-xs text-stone mt-1">currently enrolled</p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-blue-500">
+        <Card className="border-t-4 border-t-info">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               SIS Synced
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-blue-600">{stats.sis_synced}</p>
+            <p className="text-2xl font-bold text-info">{stats.sis_synced}</p>
             <p className="text-xs text-stone mt-1">
               {stats.active > 0
                 ? `${Math.round((stats.sis_synced / stats.active) * 100)}% of active`
@@ -176,7 +176,7 @@ export function EnrollmentClient({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className={`text-2xl font-bold ${stats.withdrawn === 0 ? "text-stone/50" : "text-red-600"}`}>
+            <p className={`text-2xl font-bold ${stats.withdrawn === 0 ? "text-stone/50" : "text-error"}`}>
               {stats.withdrawn}
             </p>
             <p className="text-xs text-stone mt-1">
@@ -236,7 +236,7 @@ export function EnrollmentClient({
                               {(packetStatusConfig[enrollment.packet_status] ?? packetStatusConfig.pending).label}
                             </Badge>
                             {enrollment.packet_status === "submitted" && (
-                              <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" title="Awaiting review" />
+                              <span className="w-2 h-2 rounded-full bg-info shrink-0" title="Awaiting review" />
                             )}
                           </div>
                         ) : (
@@ -276,7 +276,13 @@ export function EnrollmentClient({
                         )}
                       </TableCell>
                       <TableCell className="text-stone">
-                        {enrollment.enrolled_at ?? "—"}
+                        {enrollment.enrolled_at
+                          ? new Date(enrollment.enrolled_at).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          : "—"}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 flex-wrap">

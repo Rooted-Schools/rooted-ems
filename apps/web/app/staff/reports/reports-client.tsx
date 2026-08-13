@@ -58,16 +58,16 @@ function Bar({ value, max, color = "bg-rooted-green", className = "" }: { value:
 
 /* ─── Status color map for pipeline bars ─── */
 const STATUS_COLORS: Record<string, string> = {
-  submitted: "bg-blue-400",
-  needs_info: "bg-amber-400",
-  verified: "bg-green-400",
-  lottery_assigned: "bg-purple-400",
-  offered: "bg-indigo-400",
-  accepted: "bg-emerald-500",
+  submitted: "bg-info/60",
+  needs_info: "bg-warn",
+  verified: "bg-rooted-green/50",
+  lottery_assigned: "bg-info",
+  offered: "bg-info/80",
+  accepted: "bg-rooted-green/70",
   registered: "bg-rooted-green",
-  waitlisted: "bg-orange-400",
+  waitlisted: "bg-warn/60",
   withdrawn: "bg-stone/50",
-  declined: "bg-red-300",
+  declined: "bg-error",
 };
 
 export function ReportsClient({
@@ -222,22 +222,22 @@ export function ReportsClient({
             <p className="text-2xl font-bold mt-1">{totalApps}</p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-emerald-500">
+        <Card className="border-t-4 border-t-rooted-green">
           <CardContent className="py-4">
             <p className="text-xs text-stone uppercase tracking-wider font-medium">Registered</p>
-            <p className="text-2xl font-bold text-emerald-600 mt-1">{registeredCount}</p>
+            <p className="text-2xl font-bold text-rooted-green mt-1">{registeredCount}</p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-blue-500">
+        <Card className="border-t-4 border-t-info">
           <CardContent className="py-4">
             <p className="text-xs text-stone uppercase tracking-wider font-medium">Conversion Rate</p>
-            <p className="text-2xl font-bold text-blue-600 mt-1">{conversionRate}%</p>
+            <p className="text-2xl font-bold text-info mt-1">{conversionRate}%</p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-purple-500">
+        <Card className="border-t-4 border-t-info">
           <CardContent className="py-4">
             <p className="text-xs text-stone uppercase tracking-wider font-medium">Seat Utilization</p>
-            <p className="text-2xl font-bold text-purple-600 mt-1">{utilizationRate}%</p>
+            <p className="text-2xl font-bold text-info mt-1">{utilizationRate}%</p>
           </CardContent>
         </Card>
       </div>
@@ -316,7 +316,7 @@ export function ReportsClient({
                         />
                         {/* Accepted (lighter green, stacked) */}
                         <div
-                          className="absolute left-0 top-0 h-3 bg-emerald-300 rounded-l-full"
+                          className="absolute left-0 top-0 h-3 bg-rooted-green/40 rounded-l-full"
                           style={{ width: `${row.total_seats > 0 ? ((row.seats_registered + row.seats_accepted) / row.total_seats) * 100 : 0}%` }}
                         />
                         {/* Registered on top */}
@@ -328,7 +328,7 @@ export function ReportsClient({
                     </div>
                     <div className="text-right w-20 shrink-0">
                       <span className="text-xs font-bold">{row.seats_registered}/{row.total_seats}</span>
-                      <span className={`text-[10px] ml-1 ${fillPct >= 90 ? "text-red-500" : fillPct >= 70 ? "text-amber-500" : "text-stone"}`}>
+                      <span className={`text-[10px] ml-1 ${fillPct >= 90 ? "text-error" : fillPct >= 70 ? "text-warn-text" : "text-stone"}`}>
                         ({fillPct.toFixed(0)}%)
                       </span>
                     </div>
@@ -342,7 +342,7 @@ export function ReportsClient({
                 <span className="text-[10px] text-stone">Registered</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-emerald-300" />
+                <div className="w-3 h-3 rounded-sm bg-rooted-green/40" />
                 <span className="text-[10px] text-stone">Accepted</span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -388,7 +388,7 @@ export function ReportsClient({
               <div className="flex items-center gap-3">
                 <span className="text-xs font-medium text-ink/60 w-28 text-right">Responded</span>
                 <div className="flex-1">
-                  <Bar value={reenrollResponded} max={reenroll.eligible} color="bg-blue-400" />
+                  <Bar value={reenrollResponded} max={reenroll.eligible} color="bg-info" />
                 </div>
                 <span className="text-xs font-bold text-ink/70 w-28 text-right">
                   {reenrollResponseRate}% of {reenroll.eligible}
@@ -489,7 +489,7 @@ export function ReportsClient({
                         {row.group}
                       </span>
                       <div className="flex-1">
-                        <Bar value={row.count} max={maxCount} color="bg-purple-400" />
+                        <Bar value={row.count} max={maxCount} color="bg-info" />
                       </div>
                       <span className="text-xs font-bold text-ink/70 w-10 text-right">{row.count}</span>
                       <span className="text-[10px] text-stone w-12 text-right">{pct}%</span>

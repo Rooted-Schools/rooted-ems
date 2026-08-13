@@ -424,8 +424,8 @@ export function StaffLotteryDetailClient({
         <div
           className={`p-3 rounded-lg text-sm font-medium ${
             feedback.type === "success"
-              ? "bg-green-50 text-green-800 border border-green-200"
-              : "bg-red-50 text-red-800 border border-red-200"
+              ? "bg-rooted-green/10 text-deep-green border border-rooted-green/30"
+              : "bg-error/10 text-error border border-error/30"
           }`}
         >
           {feedback.message}
@@ -508,7 +508,7 @@ export function StaffLotteryDetailClient({
 
       {/* Simulation Results — read-only what-if, nothing is written */}
       {simulation && (
-        <Card className="border-amber-300 bg-amber-50/50">
+        <Card className="border-warn/30 bg-warn/5">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">
@@ -537,15 +537,15 @@ export function StaffLotteryDetailClient({
                   <TableRow key={tier.tier}>
                     <TableCell className="font-medium">{tier.label}</TableCell>
                     <TableCell className="text-right">{tier.entries}</TableCell>
-                    <TableCell className="text-right text-green-700 font-medium">{tier.selected}</TableCell>
-                    <TableCell className="text-right text-amber-700 font-medium">{tier.waitlisted}</TableCell>
+                    <TableCell className="text-right text-deep-green font-medium">{tier.selected}</TableCell>
+                    <TableCell className="text-right text-warn-text font-medium">{tier.waitlisted}</TableCell>
                   </TableRow>
                 ))}
                 <TableRow>
                   <TableCell className="font-semibold">Total</TableCell>
                   <TableCell className="text-right font-semibold">{simulation.total_entries}</TableCell>
-                  <TableCell className="text-right font-semibold text-green-700">{simulation.selected_total}</TableCell>
-                  <TableCell className="text-right font-semibold text-amber-700">{simulation.waitlisted_total}</TableCell>
+                  <TableCell className="text-right font-semibold text-deep-green">{simulation.selected_total}</TableCell>
+                  <TableCell className="text-right font-semibold text-warn-text">{simulation.waitlisted_total}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
@@ -586,51 +586,51 @@ export function StaffLotteryDetailClient({
             <p className="text-xs text-stone mt-1">entered in lottery</p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-blue-500">
+        <Card className="border-t-4 border-t-info">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Seats
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-blue-600">{run.seats}</p>
+            <p className="text-2xl font-bold text-info">{run.seats}</p>
             <p className="text-xs text-stone mt-1">available capacity</p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-emerald-500">
+        <Card className="border-t-4 border-t-rooted-green">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Offered
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-emerald-600">{offeredCount}</p>
+            <p className="text-2xl font-bold text-rooted-green">{offeredCount}</p>
             <p className="text-xs text-stone mt-1">
               {offeredCount === 0 ? "run lottery first" : "seats offered"}
             </p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-amber-500">
+        <Card className="border-t-4 border-t-warn">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Waitlisted
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-amber-600">{waitlistedCount}</p>
+            <p className="text-2xl font-bold text-warn-text">{waitlistedCount}</p>
             <p className="text-xs text-stone mt-1">
               {waitlistedCount === 0 ? "none" : "waiting for seats"}
             </p>
           </CardContent>
         </Card>
-        <Card className={`border-t-4 ${overSubscribed ? "border-t-red-500" : "border-t-stone/30"}`}>
+        <Card className={`border-t-4 ${overSubscribed ? "border-t-error" : "border-t-stone/30"}`}>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Over Capacity
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className={`text-2xl font-bold ${overSubscribed ? "text-red-600" : "text-stone/50"}`}>
+            <p className={`text-2xl font-bold ${overSubscribed ? "text-error" : "text-stone/50"}`}>
               {overSubscribed ? `+${run.applicants - run.seats}` : "0"}
             </p>
             <p className="text-xs text-stone mt-1">
@@ -829,7 +829,7 @@ export function StaffLotteryDetailClient({
               This generates a new random draw and replaces the current preview results. Families shown as Offered may change.
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm space-y-1">
+          <div className="rounded-lg bg-warn/10 border border-warn/30 p-3 text-sm space-y-1">
             <p className="font-medium text-ink">{run.name}</p>
             <p className="text-stone">{run.campus} &middot; {run.grade}</p>
           </div>
@@ -851,7 +851,7 @@ export function StaffLotteryDetailClient({
               This creates an immutable record of results and cannot be undone. Once finalized, you can send enrollment offers.
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm space-y-1">
+          <div className="rounded-lg bg-warn/10 border border-warn/30 p-3 text-sm space-y-1">
             <p className="font-medium text-ink">{run.name}</p>
             <p className="text-stone">{run.campus} &middot; {run.grade}</p>
             <p className="text-stone">{offeredCount} offered &middot; {waitlistedCount} waitlisted</p>
@@ -895,7 +895,7 @@ export function StaffLotteryDetailClient({
               email/text them their result. This can&apos;t be undone.
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm space-y-1">
+          <div className="rounded-lg bg-warn/10 border border-warn/30 p-3 text-sm space-y-1">
             <p className="font-medium text-ink">{run.name}</p>
             <p className="text-stone">{run.campus} &middot; {run.grade}</p>
             <p className="text-stone">{waitlistedCount} not selected</p>
@@ -919,10 +919,10 @@ export function StaffLotteryDetailClient({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm space-y-1">
+            <div className="rounded-lg bg-rooted-green/10 border border-rooted-green/30 p-3 text-sm space-y-1">
               <p className="font-medium text-ink">{run.name}</p>
               <p className="text-stone">{run.campus} &middot; {run.grade}</p>
-              <p className="text-emerald-700 font-medium">{offeredCount} offer{offeredCount !== 1 ? "s" : ""} will be sent</p>
+              <p className="text-deep-green font-medium">{offeredCount} offer{offeredCount !== 1 ? "s" : ""} will be sent</p>
             </div>
             <p className="text-xs text-stone">
               Families will be notified immediately by email and text (where opted in).

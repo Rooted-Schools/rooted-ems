@@ -94,7 +94,7 @@ export function StaffMessagesClient({ messages }: StaffMessagesClientProps) {
           <Card
             className={`cursor-pointer transition-all ${
               filter === "unread" && unreadCount > 0
-                ? "ring-2 ring-amber-400/50 border-amber-300"
+                ? "ring-2 ring-warn/50 border-warn"
                 : ""
             }`}
             onClick={() =>
@@ -103,11 +103,11 @@ export function StaffMessagesClient({ messages }: StaffMessagesClientProps) {
           >
             <CardContent className="py-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                  <IconMail size={20} className="text-amber-600" />
+                <div className="w-10 h-10 rounded-full bg-warn/10 flex items-center justify-center shrink-0">
+                  <IconMail size={20} className="text-warn-text" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-amber-600">{unreadCount}</p>
+                  <p className="text-2xl font-bold text-warn-text">{unreadCount}</p>
                   <p className="text-xs text-stone">Unread</p>
                 </div>
               </div>
@@ -180,7 +180,7 @@ export function StaffMessagesClient({ messages }: StaffMessagesClientProps) {
                   key={msg.id}
                   className={`flex items-start gap-3 p-3.5 rounded-lg border transition-all ${
                     !msg.is_read
-                      ? "border-amber-200 bg-amber-50/40 shadow-sm"
+                      ? "border-warn/40 bg-warn/5 shadow-sm"
                       : "border-rooted-gray hover:border-stone/20"
                   }`}
                 >
@@ -188,7 +188,7 @@ export function StaffMessagesClient({ messages }: StaffMessagesClientProps) {
                   <div className="relative shrink-0 mt-0.5">
                     <div
                       className={`w-9 h-9 rounded-full flex items-center justify-center ${
-                        !msg.is_read ? "bg-amber-100" : "bg-rooted-gray-light"
+                        !msg.is_read ? "bg-warn/10" : "bg-rooted-gray-light"
                       }`}
                     >
                       <span className="shrink-0" aria-hidden="true">
@@ -196,7 +196,7 @@ export function StaffMessagesClient({ messages }: StaffMessagesClientProps) {
                       </span>
                     </div>
                     {!msg.is_read && (
-                      <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-amber-500 border-2 border-white" />
+                      <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-warn border-2 border-white" />
                     )}
                   </div>
 
