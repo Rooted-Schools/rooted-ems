@@ -220,6 +220,8 @@ const dict = {
   "reg.dialog.signInstruct":   { en: "Draw your signature above using your mouse or finger", es: "Dibuje su firma con el mouse o su dedo" },
   "reg.dialog.signRequired":   { en: "Please sign above to complete this acknowledgement.", es: "Por favor firme arriba para completar este acuerdo." },
   "reg.dialog.clear":          { en: "Clear",                es: "Borrar" },
+  "reg.dialog.errorTryAgain":  { en: "Nothing was lost. Please try again.", es: "No se perdió nada. Por favor intente de nuevo." },
+  "reg.dialog.errorSignatureKept": { en: "Your signature was saved here. Please try again.", es: "Su firma se conservó aquí. Por favor intente de nuevo." },
   "reg.upload.clickToChoose":  { en: "Click to choose a file",  es: "Haga clic para elegir un archivo" },
   "reg.upload.formats":        { en: "PDF, JPEG, or PNG — max 10MB", es: "PDF, JPEG o PNG — máx. 10 MB" },
   "reg.upload.whatToUpload":   { en: "What to upload:",     es: "Qué cargar:" },
@@ -645,6 +647,7 @@ const dict = {
   "common.no":              { en: "No",                es: "No" },
   "common.at":              { en: "at",                es: "en" },
   "common.back":            { en: "Back",              es: "Atrás" },
+  "common.cancel":          { en: "Cancel",            es: "Cancelar" },
   "common.continue":        { en: "Continue",          es: "Continuar" },
   "common.updated":         { en: "Updated",           es: "Actualizado" },
   "common.day":             { en: "day",               es: "día" },
@@ -860,6 +863,59 @@ const dict = {
   "apps.detail.timelineDesc":   { en: "Track the progress of this application.", es: "Siga el progreso de esta solicitud." },
   "apps.detail.noActivity":     { en: "No activity recorded yet — updates will appear here as your application moves through review.", es: "Aún no hay actividad registrada — las actualizaciones aparecerán aquí a medida que su solicitud avance en la revisión." },
   "apps.detail.applicationId":  { en: "ID:", es: "ID:" },
+
+  // ─── Application detail: actions, cards, and confirmations ────────────────
+  // Every family-facing string on the detail screen lives here. Families
+  // accept, decline, and withdraw from this page, so the confirmation dialogs
+  // must read in the family's own language before an irreversible action.
+  "apps.detail.backToApplications": { en: "Back to My Applications", es: "Volver a Mis Solicitudes" },
+  "apps.detail.decline":            { en: "Decline",     es: "Rechazar" },
+  "apps.detail.withdraw":           { en: "Withdraw",    es: "Retirar" },
+  "apps.detail.withdrawing":        { en: "Withdrawing...", es: "Retirando..." },
+  "apps.detail.seatOfferTitle":     { en: "You Have a Seat Offer!", es: "¡Tiene una Oferta de Cupo!" },
+
+  // Post-submission confirmation card
+  "apps.detail.submittedTitle": { en: "Application submitted. You're all set for now.", es: "Solicitud enviada. Por ahora no tiene que hacer nada más." },
+  "apps.detail.submittedBody":  { en: "Our enrollment team will review your application and may reach out if they need anything. You'll receive an in-app notification here when there's an update.", es: "Nuestro equipo de inscripción revisará su solicitud y puede comunicarse con usted si necesita algo. Recibirá un aviso aquí en la aplicación cuando haya una actualización." },
+  "apps.detail.whatHappensNext": { en: "What happens next", es: "Qué sigue" },
+  "apps.detail.next1": { en: "Enrollment staff reviews your application", es: "El personal de inscripción revisa su solicitud" },
+  "apps.detail.next2": { en: "If everything looks good, your student enters the lottery", es: "Si todo está en orden, su estudiante entra al sorteo" },
+  "apps.detail.next3": { en: "Lottery results are shared, and you'll be notified of any seat offer", es: "Se comparten los resultados del sorteo y le avisaremos si recibe una oferta de cupo" },
+  "apps.detail.next4": { en: "Accept your offer and complete registration to finalize enrollment", es: "Acepte su oferta y complete el registro para finalizar la inscripción" },
+  "apps.detail.docsMayBeRequired": { en: "Documents may be required.", es: "Es posible que se requieran documentos." },
+  "apps.detail.goToDocumentsLink": { en: "Go to Documents", es: "Ir a Documentos" },
+  "apps.detail.docsUploadHint":    { en: "to upload proof of residency, birth certificate, and other required items.", es: "para cargar el comprobante de domicilio, el acta de nacimiento y otros documentos requeridos." },
+
+  // Needs-more-info response form
+  "apps.detail.needsInfoTitle":      { en: "What the enrollment team needs from you", es: "Lo que el equipo de inscripción necesita de usted" },
+  "apps.detail.yourResponse":        { en: "Your response", es: "Su respuesta" },
+  "apps.detail.responsePlaceholder": { en: "Type your response here… (optional if uploading a file)", es: "Escriba su respuesta aquí… (opcional si va a cargar un archivo)" },
+  "apps.detail.attachFile":          { en: "Attach a file (optional)", es: "Adjuntar un archivo (opcional)" },
+  "apps.detail.sendResponse":        { en: "Send Response", es: "Enviar Respuesta" },
+  "apps.detail.sending":             { en: "Sending…",      es: "Enviando…" },
+  "apps.detail.responseSent":        { en: "Your response has been sent. The enrollment team will follow up.", es: "Su respuesta fue enviada. El equipo de inscripción se comunicará con usted." },
+
+  // Action feedback
+  "apps.detail.offerDeclinedMsg":    { en: "Offer declined.", es: "Oferta rechazada." },
+  "apps.detail.withdrawnMsg":        { en: "Application withdrawn successfully.", es: "La solicitud se retiró correctamente." },
+
+  // Detail cards
+  "apps.detail.studentInfo":     { en: "Student Information", es: "Información del Estudiante" },
+  "apps.detail.contactInfo":     { en: "Contact Information", es: "Información de Contacto" },
+  "apps.detail.fullName":        { en: "Full Name",  es: "Nombre Completo" },
+  "apps.detail.guardian":        { en: "Guardian",   es: "Padre, Madre o Tutor" },
+  "apps.detail.email":           { en: "Email",      es: "Correo Electrónico" },
+  "apps.detail.phone":           { en: "Phone",      es: "Teléfono" },
+  "apps.detail.documentsTitle":  { en: "Documents",  es: "Documentos" },
+  "apps.detail.documentsDesc":   { en: "Documents uploaded with this application.", es: "Documentos cargados con esta solicitud." },
+  "apps.detail.uploadDocument":  { en: "Upload Document", es: "Cargar Documento" },
+
+  // Confirmation dialogs — irreversible actions
+  "apps.detail.declineDialogTitle": { en: "Decline Seat Offer", es: "Rechazar la Oferta de Cupo" },
+  "apps.detail.declineDialogBody":  { en: "Are you sure you want to decline this seat offer for {name}? This action cannot be undone, and the seat will be offered to the next student on the waitlist.", es: "¿Está seguro de que desea rechazar esta oferta de cupo para {name}? Esta acción no se puede deshacer y el cupo se le ofrecerá al siguiente estudiante en la lista de espera." },
+  "apps.detail.withdrawDialogTitle": { en: "Withdraw Application", es: "Retirar la Solicitud" },
+  "apps.detail.withdrawDialogBody":  { en: "Are you sure you want to withdraw {name}'s application? This action cannot be undone. You would need to submit a new application to re-apply.", es: "¿Está seguro de que desea retirar la solicitud de {name}? Esta acción no se puede deshacer. Tendría que enviar una solicitud nueva para volver a postularse." },
+  "apps.detail.withdrawConfirm":     { en: "Withdraw Application", es: "Retirar Solicitud" },
 
   // ─── Camera-first capture (UX Phase 5A) ───────────────────────────────────
   "docs.captureHint":         { en: "Lay the document flat, fill the frame, and avoid glare.", es: "Coloque el documento en una superficie plana, llene el encuadre y evite el brillo." },

@@ -500,6 +500,10 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
   const [uploadCompressing, setUploadCompressing] = useState(false);
   const [uploadValidationError, setUploadValidationError] = useState<FileValidationError | null>(null);
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  // Errors raised while completing an item are shown INSIDE the dialog, not in
+  // the page-level banner far above the fold, so a family that just drew a
+  // signature actually sees why the save failed.
+  const [completionError, setCompletionError] = useState<string | null>(null);
 
   if (enrollments.length === 0) {
     return (
@@ -569,6 +573,7 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
     setUploadValidationError(null);
     setSignatureDataUrl(null);
     setError(null);
+    setCompletionError(null);
     setCompletionOpen(true);
   }
 
@@ -577,10 +582,13 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
     const { itemId, itemType, itemName } = completionTarget;
     const config = getCompletionConfig(itemType);
 
+    // The dialog deliberately stays OPEN while the save is in flight. Closing
+    // it first unmounted the signature pad, so any failure wiped a signature
+    // the family had already drawn and forced them to draw it again.
     setLoadingItem(itemId);
     setError(null);
+    setCompletionError(null);
     setSuccess(null);
-    setCompletionOpen(false);
 
     const payload: Record<string, unknown> = {
       acknowledged: true,
@@ -598,9 +606,9 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
     if (config.mode === "upload" && uploadSelectedFile) {
       const uploadResult = await uploadFile(uploadSelectedFile, userId);
       if (uploadResult.error) {
-        setError(uploadResult.error);
+        // Keep the dialog and everything they entered; show why it failed here.
+        setCompletionError(uploadResult.error);
         setLoadingItem(null);
-        setCompletionOpen(true); // re-open so they can try again
         return;
       }
       await familyCreateDocumentRecord({
@@ -619,13 +627,19 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
     const result = await familyCompleteRegistrationItem(itemId, payload);
 
     if (result.error) {
-      setError(result.error);
-    } else {
-      setSuccess(`"${itemName}" ${t("reg.itemCompleted")}`);
-      router.refresh();
+      // Failure path: leave the dialog open with the signature, form answers
+      // and selected file intact so the family can simply press submit again.
+      setCompletionError(result.error);
+      setLoadingItem(null);
+      return;
     }
+
+    setSuccess(`"${itemName}" ${t("reg.itemCompleted")}`);
+    router.refresh();
     setLoadingItem(null);
+    setCompletionOpen(false);
     setCompletionTarget(null);
+    setCompletionError(null);
     setUploadSelectedFile(null);
     setUploadWasCompressed(false);
     setUploadValidationError(null);
@@ -1059,8 +1073,19 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
               ? completionAck && !!signatureDataUrl
               : !!uploadSelectedFile && !uploadValidationError; // upload mode: file selected and valid
 
+        const isSavingItem = loadingItem === completionTarget.itemId;
+
         return (
-          <Dialog open={completionOpen} onOpenChange={setCompletionOpen}>
+          <Dialog
+            open={completionOpen}
+            onOpenChange={(open) => {
+              // Don't let a stray click dismiss the dialog mid-save — that is
+              // what used to lose the signature.
+              if (!open && isSavingItem) return;
+              setCompletionOpen(open);
+              if (!open) setCompletionError(null);
+            }}
+          >
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>{t(config.titleKey)}</DialogTitle>
@@ -1117,7 +1142,9 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                 ))}
 
                 {config.mode === "acknowledge" && (() => {
-                  const policyText = getPolicyText(enrollment.campus_id, completionTarget.itemType);
+                  // Families e-sign this text, so it must be in the language
+                  // they are reading the packet in.
+                  const policyText = getPolicyText(enrollment.campus_id, completionTarget.itemType, locale);
                   return (
                     <>
                       {policyText && (
@@ -1251,20 +1278,43 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                 )}
               </div>
 
+              {completionError && (
+                <div
+                  role="alert"
+                  className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700 space-y-1"
+                >
+                  <p>{completionError}</p>
+                  <p className="text-xs">
+                    {config.mode === "acknowledge" && signatureDataUrl
+                      ? t("reg.dialog.errorSignatureKept")
+                      : t("reg.dialog.errorTryAgain")}
+                  </p>
+                </div>
+              )}
+
               <DialogFooter>
-                <Button variant="outline" onClick={() => setCompletionOpen(false)}>
+                <Button
+                  variant="outline"
+                  disabled={isSavingItem}
+                  onClick={() => {
+                    setCompletionOpen(false);
+                    setCompletionError(null);
+                  }}
+                >
                   {t("reg.dialog.cancel")}
                 </Button>
                 <Button
                   onClick={doCompleteItem}
-                  disabled={!canSubmit}
+                  disabled={!canSubmit || isSavingItem}
                   className="bg-rooted-green hover:bg-rooted-green/90 text-white"
                 >
-                  {config.mode === "form"
-                    ? t("reg.dialog.submit")
-                    : config.mode === "upload"
-                      ? t("reg.dialog.uploadComplete")
-                      : t("reg.dialog.confirm")}
+                  {isSavingItem
+                    ? t("reg.btn.saving")
+                    : config.mode === "form"
+                      ? t("reg.dialog.submit")
+                      : config.mode === "upload"
+                        ? t("reg.dialog.uploadComplete")
+                        : t("reg.dialog.confirm")}
                 </Button>
               </DialogFooter>
             </DialogContent>

@@ -173,7 +173,7 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
       if (result.error) {
         setFeedback({ type: "error", message: result.error });
       } else {
-        setFeedback({ type: "success", message: "Offer declined." });
+        setFeedback({ type: "success", message: t("apps.detail.offerDeclinedMsg") });
         router.refresh();
       }
     });
@@ -221,7 +221,7 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
           return;
         }
       }
-      setInlineResponseFeedback({ type: "success", message: "Your response has been sent! The enrollment team will follow up." });
+      setInlineResponseFeedback({ type: "success", message: t("apps.detail.responseSent") });
       setResponseText("");
       setResponseFile(null);
       setResponseFileCompressed(false);
@@ -239,7 +239,7 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
       if (result.error) {
         setFeedback({ type: "error", message: result.error });
       } else {
-        setFeedback({ type: "success", message: "Application withdrawn successfully." });
+        setFeedback({ type: "success", message: t("apps.detail.withdrawnMsg") });
         router.refresh();
       }
     });
@@ -249,7 +249,7 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
     <div className="space-y-6">
       {/* Breadcrumb */}
       <Link href="/family/applications" className="text-sm text-rooted-green hover:underline">
-        ← Back to My Applications
+        ← {t("apps.detail.backToApplications")}
       </Link>
 
       {/* Feedback banner */}
@@ -279,16 +279,16 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
         <div className="flex gap-2">
           {isDraft && (
             <Link href={`/family/applications/${detail.id}/edit`}>
-              <Button>Continue Application</Button>
+              <Button>{t("apps.continueApp")}</Button>
             </Link>
           )}
           {isOffered && !offerExpired && (
             <>
               <Button disabled={isPending} onClick={handleAcceptOffer}>
-                {isPending ? "Accepting..." : "Accept Offer"}
+                {isPending ? t("offers.accepting") : t("offers.accept")}
               </Button>
               <Button variant="outline" disabled={isPending} onClick={handleDeclineOffer}>
-                {isPending ? "..." : "Decline"}
+                {isPending ? "..." : t("apps.detail.decline")}
               </Button>
             </>
           )}
@@ -299,7 +299,7 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
               disabled={isPending}
               onClick={handleWithdraw}
             >
-              {isPending ? "Withdrawing..." : "Withdraw"}
+              {isPending ? t("apps.detail.withdrawing") : t("apps.detail.withdraw")}
             </Button>
           )}
         </div>
@@ -313,29 +313,29 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
               <IconCheckCircle size={24} className="text-green-700 shrink-0" aria-hidden="true" />
               <div className="space-y-3">
                 <div>
-                  <p className="text-sm font-semibold text-green-900">Application submitted — you&apos;re all set for now</p>
+                  <p className="text-sm font-semibold text-green-900">{t("apps.detail.submittedTitle")}</p>
                   <p className="text-sm text-green-800 mt-1">
-                    Our enrollment team will review your application and may reach out if they need anything. You&apos;ll receive an in-app notification here when there&apos;s an update.
+                    {t("apps.detail.submittedBody")}
                   </p>
                 </div>
                 <div className="space-y-1.5">
-                  <p className="text-xs font-semibold text-green-900 uppercase tracking-wide">What happens next</p>
+                  <p className="text-xs font-semibold text-green-900 uppercase tracking-wide">{t("apps.detail.whatHappensNext")}</p>
                   <ol className="text-sm text-green-800 space-y-1 list-decimal list-inside">
-                    <li>Enrollment staff reviews your application</li>
-                    <li>If everything looks good, your student enters the lottery</li>
-                    <li>Lottery results are shared — you&apos;ll be notified of any seat offer</li>
-                    <li>Accept your offer and complete registration to finalize enrollment</li>
+                    <li>{t("apps.detail.next1")}</li>
+                    <li>{t("apps.detail.next2")}</li>
+                    <li>{t("apps.detail.next3")}</li>
+                    <li>{t("apps.detail.next4")}</li>
                   </ol>
                 </div>
                 {detail.documents.length === 0 && (
                   <div className="pt-1 flex items-start gap-1.5">
                     <IconFileText size={14} className="text-green-700 shrink-0 mt-0.5" aria-hidden="true" />
                     <p className="text-xs text-green-700">
-                      <span className="font-medium">Documents may be required.</span>{" "}
+                      <span className="font-medium">{t("apps.detail.docsMayBeRequired")}</span>{" "}
                       <Link href="/family/documents" className="underline hover:no-underline">
-                        Go to Documents
+                        {t("apps.detail.goToDocumentsLink")}
                       </Link>{" "}
-                      to upload proof of residency, birth certificate, and other required items.
+                      {t("apps.detail.docsUploadHint")}
                     </p>
                   </div>
                 )}
@@ -353,22 +353,22 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
               <div className="flex items-start gap-3">
                 <IconClipboardList size={24} className="text-amber-700 shrink-0" aria-hidden="true" />
                 <div>
-                  <p className="text-sm font-semibold text-amber-900">What the enrollment team needs from you</p>
+                  <p className="text-sm font-semibold text-amber-900">{t("apps.detail.needsInfoTitle")}</p>
                   <p className="text-sm text-amber-800 mt-1 whitespace-pre-wrap">{detail.review_notes}</p>
                 </div>
               </div>
             )}
             <div className="space-y-3 pt-1">
-              <p className="text-sm font-medium text-amber-900">Your response</p>
+              <p className="text-sm font-medium text-amber-900">{t("apps.detail.yourResponse")}</p>
               <textarea
                 className="w-full border border-amber-300 rounded-md p-3 text-sm min-h-[100px] resize-none bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-                placeholder="Type your response here… (optional if uploading a file)"
+                placeholder={t("apps.detail.responsePlaceholder")}
                 value={responseText}
                 onChange={(e) => setResponseText(e.target.value)}
                 disabled={submittingResponse}
               />
               <div>
-                <label className="block text-sm font-medium text-amber-900 mb-1">Attach a file (optional)</label>
+                <label className="block text-sm font-medium text-amber-900 mb-1">{t("apps.detail.attachFile")}</label>
                 {/* Camera-first (Phase 5A): capture="environment" opens the rear
                     camera directly on phones; images are compressed client-side
                     before validation. */}
@@ -417,7 +417,7 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
                 disabled={submittingResponse || responseFileCompressing || (!responseText.trim() && !responseFile) || !!fileError}
                 className="bg-amber-700 hover:bg-amber-800 text-white"
               >
-                {submittingResponse ? "Sending…" : "Send Response"}
+                {submittingResponse ? t("apps.detail.sending") : t("apps.detail.sendResponse")}
               </Button>
               {inlineResponseFeedback && (
                 <p className={`text-sm font-medium mt-1 ${
@@ -444,7 +444,7 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
                 <IconBell size={32} className={isUrgent ? "text-red-700 shrink-0" : "text-amber-700 shrink-0"} aria-hidden="true" />
                 <div className="flex-1">
                   <p className="text-base font-bold text-ink">
-                    {isExpired ? "Offer Expired" : "You Have a Seat Offer!"}
+                    {isExpired ? t("offers.offerExpired") : t("apps.detail.seatOfferTitle")}
                   </p>
                   <p className="text-sm text-ink/60 mt-0.5">
                     {isExpired ? t("offers.bannerExpired") : t("offers.bannerActive")}
@@ -474,10 +474,10 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
                       onClick={handleAcceptOffer}
                       className="bg-rooted-green hover:bg-rooted-green/90 text-white"
                     >
-                      {isPending ? "Accepting..." : "Accept Offer"}
+                      {isPending ? t("offers.accepting") : t("offers.accept")}
                     </Button>
                     <Button variant="outline" size="sm" disabled={isPending} onClick={handleDeclineOffer}>
-                      {isPending ? "..." : "Decline"}
+                      {isPending ? "..." : t("apps.detail.decline")}
                     </Button>
                   </div>
                 )}
@@ -504,23 +504,23 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Student Information</CardTitle>
+            <CardTitle className="text-base">{t("apps.detail.studentInfo")}</CardTitle>
           </CardHeader>
           <CardContent>
-            <DetailRow label="Full Name" value={detail.student_name} />
-            <DetailRow label="Campus" value={detail.campus_name} />
-            <DetailRow label="Grade" value={getGradeLabel(detail.grade)} />
+            <DetailRow label={t("apps.detail.fullName")} value={detail.student_name} />
+            <DetailRow label={t("apps.campus")} value={detail.campus_name} />
+            <DetailRow label={t("apps.grade")} value={getGradeLabel(detail.grade)} />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Contact Information</CardTitle>
+            <CardTitle className="text-base">{t("apps.detail.contactInfo")}</CardTitle>
           </CardHeader>
           <CardContent>
-            <DetailRow label="Guardian" value={detail.guardian_name} />
-            <DetailRow label="Email" value={detail.guardian_email ?? "—"} />
-            <DetailRow label="Phone" value={detail.guardian_phone ?? "—"} />
+            <DetailRow label={t("apps.detail.guardian")} value={detail.guardian_name} />
+            <DetailRow label={t("apps.detail.email")} value={detail.guardian_email ?? "—"} />
+            <DetailRow label={t("apps.detail.phone")} value={detail.guardian_phone ?? "—"} />
           </CardContent>
         </Card>
       </div>
@@ -530,14 +530,14 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-base">Documents</CardTitle>
+              <CardTitle className="text-base">{t("apps.detail.documentsTitle")}</CardTitle>
               <CardDescription>
-                Documents uploaded with this application.
+                {t("apps.detail.documentsDesc")}
               </CardDescription>
             </div>
             {(isDraft || detail.status === "needs_info") && (
               <Link href="/family/documents">
-                <Button variant="outline" size="sm">Upload Document</Button>
+                <Button variant="outline" size="sm">{t("apps.detail.uploadDocument")}</Button>
               </Link>
             )}
           </div>
@@ -696,21 +696,21 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
       <Dialog open={showDeclineDialog} onOpenChange={setShowDeclineDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Decline Seat Offer</DialogTitle>
+            <DialogTitle>{t("apps.detail.declineDialogTitle")}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to decline this seat offer for {detail.student_name}? This action cannot be undone and the seat will be offered to the next student on the waitlist.
+              {t("apps.detail.declineDialogBody").replace("{name}", detail.student_name)}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeclineDialog(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               variant="destructive"
               onClick={confirmDeclineOffer}
               disabled={isPending}
             >
-              {isPending ? "Declining..." : "Decline Offer"}
+              {isPending ? t("offers.declining") : t("offers.decline")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -720,21 +720,21 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
       <Dialog open={showWithdrawDialog} onOpenChange={setShowWithdrawDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Withdraw Application</DialogTitle>
+            <DialogTitle>{t("apps.detail.withdrawDialogTitle")}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to withdraw {detail.student_name}&apos;s application? This action cannot be undone. You would need to submit a new application to re-apply.
+              {t("apps.detail.withdrawDialogBody").replace("{name}", detail.student_name)}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowWithdrawDialog(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               variant="destructive"
               onClick={confirmWithdraw}
               disabled={isPending}
             >
-              {isPending ? "Withdrawing..." : "Withdraw Application"}
+              {isPending ? t("apps.detail.withdrawing") : t("apps.detail.withdrawConfirm")}
             </Button>
           </DialogFooter>
         </DialogContent>
