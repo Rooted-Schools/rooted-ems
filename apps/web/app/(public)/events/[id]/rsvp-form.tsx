@@ -6,8 +6,52 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { IconCheckCircle } from "@/components/ui/icons";
+import { LanguageToggle } from "@/components/ui/language-toggle";
 import { useLocale } from "@/lib/i18n/locale-context";
+import type { PublicEvent } from "@/lib/queries";
+import { EventTypeLabel, formatEventWhen } from "../event-format";
 import { submitRsvp } from "../actions";
+
+/**
+ * Client-rendered event detail + RSVP page. Moved out of page.tsx (a Server
+ * Component) for the same reason as the events list — a Server Component
+ * bakes `es ? "X" : "Y"` into the HTML once at request time, so the language
+ * toggle silently did nothing for the title/date/campus copy even though the
+ * nested RsvpForm (already a client component) reacted correctly.
+ */
+export function EventDetailClient({ event }: { event: PublicEvent }) {
+  const { locale } = useLocale();
+  const es = locale === "es";
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-rooted-green/5 to-warm-white py-8 px-4">
+      <div className="max-w-md mx-auto space-y-4">
+        <div className="flex items-center justify-between">
+          <Link href="/events" className="text-sm text-rooted-green hover:underline">
+            &larr; {es ? "Todos los eventos" : "All events"}
+          </Link>
+          <LanguageToggle />
+        </div>
+
+        <div className="rounded-xl border border-stone/20 bg-white p-5">
+          <span className="inline-block text-[11px] font-semibold uppercase tracking-wide text-rooted-green bg-rooted-green/10 rounded-full px-2 py-0.5">
+            <EventTypeLabel type={event.event_type} es={es} />
+          </span>
+          <h1 className="text-xl font-bold text-ink mt-2">{event.title}</h1>
+          <p className="text-sm text-ink/80 mt-1">{formatEventWhen(event.starts_at, event.ends_at, es)}</p>
+          <p className="text-xs text-stone-text mt-0.5">
+            {event.campus_name}{event.location ? ` · ${event.location}` : ""}
+          </p>
+          {event.description && (
+            <p className="text-sm text-ink/70 mt-3 whitespace-pre-wrap">{event.description}</p>
+          )}
+        </div>
+
+        <RsvpForm eventId={event.id} campusId={event.campus_id} isFull={event.is_full} />
+      </div>
+    </div>
+  );
+}
 
 export function RsvpForm({ eventId, campusId, isFull }: { eventId: string; campusId: string; isFull: boolean }) {
   const { locale } = useLocale();
@@ -70,7 +114,7 @@ export function RsvpForm({ eventId, campusId, isFull }: { eventId: string; campu
       </div>
       <div>
         <label htmlFor="rsvp-name" className="block text-sm font-medium text-ink/70 mb-1">
-          {es ? "Su nombre" : "Your name"} <span className="text-red-500">*</span>
+          {es ? "Su nombre" : "Your name"} <span className="text-error">*</span>
         </label>
         <Input id="rsvp-name" value={form.guardian_name} onChange={(e) => set({ guardian_name: e.target.value })} autoComplete="name" />
       </div>
@@ -106,7 +150,7 @@ export function RsvpForm({ eventId, campusId, isFull }: { eventId: string; campu
             : "Yes, text me reminders about this event. Message and data rates may apply. Reply STOP to opt out."}
         </span>
       </label>
-      {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>}
+      {error && <p className="text-sm text-error bg-error/10 border border-error/30 rounded-[6px] px-3 py-2">{error}</p>}
       <Button type="submit" className="w-full" disabled={isPending}>
         {isPending ? (es ? "Registrando…" : "Registering…") : es ? "Registrarse" : "Register"}
       </Button>

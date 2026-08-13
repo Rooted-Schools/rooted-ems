@@ -105,9 +105,12 @@ export function LotteryExplainerClient({ campuses }: LotteryExplainerClientProps
                     <p className="text-xs text-stone-text mt-2">
                       {t("lottery.closesLine").replace(
                         "{date}",
+                        // Window dates are stored as UTC midnight; format in UTC so the
+                        // deadline never renders a day early for a viewer west of Greenwich
+                        // (matches formatDate() in landing-client.tsx).
                         new Date(campus.closeDate).toLocaleDateString(
                           locale === "es" ? "es-US" : "en-US",
-                          { month: "long", day: "numeric", year: "numeric" }
+                          { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }
                         )
                       )}
                     </p>

@@ -19,6 +19,13 @@ export interface CampusWindowState {
    * a placeholder.
    */
   upcomingOpenDate: string | null;
+  /**
+   * Real grade_level rows (e.g. ["6", "9"]) for the school year this window
+   * state describes. Can be a strict subset of identity.gradesRange — a
+   * campus's eventual full range isn't necessarily what's enrolling this
+   * cycle. Empty array (never fabricated) when no rows exist yet.
+   */
+  openGrades: string[];
 }
 
 export interface CampusContactInfo {
@@ -49,6 +56,30 @@ function formatDate(iso: string, locale: Locale): string {
   }).format(new Date(iso));
 }
 
+/** Joins grade numbers as "6 and 9" / "6, 9 and 10" / "6 y 9" / "6, 9 y 10". */
+function joinGrades(grades: number[], es: boolean): string {
+  const and = es ? "y" : "and";
+  if (grades.length === 1) return String(grades[0]);
+  if (grades.length === 2) return `${grades[0]} ${and} ${grades[1]}`;
+  return `${grades.slice(0, -1).join(", ")} ${and} ${grades[grades.length - 1]}`;
+}
+
+/**
+ * Honest "now enrolling" line built from real grade_level rows — e.g. "Now
+ * enrolling entering grades 6 and 9" — never the static full gradesRange.
+ * Returns null when there's nothing real to say (never fabricated).
+ */
+function formatOpenGradesLine(rawGrades: string[], es: boolean): string | null {
+  if (rawGrades.length === 0) return null;
+  const grades = [...new Set(rawGrades.map(Number))].sort((a, b) => a - b);
+  const gradeWord = es
+    ? grades.length === 1 ? "el grado de ingreso" : "los grados de ingreso"
+    : grades.length === 1 ? "entering grade" : "entering grades";
+  return es
+    ? `Inscribiendo ahora ${gradeWord} ${joinGrades(grades, true)}`
+    : `Now enrolling ${gradeWord} ${joinGrades(grades, false)}`;
+}
+
 /**
  * A campus's own, self-contained landing page — the one printed on flyers
  * and QR codes. It carries only this campus's logo, accent color, and real
@@ -67,8 +98,10 @@ export function CampusLandingClient({ identity, campus, windowState }: CampusLan
 
 function CampusLandingContent({ identity, campus, windowState }: CampusLandingClientProps) {
   const { t, locale } = useLocale();
+  const es = locale === "es";
   const { accent } = identity;
-  const { isOpen, closeDate, daysRemaining, upcomingOpenDate } = windowState;
+  const { isOpen, closeDate, daysRemaining, upcomingOpenDate, openGrades } = windowState;
+  const openGradesLine = formatOpenGradesLine(openGrades, es);
 
   const addressLine2 = [campus.city, [campus.state, campus.zip].filter(Boolean).join(" ")]
     .filter(Boolean)
@@ -112,6 +145,9 @@ function CampusLandingContent({ identity, campus, windowState }: CampusLandingCl
           <p className="text-sm text-stone-text mt-1">
             {identity.location} &middot; {t("public.grades")} {identity.gradesRange}
           </p>
+          {openGradesLine && (
+            <p className="text-sm text-stone-text mt-1">{openGradesLine}</p>
+          )}
           <p className="mt-4 text-base text-ink/60 max-w-xl mx-auto">{t("public.heroLede")}</p>
 
           {/* Status badge — same honest states as the network landing page's cards */}
@@ -139,7 +175,7 @@ function CampusLandingContent({ identity, campus, windowState }: CampusLandingCl
               <p className="text-xs text-stone-text">
                 {t("public.closes")} {formatDate(closeDate, locale)}
                 {daysRemaining !== null && daysRemaining <= 14 && (
-                  <span className="text-amber-600 font-semibold">
+                  <span className="text-warn-text font-semibold">
                     {" "}({daysRemaining} {daysRemaining === 1 ? t("public.dayLeft") : t("public.daysLeft")})
                   </span>
                 )}

@@ -36,6 +36,14 @@ async function getCampusRow(shortCode: string): Promise<CampusRow | null> {
  * as the network landing page's cards (app/(public)/page.tsx), just scoped
  * to one campus_id instead of a name-substring match, since here we already
  * have the real campus id.
+ *
+ * Also resolves the real entering grades being enrolled for the same
+ * school-year cycle this window state describes (the open window's year, or
+ * the next upcoming one). The static gradesRange in lib/campus-identity.ts
+ * is the campus's eventual full range, not necessarily what's open for this
+ * cycle — C.R. Neal and Cleveland's 2027-28 pilot only has grade_level rows
+ * for entering grades 6 and 9, for example. Never fabricated: an empty
+ * result just means no grade_level rows exist for that school year yet.
  */
 async function getCampusWindowState(campusId: string): Promise<CampusWindowState> {
   const supabase = createServiceClient();
@@ -45,7 +53,7 @@ async function getCampusWindowState(campusId: string): Promise<CampusWindowState
   const [openResult, upcomingResult] = await Promise.all([
     supabase
       .from("enrollment_window")
-      .select("close_date, open_date")
+      .select("close_date, open_date, school_year_id")
       .eq("campus_id", campusId)
       .eq("status", "open")
       .gte("close_date", nowIso)
@@ -54,7 +62,7 @@ async function getCampusWindowState(campusId: string): Promise<CampusWindowState
       .maybeSingle(),
     supabase
       .from("enrollment_window")
-      .select("open_date")
+      .select("open_date, school_year_id")
       .eq("campus_id", campusId)
       .gt("open_date", nowIso)
       .order("open_date", { ascending: true })
@@ -69,7 +77,7 @@ async function getCampusWindowState(campusId: string): Promise<CampusWindowState
     console.error("[campusSlug/getCampusWindowState] upcoming", upcomingResult.error.message);
   }
 
-  const openRow = openResult.data as { close_date: string; open_date: string } | null;
+  const openRow = openResult.data as { close_date: string; open_date: string; school_year_id: string } | null;
   const isOpen = !!openRow && now >= new Date(openRow.open_date) && now <= new Date(openRow.close_date);
 
   let daysRemaining: number | null = null;
@@ -79,7 +87,22 @@ async function getCampusWindowState(campusId: string): Promise<CampusWindowState
     );
   }
 
-  const upcomingRow = upcomingResult.data as { open_date: string } | null;
+  const upcomingRow = upcomingResult.data as { open_date: string; school_year_id: string } | null;
+
+  const relevantSchoolYearId = isOpen ? openRow?.school_year_id ?? null : upcomingRow?.school_year_id ?? null;
+  let openGrades: string[] = [];
+  if (relevantSchoolYearId) {
+    const { data: gradeRows, error: gradeError } = await supabase
+      .from("grade_level")
+      .select("grade")
+      .eq("campus_id", campusId)
+      .eq("school_year_id", relevantSchoolYearId);
+    if (gradeError) {
+      console.error("[campusSlug/getCampusWindowState] grades", gradeError.message);
+    } else {
+      openGrades = (gradeRows ?? []).map((r: { grade: string }) => r.grade);
+    }
+  }
 
   return {
     isOpen,
@@ -88,6 +111,7 @@ async function getCampusWindowState(campusId: string): Promise<CampusWindowState
     // An open window's own open_date already passed, so it can't also be
     // "upcoming" — only surface upcomingOpenDate when not currently open.
     upcomingOpenDate: !isOpen ? (upcomingRow?.open_date ?? null) : null,
+    openGrades,
   };
 }
 
