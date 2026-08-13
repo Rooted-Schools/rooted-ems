@@ -1,6 +1,6 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { generateLotterySeed, runDeterministicLottery } from "@rooted-ems/utils";
-import { AuditAction, logAuditEvent } from "@/lib/audit";
+import { AuditAction, logAuditEvent, type AuditEventPayload } from "@/lib/audit";
 import {
   anyChannelDelivered,
   notifyFamilyApplicationWaitlisted,
@@ -1234,6 +1234,57 @@ export async function resumeLotteryNotifications(
 //
 // The offer response deadline defaults to the governing policy's acceptance
 // window (RSV: 14 days) rather than to a number typed into a dialog.
+//
+// Every offer created here writes its own audit event, plus one summary event
+// for the run. This is the largest batch of consequential writes the product
+// makes — the seats a public lottery just awarded — and until these events
+// existed the only record of who issued them was offer.offered_by, a mutable
+// column on the offer itself. An authorizer asking "who awarded this seat, and
+// when" needs an answer that does not live inside the record being questioned.
+
+/**
+ * The audit event for an offer issued by a lottery.
+ *
+ * Deliberately the same field shape sendOffer uses for a hand-issued offer
+ * (lib/mutations/offers.ts), so both kinds read identically in the Audit Trail
+ * UI: an offer that came out of a lottery must not be harder to trace than one
+ * a staff member typed. The lottery linkage rides in metadata, exactly as
+ * sendOffer already carries lottery_entry_id there.
+ *
+ * Pure — it only shapes the payload, so the shape can be tested against
+ * sendOffer's without standing up a database.
+ */
+export function buildLotteryOfferAuditEvent(input: {
+  offerId: string;
+  applicationId: string;
+  campusId: string | null;
+  /** The staff user who ran the send. Never null on this path. */
+  offeredBy: string;
+  expiresAt: string;
+  /** The application's status before it was moved to `offered`, when known. */
+  fromStatus: string | null;
+  lotteryEntryId: string | null;
+  runId: string;
+}): AuditEventPayload {
+  return {
+    table_name: "offer",
+    record_id: input.offerId,
+    action: AuditAction.Create,
+    actor_id: input.offeredBy,
+    campus_id: input.campusId,
+    new_data: {
+      application_id: input.applicationId,
+      status: "pending",
+      expires_at: input.expiresAt,
+    },
+    metadata: {
+      from_status: input.fromStatus,
+      lottery_entry_id: input.lotteryEntryId,
+      lottery_run_id: input.runId,
+      issued_by: "lottery",
+    },
+  };
+}
 
 export async function sendOffersFromLottery(
   runId: string,
@@ -1280,7 +1331,9 @@ export async function sendOffersFromLottery(
 
   const { data: selectedEntries, error: entriesError } = await supabase
     .from("lottery_entry")
-    .select("id, application_id, application:application_id (student:student_id (first_name, last_name))")
+    .select(
+      "id, application_id, application:application_id (status, student:student_id (first_name, last_name))"
+    )
     .eq("lottery_run_id", runId)
     .eq("is_selected", true);
 
@@ -1289,6 +1342,8 @@ export async function sendOffersFromLottery(
   }
 
   let offersCreated = 0;
+  let alreadyOffered = 0;
+  let offerFailures = 0;
   const now = new Date().toISOString();
   const ledgerRows: LedgerRow[] = [];
   const legacyNotifications: Array<{ applicationId: string; offerId: string; studentName?: string }> = [];
@@ -1299,11 +1354,14 @@ export async function sendOffersFromLottery(
     const entryId = entryRow.id as string;
 
     const app = entryRow.application as
-      | { student?: { first_name?: string; last_name?: string } | null }
+      | { status?: string | null; student?: { first_name?: string; last_name?: string } | null }
       | null;
     const studentName = app?.student
       ? [app.student.first_name, app.student.last_name].filter(Boolean).join(" ") || undefined
       : undefined;
+    // Read before the update below moves it, so the audit event can say what
+    // the application actually was when the seat was offered.
+    const fromStatus = app?.status ?? null;
 
     const { data: existingOffer } = await supabase
       .from("offer")
@@ -1325,6 +1383,7 @@ export async function sendOffersFromLottery(
         student_name: studentName ?? null,
         expires_at: resolvedExpiresAt,
       });
+      alreadyOffered++;
       continue;
     }
 
@@ -1345,6 +1404,7 @@ export async function sendOffersFromLottery(
 
     if (offerError || !newOffer) {
       console.error(`[sendOffersFromLottery] offer for ${appId}`, offerError?.message);
+      offerFailures++;
       continue;
     }
 
@@ -1366,6 +1426,22 @@ export async function sendOffersFromLottery(
         { applicationId: appId, offerId: newOffer.id }
       );
     }
+
+    // Attributable trail for THIS seat, written in the commit phase alongside
+    // the offer it describes — not after the fan-out, where a notification
+    // failure could cost us the record of an offer that was really made.
+    await logAuditEvent(
+      buildLotteryOfferAuditEvent({
+        offerId: newOffer.id as string,
+        applicationId: appId,
+        campusId: (run.campus_id as string) ?? null,
+        offeredBy,
+        expiresAt: resolvedExpiresAt,
+        fromStatus,
+        lotteryEntryId: entryId,
+        runId,
+      })
+    );
 
     ledgerRows.push({
       lottery_run_id: runId,
@@ -1420,6 +1496,28 @@ export async function sendOffersFromLottery(
       }
     }
   }
+
+  // One event for the run itself, so the batch is legible as a batch: an
+  // authorizer reading the trail sees "this person released 42 seats from this
+  // run on this date", not only 42 individual offers.
+  await logAuditEvent({
+    table_name: "lottery_run",
+    record_id: runId,
+    action: AuditAction.Update,
+    actor_id: offeredBy,
+    campus_id: (run.campus_id as string) ?? null,
+    new_data: { offers_created: offersCreated, expires_at: resolvedExpiresAt },
+    metadata: {
+      selected_entries: selectedEntries.length,
+      offers_created: offersCreated,
+      already_offered: alreadyOffered,
+      offer_failures: offerFailures,
+      policy_id: binding.policyId,
+      ledgered,
+      notifications_sent: notifications.sent,
+      notifications_failed: notifications.failed,
+    },
+  });
 
   return { data: { offersCreated, notifications }, error: null };
 }

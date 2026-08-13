@@ -177,7 +177,12 @@ export async function staffDeclineOfferOnBehalf(
   );
   // Staff record most declines by phone, so this is the path where a reason is
   // most likely known and least likely captured. Still optional.
-  const result = await declineOffer(offerId, undefined, {
+  //
+  // The acting staff member is named twice on purpose: actingStaffUserId is
+  // what earns the bypass of the family ownership check, and the second
+  // argument is the declining user for the audit trail. Both resolve to the
+  // gated session, never to anything the client supplied.
+  const result = await declineOffer(offerId, session.user_id, {
     reason: isDeclineReason(reason) ? reason : undefined,
     note,
     actingStaffUserId: session.user_id,
