@@ -5,16 +5,21 @@ import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { requireMinRole, getAccessibleCampusIds } from "@/lib/auth/get-session";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { SectionTabs } from "@/components/layout/section-tabs";
 import { INSIGHTS_TABS } from "@/lib/section-tabs";
 
+// Design-token colors instead of raw Tailwind palette classes (green-100/
+// blue-100/red-100/purple-100/amber-100), so audit action colors carry the
+// same semantic meaning as the rest of the console's tokenized palette.
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
-  create: { label: "Created", color: "bg-green-100 text-green-800" },
-  update: { label: "Updated", color: "bg-blue-100 text-blue-800" },
-  delete: { label: "Deleted", color: "bg-red-100 text-red-800" },
-  status_change: { label: "Status Change", color: "bg-purple-100 text-purple-800" },
-  login: { label: "Login", color: "bg-rooted-gray text-ink" },
-  export: { label: "Export", color: "bg-amber-100 text-amber-800" },
+  create: { label: "Created", color: "bg-rooted-green/10 text-deep-green" },
+  update: { label: "Updated", color: "bg-info/10 text-info" },
+  delete: { label: "Deleted", color: "bg-error/10 text-error" },
+  status_change: { label: "Status Change", color: "bg-warn/10 text-warn-text" },
+  login: { label: "Login", color: "bg-sunken text-ink" },
+  export: { label: "Export", color: "bg-warn/10 text-warn-text" },
 };
 
 const TABLE_LABELS: Record<string, string> = {
@@ -113,11 +118,14 @@ export default async function AuditTrailPage({
               <input type="hidden" name="campus" value={validCampus} />
             )}
             <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-stone">Table:</label>
-              <select
+              <label htmlFor="audit-filter-table" className="text-xs font-medium text-stone">
+                Table:
+              </label>
+              <Select
+                id="audit-filter-table"
                 name="table"
                 defaultValue={searchParams.table ?? ""}
-                className="text-sm border border-stone/30 rounded-md px-2 py-1 bg-white"
+                className="w-auto text-sm"
               >
                 <option value="">All Tables</option>
                 {tables.map((t) => (
@@ -125,32 +133,32 @@ export default async function AuditTrailPage({
                     {TABLE_LABELS[t] ?? t}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-stone">Action:</label>
-              <select
+              <label htmlFor="audit-filter-action" className="text-xs font-medium text-stone">
+                Action:
+              </label>
+              <Select
+                id="audit-filter-action"
                 name="action"
                 defaultValue={searchParams.action ?? ""}
-                className="text-sm border border-stone/30 rounded-md px-2 py-1 bg-white"
+                className="w-auto text-sm"
               >
                 <option value="">All Actions</option>
                 <option value="create">Create</option>
                 <option value="update">Update</option>
                 <option value="delete">Delete</option>
                 <option value="status_change">Status Change</option>
-              </select>
+              </Select>
             </div>
-            <button
-              type="submit"
-              className="text-sm bg-rooted-green text-white px-3 py-1 rounded-md hover:bg-rooted-green-dark"
-            >
+            <Button type="submit" size="sm" className="min-h-[44px]">
               Filter
-            </button>
+            </Button>
             {(searchParams.table || searchParams.action) && (
               <a
                 href={`/staff/audit${validCampus ? `?campus=${validCampus}` : ""}`}
-                className="text-xs text-stone hover:text-ink/70 no-underline"
+                className="inline-flex min-h-[44px] items-center rounded-[6px] px-2 text-xs text-stone hover:text-ink no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rooted-green"
               >
                 Clear filters
               </a>
@@ -188,7 +196,7 @@ export default async function AuditTrailPage({
                     const action = event.action as string;
                     const actionCfg = ACTION_LABELS[action] ?? {
                       label: action,
-                      color: "bg-rooted-gray text-ink",
+                      color: "bg-sunken text-ink",
                     };
                     const oldData = event.old_data as Record<string, unknown> | null;
                     const newData = event.new_data as Record<string, unknown> | null;
@@ -271,7 +279,7 @@ export default async function AuditTrailPage({
             {page > 1 && (
               <a
                 href={`/staff/audit?page=${page - 1}${validCampus ? `&campus=${validCampus}` : ""}${searchParams.table ? `&table=${searchParams.table}` : ""}${searchParams.action ? `&action=${searchParams.action}` : ""}`}
-                className="text-sm px-3 py-1 border border-stone/30 rounded-md hover:bg-rooted-gray-light no-underline text-ink/70"
+                className="inline-flex min-h-[44px] items-center text-sm px-3 border border-stone/30 rounded-[6px] hover:bg-rooted-gray-light no-underline text-ink/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rooted-green"
               >
                 Previous
               </a>
@@ -279,7 +287,7 @@ export default async function AuditTrailPage({
             {page < totalPages && (
               <a
                 href={`/staff/audit?page=${page + 1}${validCampus ? `&campus=${validCampus}` : ""}${searchParams.table ? `&table=${searchParams.table}` : ""}${searchParams.action ? `&action=${searchParams.action}` : ""}`}
-                className="text-sm px-3 py-1 border border-stone/30 rounded-md hover:bg-rooted-gray-light no-underline text-ink/70"
+                className="inline-flex min-h-[44px] items-center text-sm px-3 border border-stone/30 rounded-[6px] hover:bg-rooted-gray-light no-underline text-ink/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rooted-green"
               >
                 Next
               </a>

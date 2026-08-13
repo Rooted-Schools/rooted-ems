@@ -911,6 +911,12 @@ function StaffUsersTab({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<StaffUserRow | null>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [removeConfirm, setRemoveConfirm] = useState<{
+    roleId: string;
+    userName: string;
+    campusName: string;
+    roleLabel: string;
+  } | null>(null);
 
   // Assign form state
   const [email, setEmail] = useState("");
@@ -951,8 +957,18 @@ function StaffUsersTab({
     });
   }
 
-  function handleRemove(roleId: string, userName: string) {
-    if (!confirm(`Remove ${userName}'s role? They will lose access to this campus.`)) return;
+  function handleRemove(assignment: StaffUserRow, userName: string) {
+    setRemoveConfirm({
+      roleId: assignment.id,
+      userName,
+      campusName: assignment.campus_name,
+      roleLabel: roleLabels[assignment.role] ?? assignment.role,
+    });
+  }
+
+  function confirmRemoveRole() {
+    if (!removeConfirm) return;
+    const { roleId, userName } = removeConfirm;
     startTransition(async () => {
       const result = await staffRemoveRole(roleId);
       if (result.error) {
@@ -961,6 +977,7 @@ function StaffUsersTab({
         toast({ variant: "success", title: `Removed ${userName}'s role` });
         router.refresh();
       }
+      setRemoveConfirm(null);
     });
   }
 
@@ -1139,7 +1156,7 @@ function StaffUsersTab({
                       {roles.map((assignment) => (
                         <div
                           key={assignment.id}
-                          className="flex items-center justify-between py-1.5 px-3 rounded-md bg-rooted-gray-light group"
+                          className="flex items-center justify-between py-1.5 px-3 rounded-md bg-rooted-gray-light"
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-sm text-ink/70">{assignment.campus_name}</span>
@@ -1147,11 +1164,11 @@ function StaffUsersTab({
                               {roleLabels[assignment.role] ?? assignment.role}
                             </span>
                           </div>
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex gap-1">
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-6 text-[10px] px-2"
+                              className="min-h-[44px] text-xs px-3"
                               disabled={isPending}
                               onClick={() => openEdit(assignment)}
                             >
@@ -1160,9 +1177,9 @@ function StaffUsersTab({
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-6 text-[10px] px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              className="min-h-[44px] text-xs px-3 text-red-600 hover:text-red-700 hover:bg-red-50"
                               disabled={isPending}
-                              onClick={() => handleRemove(assignment.id, primary.full_name)}
+                              onClick={() => handleRemove(assignment, primary.full_name)}
                             >
                               Remove
                             </Button>
@@ -1224,6 +1241,38 @@ function StaffUsersTab({
             </Button>
             <Button onClick={handleEditSave} disabled={isPending}>
               {isPending ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Role Confirmation */}
+      <Dialog open={!!removeConfirm} onOpenChange={(v) => !v && setRemoveConfirm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove staff role?</DialogTitle>
+            <DialogDescription>
+              This removes {removeConfirm?.userName}&apos;s {removeConfirm?.roleLabel} role at{" "}
+              {removeConfirm?.campusName}. They will lose access to that campus immediately. This
+              cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="rounded-[6px] min-h-[44px]"
+              onClick={() => setRemoveConfirm(null)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="rounded-[6px] min-h-[44px]"
+              onClick={confirmRemoveRole}
+              disabled={isPending}
+            >
+              {isPending ? "Removing…" : "Remove Role"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1358,8 +1407,15 @@ function SchoolYearsGradesTab({
     });
   }
 
+  const [deleteGradeConfirm, setDeleteGradeConfirm] = useState<GradeLevel | null>(null);
+
   function handleDeleteGrade(g: GradeLevel) {
-    if (!confirm(`Remove Grade ${g.grade}? This cannot be undone.`)) return;
+    setDeleteGradeConfirm(g);
+  }
+
+  function confirmDeleteGrade() {
+    if (!deleteGradeConfirm) return;
+    const g = deleteGradeConfirm;
     startTransition(async () => {
       const result = await staffDeleteGradeLevel(g.id);
       if (result.error) {
@@ -1368,6 +1424,7 @@ function SchoolYearsGradesTab({
         toast({ variant: "success", title: `Grade ${g.grade} removed.` });
         router.refresh();
       }
+      setDeleteGradeConfirm(null);
     });
   }
 
@@ -1734,8 +1791,9 @@ function SchoolYearsGradesTab({
                       type="button"
                       onClick={() => handleDeleteGrade(g)}
                       disabled={isPending}
+                      aria-label={`Remove Grade ${g.grade}`}
                       title={`Remove Grade ${g.grade}`}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-[6px] text-stone hover:bg-rooted-gray-light hover:text-red-600 disabled:opacity-40"
+                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[6px] text-stone hover:bg-rooted-gray-light hover:text-red-600 disabled:opacity-40"
                     >
                       <IconX size={14} />
                     </button>
@@ -1947,6 +2005,38 @@ function SchoolYearsGradesTab({
           </CardContent>
         </Card>
       )}
+
+      {/* Delete Grade Level Confirmation */}
+      <Dialog open={!!deleteGradeConfirm} onOpenChange={(v) => !v && setDeleteGradeConfirm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove grade level?</DialogTitle>
+            <DialogDescription>
+              This removes Grade {deleteGradeConfirm?.grade} for{" "}
+              {campuses.find((c) => c.id === deleteGradeConfirm?.campus_id)?.name ?? "this campus"}.
+              Families will no longer be able to apply for this grade. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="rounded-[6px] min-h-[44px]"
+              onClick={() => setDeleteGradeConfirm(null)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="rounded-[6px] min-h-[44px]"
+              onClick={confirmDeleteGrade}
+              disabled={isPending}
+            >
+              {isPending ? "Removing…" : "Remove Grade"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

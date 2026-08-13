@@ -277,10 +277,11 @@ export function StaffNewApplicationForm({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="new-app-campus" className="block text-sm font-medium text-ink/70 mb-1">
                 Campus *
               </label>
               <Select
+                id="new-app-campus"
                 value={form.campusId}
                 onChange={(e) => updateField("campusId", e.target.value)}
               >
@@ -293,10 +294,11 @@ export function StaffNewApplicationForm({
               </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="new-app-enrollment-window" className="block text-sm font-medium text-ink/70 mb-1">
                 Enrollment Window *
               </label>
               <Select
+                id="new-app-enrollment-window"
                 value={form.enrollmentWindowId}
                 onChange={(e) => updateField("enrollmentWindowId", e.target.value)}
                 disabled={!form.campusId}
@@ -310,10 +312,11 @@ export function StaffNewApplicationForm({
               </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="new-app-grade-level" className="block text-sm font-medium text-ink/70 mb-1">
                 Grade Level *
               </label>
               <Select
+                id="new-app-grade-level"
                 value={form.gradeLevelId}
                 onChange={(e) => updateField("gradeLevelId", e.target.value)}
                 disabled={!form.campusId}
@@ -349,20 +352,22 @@ export function StaffNewApplicationForm({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="new-app-first-name" className="block text-sm font-medium text-ink/70 mb-1">
                 First Name *
               </label>
               <Input
+                id="new-app-first-name"
                 value={form.firstName}
                 onChange={(e) => updateField("firstName", e.target.value)}
                 placeholder="Student first name"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="new-app-last-name" className="block text-sm font-medium text-ink/70 mb-1">
                 Last Name *
               </label>
               <Input
+                id="new-app-last-name"
                 value={form.lastName}
                 onChange={(e) => updateField("lastName", e.target.value)}
                 placeholder="Student last name"
@@ -371,20 +376,22 @@ export function StaffNewApplicationForm({
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="new-app-dob" className="block text-sm font-medium text-ink/70 mb-1">
                 Date of Birth
               </label>
               <Input
+                id="new-app-dob"
                 type="date"
                 value={form.dateOfBirth}
                 onChange={(e) => updateField("dateOfBirth", e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="new-app-gender" className="block text-sm font-medium text-ink/70 mb-1">
                 Gender
               </label>
               <Select
+                id="new-app-gender"
                 value={form.gender}
                 onChange={(e) => updateField("gender", e.target.value)}
               >
@@ -396,10 +403,11 @@ export function StaffNewApplicationForm({
               </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="new-app-primary-language" className="block text-sm font-medium text-ink/70 mb-1">
                 Primary Language
               </label>
               <Select
+                id="new-app-primary-language"
                 value={form.primaryLanguage}
                 onChange={(e) => updateField("primaryLanguage", e.target.value)}
               >
@@ -412,10 +420,11 @@ export function StaffNewApplicationForm({
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-ink/70 mb-1">
+            <label htmlFor="new-app-previous-school" className="block text-sm font-medium text-ink/70 mb-1">
               Previous School
             </label>
             <Input
+              id="new-app-previous-school"
               value={form.previousSchool}
               onChange={(e) => updateField("previousSchool", e.target.value)}
               placeholder="Name of previous school"
@@ -454,10 +463,11 @@ export function StaffNewApplicationForm({
           </div>
           {form.hasSiblingEnrolled && (
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="new-app-sibling-name" className="block text-sm font-medium text-ink/70 mb-1">
                 Sibling Name
               </label>
               <Input
+                id="new-app-sibling-name"
                 value={form.siblingName}
                 onChange={(e) => updateField("siblingName", e.target.value)}
                 placeholder="Name of enrolled sibling"
@@ -466,17 +476,18 @@ export function StaffNewApplicationForm({
           )}
           {(form.hasIEP || form.has504) && (
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="new-app-special-services-notes" className="block text-sm font-medium text-ink/70 mb-1">
                 Special Services Notes
               </label>
               <textarea
+                id="new-app-special-services-notes"
                 value={form.specialServicesNotes}
                 onChange={(e) =>
                   updateField("specialServicesNotes", e.target.value)
                 }
                 placeholder="Any relevant notes about special services..."
                 rows={2}
-                className="w-full px-3 py-2 border border-stone/30 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+                className="w-full px-3 py-2 border border-stone/30 rounded-[6px] text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
               />
             </div>
           )}
@@ -496,10 +507,11 @@ export function StaffNewApplicationForm({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="new-app-guardian-first-name" className="block text-sm font-medium text-ink/70 mb-1">
                 Guardian First Name *
               </label>
               <Input
+                id="new-app-guardian-first-name"
                 value={form.guardianFirstName}
                 onChange={(e) =>
                   updateField("guardianFirstName", e.target.value)
@@ -508,10 +520,11 @@ export function StaffNewApplicationForm({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="new-app-guardian-last-name" className="block text-sm font-medium text-ink/70 mb-1">
                 Guardian Last Name *
               </label>
               <Input
+                id="new-app-guardian-last-name"
                 value={form.guardianLastName}
                 onChange={(e) =>
                   updateField("guardianLastName", e.target.value)
@@ -522,10 +535,11 @@ export function StaffNewApplicationForm({
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="new-app-guardian-relationship" className="block text-sm font-medium text-ink/70 mb-1">
                 Relationship
               </label>
               <Select
+                id="new-app-guardian-relationship"
                 value={form.guardianRelationship}
                 onChange={(e) =>
                   updateField("guardianRelationship", e.target.value)
@@ -539,10 +553,11 @@ export function StaffNewApplicationForm({
               </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="new-app-guardian-phone" className="block text-sm font-medium text-ink/70 mb-1">
                 Phone *
               </label>
               <Input
+                id="new-app-guardian-phone"
                 type="tel"
                 value={form.guardianPhone}
                 onChange={(e) => updateField("guardianPhone", e.target.value)}
@@ -550,10 +565,11 @@ export function StaffNewApplicationForm({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="new-app-guardian-email" className="block text-sm font-medium text-ink/70 mb-1">
                 Email
               </label>
               <Input
+                id="new-app-guardian-email"
                 type="email"
                 value={form.guardianEmail}
                 onChange={(e) => updateField("guardianEmail", e.target.value)}

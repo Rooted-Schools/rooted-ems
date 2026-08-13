@@ -9,6 +9,14 @@ interface ToastOptions {
   title: string;
   description?: string;
   variant: ToastVariant;
+  /**
+   * Accessible label for this toast's dismiss button. Defaults to English
+   * because this component is shared with the staff console; family-facing
+   * callers pass a translated string (t("common.dismiss") or similar) so
+   * the label follows the family's chosen language — mirrors closeLabel on
+   * components/ui/dialog.tsx's DialogContent.
+   */
+  dismissLabel?: string;
 }
 
 interface ToastItem extends ToastOptions {
@@ -109,7 +117,7 @@ function ToastCard({
       <button
         onClick={() => onDismiss(item.id)}
         className="absolute right-2.5 top-2.5 rounded-sm p-0.5 text-ink/50 opacity-70 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rooted-green"
-        aria-label="Dismiss"
+        aria-label={item.dismissLabel ?? "Dismiss"}
       >
         <svg width="14" height="14" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path

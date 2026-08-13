@@ -2,9 +2,12 @@
 
 import { rsvpToEvent } from "@/lib/mutations";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { tx, type Locale } from "@/lib/i18n/translations";
 
-const RATE_LIMIT_MSG =
-  "Too many submissions from this connection — please try again in a little while. / Demasiados envíos desde esta conexión — intente de nuevo en un momento.";
+/** Narrow an untrusted client-supplied language string to a real Locale. */
+function resolveLocale(value: string | undefined): Locale {
+  return value === "es" ? "es" : "en";
+}
 
 export interface RsvpSubmission {
   event_id: string;
@@ -16,14 +19,21 @@ export interface RsvpSubmission {
   /** TCPA opt-in checkbox on the RSVP form. */
   sms_consent?: boolean;
   website: string; // honeypot
+  /**
+   * The family's currently selected UI language. Not persisted anywhere —
+   * used only to pick the language of any error string this action
+   * returns, so the caller doesn't have to guess it server-side.
+   */
+  locale: string;
 }
 
 export async function submitRsvp(input: RsvpSubmission) {
+  const locale = resolveLocale(input.locale);
   if (input.website?.trim()) return { data: null, error: null }; // bot
   // LG-0.4: generous per-IP throttle (a family RSVPing several kids is fine;
   // a script isn't).
   const rl = await checkRateLimit("rsvp", 10, 60);
-  if (!rl.allowed) return { data: null, error: RATE_LIMIT_MSG };
+  if (!rl.allowed) return { data: null, error: tx("common.rateLimitError", locale) };
   return rsvpToEvent({
     event_id: input.event_id,
     campus_id: input.campus_id,

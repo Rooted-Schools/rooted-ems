@@ -20,7 +20,7 @@ import { submitRsvp } from "../actions";
  * nested RsvpForm (already a client component) reacted correctly.
  */
 export function EventDetailClient({ event }: { event: PublicEvent }) {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const es = locale === "es";
 
   return (
@@ -28,7 +28,7 @@ export function EventDetailClient({ event }: { event: PublicEvent }) {
       <div className="max-w-md mx-auto space-y-4">
         <div className="flex items-center justify-between">
           <Link href="/events" className="text-sm text-rooted-green hover:underline">
-            &larr; {es ? "Todos los eventos" : "All events"}
+            &larr; {t("events.allEvents")}
           </Link>
           <LanguageToggle />
         </div>
@@ -54,8 +54,7 @@ export function EventDetailClient({ event }: { event: PublicEvent }) {
 }
 
 export function RsvpForm({ eventId, campusId, isFull }: { eventId: string; campusId: string; isFull: boolean }) {
-  const { locale } = useLocale();
-  const es = locale === "es";
+  const { locale, t } = useLocale();
   const [isPending, startTransition] = useTransition();
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,9 +66,9 @@ export function RsvpForm({ eventId, campusId, isFull }: { eventId: string; campu
     return (
       <div className="rounded-xl border border-stone/20 bg-white p-5 text-center">
         <p className="text-sm text-ink/70">
-          {es ? "Este evento está lleno." : "This event is full."}{" "}
+          {t("events.eventFull")}{" "}
           <Link href="/inquire" className="text-rooted-green hover:underline">
-            {es ? "Pida información sobre la próxima fecha" : "Ask about the next date"}
+            {t("events.askNextDate")}
           </Link>.
         </p>
       </div>
@@ -82,12 +81,8 @@ export function RsvpForm({ eventId, campusId, isFull }: { eventId: string; campu
         <div className="flex justify-center text-rooted-green">
           <IconCheckCircle size={32} />
         </div>
-        <p className="font-semibold text-ink">{es ? "¡Está registrado/a!" : "You're registered!"}</p>
-        <p className="text-sm text-ink/70">
-          {es
-            ? "Revise su correo para la confirmación. ¡Nos vemos pronto!"
-            : "Check your email for a confirmation. See you soon!"}
-        </p>
+        <p className="font-semibold text-ink">{t("events.registered")}</p>
+        <p className="text-sm text-ink/70">{t("events.confirmationCheck")}</p>
       </div>
     );
   }
@@ -95,12 +90,12 @@ export function RsvpForm({ eventId, campusId, isFull }: { eventId: string; campu
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.guardian_name.trim() || (!form.email.trim() && !form.phone.trim())) {
-      setError(es ? "Ingrese su nombre y un correo o teléfono." : "Please enter your name and an email or phone.");
+      setError(t("events.rsvpValidation"));
       return;
     }
     setError(null);
     startTransition(async () => {
-      const result = await submitRsvp({ ...form, event_id: eventId, campus_id: campusId, party_size: Number(form.party_size) || 1 });
+      const result = await submitRsvp({ ...form, event_id: eventId, campus_id: campusId, party_size: Number(form.party_size) || 1, locale });
       if (result.error) setError(result.error);
       else setDone(true);
     });
@@ -108,27 +103,27 @@ export function RsvpForm({ eventId, campusId, isFull }: { eventId: string; campu
 
   return (
     <form onSubmit={submit} className="rounded-xl border border-stone/20 bg-white p-5 space-y-3" noValidate>
-      <p className="text-sm font-semibold text-ink">{es ? "Reserve su lugar" : "Save your spot"}</p>
+      <p className="text-sm font-semibold text-ink">{t("events.saveSpot")}</p>
       <div className="absolute -left-[9999px]" aria-hidden="true">
         <input tabIndex={-1} autoComplete="off" value={form.website} onChange={(e) => set({ website: e.target.value })} />
       </div>
       <div>
         <label htmlFor="rsvp-name" className="block text-sm font-medium text-ink/70 mb-1">
-          {es ? "Su nombre" : "Your name"} <span className="text-error">*</span>
+          {t("events.yourName")} <span className="text-error">*</span>
         </label>
         <Input id="rsvp-name" value={form.guardian_name} onChange={(e) => set({ guardian_name: e.target.value })} autoComplete="name" />
       </div>
       <div>
-        <label htmlFor="rsvp-email" className="block text-sm font-medium text-ink/70 mb-1">{es ? "Correo" : "Email"}</label>
+        <label htmlFor="rsvp-email" className="block text-sm font-medium text-ink/70 mb-1">{t("events.email")}</label>
         <Input id="rsvp-email" type="email" value={form.email} onChange={(e) => set({ email: e.target.value })} autoComplete="email" inputMode="email" />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label htmlFor="rsvp-phone" className="block text-sm font-medium text-ink/70 mb-1">{es ? "Teléfono" : "Phone"}</label>
+          <label htmlFor="rsvp-phone" className="block text-sm font-medium text-ink/70 mb-1">{t("events.phone")}</label>
           <Input id="rsvp-phone" type="tel" value={form.phone} onChange={(e) => set({ phone: e.target.value })} autoComplete="tel" inputMode="tel" />
         </div>
         <div>
-          <label htmlFor="rsvp-party" className="block text-sm font-medium text-ink/70 mb-1">{es ? "¿Cuántos vienen?" : "How many coming?"}</label>
+          <label htmlFor="rsvp-party" className="block text-sm font-medium text-ink/70 mb-1">{t("events.howManyComing")}</label>
           <Select id="rsvp-party" value={form.party_size} onChange={(e) => set({ party_size: e.target.value })}>
             {[1, 2, 3, 4, 5, 6].map((n) => (
               <option key={n} value={String(n)}>{n}{n === 6 ? "+" : ""}</option>
@@ -144,15 +139,11 @@ export function RsvpForm({ eventId, campusId, isFull }: { eventId: string; campu
           onChange={(e) => set({ sms_consent: e.target.checked })}
           className="mt-0.5 h-4 w-4 shrink-0 rounded border-stone/40 text-rooted-green focus:ring-rooted-green"
         />
-        <span>
-          {es
-            ? "Sí, envíenme recordatorios por mensaje de texto sobre este evento. Pueden aplicar tarifas de mensajes y datos. Responda STOP para cancelar."
-            : "Yes, text me reminders about this event. Message and data rates may apply. Reply STOP to opt out."}
-        </span>
+        <span>{t("events.smsConsent")}</span>
       </label>
       {error && <p className="text-sm text-error bg-error/10 border border-error/30 rounded-[6px] px-3 py-2">{error}</p>}
       <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? (es ? "Registrando…" : "Registering…") : es ? "Registrarse" : "Register"}
+        {isPending ? t("events.registering") : t("events.register")}
       </Button>
     </form>
   );

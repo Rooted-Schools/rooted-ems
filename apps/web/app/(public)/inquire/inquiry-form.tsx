@@ -162,6 +162,7 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
         pathway_interest: details.pathway_interest,
         source: details.source,
         website: details.website,
+        locale,
       });
       if (result.error) {
         setDetailsError(result.error);
