@@ -2,6 +2,10 @@
 
 These are the operating guides for Rooted EMS (enroll.rootedschool.org), written for campus enrollment staff and managers rather than developers. Each runbook covers one piece of the job: what the system does on its own, what you need to do by hand, and what to do when something looks wrong. Read the one that matches what you are about to do, and keep this page as your index. Every runbook ends with the hardest real questions about that topic, answered honestly, and notes what only your system administrator can do.
 
+**Signing in.** The staff console is at **https://enroll.rootedschool.org/staff-login**. Bookmark it. There is deliberately no staff sign-in link on the family-facing pages, so that families are not offered a door that is not theirs. Sign in with your school email and password, or with the Google button if your school account uses Google.
+
+Staff access is granted by an administrator, never self-served. If you see a message that your account is not set up as a staff account, or that it is not assigned to a campus, that is expected until an administrator adds you; contact them rather than trying again.
+
 If you work more than one campus, the "Campus:" selector in the header controls which campus you are looking at everywhere in the app. It remembers your last choice as you move between pages, and it tints the whole screen in that campus's color (green for Vancouver, amber for C.R. Neal, blue for Cleveland), so a glance at the color confirms which campus you are in. Staff with access to only one campus never see this selector; the system shows their campus automatically.
 
 | Runbook | What it covers |

@@ -638,6 +638,8 @@ const dict = {
   "common.backToDashboard": { en: "Back to Dashboard", es: "Volver al Panel" },
   "common.loading":         { en: "Loading...",        es: "Cargando..." },
   "common.error":           { en: "Something went wrong.", es: "Algo salió mal." },
+  "common.genericError":    { en: "Something went wrong. Please try again.", es: "Algo salió mal. Por favor intente de nuevo." },
+  "common.rateLimitError":  { en: "Too many submissions from this connection. Please try again in a little while.", es: "Demasiados envíos desde esta conexión. Por favor intente de nuevo en un momento." },
   "common.tryAgain":        { en: "Try again",         es: "Intentar de nuevo" },
   "common.done":            { en: "Done",              es: "Listo" },
   "common.verified":        { en: "Verified",          es: "Verificado" },
@@ -1160,6 +1162,38 @@ const dict = {
   "lotteryResult.noResultYetTitle":  { en: "No lottery result yet", es: "Aún no hay resultado del sorteo" },
   "lotteryResult.noResultYetBody":   { en: "We haven't run the lottery for this application yet. Check back after the enrollment window closes.", es: "Aún no hemos realizado el sorteo para esta solicitud. Vuelva a consultar después de que cierre el período de inscripción." },
   "card.seeLotteryResult":           { en: "See what happened",   es: "Ver qué pasó" },
+
+  // ─── Public events (list + RSVP) ───────────────────────────────────────────
+  "events.type.info_session": { en: "Info Session",  es: "Sesión Informativa" },
+  "events.type.open_house":   { en: "Open House",    es: "Casa Abierta" },
+  "events.type.tour":         { en: "Campus Tour",   es: "Recorrido" },
+  "events.type.other":        { en: "Event",         es: "Evento" },
+  "events.backHome":          { en: "Back to home",  es: "Volver al inicio" },
+  "events.heading":           { en: "Upcoming events", es: "Próximos eventos" },
+  "events.subtitle":          { en: "Come meet us. Families and students are both welcome.", es: "Venga a conocernos. Las familias y los estudiantes son bienvenidos." },
+  "events.noneScheduled":     { en: "No events scheduled right now. Check back soon.", es: "No hay eventos programados por ahora. Vuelva pronto." },
+  "events.requestInfo":       { en: "Request more info", es: "Solicite más información" },
+  "events.full":              { en: "Full",          es: "Lleno" },
+  "events.register":          { en: "Register",      es: "Registrarse" },
+  "events.allEvents":         { en: "All events",    es: "Todos los eventos" },
+  "events.eventFull":         { en: "This event is full.", es: "Este evento está lleno." },
+  "events.askNextDate":       { en: "Ask about the next date", es: "Pida información sobre la próxima fecha" },
+  "events.registered":        { en: "You're registered!", es: "¡Está registrado/a!" },
+  "events.confirmationCheck": { en: "Check your email for a confirmation. See you soon!", es: "Revise su correo para la confirmación. ¡Nos vemos pronto!" },
+  "events.rsvpValidation":    { en: "Please enter your name and an email or phone.", es: "Ingrese su nombre y un correo o teléfono." },
+  "events.saveSpot":          { en: "Save your spot", es: "Reserve su lugar" },
+  "events.yourName":          { en: "Your name",     es: "Su nombre" },
+  "events.email":             { en: "Email",         es: "Correo" },
+  "events.phone":             { en: "Phone",         es: "Teléfono" },
+  "events.howManyComing":     { en: "How many coming?", es: "¿Cuántos vienen?" },
+  "events.smsConsent":        { en: "Yes, text me reminders about this event. Message and data rates may apply. Reply STOP to opt out.", es: "Sí, envíenme recordatorios por mensaje de texto sobre este evento. Pueden aplicar tarifas de mensajes y datos. Responda STOP para cancelar." },
+  "events.registering":       { en: "Registering…",  es: "Registrando…" },
+
+  // ─── Unsubscribe landing (email link — locale may be unresolved) ──────────
+  "unsubscribe.confirmedTitle": { en: "You're unsubscribed", es: "Cancelamos su suscripción" },
+  "unsubscribe.confirmedBody":  { en: "We won't send you any more recruitment emails. If you applied or enroll, we'll still send the messages your application needs (offers, deadlines, registration).", es: "No le enviaremos más correos de reclutamiento. Si aplicó o se inscribe, aún le enviaremos los mensajes que su solicitud necesita (ofertas, fechas límite, registro)." },
+  "unsubscribe.failedTitle":    { en: "This link didn't work", es: "Este enlace no funcionó" },
+  "unsubscribe.failedBody":     { en: "The unsubscribe link looks incomplete. Reply to any email from us and a real person will remove you right away.", es: "El enlace para cancelar la suscripción parece incompleto. Responda a cualquier correo nuestro y una persona real le dará de baja de inmediato." },
 } satisfies Record<string, Record<Locale, string>>;
 
 export type TranslationKey = keyof typeof dict;

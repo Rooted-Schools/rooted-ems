@@ -96,10 +96,11 @@ function FeedbackForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-ink/70 mb-1">
+          <label htmlFor="feedback-category" className="block text-sm font-medium text-ink/70 mb-1">
             Category
           </label>
           <Select
+            id="feedback-category"
             value={category}
             onChange={(e) => setCategory(e.target.value as FeedbackCategory)}
             className="min-h-[44px] rounded-[6px]"
@@ -112,10 +113,11 @@ function FeedbackForm() {
           </Select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-ink/70 mb-1">
+          <label htmlFor="feedback-where" className="block text-sm font-medium text-ink/70 mb-1">
             Where were you? (optional)
           </label>
           <Input
+            id="feedback-where"
             value={where}
             onChange={(e) => setWhere(e.target.value)}
             placeholder="e.g. Recruitment follow-up queue"
@@ -125,10 +127,11 @@ function FeedbackForm() {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-ink/70 mb-1">
+        <label htmlFor="feedback-body" className="block text-sm font-medium text-ink/70 mb-1">
           Feedback
         </label>
         <textarea
+          id="feedback-body"
           value={body}
           onChange={(e) => setBody(e.target.value)}
           required

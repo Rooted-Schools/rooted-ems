@@ -422,6 +422,7 @@ function MemberRow({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
+  const [removeConfirm, setRemoveConfirm] = useState<{ rowId: string; campusName: string } | null>(null);
 
   function startEdit(rowId: string, currentRole: string) {
     setEditingRowId(rowId);
@@ -446,12 +447,18 @@ function MemberRow({
     });
   }
 
-  function removeRow(rowId: string) {
-    if (!confirm("Remove this campus assignment? If it's their last one, they'll lose staff access.")) return;
+  function removeRow(rowId: string, campusName: string) {
+    setRemoveConfirm({ rowId, campusName });
+  }
+
+  function confirmRemoveRow() {
+    if (!removeConfirm) return;
+    const { rowId } = removeConfirm;
     startTransition(async () => {
       const result = await removeCampusFromMember(rowId, member.user_id);
       if (result.error) setError(result.error);
       else toast({ variant: "success", title: "Campus assignment removed" });
+      setRemoveConfirm(null);
     });
   }
 
@@ -491,7 +498,7 @@ function MemberRow({
                 <Select
                   value={editRole}
                   onChange={(e) => setEditRole(e.target.value)}
-                  className="text-xs h-7 py-0 flex-1"
+                  className="text-xs min-h-[44px] flex-1"
                 >
                   {ROLES.map((r) => (
                     <option key={r.value} value={r.value}>
@@ -502,13 +509,13 @@ function MemberRow({
                 <button
                   onClick={() => saveRole(cr.row_id)}
                   disabled={isPending}
-                  className="text-xs text-rooted-green hover:underline disabled:opacity-50"
+                  className="inline-flex min-h-[44px] items-center px-2 text-xs text-rooted-green hover:underline disabled:opacity-50"
                 >
                   Save
                 </button>
                 <button
                   onClick={cancelEdit}
-                  className="text-xs text-stone hover:text-ink"
+                  className="inline-flex min-h-[44px] items-center px-2 text-xs text-stone hover:text-ink"
                 >
                   Cancel
                 </button>
@@ -524,14 +531,14 @@ function MemberRow({
                 </span>
                 <button
                   onClick={() => startEdit(cr.row_id, cr.role)}
-                  className="text-[11px] text-stone hover:text-ink ml-auto"
+                  className="inline-flex min-h-[44px] items-center px-2 text-[11px] text-stone hover:text-ink ml-auto"
                 >
                   Edit
                 </button>
                 <button
-                  onClick={() => removeRow(cr.row_id)}
+                  onClick={() => removeRow(cr.row_id, cr.campus_name)}
                   disabled={isPending}
-                  className="text-[11px] text-stone hover:text-red-500 disabled:opacity-50"
+                  className="inline-flex min-h-[44px] items-center px-2 text-[11px] text-stone hover:text-red-500 disabled:opacity-50"
                 >
                   Remove
                 </button>
@@ -544,6 +551,38 @@ function MemberRow({
           <p className="text-xs text-red-600 mt-1">{error}</p>
         )}
       </div>
+
+      {/* Remove Campus Assignment Confirmation */}
+      <Dialog open={!!removeConfirm} onOpenChange={(v) => !v && setRemoveConfirm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove campus assignment?</DialogTitle>
+            <DialogDescription>
+              This removes {member.full_name !== "Unknown" ? member.full_name : member.email}&apos;s
+              access to {removeConfirm?.campusName}. If it&apos;s their last campus, they will lose
+              staff access entirely. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="min-h-[44px]"
+              onClick={() => setRemoveConfirm(null)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="min-h-[44px]"
+              onClick={confirmRemoveRow}
+              disabled={isPending}
+            >
+              {isPending ? "Removing…" : "Remove"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

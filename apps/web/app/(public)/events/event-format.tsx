@@ -3,18 +3,14 @@
 import Link from "next/link";
 import { LanguageToggle } from "@/components/ui/language-toggle";
 import { useLocale } from "@/lib/i18n/locale-context";
+import { tx, type TranslationKey } from "@/lib/i18n/translations";
 import type { PublicEvent } from "@/lib/queries";
 
-const TYPE_LABELS: Record<string, { en: string; es: string }> = {
-  info_session: { en: "Info Session", es: "Sesión Informativa" },
-  open_house: { en: "Open House", es: "Casa Abierta" },
-  tour: { en: "Campus Tour", es: "Recorrido" },
-  other: { en: "Event", es: "Evento" },
-};
+const KNOWN_EVENT_TYPES = new Set(["info_session", "open_house", "tour"]);
 
 export function EventTypeLabel({ type, es }: { type: string; es: boolean }) {
-  const l = TYPE_LABELS[type] ?? TYPE_LABELS.other;
-  return <>{es ? l.es : l.en}</>;
+  const key = (KNOWN_EVENT_TYPES.has(type) ? `events.type.${type}` : "events.type.other") as TranslationKey;
+  return <>{tx(key, es ? "es" : "en")}</>;
 }
 
 export function formatEventWhen(startsAt: string, endsAt: string | null, es: boolean): string {
@@ -41,7 +37,7 @@ export function formatEventWhen(startsAt: string, endsAt: string | null, es: boo
  * here makes every string on this page reactive to the toggle.
  */
 export function EventsListClient({ events }: { events: PublicEvent[] }) {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const es = locale === "es";
 
   return (
@@ -49,29 +45,21 @@ export function EventsListClient({ events }: { events: PublicEvent[] }) {
       <div className="max-w-2xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
           <Link href="/" className="text-sm text-rooted-green hover:underline">
-            &larr; {es ? "Volver al inicio" : "Back to home"}
+            &larr; {t("events.backHome")}
           </Link>
           <LanguageToggle />
         </div>
 
         <div>
-          <h1 className="text-2xl font-bold text-ink">{es ? "Próximos eventos" : "Upcoming events"}</h1>
-          <p className="text-sm text-stone-text mt-1">
-            {es
-              ? "Venga a conocernos. Las familias y los estudiantes son bienvenidos."
-              : "Come meet us. Families and students are both welcome."}
-          </p>
+          <h1 className="text-2xl font-bold text-ink">{t("events.heading")}</h1>
+          <p className="text-sm text-stone-text mt-1">{t("events.subtitle")}</p>
         </div>
 
         {events.length === 0 ? (
           <div className="rounded-xl border border-stone/20 bg-white px-4 py-10 text-center">
-            <p className="text-stone-text text-sm">
-              {es
-                ? "No hay eventos programados por ahora. Vuelva pronto."
-                : "No events scheduled right now. Check back soon."}
-            </p>
+            <p className="text-stone-text text-sm">{t("events.noneScheduled")}</p>
             <Link href="/inquire" className="text-sm text-rooted-green hover:underline mt-2 inline-block">
-              {es ? "Solicite más información" : "Request more info"} &rarr;
+              {t("events.requestInfo")} &rarr;
             </Link>
           </div>
         ) : (
@@ -90,13 +78,13 @@ export function EventsListClient({ events }: { events: PublicEvent[] }) {
                 </div>
                 <div className="shrink-0 self-center">
                   {e.is_full ? (
-                    <span className="text-xs text-stone-text">{es ? "Lleno" : "Full"}</span>
+                    <span className="text-xs text-stone-text">{t("events.full")}</span>
                   ) : (
                     <Link
                       href={`/events/${e.id}`}
                       className="inline-flex min-h-[44px] items-center justify-center px-4 rounded-[6px] text-sm font-semibold text-white bg-rooted-green hover:bg-deep-green transition-colors"
                     >
-                      {es ? "Registrarse" : "Register"}
+                      {t("events.register")}
                     </Link>
                   )}
                 </div>

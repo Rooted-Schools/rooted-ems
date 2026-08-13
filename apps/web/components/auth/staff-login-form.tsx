@@ -242,7 +242,7 @@ export function StaffLoginForm() {
 
         <p className="mt-5 text-xs text-center text-stone/70 leading-relaxed">
           Access to this system is restricted to authorized staff. Student
-          records are protected under FERPA — unauthorized access or
+          records are protected under FERPA. Unauthorized access or
           disclosure is prohibited.
         </p>
       </div>

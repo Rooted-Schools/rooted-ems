@@ -3,6 +3,12 @@
 import { createLeadFromInquiry } from "@/lib/mutations";
 import { updateLeadFromInquiryDetails } from "@/lib/mutations/leads";
 import { signInquiryLeadToken, verifyInquiryLeadToken } from "@/lib/inquiry-token";
+import { tx, type Locale } from "@/lib/i18n/translations";
+
+/** Narrow an untrusted client-supplied language string to a real Locale. */
+function resolveLocale(value: string | undefined): Locale {
+  return value === "es" ? "es" : "en";
+}
 
 export interface InquirySubmission {
   first_name: string;
@@ -39,6 +45,12 @@ const VALID_SOURCES = new Set(["website", "event", "referral", "qr", "ad", "walk
  * this ever becoming a general "update any lead" endpoint.
  */
 export async function submitInquiry(input: InquirySubmission) {
+  // The form already knows the family's chosen language (see
+  // preferred_language on InquirySubmission) — use it to pick the language
+  // of any error string this action returns, rather than guessing or
+  // jamming both languages into one string.
+  const locale = resolveLocale(input.preferred_language);
+
   // Bots fill every field; humans never see this one.
   if (input.website?.trim()) {
     // Pretend success — don't teach the bot what failed.
@@ -52,8 +64,7 @@ export async function submitInquiry(input: InquirySubmission) {
   if (!rl.allowed) {
     return {
       data: null,
-      error:
-        "Too many submissions from this connection — please try again in a little while. / Demasiados envíos desde esta conexión — intente de nuevo en un momento.",
+      error: tx("common.rateLimitError", locale),
     };
   }
 
@@ -111,6 +122,12 @@ export interface InquiryDetailsSubmission {
   source: string;
   /** Honeypot — humans never fill this; bots do. */
   website: string;
+  /**
+   * The family's currently selected UI language. Not persisted anywhere —
+   * used only to pick the language of any error string this action returns,
+   * so the caller doesn't have to guess it server-side.
+   */
+  locale: string;
 }
 
 /**
@@ -120,6 +137,8 @@ export interface InquiryDetailsSubmission {
  * way to edit an arbitrary lead by id.
  */
 export async function submitInquiryDetails(input: InquiryDetailsSubmission) {
+  const locale = resolveLocale(input.locale);
+
   if (input.website?.trim()) {
     return { data: null, error: null };
   }
@@ -129,13 +148,12 @@ export async function submitInquiryDetails(input: InquiryDetailsSubmission) {
   if (!rl.allowed) {
     return {
       data: null,
-      error:
-        "Too many submissions from this connection — please try again in a little while. / Demasiados envíos desde esta conexión — intente de nuevo en un momento.",
+      error: tx("common.rateLimitError", locale),
     };
   }
 
   if (!verifyInquiryLeadToken(input.lead_id, input.token)) {
-    return { data: null, error: "Something went wrong. Please try again." };
+    return { data: null, error: tx("common.genericError", locale) };
   }
 
   return updateLeadFromInquiryDetails(input.lead_id, {

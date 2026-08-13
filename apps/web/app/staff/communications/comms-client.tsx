@@ -661,10 +661,11 @@ function NewMessageDialog({
           {/* Template selector */}
           {templates.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="comms-new-message-template" className="block text-sm font-medium text-ink/70 mb-1">
                 Use Template (optional)
               </label>
               <select
+                id="comms-new-message-template"
                 value={templateId}
                 onChange={(e) => handleTemplateSelect(e.target.value)}
                 className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
@@ -682,10 +683,11 @@ function NewMessageDialog({
           {/* Campus */}
           {campuses.length > 1 && (
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="comms-new-message-campus" className="block text-sm font-medium text-ink/70 mb-1">
                 Campus
               </label>
               <select
+                id="comms-new-message-campus"
                 value={selectedCampusId}
                 onChange={(e) => setSelectedCampusId(e.target.value)}
                 className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
@@ -753,6 +755,7 @@ function NewMessageDialog({
 
             {audienceType === "status" && (
               <select
+                aria-label="Application status"
                 value={statusTarget}
                 onChange={(e) => setStatusTarget(e.target.value)}
                 className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
@@ -812,10 +815,11 @@ function NewMessageDialog({
 
           {/* Subject */}
           <div>
-            <label className="block text-sm font-medium text-ink/70 mb-1">
+            <label htmlFor="comms-new-message-subject" className="block text-sm font-medium text-ink/70 mb-1">
               Subject
             </label>
             <input
+              id="comms-new-message-subject"
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
@@ -826,10 +830,11 @@ function NewMessageDialog({
 
           {/* Body */}
           <div>
-            <label className="block text-sm font-medium text-ink/70 mb-1">
+            <label htmlFor="comms-new-message-body" className="block text-sm font-medium text-ink/70 mb-1">
               Message
             </label>
             <textarea
+              id="comms-new-message-body"
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="Write your message..."
@@ -841,10 +846,11 @@ function NewMessageDialog({
           {/* Optional link (in-app only) */}
           {channel === "in_app" && (
             <div>
-              <label className="block text-sm font-medium text-ink/70 mb-1">
+              <label htmlFor="comms-new-message-link" className="block text-sm font-medium text-ink/70 mb-1">
                 Link (optional)
               </label>
               <input
+                id="comms-new-message-link"
                 type="text"
                 value={link}
                 onChange={(e) => setLink(e.target.value)}
@@ -962,10 +968,11 @@ function NewTemplateDialog({
 
         <div className="space-y-4 py-4">
           <div>
-            <label className="block text-sm font-medium text-ink/70 mb-1">
+            <label htmlFor="comms-new-template-name" className="block text-sm font-medium text-ink/70 mb-1">
               Template Name
             </label>
             <input
+              id="comms-new-template-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -1000,10 +1007,11 @@ function NewTemplateDialog({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-ink/70 mb-1">
+            <label htmlFor="comms-new-template-subject" className="block text-sm font-medium text-ink/70 mb-1">
               Subject (optional)
             </label>
             <input
+              id="comms-new-template-subject"
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
@@ -1013,10 +1021,11 @@ function NewTemplateDialog({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-ink/70 mb-1">
+            <label htmlFor="comms-new-template-body" className="block text-sm font-medium text-ink/70 mb-1">
               Message Body
             </label>
             <textarea
+              id="comms-new-template-body"
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="Write the template message... Use {{student_name}}, {{campus_name}} for merge fields."
