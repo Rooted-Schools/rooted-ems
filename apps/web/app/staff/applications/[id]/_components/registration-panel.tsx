@@ -97,9 +97,9 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
 };
 
 const regItemStatusConfig: Record<string, { label: string; color: string }> = {
-  pending: { label: "Pending", color: "text-amber-700 bg-amber-50 border-amber-200" },
-  submitted: { label: "Submitted", color: "text-blue-700 bg-blue-50 border-blue-200" },
-  verified: { label: "Verified", color: "text-green-700 bg-green-50 border-green-200" },
+  pending: { label: "Pending", color: "text-warn bg-warn/10 border-warn/30" },
+  submitted: { label: "Submitted", color: "text-info bg-info/10 border-info/30" },
+  verified: { label: "Verified", color: "text-rooted-green bg-rooted-green/10 border-rooted-green/30" },
 };
 
 const packetStatusConfig: Record<string, { label: string; variant: "default" | "secondary" | "warning" | "success" | "destructive" }> = {
@@ -134,7 +134,7 @@ function ViewFileButton({ storagePath, fileName }: { storagePath: string; fileNa
     <button
       onClick={handleClick}
       disabled={loading}
-      className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline disabled:opacity-50 transition-colors"
+      className="inline-flex items-center gap-1.5 text-xs font-medium text-info hover:underline disabled:opacity-50 transition-colors"
     >
       <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -409,7 +409,7 @@ export function RegistrationPanel({ detail, registrationPacket }: RegistrationPa
                               </Button>
                             )}
                             {item.status === "verified" && (
-                              <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
+                              <span className="inline-flex items-center gap-1 text-xs text-rooted-green font-medium">
                                 <IconCheckCircle size={14} aria-hidden="true" />
                                 Done
                               </span>
@@ -434,7 +434,7 @@ export function RegistrationPanel({ detail, registrationPacket }: RegistrationPa
       </Card>
 
       {(detail.status === "placement_review" || detail.status === "enrolled") && (
-        <Card className={detail.status === "enrolled" ? "border-green-200 bg-green-50/20" : "border-blue-200 bg-blue-50/20"}>
+        <Card className={detail.status === "enrolled" ? "border-rooted-green/30 bg-rooted-green/10" : "border-info/30 bg-info/10"}>
           <CardHeader>
             <div className="flex items-center gap-2">
               <IconGraduationCap size={20} className="text-ink/70 shrink-0" aria-hidden="true" />

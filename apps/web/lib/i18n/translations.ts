@@ -654,6 +654,8 @@ const dict = {
   "common.updated":         { en: "Updated",           es: "Actualizado" },
   "common.day":             { en: "day",               es: "día" },
   "common.days":            { en: "days",              es: "días" },
+  "common.close":           { en: "Close",             es: "Cerrar" },
+  "common.dismiss":         { en: "Dismiss",           es: "Descartar" },
 
   // ─── New Application Form ─────────────────────────────────────────────────
   "appForm.backToApplications": { en: "Back to Applications", es: "Volver a Solicitudes" },

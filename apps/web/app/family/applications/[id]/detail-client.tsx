@@ -694,7 +694,7 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
 
       {/* Decline Offer Dialog */}
       <Dialog open={showDeclineDialog} onOpenChange={setShowDeclineDialog}>
-        <DialogContent>
+        <DialogContent closeLabel={t("common.close")}>
           <DialogHeader>
             <DialogTitle>{t("apps.detail.declineDialogTitle")}</DialogTitle>
             <DialogDescription>
@@ -718,7 +718,7 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
 
       {/* Withdraw Application Dialog */}
       <Dialog open={showWithdrawDialog} onOpenChange={setShowWithdrawDialog}>
-        <DialogContent>
+        <DialogContent closeLabel={t("common.close")}>
           <DialogHeader>
             <DialogTitle>{t("apps.detail.withdrawDialogTitle")}</DialogTitle>
             <DialogDescription>

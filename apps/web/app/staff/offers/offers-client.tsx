@@ -367,12 +367,12 @@ export function OffersClient({
       </div>
 
       {error && (
-        <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+        <div className="rounded-md bg-error/10 border border-error/30 p-3 text-sm text-error">
           {error}
         </div>
       )}
       {success && (
-        <div className="rounded-md bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+        <div className="rounded-md bg-rooted-green/10 border border-rooted-green/30 p-3 text-sm text-deep-green">
           {success}
         </div>
       )}
@@ -412,25 +412,25 @@ export function OffersClient({
                   <p className="text-xs text-stone mt-1">all time</p>
                 </CardContent>
               </Card>
-              <Card className="border-t-4 border-t-amber-500">
+              <Card className="border-t-4 border-t-warn">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
                     Pending Response
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
+                  <p className="text-2xl font-bold text-warn-text">{stats.pending}</p>
                   <p className="text-xs text-stone mt-1">awaiting family reply</p>
                 </CardContent>
               </Card>
-              <Card className="border-t-4 border-t-emerald-500">
+              <Card className="border-t-4 border-t-rooted-green">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
                     Accepted
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-2xl font-bold text-emerald-600">{stats.accepted}</p>
+                  <p className="text-2xl font-bold text-rooted-green">{stats.accepted}</p>
                   <p className="text-xs text-stone mt-1">
                     {stats.total > 0
                       ? `${Math.round((stats.accepted / stats.total) * 100)}% acceptance rate`
@@ -445,7 +445,7 @@ export function OffersClient({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className={`text-2xl font-bold ${stats.declined_or_expired === 0 ? "text-stone/50" : "text-red-600"}`}>
+                  <p className={`text-2xl font-bold ${stats.declined_or_expired === 0 ? "text-stone/50" : "text-error"}`}>
                     {stats.declined_or_expired}
                   </p>
                   <p className="text-xs text-stone mt-1">
@@ -495,7 +495,7 @@ export function OffersClient({
                         const isUrgent = daysLeft !== null && daysLeft <= 3;
                         const isExpired = daysLeft !== null && daysLeft <= 0;
                         return (
-                          <TableRow key={offer.id} className={isUrgent ? "bg-red-50/50" : ""}>
+                          <TableRow key={offer.id} className={isUrgent ? "bg-error/5" : ""}>
                             <TableCell className="font-medium">
                               {offer.student_name}
                             </TableCell>
@@ -524,7 +524,7 @@ export function OffersClient({
                             <TableCell className="text-stone">
                               {offer.offered_at}
                             </TableCell>
-                            <TableCell className={isUrgent ? "text-red-600 font-medium" : "text-stone"}>
+                            <TableCell className={isUrgent ? "text-error font-medium" : "text-stone"}>
                               {offer.expires_at}
                             </TableCell>
                             <TableCell>
@@ -576,7 +576,7 @@ export function OffersClient({
         <TabsContent value="waitlist">
           <div className="space-y-4">
             {waitlistCampusCounts.length > 0 && (() => {
-              const borderColors = ["border-t-rooted-green", "border-t-blue-500", "border-t-amber-500"];
+              const borderColors = ["border-t-warn", "border-t-warn/70", "border-t-warn/50"];
               return (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {waitlistCampusCounts.map((cc, idx) => (
@@ -759,7 +759,7 @@ export function OffersClient({
             const entry = waitlistEntries.find((e) => e.id === removePositionId);
             if (!entry) return null;
             return (
-              <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm">
+              <div className="rounded-lg bg-error/10 border border-error/30 p-3 text-sm">
                 <p className="font-medium text-ink">{entry.student_name}</p>
                 <p className="text-stone">
                   {entry.campus_name} · Grade {entry.grade} · Waitlist #{entry.position}

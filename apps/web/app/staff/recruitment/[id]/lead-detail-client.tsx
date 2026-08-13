@@ -337,7 +337,7 @@ export function LeadDetailClient({
               <p className="text-ink flex items-center gap-1.5">
                 {lead.next_follow_up_at ? formatRelativeTime(lead.next_follow_up_at) : "None scheduled"}
                 {lead.next_follow_up_at && latestCall && bodyHasOutcome(latestCall.body, "callback") && (
-                  <span className="rounded-[6px] bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+                  <span className="rounded-[6px] bg-warn/20 px-1.5 py-0.5 text-[10px] font-medium text-warn-text">
                     Callback
                   </span>
                 )}
@@ -402,7 +402,7 @@ export function LeadDetailClient({
                 <button
                   type="button"
                   onClick={() => { setDeleteError(null); setDeleteOpen(true); }}
-                  className="text-xs text-red-600 hover:text-red-700 hover:underline"
+                  className="text-xs text-error hover:text-error/80 hover:underline"
                 >
                   Delete this lead
                 </button>
@@ -458,7 +458,7 @@ export function LeadDetailClient({
             </DialogDescription>
           </DialogHeader>
           {deleteError && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{deleteError}</p>
+            <p className="text-sm text-error bg-error/10 border border-error/30 rounded-md px-3 py-2">{deleteError}</p>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={isPending}>
@@ -467,7 +467,7 @@ export function LeadDetailClient({
             <Button
               onClick={doDelete}
               disabled={isPending}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="bg-error hover:bg-error/90 text-white"
             >
               {isPending ? "Deleting…" : "Delete permanently"}
             </Button>
@@ -559,7 +559,7 @@ export function LeadDetailClient({
               </>
             )}
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>
+              <p className="text-sm text-error bg-error/10 border border-error/30 rounded-md px-3 py-2">{error}</p>
             )}
           </div>
           <DialogFooter>

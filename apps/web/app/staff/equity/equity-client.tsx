@@ -203,25 +203,25 @@ export function EquityClient({
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-t-4 border-t-blue-500">
+        <Card className="border-t-4 border-t-info">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Total Applied
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-blue-600">{summary.total_applied}</p>
+            <p className="text-2xl font-bold text-info">{summary.total_applied}</p>
             <p className="text-xs text-stone mt-1">non-draft applications</p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-amber-500">
+        <Card className="border-t-4 border-t-warn">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Offered
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-amber-600">{summary.total_offered}</p>
+            <p className="text-2xl font-bold text-warn-text">{summary.total_offered}</p>
             <p className="text-xs text-stone mt-1">
               {summary.total_applied > 0
                 ? `${Math.round((summary.total_offered / summary.total_applied) * 100)}% offer rate`
@@ -229,14 +229,14 @@ export function EquityClient({
             </p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-emerald-500">
+        <Card className="border-t-4 border-t-rooted-green">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-stone uppercase tracking-wider">
               Accepted
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-emerald-600">{summary.total_accepted}</p>
+            <p className="text-2xl font-bold text-rooted-green">{summary.total_accepted}</p>
             <p className="text-xs text-stone mt-1">
               {summary.total_offered > 0
                 ? `${Math.round((summary.total_accepted / summary.total_offered) * 100)}% accept rate`
@@ -349,7 +349,7 @@ export function EquityClient({
                 {equity_funnel.map((row) => (
                   <TableRow
                     key={row.label}
-                    className={row.is_flagged ? "bg-amber-50 border-l-4 border-l-amber-400" : ""}
+                    className={row.is_flagged ? "bg-warn/5 border-l-4 border-l-warn" : ""}
                   >
                     <TableCell className="font-medium text-ink">{row.label}</TableCell>
                     <TableCell className="text-right text-stone">{row.applied}</TableCell>
@@ -361,7 +361,7 @@ export function EquityClient({
                         <span
                           className={
                             row.is_flagged
-                              ? "font-semibold text-amber-700"
+                              ? "font-semibold text-warn-text"
                               : "text-stone"
                           }
                         >
@@ -417,7 +417,7 @@ export function EquityClient({
                 {race_ethnicity.map((row) => (
                   <TableRow
                     key={row.group}
-                    className={row.is_flagged ? "bg-amber-50 border-l-4 border-l-amber-400" : ""}
+                    className={row.is_flagged ? "bg-warn/5 border-l-4 border-l-warn" : ""}
                   >
                     <TableCell className="font-medium text-ink">{row.group}</TableCell>
                     <TableCell className="text-right text-stone">{row.applied}</TableCell>
@@ -426,7 +426,7 @@ export function EquityClient({
                       {row.is_suppressed ? (
                         <span className="text-stone">n &lt; {conversion.suppression_threshold} — suppressed</span>
                       ) : (
-                        <span className={row.is_flagged ? "font-semibold text-amber-700" : "text-stone"}>
+                        <span className={row.is_flagged ? "font-semibold text-warn-text" : "text-stone"}>
                           {row.applied > 0 ? `${row.offer_rate_pct}%` : "—"}
                         </span>
                       )}

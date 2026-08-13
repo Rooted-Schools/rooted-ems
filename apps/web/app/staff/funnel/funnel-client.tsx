@@ -25,7 +25,7 @@ const statusCodes = PLAYBOOK_STATUS_CODES.map((c) => PLAYBOOK_STATUS_META[c]);
 const STATUS_STYLES: Record<RagStatus, { label: string; className: string }> = {
   green: { label: "On target", className: "bg-rooted-green/10 text-rooted-green border-rooted-green/30" },
   yellow: { label: "Below target", className: "bg-warn/10 text-warn border-warn/30" },
-  red: { label: "Red", className: "bg-red-50 text-red-700 border-red-200" },
+  red: { label: "Red", className: "bg-error/10 text-error border-error/30" },
   unavailable: { label: "Not yet measurable", className: "bg-sunken text-stone border-line" },
 };
 

@@ -125,8 +125,8 @@ export function SeatsClient({ rows }: SeatsClientProps) {
         <div
           className={`p-3 rounded-lg text-sm ${
             feedback.type === "success"
-              ? "bg-green-50 border border-green-200 text-green-800"
-              : "bg-red-50 border border-red-200 text-red-800"
+              ? "bg-rooted-green/10 border border-rooted-green/30 text-deep-green"
+              : "bg-error/10 border border-error/30 text-error"
           }`}
         >
           {feedback.message}
@@ -144,34 +144,34 @@ export function SeatsClient({ rows }: SeatsClientProps) {
             <p className="text-xs text-stone mt-1">across all grades</p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-blue-500">
+        <Card className="border-t-4 border-t-info">
           <CardContent className="pt-4">
             <p className="text-xs font-medium text-stone uppercase tracking-wider">
               Offered
             </p>
-            <p className="text-3xl font-bold text-blue-600 mt-1">
+            <p className="text-3xl font-bold text-info mt-1">
               {totalOffered}
             </p>
             <p className="text-xs text-stone mt-1">pending acceptance</p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-amber-500">
+        <Card className="border-t-4 border-t-rooted-green">
           <CardContent className="pt-4">
             <p className="text-xs font-medium text-stone uppercase tracking-wider">
               Accepted
             </p>
-            <p className="text-3xl font-bold text-amber-600 mt-1">
+            <p className="text-3xl font-bold text-rooted-green mt-1">
               {totalAccepted}
             </p>
             <p className="text-xs text-stone mt-1">completing registration</p>
           </CardContent>
         </Card>
-        <Card className="border-t-4 border-t-emerald-500">
+        <Card className="border-t-4 border-t-rooted-green">
           <CardContent className="pt-4">
             <p className="text-xs font-medium text-stone uppercase tracking-wider">
               Registered
             </p>
-            <p className="text-3xl font-bold text-emerald-600 mt-1">
+            <p className="text-3xl font-bold text-rooted-green mt-1">
               {totalRegistered}
             </p>
             <p className="text-xs text-stone mt-1">
@@ -181,12 +181,12 @@ export function SeatsClient({ rows }: SeatsClientProps) {
             </p>
           </CardContent>
         </Card>
-        <Card className={`border-t-4 ${totalAvailable <= 5 ? "border-t-red-500" : "border-t-stone"}`}>
+        <Card className={`border-t-4 ${totalAvailable <= 5 ? "border-t-warn" : "border-t-stone"}`}>
           <CardContent className="pt-4">
             <p className="text-xs font-medium text-stone uppercase tracking-wider">
               Available
             </p>
-            <p className={`text-3xl font-bold mt-1 ${totalAvailable <= 0 ? "text-red-600" : totalAvailable <= 5 ? "text-amber-600" : "text-ink/60"}`}>
+            <p className={`text-3xl font-bold mt-1 ${totalAvailable <= 0 ? "text-error" : totalAvailable <= 5 ? "text-warn-text" : "text-ink/60"}`}>
               {totalAvailable}
             </p>
             <p className="text-xs text-stone mt-1">
@@ -221,9 +221,9 @@ export function SeatsClient({ rows }: SeatsClientProps) {
                     <div
                       className={`h-full rounded-full ${
                         campusFill >= 90
-                          ? "bg-red-500"
+                          ? "bg-error"
                           : campusFill >= 70
-                          ? "bg-amber-500"
+                          ? "bg-warn"
                           : "bg-rooted-green"
                       }`}
                       style={{ width: `${campusFill}%` }}
@@ -301,10 +301,10 @@ export function SeatsClient({ rows }: SeatsClientProps) {
                             </span>
                           )}
                         </td>
-                        <td className="py-2.5 text-right text-blue-600">
+                        <td className="py-2.5 text-right text-info">
                           {row.seats_offered}
                         </td>
-                        <td className="py-2.5 text-right text-amber-600">
+                        <td className="py-2.5 text-right text-rooted-green">
                           {row.seats_accepted}
                         </td>
                         <td className="py-2.5 text-right text-rooted-green">
@@ -329,9 +329,9 @@ export function SeatsClient({ rows }: SeatsClientProps) {
                               <div
                                 className={`h-full rounded-full ${
                                   row.fill_pct >= 90
-                                    ? "bg-red-500"
+                                    ? "bg-error"
                                     : row.fill_pct >= 70
-                                    ? "bg-amber-500"
+                                    ? "bg-warn"
                                     : "bg-rooted-green"
                                 }`}
                                 style={{ width: `${row.fill_pct}%` }}

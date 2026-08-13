@@ -261,7 +261,7 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
 
       {/* Follow-up queue — the morning triage */}
       {queue.length > 0 && (
-        <Card className="border-amber-300 bg-amber-50/50">
+        <Card className="border-warn/30 bg-warn/10">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-1.5">
               <IconPhone size={16} /> Follow up today ({queue.length})
@@ -279,7 +279,7 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
                 <Link
                   key={lead.id}
                   href={`/staff/recruitment/${lead.id}`}
-                  className="flex items-center justify-between gap-3 rounded-lg bg-white border border-amber-200 px-3 py-2 hover:border-amber-400 transition-colors"
+                  className="flex items-center justify-between gap-3 rounded-lg bg-white border border-warn/30 px-3 py-2 hover:border-warn/60 transition-colors"
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-ink truncate">
@@ -296,7 +296,7 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <Badge variant={cfg.variant}>{cfg.label}</Badge>
                     {lead.is_callback && (
-                      <span className="inline-flex items-center gap-1 rounded-[6px] bg-amber-200 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1 rounded-[6px] bg-warn/20 px-1.5 py-0.5 text-[10px] font-medium text-warn-text whitespace-nowrap">
                         {lead.next_follow_up_at && isDueToday(lead.next_follow_up_at)
                           ? "Callback due today"
                           : "Callback overdue"}
@@ -428,7 +428,7 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
         ].map((s) => (
           <Card key={s.label}>
             <CardContent className="py-4 text-center">
-              <p className={`text-2xl font-bold ${s.accent ? "text-rooted-green" : s.warn && s.value > 0 ? "text-amber-600" : "text-ink"}`}>
+              <p className={`text-2xl font-bold ${s.accent ? "text-rooted-green" : s.warn && s.value > 0 ? "text-warn-text" : "text-ink"}`}>
                 {s.value}
               </p>
               <p className="text-xs text-stone mt-0.5">{s.label}</p>
@@ -678,7 +678,7 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
               />
             </div>
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>
+              <p className="text-sm text-error bg-error/10 border border-error/30 rounded-md px-3 py-2">{error}</p>
             )}
           </div>
           <DialogFooter>

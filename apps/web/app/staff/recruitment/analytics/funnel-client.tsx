@@ -5,6 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { RecruitmentFunnel } from "@/lib/queries";
@@ -109,7 +117,7 @@ export function FunnelDashboardClient({ funnel, speedToContact, speedToContactTr
     download("recruitment-funnel.csv", toCsv([], rows.map((r) => r.length ? r : [""])));
   }
 
-  const FUNNEL_COLORS = ["bg-stone/60", "bg-blue-500", "bg-amber-500", "bg-rooted-green", "bg-deep-green"];
+  const FUNNEL_COLORS = ["bg-stone/60", "bg-info", "bg-warn", "bg-rooted-green", "bg-deep-green"];
 
   return (
     <div className="space-y-6">
@@ -277,7 +285,7 @@ export function FunnelDashboardClient({ funnel, speedToContact, speedToContactTr
                 {funnel.top_zips.map((z) => (
                   <div key={z.zip} className="flex items-center gap-3">
                     <span className="text-xs font-mono text-ink/70 w-14">{z.zip}</span>
-                    <div className="flex-1"><Bar pct={(z.count / maxZip) * 100} color="bg-amber-500" /></div>
+                    <div className="flex-1"><Bar pct={(z.count / maxZip) * 100} color="bg-info" /></div>
                     <span className="text-xs text-ink/70 w-10 text-right tabular-nums">{z.count}</span>
                   </div>
                 ))}
@@ -304,7 +312,7 @@ export function FunnelDashboardClient({ funnel, speedToContact, speedToContactTr
                       <span className="text-xs font-medium text-ink/70 w-32 truncate">
                         {PATHWAY_LABELS[p.pathway] ?? p.pathway}
                       </span>
-                      <div className="flex-1"><Bar pct={(p.count / maxPath) * 100} color="bg-blue-500" /></div>
+                      <div className="flex-1"><Bar pct={(p.count / maxPath) * 100} color="bg-info" /></div>
                       <span className="text-xs text-ink/70 w-10 text-right tabular-nums">{p.count}</span>
                     </div>
                   );
@@ -449,51 +457,49 @@ export function FunnelDashboardClient({ funnel, speedToContact, speedToContactTr
       </Card>
 
       {/* Ad-spend entry (LG-2 cost tracking) */}
-      {spendOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onClick={() => setSpendOpen(false)}>
-          <Card className="max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Record ad spend</CardTitle>
-              <CardDescription>Feeds cost per enrolled student on this dashboard.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {campuses.length > 1 && (
-                <div>
-                  <label className="block text-sm font-medium text-ink/70 mb-1">Campus</label>
-                  <Select value={spendCampus} onChange={(e) => setSpendCampus(e.target.value)}>
-                    <option value="">Choose…</option>
-                    {campuses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </Select>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-ink/70 mb-1">Amount ($)</label>
-                  <Input type="number" min="0" step="0.01" value={spendAmount} onChange={(e) => setSpendAmount(e.target.value)} placeholder="500" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-ink/70 mb-1">Month</label>
-                  <Input type="month" value={spendMonth} onChange={(e) => setSpendMonth(e.target.value)} />
-                </div>
-              </div>
+      <Dialog open={spendOpen} onOpenChange={setSpendOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Record ad spend</DialogTitle>
+            <DialogDescription>Feeds cost per enrolled student on this dashboard.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {campuses.length > 1 && (
               <div>
-                <label className="block text-sm font-medium text-ink/70 mb-1">Channel</label>
-                <Select value={spendChannel} onChange={(e) => setSpendChannel(e.target.value)}>
-                  <option value="ads">Ads (Facebook / Google)</option>
-                  <option value="print">Print / flyers</option>
-                  <option value="event">Events / tabling</option>
-                  <option value="other">Other</option>
+                <label className="block text-sm font-medium text-ink/70 mb-1">Campus</label>
+                <Select value={spendCampus} onChange={(e) => setSpendCampus(e.target.value)}>
+                  <option value="">Choose…</option>
+                  {campuses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </Select>
               </div>
-              {spendError && <p className="text-sm text-red-600">{spendError}</p>}
-              <div className="flex justify-end gap-2 pt-1">
-                <Button variant="outline" size="sm" onClick={() => setSpendOpen(false)} disabled={isPending}>Cancel</Button>
-                <Button size="sm" onClick={recordSpend} disabled={isPending}>{isPending ? "Saving…" : "Record"}</Button>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-ink/70 mb-1">Amount ($)</label>
+                <Input type="number" min="0" step="0.01" value={spendAmount} onChange={(e) => setSpendAmount(e.target.value)} placeholder="500" />
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+              <div>
+                <label className="block text-sm font-medium text-ink/70 mb-1">Month</label>
+                <Input type="month" value={spendMonth} onChange={(e) => setSpendMonth(e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-ink/70 mb-1">Channel</label>
+              <Select value={spendChannel} onChange={(e) => setSpendChannel(e.target.value)}>
+                <option value="ads">Ads (Facebook / Google)</option>
+                <option value="print">Print / flyers</option>
+                <option value="event">Events / tabling</option>
+                <option value="other">Other</option>
+              </Select>
+            </div>
+            {spendError && <p className="text-sm text-error">{spendError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSpendOpen(false)} disabled={isPending}>Cancel</Button>
+            <Button onClick={recordSpend} disabled={isPending}>{isPending ? "Saving…" : "Record"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -127,6 +127,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
           variant: "error",
           title: t("toast.errorTitle"),
           description: result.error,
+          dismissLabel: t("common.dismiss"),
         });
         setShowAcceptDialog(false);
       } else {
@@ -148,6 +149,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
           variant: "error",
           title: t("toast.errorTitle"),
           description: result.error,
+          dismissLabel: t("common.dismiss"),
         });
         setShowDeclineDialog(false);
       } else {
@@ -283,7 +285,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
 
       {/* ── Accept confirmation dialog ── */}
       <Dialog open={showAcceptDialog} onOpenChange={setShowAcceptDialog}>
-        <DialogContent>
+        <DialogContent closeLabel={t("common.close")}>
           <DialogHeader>
             <DialogTitle>{t("offers.acceptTitle")}</DialogTitle>
             <DialogDescription>
@@ -314,7 +316,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
 
       {/* ── Decline confirmation dialog ── */}
       <Dialog open={showDeclineDialog} onOpenChange={setShowDeclineDialog}>
-        <DialogContent>
+        <DialogContent closeLabel={t("common.close")}>
           <DialogHeader>
             <DialogTitle>{t("offers.declineTitle")}</DialogTitle>
             <DialogDescription>
