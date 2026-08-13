@@ -14,6 +14,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Wait for this commit's production deployment
+        # The suite runs against the LIVE site, but this workflow starts the
+        # moment main is pushed, well before Vercel has finished building. It
+        # was therefore testing the PREVIOUS deployment: a commit that broke
+        # production passed, and the commit that fixed it failed. Block until
+        # the deployment for THIS sha reports success.
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in $(seq 1 40); do
+            state=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/status" -q .state)
+            echo "attempt $i: $state"
+            if [ "$state" = "success" ]; then exit 0; fi
+            if [ "$state" = "failure" ]; then
+              echo "The deployment for this commit failed; skipping smoke tests."
+              exit 1
+            fi
+            sleep 15
+          done
+          echo "Timed out waiting for the deployment of this commit."
+          exit 1
+
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
