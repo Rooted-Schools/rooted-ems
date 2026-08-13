@@ -37,7 +37,22 @@
 
 // ─── Deterministic randomness ──────────────────────────────────────────────
 
-/** djb2 (Dan Bernstein). Same input, same unsigned 32-bit output, always. */
+/**
+ * djb2 (Dan Bernstein). Same input, same unsigned 32-bit output, always.
+ *
+ * Its fairness here depends on entry ids carrying real entropy, and that is
+ * not a stylistic preference. djb2 has weak avalanche: fed short, structured,
+ * near-identical strings its outputs cluster, and a rehearsal measured
+ * selection rates spreading from roughly 12% to 26% around a 19% expectation.
+ * Fed real UUIDs, the same hash is uniform to within about two percent and
+ * selection rates land exactly on sampling noise.
+ *
+ * Every id reaching this function is a gen_random_uuid() value today
+ * (lottery_entry, application, lottery_entry_snapshot). If that ever changes
+ * to a readable scheme, a sequence or a campus-prefixed run number, the draw
+ * becomes quietly unfair with no error and no visible symptom.
+ * lib/__tests__/lottery-fairness.test.ts fails loudly if it does.
+ */
 function djb2Hash(value: string): number {
   let hash = 5381;
   for (let i = 0; i < value.length; i++) {
