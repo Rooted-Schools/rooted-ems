@@ -1038,6 +1038,14 @@ export async function staffFastTrackEnroll(
   const { id: applicationId, student_id, guardian_id } = appResult.data;
 
   // 2. Auto-verify the application
+  //
+  // Fast track is the one path where a human seats a student without a
+  // lottery, so "who decided this" has no other record: unlike a lottery
+  // there is no run row carrying an executed_by. Each of the three status
+  // changes below is stamped with the acting staff member. The transition is
+  // matched on to_status only, without a from_status, because this sequence
+  // is the only thing moving the row and the watermark already bounds it.
+  const verifiedWatermark = await readStatusHistoryWatermark(applicationId);
   await supabase
     .from("application")
     .update({
@@ -1047,6 +1055,12 @@ export async function staffFastTrackEnroll(
       review_notes: "Fast-track enrollment by staff.",
     })
     .eq("id", applicationId);
+  await stampStatusHistoryActor({
+    applicationId,
+    actorId: session.user_id,
+    toStatus: "verified",
+    watermark: verifiedWatermark,
+  });
 
   // 3. Get school_year_id from enrollment window
   const { data: ew } = await supabase
@@ -1093,12 +1107,21 @@ export async function staffFastTrackEnroll(
   }
 
   // 6. Update application to "accepted" (createEnrollment below will set to "registered")
+  const acceptedWatermark = await readStatusHistoryWatermark(applicationId);
   await supabase
     .from("application")
     .update({ status: "accepted", updated_at: offerNow })
     .eq("id", applicationId);
+  await stampStatusHistoryActor({
+    applicationId,
+    actorId: session.user_id,
+    toStatus: "accepted",
+    watermark: acceptedWatermark,
+  });
 
-  // 7. Create enrollment
+  // 7. Create enrollment. This moves the application to "registered" inside
+  // createEnrollment, so the watermark has to be read before that call.
+  const registeredWatermark = await readStatusHistoryWatermark(applicationId);
   const { createEnrollment } = await import("./enrollment");
   const enrollResult = await createEnrollment({
     student_id,
@@ -1112,6 +1135,13 @@ export async function staffFastTrackEnroll(
   if (enrollResult.error || !enrollResult.data) {
     return { data: null, error: enrollResult.error ?? "Failed to create enrollment" };
   }
+
+  await stampStatusHistoryActor({
+    applicationId,
+    actorId: session.user_id,
+    toStatus: "registered",
+    watermark: registeredWatermark,
+  });
 
   // 8. Initialize registration packet
   const { initializeRegistrationPacket } = await import("./registration");
