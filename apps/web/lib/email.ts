@@ -159,6 +159,19 @@ function bareAddress(value: string): string {
 }
 
 /**
+ * Reduce a recipient address to just its domain for logging, e.g.
+ * "jane@example.com" -> "…@example.com". Mirrors the phone-number redaction
+ * in lib/sms.ts (see the comment there): the address itself is family PII,
+ * and subjects on family email routinely embed a student's first name, so
+ * neither belongs in a server log even on a failed send.
+ */
+function redactedRecipient(address: string): string {
+  const bare = bareAddress(address);
+  const at = bare.lastIndexOf("@");
+  return at === -1 ? "…" : `…@${bare.slice(at + 1)}`;
+}
+
+/**
  * True when `email` is one of this app's own sending addresses
  * (FROM_ADDRESS or INBOUND_REPLY_ADDRESS), compared as bare addresses,
  * case-insensitive. Used by the inbound-email loop guard
@@ -217,7 +230,7 @@ export async function sendEmail({ to, subject, html, text, replyTo, preserveRepl
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
       const error = `Resend API error ${response.status}: ${detail.slice(0, 500)}`;
-      console.error("[sendEmail]", error, { to, subject });
+      console.error("[sendEmail]", error, { to: redactedRecipient(to) });
       return { ok: false, error };
     }
 
@@ -231,7 +244,7 @@ export async function sendEmail({ to, subject, html, text, replyTo, preserveRepl
     return { ok: true, id };
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    console.error("[sendEmail] request failed", error, { to, subject });
+    console.error("[sendEmail] request failed", error, { to: redactedRecipient(to) });
     return { ok: false, error };
   }
 }

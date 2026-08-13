@@ -341,13 +341,15 @@ async function processInboundEmail({
       })
     : false;
 
+  // Never log subject or body — family replies are free text and routinely
+  // contain a student's name and situation. Identify the message by provider
+  // id; on the store-failure path, note only how many bytes were received.
   console.info("[handleInboundEmail] inbound email", {
     providerId: providerId ?? null,
     matched,
     campusId,
     stored,
-    subject: subject ?? null,
-    body: stored ? undefined : preview,
+    bodyBytes: stored ? undefined : Buffer.byteLength(text ?? "", "utf8"),
   });
 
   // ── LEAD path: log to the family timeline. Deliberately does NOT stamp

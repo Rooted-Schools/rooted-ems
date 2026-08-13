@@ -328,8 +328,10 @@ async function processInboundSms({
       })
     : false;
 
-  // Always leave a server-side trace of the content. When the table is
-  // missing this line is the only record that exists, so it carries the body.
+  // Never log the message body — family texts are free text and routinely
+  // contain a student's name and situation. Identify the message by its
+  // provider SID; on the store-failure path, note only how many bytes were
+  // received.
   console.info("[handleInboundSms] inbound text", {
     messageSid,
     from: `…${last4}`,
@@ -337,7 +339,7 @@ async function processInboundSms({
     campusId,
     intent,
     stored,
-    body: stored ? undefined : body.slice(0, 320),
+    bodyBytes: stored ? undefined : Buffer.byteLength(body, "utf8"),
   });
 
   // ── Notify campus staff. No campus means no audience: an unrecognized

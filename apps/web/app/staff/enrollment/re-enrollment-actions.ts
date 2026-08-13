@@ -325,7 +325,7 @@ export async function staffBulkInitiateReenrollment(
     if (!nextGrade) {
       result.failed++;
       result.errors.push(
-        `Enrollment ${enrollment.id as string}: student is in grade 12 — no next grade to re-enroll into.`
+        `Enrollment ${enrollment.id as string}: student is in grade 12, no next grade to re-enroll into.`
       );
       continue;
     }
@@ -416,7 +416,7 @@ export async function staffSendReenrollmentPulse(enrollmentId: string): Promise<
       );
       return {
         data: null,
-        error: "The re-enrollment pulse isn't available yet — this database is still missing migration 00038.",
+        error: "The re-enrollment pulse isn't available yet: this database is still missing migration 00038.",
       };
     }
     console.error("[staffSendReenrollmentPulse] fetch", fetchErr?.message);
@@ -494,7 +494,7 @@ export async function staffSendReenrollmentPulse(enrollmentId: string): Promise<
     console.error("[staffSendReenrollmentPulse] stamp", stampErr.message);
     return {
       data: null,
-      error: "The pulse was sent, but we could not record it — do not resend; the family has already been contacted.",
+      error: "The pulse was sent, but we could not record it. Do not resend; the family has already been contacted.",
     };
   }
 

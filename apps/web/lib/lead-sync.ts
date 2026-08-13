@@ -446,7 +446,7 @@ export async function syncLeadSheets(): Promise<SyncSummary> {
         const candidates = extractRows(tab.kind, rows[0], rows.slice(1), campus.name);
         summary.checked += candidates.length;
 
-        for (const candidate of candidates) {
+        for (const [rowIndex, candidate] of candidates.entries()) {
           const dup = existing.get(candidate.email);
           if (dup) {
             const merge = computeMerge(dup, candidate);
@@ -456,7 +456,10 @@ export async function syncLeadSheets(): Promise<SyncSummary> {
             }
             const { error } = await supabase.from("lead").update(merge.patch).eq("id", dup.id);
             if (error) {
-              summary.errors.push(`${candidate.email}: ${error.message}`);
+              // Identify by lead id, never by email — this runs from a daily
+              // cron, and a repeating data-quality problem in a spreadsheet
+              // would otherwise dump real family emails into logs on every run.
+              summary.errors.push(`lead ${dup.id}: ${error.message}`);
               continue;
             }
             await supabase.from("lead_activity").insert({
@@ -492,7 +495,8 @@ export async function syncLeadSheets(): Promise<SyncSummary> {
               welcomeMessagingEnabled: welcomeEnabled,
             });
             if (result.error) {
-              summary.errors.push(`${candidate.email}: ${result.error}`);
+              // Row index, not email — see the comment above on the dup-update path.
+              summary.errors.push(`row ${rowIndex}: ${result.error}`);
               continue;
             }
             // Fields the inquiry entry point doesn't accept
@@ -545,7 +549,8 @@ export async function syncLeadSheets(): Promise<SyncSummary> {
               .select("id")
               .single();
             if (error) {
-              summary.errors.push(`${candidate.email}: ${error.message}`);
+              // Row index, not email — see the comment above on the dup-update path.
+              summary.errors.push(`row ${rowIndex}: ${error.message}`);
               continue;
             }
             await supabase.from("lead_activity").insert({

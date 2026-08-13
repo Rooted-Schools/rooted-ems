@@ -521,7 +521,7 @@ export function CommsClient({
                 const more = skipped.length > 3 ? `, +${skipped.length - 3} more` : "";
                 setFeedback({
                   type: sent > 0 ? "success" : "error",
-                  message: `Sent to ${sent} of ${sent + skipped.length} — not reached: ${preview}${more}`,
+                  message: `Sent to ${sent} of ${sent + skipped.length}. Not reached: ${preview}${more}`,
                 });
               } else {
                 setFeedback({
@@ -669,7 +669,7 @@ function NewMessageDialog({
                 onChange={(e) => handleTemplateSelect(e.target.value)}
                 className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
               >
-                <option value="">No template — write custom message</option>
+                <option value="">No template, write custom message</option>
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name} ({channelLabels[t.channel] ?? t.channel})
@@ -803,7 +803,7 @@ function NewMessageDialog({
               const eligible = recipients.filter((r) => targetIds.has(r.userId) && r.smsEligible).length;
               return eligible < recipientCount ? (
                 <p className="text-xs text-warn-text mt-0.5">
-                  Only {eligible} of {recipientCount} can be texted — the rest have no phone on
+                  Only {eligible} of {recipientCount} can be texted. The rest have no phone on
                   file or haven&apos;t opted in. They&apos;ll be skipped, not failed silently.
                 </p>
               ) : null;

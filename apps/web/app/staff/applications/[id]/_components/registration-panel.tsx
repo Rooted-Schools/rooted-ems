@@ -105,7 +105,7 @@ const regItemStatusConfig: Record<string, { label: string; color: string }> = {
 const packetStatusConfig: Record<string, { label: string; variant: "default" | "secondary" | "warning" | "success" | "destructive" }> = {
   pending: { label: "Not Started", variant: "secondary" },
   in_progress: { label: "In Progress", variant: "warning" },
-  submitted: { label: "Submitted — Awaiting Review", variant: "default" },
+  submitted: { label: "Submitted, Awaiting Review", variant: "default" },
   complete: { label: "Complete", variant: "success" },
 };
 
@@ -505,7 +505,7 @@ export function RegistrationPanel({ detail, registrationPacket }: RegistrationPa
                       });
                       if (result.error) showFeedback("error", result.error);
                       else {
-                        showFeedback("success", "Academic audit complete — student is now fully enrolled.");
+                        showFeedback("success", "Academic audit complete. Student is now fully enrolled.");
                         router.refresh();
                       }
                     });

@@ -380,7 +380,7 @@ export function PipelineClient({
           description:
             result.notified < result.total
               ? "The rest have no linked family account to notify in-app."
-              : "Delivered in-app — families will see it on their dashboard.",
+              : "Delivered in-app. Families will see it on their dashboard.",
         });
         setShowMessageDialog(false);
         setMessageBody("");
@@ -573,7 +573,7 @@ export function PipelineClient({
       {/* Table */}
       {queueTruncated && (
         <p className="text-xs text-stone">
-          Review queue capped at the first {MAX_QUEUE_IDS} of {filtered.length} rows in this view — K/J will move within that set.
+          Review queue capped at the first {MAX_QUEUE_IDS} of {filtered.length} rows in this view. K/J will move within that set.
         </p>
       )}
       <div className="rounded-[10px] border border-line bg-white">
@@ -581,7 +581,7 @@ export function PipelineClient({
           <EmptyState
             icon={<IconClipboardList size={40} />}
             title="No applications in this stage"
-            description={search || campusFilter !== "all" || gradeFilter !== "all" ? "Try adjusting your search or filters." : "Nothing is sitting in this stage right now — applications will land here automatically as they move through review."}
+            description={search || campusFilter !== "all" || gradeFilter !== "all" ? "Try adjusting your search or filters." : "Nothing is sitting in this stage right now. Applications will land here automatically as they move through review."}
           />
         ) : (
           <Table>
@@ -663,7 +663,7 @@ export function PipelineClient({
             <span className="text-sm font-medium whitespace-nowrap">{selectedCount} selected</span>
             <span className="hidden h-5 w-px bg-white/30 sm:block" aria-hidden="true" />
             <span className="text-sm text-white/90">
-              {sharedCause ? sharedCause.label : "Mixed — no single shared cause"}
+              {sharedCause ? sharedCause.label : "Mixed, no single shared cause"}
             </span>
             <div className="ml-auto flex flex-wrap items-center gap-2">
               {initialStage === "needs_review" && sharedCause?.key.startsWith("document:") && (
@@ -726,7 +726,7 @@ export function PipelineClient({
             <DialogTitle>Message {selectedCount} famil{selectedCount !== 1 ? "ies" : "y"}</DialogTitle>
             <DialogDescription>
               Sent in-app to each family&apos;s portal immediately. Families with no linked
-              account will be skipped and reported — nothing is faked.
+              account will be skipped and reported: nothing is faked.
             </DialogDescription>
           </DialogHeader>
           <textarea

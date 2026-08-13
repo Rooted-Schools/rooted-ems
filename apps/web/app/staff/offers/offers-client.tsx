@@ -751,7 +751,8 @@ export function OffersClient({
           <DialogHeader>
             <DialogTitle>Remove from Waitlist</DialogTitle>
             <DialogDescription>
-              Are you sure you want to remove this student from the waitlist? This action cannot be undone.
+              This removes the student from this waitlist position. Their application status is not changed, and the
+              family is not notified automatically. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           {removePositionId && (() => {

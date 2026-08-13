@@ -185,7 +185,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
   // Toast + clean the URL after landing here via a queue "Verify → next" hop.
   useEffect(() => {
     if (searchParams.get("justVerified") === "1") {
-      toast({ variant: "success", title: `Verified — next: ${detail.student_name}` });
+      toast({ variant: "success", title: `Verified. Next: ${detail.student_name}` });
       const params = new URLSearchParams(searchParams.toString());
       params.delete("justVerified");
       router.replace(`${pathname}?${params.toString()}`);
@@ -320,7 +320,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
       const result = await staffReviewDocument(rejectDocId, detail.id, "rejected", rejectDocReason.trim() || undefined);
       if (result.error) showFeedback("error", result.error);
       else {
-        showFeedback("success", "Document rejected — family will be notified to re-upload.");
+        showFeedback("success", "Document rejected. Family will be notified to re-upload.");
         router.refresh();
       }
     });
@@ -427,10 +427,10 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
                     </span>
                   )}
                   {detail.documents.length > 0 && verifiedDocs.length === detail.documents.length && (
-                    <span className="text-green-700 font-medium"> All documents verified — ready to mark as Verified.</span>
+                    <span className="text-green-700 font-medium"> All documents verified. Ready to mark as Verified.</span>
                   )}
                   {detail.documents.length === 0 && (
-                    <span className="text-amber-700 font-medium"> No documents uploaded yet — consider requesting more info.</span>
+                    <span className="text-amber-700 font-medium"> No documents uploaded yet. Consider requesting more info.</span>
                   )}
                 </p>
               </div>
@@ -497,7 +497,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
             <div className="flex items-start gap-3">
               <IconMail size={24} className="text-blue-700 shrink-0" aria-hidden="true" />
               <div>
-                <p className="text-sm font-semibold text-ink">Registration Packet Submitted — Awaiting Verification</p>
+                <p className="text-sm font-semibold text-ink">Registration Packet Submitted: Awaiting Verification</p>
                 <p className="text-xs text-ink/60 mt-0.5">
                   The family has submitted all required registration items. Go to Registration & Placement below to verify each
                   item. Once all are verified, the student moves to Placement Review.
@@ -643,7 +643,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
             <DialogTitle>Withdraw Application</DialogTitle>
             <DialogDescription>
               Are you sure you want to withdraw {detail.student_name}&apos;s application? This action will remove the student from
-              the enrollment pipeline. The family will not be notified automatically. Withdrawn is final — there is no action to
+              the enrollment pipeline. The family will not be notified automatically. Withdrawn is final: there is no action to
               undo it; the family would need to submit a new application to re-apply.
             </DialogDescription>
           </DialogHeader>
@@ -671,12 +671,12 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
             <DialogTitle>Reject Application</DialogTitle>
             <DialogDescription>
               Are you sure you want to reject {detail.student_name}&apos;s application? This is a different decision than
-              Withdraw — reject when the application does not meet requirements.
+              Withdraw: reject when the application does not meet requirements.
             </DialogDescription>
           </DialogHeader>
           <div className="py-2 space-y-2">
             <label className="block text-sm font-medium text-ink/70">
-              Reason <span className="text-stone font-normal">(optional — internal only, not shown to the family)</span>
+              Reason <span className="text-stone font-normal">(optional, internal only, not shown to the family)</span>
             </label>
             <textarea
               value={rejectAppReason}
@@ -719,11 +719,11 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
             <textarea
               value={rejectDocReason}
               onChange={(e) => setRejectDocReason(e.target.value)}
-              placeholder="e.g. Document is blurry — please re-scan and upload a clearer copy."
+              placeholder="e.g. Document is blurry. Please re-scan and upload a clearer copy."
               rows={3}
               className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 resize-none"
             />
-            <p className="text-xs text-stone">Optional but strongly recommended — families can only act on specific feedback.</p>
+            <p className="text-xs text-stone">Optional but strongly recommended: families can only act on specific feedback.</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowRejectDocDialog(false)}>

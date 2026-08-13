@@ -57,8 +57,7 @@ async function getGuardianContact(applicationId: string): Promise<GuardianContac
   if (!userId) {
     console.warn("[getGuardianContact] no user_id found", {
       applicationId,
-      guardian_id: row?.guardian_id ?? null,
-      guardian,
+      guardianId: row?.guardian_id ?? null,
     });
   }
   return {
@@ -651,9 +650,14 @@ export async function notifyFamilyDocumentRejected({
       campusId,
       logTag: "notifyFamilyDocumentRejected",
     }),
+    // The SMS stays generic on purpose — a text is visible on a lock screen,
+    // and a document type like "Iep Records" would disclose a student's
+    // disability-services status to anyone who glances at the phone. The
+    // specific type is only named in the in-app and email versions above,
+    // where the family has actually signed in.
     smsGuardian(
       contact,
-      `Rooted Schools: We need a new copy of your ${readableType}. Upload here: ${APP_LINK}/family/documents\nNecesitamos una nueva copia de su documento. Súbala en el enlace.`,
+      `Rooted Schools: We need a new copy of a document for your application. Upload here: ${APP_LINK}/family/documents\nNecesitamos una nueva copia de un documento para su solicitud. Súbala en el enlace.`,
       "notifyFamilyDocumentRejected"
     ),
   ]);
@@ -1241,9 +1245,14 @@ export async function notifyStaffDocumentUploaded({
   studentName?: string;
 }): Promise<void> {
   const readableType = documentType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  // Subject stays generic on purpose: documentType values include iep_records
+  // and 504_plan, and a subject like "Document uploaded: Iep Records for
+  // Jordan Rivera" would store a student's disability-services status next to
+  // their full name in a field every staff member at the campus can read.
+  // The specific type + student name belong in the body only.
   await notifyStaff({
     campusId,
-    subject: `Document uploaded: ${readableType}${studentName ? ` for ${studentName}` : ""}`,
+    subject: "New document uploaded for review",
     body: `A new document (${readableType}) has been uploaded${studentName ? ` for ${studentName}` : ""} and is pending review.`,
     link: `/staff/documents`,
     logTag: "notifyStaffDocumentUploaded",
