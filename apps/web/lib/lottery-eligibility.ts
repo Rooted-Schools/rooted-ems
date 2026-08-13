@@ -84,7 +84,13 @@ export async function deriveSiblingOfEnrolled(
   supabase: QueryClient,
   applicationIds: string[],
   campusId: string,
-  preference: LotteryPolicyAbsolutePreference | null
+  preference: LotteryPolicyAbsolutePreference | null,
+  /**
+   * True when the policy pulls co-applying siblings in behind a drawn
+   * applicant. That rule needs the guardian map even when the absolute sibling
+   * preference is off, so the early return below must not skip building it.
+   */
+  linkedSiblingActivation = false
 ): Promise<SiblingDerivation> {
   const empty: SiblingDerivation = {
     qualified: new Set(),
@@ -127,8 +133,13 @@ export async function deriveSiblingOfEnrolled(
   }
 
   const guardiansByApplication = new Map<string, string[]>();
+  const preferenceEnabled = !!preference?.enabled;
 
-  if (!preference || !preference.enabled) {
+  // The guardian map is what linked-sibling activation runs on. Returning here
+  // whenever the absolute sibling preference is off left that map empty, which
+  // silently switched off a rule the policy had turned ON — co-applying
+  // siblings were never pulled in together and nothing said so.
+  if (!preferenceEnabled && !linkedSiblingActivation) {
     return { ...empty, studentByApplication, claimedUnverified: new Set(), guardiansByApplication };
   }
 
@@ -144,7 +155,7 @@ export async function deriveSiblingOfEnrolled(
     };
   }
 
-  const bySharedHousehold = preference.siblingDefinition === "shared_household";
+  const bySharedHousehold = preference?.siblingDefinition === "shared_household";
 
   // ── Applicant student -> the people they are linked to ───────────────────
   const linkKeyByStudent = new Map<string, string[]>();
@@ -179,6 +190,21 @@ export async function deriveSiblingOfEnrolled(
   const method = bySharedHousehold
     ? "A sibling shares a household with the applicant, and is actively enrolled at this campus in a current school year."
     : "A sibling shares a legal parent or guardian with the applicant (guardian_student.is_legal_guardian), and is actively enrolled at this campus in a current school year.";
+
+  // Linked-sibling activation only needs the map built above. Stop here when
+  // the absolute preference is off: nothing qualifies for it, and saying so is
+  // different from saying the linkage could not be read.
+  if (!preferenceEnabled) {
+    return {
+      qualified: new Set(),
+      claimedUnverified: new Set(),
+      linkageUnresolvable: false,
+      studentByApplication,
+      guardiansByApplication,
+      method:
+        "The governing policy applies no absolute sibling preference. Guardian linkage was still read so co-applying siblings can be drawn together.",
+    };
+  }
 
   const allLinkKeys = [...new Set([...linkKeyByStudent.values()].flat())];
   if (allLinkKeys.length === 0) {

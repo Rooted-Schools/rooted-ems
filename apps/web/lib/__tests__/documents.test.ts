@@ -13,8 +13,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { supabaseMock, hasEqFilter } from "./helpers/supabase-mock";
 import { createDocumentRecord, reviewDocument } from "@/lib/mutations/documents";
 
-const { requireStaffSessionMock } = vi.hoisted(() => ({
+const { requireStaffSessionMock, requireRoleOnCampusMock } = vi.hoisted(() => ({
   requireStaffSessionMock: vi.fn(),
+  requireRoleOnCampusMock: vi.fn(),
 }));
 
 vi.mock("@rooted-ems/database/server", async () => {
@@ -27,6 +28,9 @@ vi.mock("@rooted-ems/database/server", async () => {
 
 vi.mock("@/lib/auth/get-session", () => ({
   requireStaffSession: requireStaffSessionMock,
+  // reviewDocument resolves the document's real campus first, then gates on
+  // THAT campus — never on client input. Default resolves for the STAFF user.
+  requireRoleOnCampus: requireRoleOnCampusMock,
 }));
 
 vi.mock("@/lib/audit", () => ({
@@ -50,19 +54,29 @@ const ATTACKER = { id: "user-attacker" };
 const STAFF = { id: "user-staff" };
 const DOC_ID = "doc-1";
 
-const uploadInput = {
+/**
+ * createDocumentRecord now rejects any storage_path whose first path segment
+ * isn't the authenticated user's own id (the `{userId}/...` upload layout).
+ * Build the input against whichever user is authenticated in a given test.
+ */
+const makeUploadInput = (uploaderId: string) => ({
   application_id: "app-1",
   student_id: "stu-1",
   document_type: "birth_certificate",
   file_name: "birth-cert.pdf",
   file_size: 12345,
   mime_type: "application/pdf",
-  storage_path: "app-1/birth-cert.pdf",
-};
+  storage_path: `${uploaderId}/birth-cert.pdf`,
+});
 
-/** Result of the ownership-guard select on `application`. */
-const guardRow = (ownerUserId: string) => ({
-  data: { id: "app-1", guardian: { user_id: ownerUserId } },
+/**
+ * Result of the ownership-guard select on `application`. student_id is now
+ * always derived from this row (never trusted from the client), so it must
+ * be present for the success path to have a student to file the document
+ * against.
+ */
+const guardRow = (ownerUserId: string, studentId = "stu-1") => ({
+  data: { id: "app-1", student_id: studentId, guardian: { user_id: ownerUserId } },
   error: null,
 });
 
@@ -77,17 +91,26 @@ describe("createDocumentRecord", () => {
   it("rejects unauthenticated users and performs no write", async () => {
     supabaseMock.setUser(null);
 
-    const result = await createDocumentRecord(uploadInput);
+    const result = await createDocumentRecord(makeUploadInput(OWNER.id));
 
     expect(result.error).toBe("Not authenticated");
     expect(supabaseMock.writes()).toHaveLength(0);
+  });
+
+  it("rejects a storage_path outside the caller's own upload folder, even for the true owner", async () => {
+    supabaseMock.setUser(OWNER);
+
+    const result = await createDocumentRecord(makeUploadInput(ATTACKER.id));
+
+    expect(result.error).toBe("Not authorized");
+    expect(supabaseMock.writes("document")).toHaveLength(0);
   });
 
   it("rejects a user who does not own the application and performs no insert", async () => {
     supabaseMock.setUser(ATTACKER);
     supabaseMock.queueResult("application", guardRow(OWNER.id));
 
-    const result = await createDocumentRecord(uploadInput);
+    const result = await createDocumentRecord(makeUploadInput(ATTACKER.id));
 
     expect(result.error).toBe("Not authorized");
     expect(supabaseMock.writes("document")).toHaveLength(0);
@@ -102,7 +125,7 @@ describe("createDocumentRecord", () => {
     );
     supabaseMock.queueResult("document", { data: { id: DOC_ID }, error: null });
 
-    const result = await createDocumentRecord(uploadInput);
+    const result = await createDocumentRecord(makeUploadInput(OWNER.id));
 
     expect(result.error).toBeNull();
     expect(result.data).toEqual({ id: DOC_ID });
@@ -128,6 +151,7 @@ describe("reviewDocument", () => {
 
   it("allows staff to verify a pending document", async () => {
     requireStaffSessionMock.mockResolvedValue({ user_id: STAFF.id, is_staff: true });
+    requireRoleOnCampusMock.mockResolvedValue({ user_id: STAFF.id, is_staff: true });
     supabaseMock.setUser(STAFF);
     supabaseMock.queueResult(
       "document",
@@ -159,6 +183,7 @@ describe("reviewDocument", () => {
 
   it("refuses to re-review an already reviewed document (no write)", async () => {
     requireStaffSessionMock.mockResolvedValue({ user_id: STAFF.id, is_staff: true });
+    requireRoleOnCampusMock.mockResolvedValue({ user_id: STAFF.id, is_staff: true });
     supabaseMock.setUser(STAFF);
     supabaseMock.queueResult("document", {
       data: { id: DOC_ID, status: "verified", application_id: "app-1" },

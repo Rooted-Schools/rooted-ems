@@ -1,5 +1,5 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
-import { requireMinRole } from "@/lib/auth/get-session";
+import { requireMinRole, requireRoleOnCampus } from "@/lib/auth/get-session";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
 import type { MutationResult } from "./applications";
 
@@ -140,13 +140,21 @@ export interface AssignStaffRoleInput {
   user_email: string;
   campus_id: string;
   role: "system_admin" | "enrollment_manager" | "enrollment_staff" | "compliance_auditor";
-  /**
-   * The system_admin performing the grant. Server actions overwrite this with
-   * the session user id before calling — a client-supplied value here is never
-   * trusted, it would let a caller forge the audit trail on a privilege grant.
-   */
-  assigned_by: string;
 }
+
+/**
+ * Access grants are the sharpest tool in this file, and until now all three
+ * of them (assign / edit / remove) gated on requireMinRole("system_admin"),
+ * which asks only whether the caller is an admin SOMEWHERE. A system_admin at
+ * one campus could therefore grant themselves — or anyone — a role at every
+ * other campus in the network, which is privilege escalation by design rather
+ * than by bug. Each one now checks system_admin on the campus the grant
+ * actually lands on, resolved from the row for edit/remove where the caller
+ * only supplies an opaque row id.
+ *
+ * assigned_by likewise comes from the session, never the payload: it is the
+ * audit trail for a privilege grant, and a caller-supplied value forges it.
+ */
 
 /**
  * Invite a staff user by email. Creates the auth user (sends invite email),
@@ -156,7 +164,7 @@ export interface AssignStaffRoleInput {
 export async function assignStaffRole(
   input: AssignStaffRoleInput
 ): Promise<MutationResult<{ id: string; invited: boolean }>> {
-  await requireMinRole("system_admin");
+  const session = await requireRoleOnCampus(input.campus_id, "system_admin");
   try {
     const supabase = createServiceRoleClient();
 
@@ -203,7 +211,7 @@ export async function assignStaffRole(
           user_id: authUserId,
           campus_id: input.campus_id,
           role: input.role,
-          assigned_by: input.assigned_by,
+          assigned_by: session.user_id,
         },
         { onConflict: "user_id,campus_id,role" }
       )
@@ -217,14 +225,30 @@ export async function assignStaffRole(
   }
 }
 
+/**
+ * Moving a role row is two grants in one: it revokes access on the campus the
+ * row currently sits on and creates it on the campus it moves to. Both ends
+ * are checked, or a single-campus admin could relocate someone else's role
+ * onto a campus they have no authority over.
+ */
 export async function editStaffRole(
   roleId: string,
   updates: { role?: string; campus_id?: string }
 ): Promise<MutationResult> {
-  await requireMinRole("system_admin");
-  try {
-    const supabase = createServiceRoleClient();
+  const supabase = createServiceRoleClient();
 
+  const { data: roleRow } = await supabase
+    .from("user_campus_role")
+    .select("campus_id")
+    .eq("id", roleId)
+    .single();
+
+  await requireRoleOnCampus(roleRow?.campus_id as string | undefined, "system_admin");
+  if (updates.campus_id && updates.campus_id !== roleRow?.campus_id) {
+    await requireRoleOnCampus(updates.campus_id, "system_admin");
+  }
+
+  try {
     const { error } = await supabase
       .from("user_campus_role")
       .update(updates)
@@ -238,17 +262,19 @@ export async function editStaffRole(
 }
 
 export async function removeStaffRole(roleId: string): Promise<MutationResult> {
-  await requireMinRole("system_admin");
+  const supabase = createServiceRoleClient();
+
+  // Grab the campus + user_id before deleting — the campus is what the gate
+  // below is checked against, so it has to be read first.
+  const { data: roleRow } = await supabase
+    .from("user_campus_role")
+    .select("user_id, campus_id")
+    .eq("id", roleId)
+    .single();
+
+  await requireRoleOnCampus(roleRow?.campus_id as string | undefined, "system_admin");
+
   try {
-    const supabase = createServiceRoleClient();
-
-    // Grab the user_id before deleting
-    const { data: roleRow } = await supabase
-      .from("user_campus_role")
-      .select("user_id")
-      .eq("id", roleId)
-      .single();
-
     const { error } = await supabase
       .from("user_campus_role")
       .delete()
@@ -322,6 +348,223 @@ export async function bulkUpdatePacketRequirements(
     return { data: null, error: null };
   } catch (err) {
     return { data: null, error: "Failed to update packet requirements" };
+  }
+}
+
+/**
+ * Until now this file could only toggle packet requirements that already
+ * existed. There was no way to create one, and no way to carry a campus's
+ * requirement set into a new school year — so a new year opened with an empty
+ * requirement list, and every registration packet built against it came out
+ * with zero items and read as complete. Settings owns the fix; lib/mutations/
+ * registration.ts refuses to build a packet against an empty set as the
+ * backstop.
+ */
+
+export interface CreatePacketRequirementInput {
+  campus_id: string;
+  school_year_id: string;
+  /** Matches registration_item.item_type — the join key for the whole packet. */
+  item_type: string;
+  name: string;
+  description?: string;
+  is_required?: boolean;
+  sort_order?: number;
+}
+
+export async function createPacketRequirement(
+  input: CreatePacketRequirementInput
+): Promise<MutationResult<{ id: string }>> {
+  const session = await requireRoleOnCampus(input.campus_id, "system_admin");
+  try {
+    const itemType = input.item_type.trim();
+    const name = input.name.trim();
+    if (!itemType) return { data: null, error: "An item type is required." };
+    if (!name) return { data: null, error: "A display name is required." };
+    if (!input.school_year_id) return { data: null, error: "A school year is required." };
+
+    const supabase = createServiceRoleClient();
+
+    // (campus_id, school_year_id, item_type) is UNIQUE — precheck so the
+    // refusal is plain English rather than a raw constraint violation.
+    const { data: existing, error: existingError } = await supabase
+      .from("packet_requirement")
+      .select("id")
+      .eq("campus_id", input.campus_id)
+      .eq("school_year_id", input.school_year_id)
+      .eq("item_type", itemType)
+      .maybeSingle();
+    if (existingError) return { data: null, error: existingError.message };
+    if (existing) {
+      return {
+        data: null,
+        error: `A "${itemType}" requirement already exists for this campus and school year.`,
+      };
+    }
+
+    const { data, error } = await supabase
+      .from("packet_requirement")
+      .insert({
+        campus_id: input.campus_id,
+        school_year_id: input.school_year_id,
+        item_type: itemType,
+        name,
+        description: input.description?.trim() || null,
+        is_required: input.is_required ?? true,
+        sort_order: input.sort_order ?? 0,
+        is_active: true,
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      if ((error as { code?: string }).code === "23505") {
+        return {
+          data: null,
+          error: `A "${itemType}" requirement already exists for this campus and school year.`,
+        };
+      }
+      return { data: null, error: error.message };
+    }
+
+    await logAuditEvent({
+      table_name: "packet_requirement",
+      record_id: data.id,
+      action: AuditAction.Create,
+      actor_id: session.user_id,
+      campus_id: input.campus_id,
+      new_data: {
+        school_year_id: input.school_year_id,
+        item_type: itemType,
+        name,
+        is_required: input.is_required ?? true,
+      },
+    });
+
+    return { data: { id: data.id }, error: null };
+  } catch (err) {
+    return { data: null, error: "Failed to create packet requirement" };
+  }
+}
+
+/** One source requirement, as read for a copy-forward. */
+export interface PacketRequirementSeed {
+  item_type: string;
+  name: string;
+  description: string | null;
+  is_required: boolean;
+  sort_order: number | null;
+}
+
+/**
+ * Decide what a copy-forward would write. Pure, and exported so the skip rule
+ * is testable without a database: an item_type that already exists in the
+ * target year is left alone rather than overwritten, because the target row
+ * may have been edited deliberately since it was created.
+ */
+export function planPacketRequirementCopy(
+  source: PacketRequirementSeed[],
+  existingTargetItemTypes: string[]
+): { toInsert: PacketRequirementSeed[]; skipped: string[] } {
+  const existing = new Set(existingTargetItemTypes);
+  const toInsert: PacketRequirementSeed[] = [];
+  const skipped: string[] = [];
+  const seen = new Set<string>();
+  for (const req of source) {
+    if (seen.has(req.item_type)) continue;
+    seen.add(req.item_type);
+    if (existing.has(req.item_type)) skipped.push(req.item_type);
+    else toInsert.push(req);
+  }
+  return { toInsert, skipped };
+}
+
+/**
+ * Copy a campus's active packet requirements from one school year to the
+ * next. Requirements that already exist in the target year are skipped and
+ * reported, never overwritten.
+ */
+export async function copyPacketRequirementsFromYear(
+  campusId: string,
+  fromYearId: string,
+  toYearId: string
+): Promise<MutationResult<{ copied: number; skipped: string[] }>> {
+  const session = await requireRoleOnCampus(campusId, "system_admin");
+  try {
+    if (!fromYearId || !toYearId) {
+      return { data: null, error: "Both a source and a target school year are required." };
+    }
+    if (fromYearId === toYearId) {
+      return { data: null, error: "Choose two different school years." };
+    }
+
+    const supabase = createServiceRoleClient();
+
+    const { data: sourceRows, error: sourceError } = await supabase
+      .from("packet_requirement")
+      .select("item_type, name, description, is_required, sort_order")
+      .eq("campus_id", campusId)
+      .eq("school_year_id", fromYearId)
+      .eq("is_active", true)
+      .order("sort_order");
+    if (sourceError) return { data: null, error: sourceError.message };
+
+    const source = (sourceRows ?? []) as unknown as PacketRequirementSeed[];
+    if (source.length === 0) {
+      return {
+        data: null,
+        error: "That school year has no active registration requirements to copy.",
+      };
+    }
+
+    const { data: targetRows, error: targetError } = await supabase
+      .from("packet_requirement")
+      .select("item_type")
+      .eq("campus_id", campusId)
+      .eq("school_year_id", toYearId);
+    if (targetError) return { data: null, error: targetError.message };
+
+    const { toInsert, skipped } = planPacketRequirementCopy(
+      source,
+      (targetRows ?? []).map((r) => r.item_type as string)
+    );
+
+    if (toInsert.length === 0) {
+      return { data: { copied: 0, skipped }, error: null };
+    }
+
+    const { error } = await supabase.from("packet_requirement").insert(
+      toInsert.map((req) => ({
+        campus_id: campusId,
+        school_year_id: toYearId,
+        item_type: req.item_type,
+        name: req.name,
+        description: req.description ?? null,
+        is_required: req.is_required,
+        sort_order: req.sort_order ?? 0,
+        is_active: true,
+      }))
+    );
+
+    if (error) return { data: null, error: error.message };
+
+    await logAuditEvent({
+      table_name: "packet_requirement",
+      record_id: null,
+      action: AuditAction.Create,
+      actor_id: session.user_id,
+      campus_id: campusId,
+      new_data: {
+        copied_from_school_year_id: fromYearId,
+        school_year_id: toYearId,
+        item_types: toInsert.map((r) => r.item_type),
+      },
+      metadata: { skipped },
+    });
+
+    return { data: { copied: toInsert.length, skipped }, error: null };
+  } catch (err) {
+    return { data: null, error: "Failed to copy packet requirements" };
   }
 }
 

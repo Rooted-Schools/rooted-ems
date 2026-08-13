@@ -674,6 +674,13 @@ const dict = {
   "appForm.selectGrade":        { en: "Select grade...",      es: "Seleccione un grado..." },
   "appForm.siblingLabel":       { en: "This student has a sibling currently attending or enrolled at this campus.", es: "Este estudiante tiene un hermano o hermana que actualmente asiste o está matriculado/a en esta escuela." },
   "appForm.siblingNote":        { en: "Sibling enrollment may affect lottery priority.", es: "Tener un hermano/a matriculado/a puede afectar la prioridad en el sorteo." },
+  // Policy-driven lottery questions. Shown only on a campus whose board has
+  // ADOPTED a lottery policy declaring the matching weighted tier. Never ask
+  // for income amounts or income documents here.
+  "appForm.staffChildLabel":    { en: "Is this student the child of a contracted full-time staff member at this school?", es: "¿Este estudiante es hijo o hija de un empleado de tiempo completo con contrato en esta escuela?" },
+  "appForm.staffChildNote":     { en: "Answer yes only if a parent or legal guardian is a contracted full-time employee.", es: "Responda que sí solo si un padre, una madre o un tutor legal es empleado de tiempo completo con contrato." },
+  "appForm.frlLabel":           { en: "Does this student qualify as economically disadvantaged (for example, eligible for free or reduced-price school meals)?", es: "¿Este estudiante califica como económicamente desfavorecido (por ejemplo, elegible para comidas escolares gratis o a precio reducido)?" },
+  "appForm.frlNote":            { en: "Your answer is verified later through the meal benefit form. Do not send income documents with this application.", es: "Su respuesta se verifica más adelante mediante el formulario de beneficio de comidas. No envíe documentos de ingresos con esta solicitud." },
   "appForm.studentInfoTitle":   { en: "Student Information",  es: "Información del Estudiante" },
   "appForm.studentInfoDesc":    { en: "Your student's legal name and date of birth.", es: "El nombre legal y la fecha de nacimiento de su estudiante." },
   "appForm.firstName":          { en: "First Name",           es: "Nombre" },
@@ -708,6 +715,8 @@ const dict = {
   "appForm.regNote":            { en: "Additional information (address, emergency contacts, demographics, and service needs) will be collected during the registration process after an enrollment offer is made.", es: "La información adicional (dirección, contactos de emergencia, datos demográficos y necesidades de servicios) se recopilará durante el proceso de registro, después de que se haga una oferta de inscripción." },
   "appForm.reviewDesc":         { en: "Please review your application details before submitting.", es: "Por favor revise los detalles de su solicitud antes de enviarla." },
   "appForm.review.siblingAtCampus": { en: "Sibling at campus", es: "Hermano/a en la escuela" },
+  "appForm.review.staffChild":  { en: "Child of full-time staff", es: "Hijo/a de personal de tiempo completo" },
+  "appForm.review.frl":         { en: "Economically disadvantaged", es: "Económicamente desfavorecido" },
   "appForm.review.name":        { en: "Name",                 es: "Nombre" },
   "appForm.review.relationship": { en: "Relationship",        es: "Relación" },
   "appForm.review.email":       { en: "Email",                es: "Correo" },

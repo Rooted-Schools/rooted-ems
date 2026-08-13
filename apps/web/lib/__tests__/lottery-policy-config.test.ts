@@ -154,13 +154,34 @@ describe("parseLotteryPolicyConfig — the RSV configuration", () => {
     expect(preference!.falseClaimForfeitsSeat).toBe(true);
   });
 
-  it("reports both RSV weighted tiers as unsourced, because the application collects neither field", () => {
-    // This is the honest gap, asserted rather than hidden: the board weights
-    // staff children and economically disadvantaged applicants, and the
-    // application form captures neither indicator.
+  it("reports both RSV weighted tiers as sourced, because the family application form now collects is_staff_child and is_frl_qualifying for campuses whose board adopted them", () => {
+    // POLICY_COLLECTED_ANSWER_KEYS now includes both fields — a campus whose
+    // board adopted these tiers collects the questions on the family
+    // application form, so neither is an honest gap anymore.
     const { config } = parseLotteryPolicyConfig(rsvConfig());
     const unsourced = unsourcedWeightedTiers(config!).map((t) => t.key);
-    expect(unsourced).toEqual(["staff_child", "economically_disadvantaged"]);
+    expect(unsourced).toEqual([]);
+  });
+
+  it("still reports a weighted tier as unsourced when it declares a field the application genuinely does not collect", () => {
+    const configWithUncollectedTier = {
+      ...rsvConfig(),
+      weightedTiers: [
+        {
+          key: "military_family",
+          label: "Child of an active-duty service member",
+          weight: 2,
+          enabled: true,
+          optional: false,
+          // Not in POLICY_COLLECTED_ANSWER_KEYS — no form on any campus asks this.
+          source: { kind: "application_answer", field: "is_military_family" },
+          authorityNote: "Test citation.",
+        },
+      ],
+    };
+    const { config } = parseLotteryPolicyConfig(configWithUncollectedTier);
+    const unsourced = unsourcedWeightedTiers(config!).map((t) => t.key);
+    expect(unsourced).toEqual(["military_family"]);
   });
 
   it("derives deadlines from the policy, not from a hardcoded number", () => {

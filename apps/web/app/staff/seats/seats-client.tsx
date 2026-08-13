@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { IconPenLine } from "@/components/ui/icons";
+import { IconPenLine, IconX, IconCheckCircle } from "@/components/ui/icons";
 import { staffUpdateCapacity } from "./actions";
 
 interface SeatRow {
@@ -382,22 +382,31 @@ export function SeatsClient({ rows }: SeatsClientProps) {
                         <td className="py-2.5 text-right align-top">
                           {editingId === row.id ? (
                             <div className="flex items-center justify-end gap-1">
+                              {/* Icon-only controls carry an aria-label: a
+                                  screen reader announcing "button" alone gives
+                                  no clue which one commits the seat change. */}
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={handleCancel}
                                 disabled={isPending}
-                                className="h-7 px-2 text-xs"
+                                aria-label="Cancel seat edit"
+                                className="min-h-[44px] px-3"
                               >
-                                ✕
+                                <IconX size={16} />
                               </Button>
                               <Button
                                 size="sm"
                                 onClick={() => handleSave(row.id)}
                                 disabled={isPending}
-                                className="h-7 px-2 text-xs"
+                                aria-label="Save seat count"
+                                className="min-h-[44px] px-3"
                               >
-                                {isPending ? "…" : "✓"}
+                                {isPending ? (
+                                  <span className="text-xs">Saving</span>
+                                ) : (
+                                  <IconCheckCircle size={16} />
+                                )}
                               </Button>
                             </div>
                           ) : (

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireMinRole } from "@/lib/auth/get-session";
+import { requireMinRole, requireRoleOnCampus } from "@/lib/auth/get-session";
 import { setWelcomeMessagingEnabled } from "@/lib/messaging-flags";
 import {
   createEnrollmentWindow,
@@ -12,6 +12,8 @@ import {
   removeStaffRole,
   updatePacketRequirement,
   bulkUpdatePacketRequirements,
+  createPacketRequirement,
+  copyPacketRequirementsFromYear,
   createSchoolYear,
   updateSchoolYearCurrent,
   createGradeLevel,
@@ -20,6 +22,7 @@ import {
   type CreateEnrollmentWindowInput,
   type UpdateEnrollmentWindowInput,
   type AssignStaffRoleInput,
+  type CreatePacketRequirementInput,
   type CreateSchoolYearInput,
   type CreateGradeLevelInput,
   type CreateCapacityPlanInput,
@@ -30,6 +33,12 @@ import {
  * enrollment_manager for the operational settings, system_admin for anything
  * that grants or removes access. requireStaffSession (is_staff only) let any
  * staff account — including a compliance auditor — hand out system_admin.
+ *
+ * For the three access-grant actions, requireMinRole is not the boundary
+ * either: it only asks whether the caller is an admin on SOME campus. The
+ * mutations in lib/mutations/settings.ts check system_admin on the campus the
+ * grant actually lands on, which for editRole/removeRole means reading the
+ * row first. The requireMinRole calls here just fail obvious non-admins fast.
  */
 
 export async function staffCreateEnrollmentWindow(input: CreateEnrollmentWindowInput) {
@@ -66,10 +75,11 @@ export async function staffUpdateEnrollmentWindow(
 }
 
 export async function staffAssignRole(input: AssignStaffRoleInput) {
-  const session = await requireMinRole("system_admin");
-  // assigned_by is the audit trail for a privilege grant — take it from the
-  // session, never from whatever the caller put in the payload.
-  const result = await assignStaffRole({ ...input, assigned_by: session.user_id });
+  // The campus the grant lands on is known here, so gate on it directly.
+  // assigned_by is no longer part of the payload at all — the mutation stamps
+  // it from the session, so a privilege grant's audit trail cannot be forged.
+  await requireRoleOnCampus(input.campus_id, "system_admin");
+  const result = await assignStaffRole(input);
   if (!result.error) {
     revalidatePath("/staff/settings");
   }
@@ -116,6 +126,37 @@ export async function staffBulkUpdatePacketRequirements(
 ) {
   await requireMinRole("enrollment_manager");
   const result = await bulkUpdatePacketRequirements(requirementIds, updates);
+  if (!result.error) {
+    revalidatePath("/staff/settings");
+    revalidatePath("/family/registration");
+  }
+  return result;
+}
+
+/**
+ * Creating requirements and carrying them into a new school year are
+ * system_admin, on the campus in question — a campus opening a new year with
+ * no requirements produces packets with zero items that read as complete, so
+ * this is closer to schema setup than to day-to-day settings.
+ */
+
+export async function staffCreatePacketRequirement(input: CreatePacketRequirementInput) {
+  await requireRoleOnCampus(input.campus_id, "system_admin");
+  const result = await createPacketRequirement(input);
+  if (!result.error) {
+    revalidatePath("/staff/settings");
+    revalidatePath("/family/registration");
+  }
+  return result;
+}
+
+export async function staffCopyPacketRequirements(
+  campusId: string,
+  fromYearId: string,
+  toYearId: string
+) {
+  await requireRoleOnCampus(campusId, "system_admin");
+  const result = await copyPacketRequirementsFromYear(campusId, fromYearId, toYearId);
   if (!result.error) {
     revalidatePath("/staff/settings");
     revalidatePath("/family/registration");

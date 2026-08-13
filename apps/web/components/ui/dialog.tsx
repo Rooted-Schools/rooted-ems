@@ -63,26 +63,94 @@ function DialogTrigger({
   );
 }
 
+const FOCUSABLE =
+  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
+interface DialogContentProps extends React.HTMLAttributes<HTMLDivElement> {
+  /**
+   * Accessible label for the close button. Defaults to English because this
+   * component is shared with the staff console; family-facing callers pass a
+   * translated string (t("common.close")) so the label follows the family's
+   * chosen language.
+   */
+  closeLabel?: string;
+}
+
 function DialogContent({
   className,
   children,
+  closeLabel = "Close",
   ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
+}: DialogContentProps) {
   const { open, onOpenChange } = useDialog();
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  // The element that had focus before the dialog opened, so it can be
+  // restored on close rather than dropping focus to the top of the document.
+  const restoreFocusRef = React.useRef<HTMLElement | null>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+
+    restoreFocusRef.current = document.activeElement as HTMLElement | null;
+
+    // Move focus into the dialog. Prefer the first focusable control; fall
+    // back to the panel itself (tabIndex -1) for dialogs that are pure text.
+    const panel = panelRef.current;
+    const first = panel?.querySelector<HTMLElement>(FOCUSABLE);
+    (first ?? panel)?.focus();
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onOpenChange(false);
+        return;
+      }
+      if (e.key !== "Tab") return;
+
+      // Trap Tab inside the panel so focus cannot land on the page behind
+      // the overlay, where a click would do something the user cannot see.
+      const nodes = panelRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE);
+      if (!nodes || nodes.length === 0) return;
+      const firstNode = nodes[0];
+      const lastNode = nodes[nodes.length - 1];
+      if (e.shiftKey && document.activeElement === firstNode) {
+        e.preventDefault();
+        lastNode.focus();
+      } else if (!e.shiftKey && document.activeElement === lastNode) {
+        e.preventDefault();
+        firstNode.focus();
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown, true);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", onKeyDown, true);
+      document.body.style.overflow = previousOverflow;
+      restoreFocusRef.current?.focus?.();
+    };
+  }, [open, onOpenChange]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Overlay */}
       <div
         className="fixed inset-0 bg-black/50 animate-in fade-in-0"
         onClick={() => onOpenChange(false)}
       />
-      {/* Content */}
+      {/* Content — max-h keeps the footer actions reachable on a phone;
+          the panel scrolls rather than pushing its buttons off screen. */}
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
         className={cn(
-          "relative z-50 w-full max-w-lg rounded-lg bg-white p-6 shadow-lg animate-in fade-in-0 zoom-in-95",
+          "relative z-50 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-[6px] bg-white p-6 shadow-lg outline-none animate-in fade-in-0 zoom-in-95",
           className
         )}
         {...props}
@@ -91,7 +159,7 @@ function DialogContent({
         <button
           onClick={() => onOpenChange(false)}
           className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100 transition-opacity"
-          aria-label="Close"
+          aria-label={closeLabel}
         >
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path

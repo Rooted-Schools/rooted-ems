@@ -20,6 +20,40 @@ export interface CompleteRegistrationItemInput {
   data?: Record<string, unknown>;
 }
 
+/**
+ * Refusal used whenever a campus/year has no active packet requirements.
+ *
+ * A packet built against an empty requirement set has zero items, and a
+ * packet with zero items satisfies every "nothing is still pending" check in
+ * this file — so it reads as complete, the application advances, and a family
+ * is treated as fully registered without submitting a single document. That
+ * is a silent data-integrity failure, so both entry points refuse instead.
+ * Settings owns the fix (createPacketRequirement /
+ * copyPacketRequirementsFromYear in lib/mutations/settings.ts).
+ */
+export const NO_REQUIREMENTS_ERROR =
+  "No registration requirements are configured for this school year. Add them in Settings before registering families.";
+
+/** The ACTIVE requirements for a campus/year, in display order. */
+async function fetchActiveRequirements(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  campusId: string,
+  schoolYearId: string
+): Promise<{ item_type: string }[]> {
+  const { data, error } = await supabase
+    .from("packet_requirement")
+    .select("item_type")
+    .eq("campus_id", campusId)
+    .eq("school_year_id", schoolYearId)
+    .eq("is_active", true)
+    .order("sort_order");
+  if (error) {
+    console.error("[fetchActiveRequirements]", error.message);
+    return [];
+  }
+  return (data ?? []) as { item_type: string }[];
+}
+
 // ─── Mutations ─────────────────────────────────────────
 
 /**
@@ -47,6 +81,18 @@ export async function initializeRegistrationPacket(
     return { data: { packet_id: existing.id, items_created: 0 }, error: null };
   }
 
+  // Requirements come FIRST, before anything is written: a campus/year with
+  // no active requirements produces an empty packet that reads complete, so
+  // refuse rather than create one. See NO_REQUIREMENTS_ERROR.
+  const requirements = await fetchActiveRequirements(
+    supabase,
+    input.campus_id,
+    input.school_year_id
+  );
+  if (requirements.length === 0) {
+    return { data: null, error: NO_REQUIREMENTS_ERROR };
+  }
+
   // Create packet
   const { data: packet, error: packetError } = await supabase
     .from("registration_packet")
@@ -65,35 +111,24 @@ export async function initializeRegistrationPacket(
     return { data: null, error: "Failed to create registration packet." };
   }
 
-  // Fetch requirements for this campus/year
-  const { data: requirements } = await supabase
-    .from("packet_requirement")
-    .select("item_type")
-    .eq("campus_id", input.campus_id)
-    .eq("school_year_id", input.school_year_id)
-    .eq("is_active", true)
-    .order("sort_order");
-
   // Create registration items for each requirement
   let itemsCreated = 0;
-  if (requirements && requirements.length > 0) {
-    const itemInserts = requirements.map((req: { item_type: string }) => ({
-      enrollment_id: input.enrollment_id,
-      item_type: req.item_type,
-      status: "pending",
-      data: {},
-    }));
+  const itemInserts = requirements.map((req) => ({
+    enrollment_id: input.enrollment_id,
+    item_type: req.item_type,
+    status: "pending",
+    data: {},
+  }));
 
-    const { error: itemsError } = await supabase
-      .from("registration_item")
-      .insert(itemInserts);
+  const { error: itemsError } = await supabase
+    .from("registration_item")
+    .insert(itemInserts);
 
-    if (itemsError) {
-      console.error("[initializeRegistrationPacket] items", itemsError.message);
-      // Packet created but items failed — still return packet
-    } else {
-      itemsCreated = requirements.length;
-    }
+  if (itemsError) {
+    console.error("[initializeRegistrationPacket] items", itemsError.message);
+    // Packet created but items failed — still return packet
+  } else {
+    itemsCreated = requirements.length;
   }
 
   // Notify family that their registration packet is ready to complete
@@ -298,6 +333,18 @@ export async function submitRegistrationPacket(
     return { data: null, error: "Enrollment not found." };
   }
 
+  // Same guard as initializeRegistrationPacket: with no active requirements
+  // every "nothing pending" check below passes vacuously, and the family
+  // would be marked registered on an empty packet.
+  const activeRequirements = await fetchActiveRequirements(
+    supabase,
+    enrollment.campus_id as string,
+    enrollment.school_year_id as string
+  );
+  if (activeRequirements.length === 0) {
+    return { data: null, error: NO_REQUIREMENTS_ERROR };
+  }
+
   // Find which item types are marked required for this campus/year
   const { data: requiredReqs } = await supabase
     .from("packet_requirement")
@@ -340,8 +387,25 @@ export async function submitRegistrationPacket(
     return { data: null, error: "Failed to submit registration packet." };
   }
 
-  // NOTE: application status stays "accepted" here.
-  // It will move to "placement_review" only after staff verify all registration items.
+  // The application moves to "registered" here — that status existed in the
+  // state machine but nothing ever set it, so a family who had submitted
+  // their whole packet was indistinguishable from one who had only accepted
+  // a seat. The .eq("status", "accepted") guard means a later stage
+  // (placement_review, enrolled) is never walked backwards, and a repeat
+  // submit is a no-op. It advances to "placement_review" later, once staff
+  // verify the items (see advanceApplicationAfterPacketComplete).
+  if (enrollment.application_id) {
+    const { error: statusError } = await supabase
+      .from("application")
+      .update({ status: "registered", updated_at: new Date().toISOString() })
+      .eq("id", enrollment.application_id as string)
+      .eq("status", "accepted");
+    if (statusError) {
+      // The packet is submitted either way — say so in the log, but never
+      // fail the family's submission over the status stamp.
+      console.error("[submitRegistrationPacket] status flip", statusError.message);
+    }
+  }
 
   // Notify family confirmation + staff to begin verification — fire and forget
   notifyFamilyRegistrationSubmitted({

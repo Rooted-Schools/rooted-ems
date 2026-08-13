@@ -18,6 +18,7 @@ import {
 import { useDraftAutosave, SaveIndicator } from "@/components/draft-autosave";
 import { useLocale } from "@/lib/i18n/locale-context";
 import { type TranslationKey } from "@/lib/i18n/translations";
+import { NO_POLICY_QUESTIONS, type PolicyQuestionFlags } from "@/lib/lottery-policy";
 
 /* ───────────── Props ───────────── */
 
@@ -41,7 +42,17 @@ interface NewApplicationFormProps {
    * back onto the shared guardian record (no duplicate is created).
    */
   existingHousehold?: ExistingHouseholdInfo | null;
+  /**
+   * Per-campus map of the extra lottery questions that campus's board-adopted
+   * policy asks for. Keyed by campus id; a campus that is absent (or whose
+   * flags are all false) asks nothing extra. Computed on the server from the
+   * ADOPTED policy only.
+   */
+  policyQuestions?: Record<string, PolicyQuestionFlags>;
 }
+
+/** Yes/No answers are stored as the strings the policy matchers accept. */
+type YesNo = "yes" | "no";
 
 /* ───────────── step definitions ───────────── */
 
@@ -78,6 +89,10 @@ interface FormData {
   smsConsent: boolean;
   // Sibling priority (affects lottery weighting)
   hasSibling: boolean;
+  // Policy-driven lottery questions (only asked where the campus's adopted
+  // policy declares the matching weighted tier)
+  isStaffChild: YesNo;
+  isFrlQualifying: YesNo;
   // Step 3: Consent
   dataSharingConsent: boolean;
   agreeTerms: boolean;
@@ -101,6 +116,8 @@ const INITIAL: FormData = {
   guardianPhone: "",
   smsConsent: false,
   hasSibling: false,
+  isStaffChild: "no",
+  isFrlQualifying: "no",
   dataSharingConsent: false,
   agreeTerms: false,
   signatureName: "",
@@ -200,13 +217,84 @@ function StepIndicator({
   );
 }
 
+/* ───────────── yes / no question ───────────── */
+
+/**
+ * A two-option radio for a policy-driven lottery question. Defaults to No and
+ * is always answerable: there is no "prefer not to say" here because the
+ * weighted tier reads yes or nothing at all.
+ */
+function YesNoQuestion({
+  name,
+  label,
+  note,
+  value,
+  onChange,
+}: {
+  name: string;
+  label: string;
+  note?: string;
+  value: YesNo;
+  onChange: (value: YesNo) => void;
+}) {
+  const { t } = useLocale();
+  return (
+    <fieldset className="pt-1">
+      <legend className="text-sm font-medium text-ink/70 mb-1">{label}</legend>
+      {note && <p className="text-xs text-stone-text mb-2">{note}</p>}
+      <div className="flex items-center gap-5">
+        {(["yes", "no"] as const).map((option) => (
+          <label key={option} htmlFor={`${name}-${option}`} className="flex items-center gap-2 text-sm text-ink/70">
+            <input
+              type="radio"
+              id={`${name}-${option}`}
+              name={name}
+              value={option}
+              checked={value === option}
+              onChange={() => onChange(option)}
+              className="h-4 w-4 border-stone/30 text-rooted-green focus:ring-rooted-green"
+            />
+            {option === "yes" ? t("common.yes") : t("common.no")}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 /* ───────────── build mutation input ───────────── */
 
-function buildCreateInput(form: FormData, campusWindows: EnrollmentWindowInfo[]) {
+/**
+ * The two policy-driven answers, keyed exactly as the weighted tiers read them.
+ *
+ * A campus that does not ask a question writes "" rather than leaving the key
+ * out: a family who picked Vancouver, answered yes, then switched campuses
+ * must not carry that answer to a school whose board never adopted the tier.
+ */
+function policyAnswerValues(form: FormData, flags: PolicyQuestionFlags) {
+  return {
+    is_staff_child: flags.is_staff_child ? form.isStaffChild : "",
+    is_frl_qualifying: flags.is_frl_qualifying ? form.isFrlQualifying : "",
+  };
+}
+
+/** The questions a campus asks, defaulting to none for an unknown campus. */
+function questionFlagsFor(
+  policyQuestions: Record<string, PolicyQuestionFlags> | undefined,
+  campusId: string
+): PolicyQuestionFlags {
+  return policyQuestions?.[campusId] ?? NO_POLICY_QUESTIONS;
+}
+
+function buildCreateInput(
+  form: FormData,
+  campusWindows: EnrollmentWindowInfo[],
+  flags: PolicyQuestionFlags
+) {
   const windowId = form.enrollmentWindowId || campusWindows[0]?.id;
   if (!windowId) return null;
 
-  const answers: Record<string, string | boolean> = {};
+  const answers: Record<string, unknown> = { ...policyAnswerValues(form, flags) };
   if (form.dataSharingConsent) answers.data_sharing_consent = true;
   if (form.signatureName) answers.e_signature_name = form.signatureName;
   answers.e_signature_date = new Date().toISOString().split("T")[0];
@@ -239,9 +327,10 @@ function buildCreateInput(form: FormData, campusWindows: EnrollmentWindowInfo[])
 function buildAutosaveInput(
   applicationId: string,
   form: FormData,
-  campusWindows: EnrollmentWindowInfo[]
+  campusWindows: EnrollmentWindowInfo[],
+  flags: PolicyQuestionFlags
 ) {
-  const answers: Record<string, string | boolean> = {
+  const answers: Record<string, unknown> = {
     // Persist booleans unconditionally so unchecking is saved too.
     data_sharing_consent: form.dataSharingConsent,
     agree_terms: form.agreeTerms,
@@ -249,6 +338,7 @@ function buildAutosaveInput(
     e_signature_name: form.signatureName,
     guardian_relationship_other:
       form.guardianRelationship === "other" ? form.guardianRelationshipOther : "",
+    ...policyAnswerValues(form, flags),
   };
   if (form.signatureName) {
     answers.e_signature_date = new Date().toISOString().split("T")[0];
@@ -292,6 +382,7 @@ export function NewApplicationForm({
   gradeLevels,
   initialCampusId,
   existingHousehold,
+  policyQuestions,
 }: NewApplicationFormProps) {
   const { t, locale } = useLocale();
   const router = useRouter();
@@ -328,6 +419,11 @@ export function NewApplicationForm({
   const campusWindows = windows.filter((w) => w.campus_id === form.campusId && w.is_open);
   const campusGrades = gradeLevels.filter((g) => g.campus_id === form.campusId);
 
+  // The extra lottery questions follow the selected campus, so they appear and
+  // disappear when the family changes their mind on step 1.
+  const questionFlags = questionFlagsFor(policyQuestions, form.campusId);
+  const showPolicyQuestions = questionFlags.is_staff_child || questionFlags.is_frl_qualifying;
+
   // Debounced auto-save (~2s after the last change) once the draft row exists.
   // The server action re-verifies auth + guardian ownership on every save.
   const { status: saveStatus, flush: flushAutosave } = useDraftAutosave({
@@ -336,7 +432,14 @@ export function NewApplicationForm({
     onSave: async (current) => {
       if (!draftId) return { error: null };
       const currentWindows = windows.filter((w) => w.campus_id === current.campusId && w.is_open);
-      return familyUpdateApplication(buildAutosaveInput(draftId, current, currentWindows));
+      return familyUpdateApplication(
+        buildAutosaveInput(
+          draftId,
+          current,
+          currentWindows,
+          questionFlagsFor(policyQuestions, current.campusId)
+        )
+      );
     },
   });
 
@@ -358,7 +461,7 @@ export function NewApplicationForm({
       creatingDraftRef.current = true;
       startTransition(async () => {
         try {
-          const input = buildCreateInput(form, campusWindows);
+          const input = buildCreateInput(form, campusWindows, questionFlags);
           if (!input) {
             setFeedback({ type: "error", message: t("appForm.noOpenWindow") });
             return;
@@ -391,7 +494,7 @@ export function NewApplicationForm({
     startTransition(async () => {
       // Draft already exists (created on step 1) — just save the latest values.
       if (draftId) {
-        const result = await familyUpdateApplication(buildAutosaveInput(draftId, form, campusWindows));
+        const result = await familyUpdateApplication(buildAutosaveInput(draftId, form, campusWindows, questionFlags));
         if (result.error) {
           setFeedback({ type: "error", message: result.error });
         } else {
@@ -401,7 +504,7 @@ export function NewApplicationForm({
         return;
       }
 
-      const input = buildCreateInput(form, campusWindows);
+      const input = buildCreateInput(form, campusWindows, questionFlags);
       if (!input) {
         setFeedback({ type: "error", message: t("appForm.noOpenWindow") });
         return;
@@ -426,7 +529,7 @@ export function NewApplicationForm({
       if (applicationId) {
         // Draft exists — persist the final values, then submit it.
         const updateResult = await familyUpdateApplication(
-          buildAutosaveInput(applicationId, form, campusWindows)
+          buildAutosaveInput(applicationId, form, campusWindows, questionFlags)
         );
         if (updateResult.error) {
           setFeedback({ type: "error", message: updateResult.error });
@@ -434,7 +537,7 @@ export function NewApplicationForm({
         }
       } else {
         // Fallback (draft creation failed earlier): create + submit in one go.
-        const input = buildCreateInput(form, campusWindows);
+        const input = buildCreateInput(form, campusWindows, questionFlags);
         if (!input) {
           setFeedback({ type: "error", message: t("appForm.noOpenWindow") });
           return;
@@ -591,6 +694,34 @@ export function NewApplicationForm({
                 </span>
               </label>
             </div>
+
+            {/* Policy-driven lottery questions. Rendered only where the
+                selected campus's board has ADOPTED a policy declaring the
+                matching weighted tier, so they appear and disappear with the
+                campus choice above. */}
+            {showPolicyQuestions && (
+              <div className="space-y-4 border-t border-stone/20 pt-4">
+                {questionFlags.is_staff_child && (
+                  <YesNoQuestion
+                    name="is-staff-child"
+                    label={t("appForm.staffChildLabel")}
+                    note={t("appForm.staffChildNote")}
+                    value={form.isStaffChild}
+                    onChange={(v) => update({ isStaffChild: v })}
+                  />
+                )}
+                {questionFlags.is_frl_qualifying && (
+                  <YesNoQuestion
+                    name="is-frl-qualifying"
+                    label={t("appForm.frlLabel")}
+                    note={t("appForm.frlNote")}
+                    value={form.isFrlQualifying}
+                    onChange={(v) => update({ isFrlQualifying: v })}
+                  />
+                )}
+              </div>
+            )}
+
             <Link
               href="/how-the-lottery-works"
               target="_blank"
@@ -782,6 +913,18 @@ export function NewApplicationForm({
                 <ReviewRow label={t("appForm.campus")} value={campuses.find((c) => c.id === form.campusId)?.name || "—"} />
                 <ReviewRow label={t("apps.grade")} value={form.gradeLevel ? GRADE_LABELS[form.gradeLevel] || `${t("apps.grade")} ${form.gradeLevel}` : "—"} />
                 <ReviewRow label={t("appForm.review.siblingAtCampus")} value={form.hasSibling ? t("common.yes") : t("common.no")} />
+                {questionFlags.is_staff_child && (
+                  <ReviewRow
+                    label={t("appForm.review.staffChild")}
+                    value={form.isStaffChild === "yes" ? t("common.yes") : t("common.no")}
+                  />
+                )}
+                {questionFlags.is_frl_qualifying && (
+                  <ReviewRow
+                    label={t("appForm.review.frl")}
+                    value={form.isFrlQualifying === "yes" ? t("common.yes") : t("common.no")}
+                  />
+                )}
               </ReviewSection>
               <ReviewSection title={t("offers.student")}>
                 <ReviewRow label={t("appForm.review.name")} value={[form.firstName, form.lastName].filter(Boolean).join(" ") || "—"} />

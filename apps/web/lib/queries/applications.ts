@@ -1,4 +1,5 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
+import { normalizeAnswerValue } from "@/lib/lottery-policy";
 
 // ─── Types ─────────────────────────────────────────────
 export interface ApplicationRow {
@@ -368,8 +369,15 @@ export async function getApplicationDetail(
     .eq("application_id", applicationId)
     .order("created_at", { ascending: false });
 
-  // Fetch notes
-  const { data: notes } = await supabase
+  // Fetch notes.
+  //
+  // A userId means this payload is being built for the family portal, and the
+  // whole thing is serialized to the browser whether or not a component
+  // renders it. Internal staff notes ("mother sounded frustrated on the
+  // phone", "flagged for residency check") are written on the understanding
+  // that families do not read them, so they are filtered out at the query,
+  // not hidden in the markup.
+  let notesQuery = supabase
     .from("note")
     .select(
       `
@@ -378,8 +386,13 @@ export async function getApplicationDetail(
     `
     )
     .eq("entity_type", "application")
-    .eq("entity_id", applicationId)
-    .order("created_at", { ascending: false });
+    .eq("entity_id", applicationId);
+
+  if (userId) {
+    notesQuery = notesQuery.eq("is_internal", false);
+  }
+
+  const { data: notes } = await notesQuery.order("created_at", { ascending: false });
 
   // Fetch tags
   const { data: tagRows } = await supabase
@@ -522,8 +535,13 @@ export interface DraftApplicationData {
     state: string | null;
     zip: string | null;
   };
-  // Application answers (EAV)
-  answers: Record<string, string>;
+  /**
+   * Application answers (EAV). Values are whatever the JSONB column holds,
+   * normalized: a boolean answer reads back as a boolean and a text answer as
+   * a string. Consumers must not compare a stored boolean to the string
+   * "true" — use isAffirmativeAnswer / answerAsText from lib/lottery-policy.
+   */
+  answers: Record<string, unknown>;
 }
 
 /**
@@ -600,14 +618,15 @@ export async function getDraftApplicationForEdit(
     .select("field_key, value")
     .eq("application_id", applicationId);
 
-  const answers: Record<string, string> = {};
+  // application_answer.value is JSONB, so supabase-js has already parsed it.
+  // JSON.parse-ing that a second time turned the boolean true into a throw
+  // (caught, kept as-is) and left legacy double-encoded rows quoted, which is
+  // how a reopened draft came back with its consents unchecked. normalize once,
+  // here, so every consumer sees the value that was actually meant.
+  const answers: Record<string, unknown> = {};
   for (const row of answerRows ?? []) {
     const r = row as Record<string, unknown>;
-    try {
-      answers[r.field_key as string] = JSON.parse(r.value as string);
-    } catch {
-      answers[r.field_key as string] = r.value as string;
-    }
+    answers[r.field_key as string] = normalizeAnswerValue(r.value);
   }
 
   return {

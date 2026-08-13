@@ -190,7 +190,13 @@ export async function checkInRsvp(
 
 export interface WalkInInput {
   event_id: string;
-  campus_id: string;
+  /**
+   * Kept for call-site compatibility and ignored — the lead is filed against
+   * the campus that actually owns the event, read from the event row below.
+   * A client-supplied campus here would have parked a walk-in family's lead
+   * on a campus that had nothing to do with the event they walked into.
+   */
+  campus_id?: string;
   guardian_name: string;
   phone?: string;
 }
@@ -216,10 +222,13 @@ export async function addWalkInRsvp(
 
   const { data: event } = await supabase
     .from("event")
-    .select("id, title")
+    .select("id, title, campus_id")
     .eq("id", input.event_id)
     .single();
   if (!event) return { data: null, error: "Event not found." };
+
+  const eventCampusId = (event.campus_id as string | null) ?? null;
+  if (!eventCampusId) return { data: null, error: "This event has no campus on file." };
 
   const nameParts = input.guardian_name.trim().split(/\s+/);
   const firstName = nameParts[0] ?? input.guardian_name.trim();
@@ -228,7 +237,7 @@ export async function addWalkInRsvp(
   const { createLeadByStaff } = await import("./leads");
   const leadResult = await createLeadByStaff(
     {
-      campus_id: input.campus_id,
+      campus_id: eventCampusId,
       first_name: firstName,
       last_name: lastName,
       phone: input.phone?.trim() || undefined,

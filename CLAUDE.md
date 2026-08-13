@@ -122,9 +122,14 @@ You'll need a `.env.local` in `apps/web/` — get this from Steven. It contains:
 | Rooted School Vancouver (RSV) | 2026-27 | 9, 10, 11, 12 | Active pilot |
 
 ## Staff Accounts
-- `scarney@rootedschool.org` — system_admin (Steven Carney)
-- `lradney@rootedschoolcola.org` — enrollment_manager (Lalah Radney, CRN)
-- `tjones@rootedschoolcle.org` — system_admin, Cleveland (Tim Jones, RSOH)
+
+Verified against production 2026-08-12. Roles live in `user_campus_role`; this table is a convenience copy and can go stale, so trust the database.
+
+- `scarney@rootedschool.org` — system_admin on all three campuses (Steven Carney). Holding system_admin on 2+ campuses is what grants network/CMO access.
+- `lradney@rootedschoolcola.org` — system_admin, C.R. Neal (Lalah Radney)
+- `tjones@rootedschoolcle.org` — system_admin, Cleveland (Tim Jones)
+
+**Access convention:** org-wide/CMO access means system_admin on two or more campuses (`hasNetworkAccess` = `isCMOAdmin`). A staff account with zero campus roles has NO access and is refused at sign-in; an empty role list is never treated as "sees everything".
 
 ---
 

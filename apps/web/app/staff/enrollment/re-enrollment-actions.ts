@@ -1,7 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
+import {
+  requireStaffSession,
+  requireRoleOnCampus,
+  hasRoleOnCampus,
+  getAccessibleCampusIds,
+} from "@/lib/auth/get-session";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { notifyFamilyReenrollmentOffer, notifyFamilyReenrollmentPulse } from "@/lib/notify";
 import { createNote } from "@/lib/mutations";
@@ -45,6 +50,13 @@ interface BulkReenrollmentResult {
  *   2. Fall back to any window for that campus + year regardless of status.
  *   3. If none exists the action returns an error — staff must create a window
  *      in settings before initiating re-enrollment.
+ *
+ * Campus gate: this creates an application AND an enrollment, so it carries
+ * the same bar as the offer actions — enrollment_manager on the campus the
+ * source enrollment actually belongs to. It previously ran at requireStaff
+ * Session and never compared the row's campus to anything, so a staff member
+ * at one campus could re-enroll another campus's students by supplying their
+ * enrollment ids.
  */
 export async function staffInitiateReenrollment(
   enrollmentId: string,
@@ -83,6 +95,9 @@ export async function staffInitiateReenrollment(
       student: { first_name: string; last_name: string } | null;
     } | null;
   };
+
+  // The record's real campus, resolved before anything is written.
+  await requireRoleOnCampus(row.campus_id, "enrollment_manager");
 
   const guardianId = row.application?.guardian_id ?? null;
   if (!guardianId) {
@@ -199,12 +214,18 @@ export async function staffInitiateReenrollment(
 /**
  * Initiate re-enrollment for multiple active enrollments at once.
  * Grade level is automatically inferred as +1 from the student's current grade.
+ *
+ * The campus filter here has to match staffInitiateReenrollment's gate exactly
+ * (enrollment_manager on the row's campus). That gate redirects rather than
+ * returning, so an unauthorized row reaching it would abort the whole batch
+ * mid-run instead of being reported — rows the caller may not act on are
+ * filtered out first and counted as failures with an honest reason.
  */
 export async function staffBulkInitiateReenrollment(
   enrollmentIds: string[],
   newSchoolYearId: string
 ): Promise<BulkReenrollmentResult> {
-  await requireStaffSession();
+  const session = await requireStaffSession();
   const supabase = createServiceRoleClient();
 
   const result: BulkReenrollmentResult = {
@@ -236,14 +257,35 @@ export async function staffBulkInitiateReenrollment(
     };
   }
 
+  // ── Campus scope, per row — the id list is client-supplied ────────────────
+  const permitted: Array<Record<string, unknown>> = [];
+  for (const enrollment of enrollments as Array<Record<string, unknown>>) {
+    if (hasRoleOnCampus(session, enrollment.campus_id as string, "enrollment_manager")) {
+      permitted.push(enrollment);
+      continue;
+    }
+    result.failed++;
+    result.errors.push(
+      `Enrollment ${enrollment.id as string}: you do not have access to this campus.`
+    );
+  }
+
+  if (permitted.length === 0) {
+    // Still account for ids that never came back as active, below.
+    const foundActiveIds = new Set(
+      (enrollments as Array<Record<string, unknown>>).map((e) => e.id as string)
+    );
+    for (const id of enrollmentIds) {
+      if (!foundActiveIds.has(id)) {
+        result.failed++;
+        result.errors.push(`Enrollment ${id}: not found or not in active status.`);
+      }
+    }
+    return result;
+  }
+
   // Fetch all grade levels for the new school year (to map current grade → next grade)
-  const campusIds = [
-    ...new Set(
-      (enrollments as Array<Record<string, unknown>>).map(
-        (e) => e.campus_id as string
-      )
-    ),
-  ];
+  const campusIds = [...new Set(permitted.map((e) => e.campus_id as string))];
 
   const { data: gradeLevelRows } = await supabase
     .from("grade_level")
@@ -267,7 +309,7 @@ export async function staffBulkInitiateReenrollment(
     "11": "12",
   };
 
-  for (const enrollment of enrollments as Array<Record<string, unknown>>) {
+  for (const enrollment of permitted) {
     const gradeLevel = enrollment.grade_level as Record<string, string> | null;
     const currentGrade = gradeLevel?.grade ?? null;
 

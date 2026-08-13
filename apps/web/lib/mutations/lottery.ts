@@ -1,7 +1,11 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { generateLotterySeed, runDeterministicLottery } from "@rooted-ems/utils";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
-import { notifyFamilyApplicationWaitlisted, notifyFamilyOfOffer } from "@/lib/notify";
+import {
+  anyChannelDelivered,
+  notifyFamilyApplicationWaitlisted,
+  notifyFamilyOfOffer,
+} from "@/lib/notify";
 import { ensureWaitlist, addToWaitlist } from "./waitlist";
 import type { MutationResult } from "./applications";
 import {
@@ -310,12 +314,15 @@ export async function createLotteryRun(
 
   const nextRunNumber = ((existing?.[0] as Record<string, number> | undefined)?.run_number ?? 0) + 1;
 
-  // Count eligible applicants (verified status for this campus + grade)
+  // Count eligible applicants for this campus + grade + enrollment window.
+  // The window is what binds a run to a school year: without it, a 2027-28
+  // lottery would draw every still-open 2026-27 applicant into the same pool.
   const { count: applicantCount } = await supabase
     .from("application")
     .select("id", { count: "exact", head: true })
     .eq("campus_id", input.campus_id)
     .eq("grade_level_id", input.grade_level_id)
+    .eq("enrollment_window_id", input.enrollment_window_id)
     .in("status", ["verified", "lottery_assigned"]);
 
   // Resolve the campus's priority tiers before creating the run so the run
@@ -388,12 +395,14 @@ export async function createLotteryRun(
     return { data: null, error: "Failed to create lottery run." };
   }
 
-  // Auto-populate lottery entries from eligible applications
+  // Auto-populate lottery entries from eligible applications — same
+  // campus + grade + enrollment window scope as the count above.
   const { data: eligibleApps } = await supabase
     .from("application")
     .select("id")
     .eq("campus_id", input.campus_id)
     .eq("grade_level_id", input.grade_level_id)
+    .eq("enrollment_window_id", input.enrollment_window_id)
     .in("status", ["verified", "lottery_assigned"]);
 
   if (eligibleApps && eligibleApps.length > 0) {
@@ -452,7 +461,13 @@ async function buildPolicyDrawEntries(
   const applicationIds = rawEntries.map((e) => e.application_id);
 
   const preference = siblingAbsolutePreference(config);
-  const sibling = await deriveSiblingOfEnrolled(supabase, applicationIds, campusId, preference);
+  const sibling = await deriveSiblingOfEnrolled(
+    supabase,
+    applicationIds,
+    campusId,
+    preference,
+    config.linkedSiblingActivation
+  );
   const linked = deriveLinkedSiblings(sibling.guardiansByApplication);
 
   const tiers = enabledWeightedTiers(config);
@@ -935,8 +950,13 @@ export async function finalizeLotteryRun(
   }
 
   // ── Step 3: STATUS (the commit point) ───────────────────────────────────
+  //
+  // .select("id") is load-bearing: without it a compare-and-set that matched
+  // NOTHING returns no error, and finalize reported success on a run it never
+  // flipped. Only a returned row proves the run went official, and only then
+  // is the audit event true.
   const now = new Date().toISOString();
-  const { error: runUpdateError } = await supabase
+  const { data: flipped, error: runUpdateError } = await supabase
     .from("lottery_run")
     .update({
       status: "official",
@@ -946,10 +966,19 @@ export async function finalizeLotteryRun(
       updated_at: now,
     })
     .eq("id", runId)
-    .eq("status", "preview");
+    .eq("status", "preview")
+    .select("id");
 
   if (runUpdateError) {
+    console.error("[finalizeLotteryRun] status", runUpdateError.message);
     return { data: null, error: "Failed to finalize lottery run." };
+  }
+
+  if (!flipped || flipped.length === 0) {
+    return {
+      data: null,
+      error: "This run is no longer in preview, so it was not finalized. Reload the run to see its current status.",
+    };
   }
 
   await logAuditEvent({
@@ -978,17 +1007,28 @@ export async function archiveLotteryRun(
 ): Promise<MutationResult> {
   const supabase = await createServerClient();
 
-  const { error } = await supabase
+  // Same compare-and-set discipline as finalize: no returned row means nothing
+  // was archived, and saying otherwise would be a lie about the record.
+  const { data: flipped, error } = await supabase
     .from("lottery_run")
     .update({
       status: "archived",
       updated_at: new Date().toISOString(),
     })
     .eq("id", runId)
-    .eq("status", "official");
+    .eq("status", "official")
+    .select("id");
 
   if (error) {
+    console.error("[archiveLotteryRun]", error.message);
     return { data: null, error: "Failed to archive lottery run." };
+  }
+
+  if (!flipped || flipped.length === 0) {
+    return {
+      data: null,
+      error: "Only an official run can be archived. This run is no longer official.",
+    };
   }
 
   return { data: null, error: null };
@@ -1076,21 +1116,40 @@ export async function runNotificationFanOut(
     const attempts = ((row.attempts as number) ?? 0) + 1;
 
     try {
-      if (row.kind === "offer") {
-        await notifyFamilyOfOffer({
-          applicationId,
-          offerId: (row.offer_id as string) ?? "",
-          expiresAt: (row.expires_at as string) ?? "",
-          campusId,
-          studentName: (row.student_name as string) ?? undefined,
-        });
-      } else {
-        await notifyFamilyApplicationWaitlisted({
-          applicationId,
-          campusId,
-          studentName: (row.student_name as string) ?? "your student",
-          position: (row.position_number as number) ?? 0,
-        });
+      // These notify functions never throw, so "no exception" proves nothing.
+      // Read what they actually delivered: a guardian with no email address
+      // and no portal account reaches zero channels, and marking that family
+      // 'sent' is how a lottery result goes undelivered with a green ledger.
+      const delivery =
+        row.kind === "offer"
+          ? await notifyFamilyOfOffer({
+              applicationId,
+              offerId: (row.offer_id as string) ?? "",
+              expiresAt: (row.expires_at as string) ?? "",
+              campusId,
+              studentName: (row.student_name as string) ?? undefined,
+            })
+          : await notifyFamilyApplicationWaitlisted({
+              applicationId,
+              campusId,
+              studentName: (row.student_name as string) ?? "your student",
+              position: (row.position_number as number) ?? 0,
+            });
+
+      if (!anyChannelDelivered(delivery)) {
+        const reason = "no email and no account on file";
+        console.error("[runNotificationFanOut] nothing delivered", { applicationId, reason });
+        await supabase
+          .from("lottery_notification")
+          .update({
+            status: "failed",
+            attempts,
+            last_error: reason,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", row.id as string);
+        result.failed++;
+        continue;
       }
 
       await supabase
@@ -1289,10 +1348,24 @@ export async function sendOffersFromLottery(
       continue;
     }
 
-    await supabase
+    // Only move an application that is still in a pre-offer state. Without the
+    // precondition this overwrote whatever the application had become since
+    // the draw — an accepted seat, a withdrawal — and stamped it "offered".
+    const { data: statusMoved, error: statusError } = await supabase
       .from("application")
       .update({ status: "offered", updated_at: now })
-      .eq("id", appId);
+      .eq("id", appId)
+      .in("status", ["lottery_assigned", "verified", "waitlisted"])
+      .select("id");
+
+    if (statusError) {
+      console.error(`[sendOffersFromLottery] status for ${appId}`, statusError.message);
+    } else if (!statusMoved || statusMoved.length === 0) {
+      console.warn(
+        "[sendOffersFromLottery] application was not in a pre-offer status, leaving it as it is",
+        { applicationId: appId, offerId: newOffer.id }
+      );
+    }
 
     ledgerRows.push({
       lottery_run_id: runId,
@@ -1325,14 +1398,22 @@ export async function sendOffersFromLottery(
     for (const item of legacyNotifications) {
       notifications.attempted++;
       try {
-        await notifyFamilyOfOffer({
+        const delivery = await notifyFamilyOfOffer({
           applicationId: item.applicationId,
           offerId: item.offerId,
           expiresAt: resolvedExpiresAt,
           campusId: run.campus_id as string,
           studentName: item.studentName,
         });
-        notifications.sent++;
+        if (anyChannelDelivered(delivery)) {
+          notifications.sent++;
+        } else {
+          notifications.failed++;
+          console.error("[sendOffersFromLottery] nothing delivered", {
+            applicationId: item.applicationId,
+            reason: "no email and no account on file",
+          });
+        }
       } catch (err) {
         notifications.failed++;
         console.error(`[sendOffersFromLottery] notify ${item.applicationId}`, err);
@@ -1447,9 +1528,24 @@ export async function completeLotteryResults(
   ]);
 
   let waitlisted = 0;
-  // Sequential 1-based position among the families we actually add — matches
-  // the rest of the waitlist system and what the family sees on their portal.
-  let position = 0;
+
+  // Positions continue from the highest already on this waitlist. Restarting
+  // at 1 on a second pass (a re-run, a later grade batch) gave two families
+  // the same "you are #1" and made the ordering a lie.
+  const { data: highest, error: highestError } = await supabase
+    .from("waitlist_position")
+    .select("position_number")
+    .eq("waitlist_id", waitlistId)
+    .order("position_number", { ascending: false })
+    .limit(1);
+
+  if (highestError) {
+    console.error("[completeLotteryResults] highest position", highestError.message);
+    return { data: null, error: "Failed to read the existing waitlist order." };
+  }
+
+  let position =
+    ((highest ?? [])[0] as { position_number?: number } | undefined)?.position_number ?? 0;
   const ledgerRows: LedgerRow[] = [];
 
   for (const row of rows) {
@@ -1492,13 +1588,21 @@ export async function completeLotteryResults(
     for (const item of ledgerRows) {
       notifications.attempted++;
       try {
-        await notifyFamilyApplicationWaitlisted({
+        const delivery = await notifyFamilyApplicationWaitlisted({
           applicationId: item.application_id,
           campusId: run.campus_id as string,
           studentName: item.student_name ?? "your student",
           position: item.position_number ?? 0,
         });
-        notifications.sent++;
+        if (anyChannelDelivered(delivery)) {
+          notifications.sent++;
+        } else {
+          notifications.failed++;
+          console.error("[completeLotteryResults] nothing delivered", {
+            applicationId: item.application_id,
+            reason: "no email and no account on file",
+          });
+        }
       } catch (err) {
         notifications.failed++;
         console.error("[completeLotteryResults] notify failed", err, {

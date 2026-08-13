@@ -80,9 +80,30 @@ export async function requireSession(): Promise<AuthSession> {
 }
 
 /**
+ * True when a staff session carries at least one user_campus_role row.
+ *
+ * Factored out of requireStaffSession so the rule can be tested as a pure
+ * predicate. Zero rows means NO access — see requireStaffSession's note on
+ * why that is the only safe reading.
+ */
+export function hasAnyCampusAccess(session: AuthSession): boolean {
+  return Object.keys(session.campus_roles).length > 0;
+}
+
+/**
  * Require that the user is a staff member.
  * Unauthenticated users → /staff-login
  * Authenticated non-staff users → /login
+ * Staff with zero campus roles → /staff-login?error=no_campus_access
+ *
+ * That last case is the fail-closed gate. Every provisioned staff account
+ * holds at least one user_campus_role row, so a zero-row is_staff account is
+ * always a half-provisioned or half-deprovisioned one: the role rows were
+ * never written, or they were revoked and is_staff was left true. Around 29
+ * campus-scoped queries treat an empty accessible-campus list as "unscoped,
+ * so return everything", which turned that broken state into org-wide read
+ * access. Denying at the door means those call sites can keep their empty ==
+ * unscoped shortcut, because an empty map can no longer reach them.
  */
 export async function requireStaffSession(): Promise<AuthSession> {
   const session = await getSession();
@@ -92,13 +113,25 @@ export async function requireStaffSession(): Promise<AuthSession> {
   if (!session.is_staff) {
     redirect("/login");
   }
+  if (!hasAnyCampusAccess(session)) {
+    redirect("/staff-login?error=no_campus_access");
+  }
   return session;
 }
 
 /**
  * Get the list of campus IDs this staff user can access.
- * CMO / system_admin users with 3+ campus roles see all.
- * School-level staff see only their assigned campus(es).
+ *
+ * Always the explicit campus list from user_campus_role, including for a
+ * CMO-level admin (see isCMOAdmin) — the CMO holds real rows on every
+ * campus, and the campus-scoped mutation guards (hasRoleOnCampus /
+ * requireRoleOnCampus) can only authorize against real rows. Returning an
+ * empty list for the CMO would read as "unscoped" to the ~29 queries that
+ * branch on length === 0 while simultaneously stripping every mutation
+ * permission, so the explicit list is both safer and more accurate.
+ *
+ * An empty list here means no access at all, not org-wide access;
+ * requireStaffSession denies such a session before it can reach a query.
  */
 export function getAccessibleCampusIds(session: AuthSession): string[] {
   return Object.keys(session.campus_roles);
@@ -106,6 +139,8 @@ export function getAccessibleCampusIds(session: AuthSession): string[] {
 
 /**
  * Check if user is a CMO-level admin (system_admin on 2+ campuses).
+ * This is the app's single definition of org-wide access — hasNetworkAccess
+ * and requireNetworkAccess both resolve to it.
  */
 export function isCMOAdmin(session: AuthSession): boolean {
   const campusIds = Object.keys(session.campus_roles);
@@ -138,10 +173,17 @@ export function resolveActiveCampus(
   // Single-campus staff always see only their campus
   if (accessible.length === 1) return accessible[0];
 
-  // Honor an explicit campus selection when provided
+  // Honor an explicit campus selection when provided: scoped staff can only
+  // select campuses in their accessible list.
+  //
+  // The `accessible.length === 0` arm below is dead in practice — a staff
+  // session with zero campus roles is now denied by requireStaffSession
+  // before any page calls this. It is left in place deliberately: this
+  // function is pure and exported, so a caller holding a raw AuthSession
+  // still reaches it, and on that path the arm NARROWS the result to the
+  // requested campus rather than falling through to "all campuses". Removing
+  // it would widen, not tighten.
   if (selectedCampusId && selectedCampusId !== "all") {
-    // Global/CMO admin with no explicit role assignments can access any campus;
-    // scoped staff can only select campuses in their accessible list.
     if (accessible.length === 0 || accessible.includes(selectedCampusId)) {
       return selectedCampusId;
     }
@@ -282,18 +324,21 @@ export async function requireRoleOnCampus(
 }
 
 /**
- * True when a session reads as org-wide / CMO-level access under this app's
- * existing convention: zero rows in user_campus_role. That empty map is not
- * "no access" — it's the established signal (already load-bearing across
- * app/staff/pipeline, /today, /recruitment, /applications, /equity, /funnel:
- * see each page's `accessibleIds.length === 0 || accessibleIds.includes(...)`
- * campus-filter bypass) that this staff member isn't scoped to any single
- * campus and therefore sees everything. A scoped staff member — even a
- * system_admin on their one campus — has at least one row and reads false
- * here.
+ * True when a session reads as org-wide / CMO-level access.
+ *
+ * The convention, stated once for the whole app: org-wide / CMO access means
+ * system_admin on 2 or more campuses (isCMOAdmin). Zero campus roles means NO
+ * access, not org-wide access, and never reaches here — requireStaffSession
+ * denies such a session at the door.
+ *
+ * This replaces an earlier reading in which zero user_campus_role rows was
+ * taken as the org-wide signal. That was wrong in both directions. It denied
+ * the actual CMO, who holds system_admin on every campus and therefore has
+ * rows; and it granted everything to a half-provisioned or half-deprovisioned
+ * account, which is exactly the shape that lands at zero rows.
  */
 export function hasNetworkAccess(session: AuthSession): boolean {
-  return getAccessibleCampusIds(session).length === 0;
+  return isCMOAdmin(session);
 }
 
 /**

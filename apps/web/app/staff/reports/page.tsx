@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { ReportsClient } from "./reports-client";
-import { requireMinRole, hasMinRole, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { requireMinRole, hasMinRole, getAccessibleCampusIds, resolveActiveCampus, hasNetworkAccess } from "@/lib/auth/get-session";
 import { getCampusLensId } from "@/lib/campus-lens";
 import { SectionTabs } from "@/components/layout/section-tabs";
 import { INSIGHTS_TABS } from "@/lib/section-tabs";
@@ -218,11 +218,11 @@ export default async function StaffReportsPage({
     ? INSIGHTS_TABS
     : INSIGHTS_TABS.filter((t) => t.href === "/staff/reports");
 
-  // Same org-wide convention as the campus filters above this line
-  // (accessibleIds.length === 0 = no single-campus scoping = CMO-level
-  // access): only surface the Network view link to a staff member who can
-  // actually see the network. A scoped enrollment_manager gets none.
-  const showNetworkLink = accessibleIds.length === 0;
+  // Network/CMO access is system_admin on two or more campuses
+  // (hasNetworkAccess === isCMOAdmin, see lib/auth/get-session.ts). It used to
+  // be inferred from an empty campus list, which both denied the real CMO and
+  // let a half-provisioned account read as org-wide.
+  const showNetworkLink = hasNetworkAccess(session);
 
   return (
     <div className="space-y-6">

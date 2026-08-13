@@ -2,6 +2,11 @@ import { cache } from "react";
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { formatRelativeTime } from "./utils";
 import { getGradeLabel } from "@/lib/application-helpers";
+import {
+  TIER_SIBLING_ABSOLUTE,
+  TIER_LINKED_SIBLING,
+  TIER_GENERAL,
+} from "@/lib/lottery-draw";
 
 // ─── Document Types ─────────────────────────────────────
 
@@ -351,13 +356,36 @@ export async function getRegistrationSummary(
 /**
  * Per-application journey data for the family dashboard cards.
  *
- * Uses the user-scoped server client: RLS (app_family / offer_family /
- * student_own) restricts rows to the authenticated guardian's household, so
- * no service-role access is needed for this family-facing read. Two queries
- * total — applications with joins, then pending offers for those apps.
+ * Uses the user-scoped server client, but does NOT lean on RLS alone for
+ * ownership. The application table's family policy is ORed with a staff
+ * policy, so a dual-role account — staff who is also a guardian on an
+ * application, which happens on a small network — passed the staff arm and
+ * had every family's children rendered onto their own family dashboard. The
+ * explicit guardian_id predicate below is the real ownership check; RLS stays
+ * as the second lock behind it. Mirrors getFamilyDashboardApps.
  */
 export async function getFamilyJourneyCards(): Promise<FamilyJourneyCard[]> {
   const supabase = await createServerClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  // Resolve this user's own guardian records. Filtering by user_id here is
+  // what keeps the staff RLS arm from widening the read below.
+  const { data: guardians, error: guardianError } = await supabase
+    .from("guardian")
+    .select("id")
+    .eq("user_id", user.id);
+
+  if (guardianError) {
+    console.error("[getFamilyJourneyCards] guardian", guardianError.message);
+    return [];
+  }
+  if (!guardians || guardians.length === 0) return [];
+
+  const guardianIds = guardians.map((g: Record<string, unknown>) => g.id as string);
 
   const { data: apps, error } = await supabase
     .from("application")
@@ -370,6 +398,7 @@ export async function getFamilyJourneyCards(): Promise<FamilyJourneyCard[]> {
       enrollment_window:enrollment_window_id (open_date, close_date)
     `
     )
+    .in("guardian_id", guardianIds)
     .order("updated_at", { ascending: false })
     .limit(20);
 
@@ -1033,6 +1062,25 @@ export interface LotteryOutcome {
 const DEFAULT_TIER_LABEL = "Sibling enrolled at campus";
 
 /**
+ * Band labels for a GOVERNED run — one whose lottery_run.policy_snapshot is
+ * set. A governed run draws in three fixed bands keyed by the tier constants
+ * in lib/lottery-draw.ts, not in the free-form tiers of a lottery_rule_set,
+ * so reading its priority_tier through extractTierLabels below mislabels the
+ * family's own result (a linked sibling shown as the rule set's second
+ * custom tier, and so on).
+ *
+ * Deliberately re-declared here rather than imported from
+ * lib/mutations/lottery.ts: a query module must not depend on a mutation
+ * module. The constants themselves come from lib/lottery-draw.ts, which both
+ * sides already share, so the band numbering cannot drift.
+ */
+const GOVERNED_BAND_LABELS: Record<number, string> = {
+  [TIER_SIBLING_ABSOLUTE]: "Sibling of a currently enrolled student",
+  [TIER_LINKED_SIBLING]: "Sibling pulled in by the linked-sibling rule",
+  [TIER_GENERAL]: "General weighted pool",
+};
+
+/**
  * Defensively pull tier labels out of a rule set's priority_tiers JSONB.
  * Falls back to the single sibling-priority label when the array is
  * missing, empty, or malformed. Mirrors the extraction used in
@@ -1052,28 +1100,45 @@ function extractTierLabels(raw: unknown): string[] {
 /**
  * Fetch a family's lottery result for a single application.
  *
- * Ownership is proven FIRST via the RLS user client — the application read
- * is scoped to the guardian's household by RLS (same pattern as every other
- * family query in this file). Only once that row comes back do we escalate
- * to the service-role client to read the lottery snapshot/run, because that
- * read needs cross-table access (rule set tiers, other waitlist entries)
- * that family RLS rightly forbids. If the RLS read returns nothing — the
- * application doesn't exist, or belongs to another family — we return null
- * and never touch service-role data. Fails closed.
+ * Ownership is proven FIRST, by an explicit guardian walk on the caller's
+ * authenticated user id, and only then via the RLS user client as a second
+ * lock. RLS alone was not enough here: the application policy ORs the family
+ * arm with a staff arm, so a dual-role account (staff who is also a guardian
+ * elsewhere) satisfied it for any application in the network and could read
+ * another family's lottery result by id. Only once ownership holds do we
+ * escalate to the service-role client for the snapshot/run, because that read
+ * needs cross-table access (policy snapshot, rule set tiers, other waitlist
+ * entries) family RLS rightly forbids. Fails closed at every step.
  */
-export async function getLotteryOutcome(applicationId: string): Promise<LotteryOutcome | null> {
+export async function getLotteryOutcome(
+  applicationId: string,
+  userId: string
+): Promise<LotteryOutcome | null> {
   const supabase = await createServerClient();
+
+  const { data: guardians, error: guardianError } = await supabase
+    .from("guardian")
+    .select("id")
+    .eq("user_id", userId);
+
+  if (guardianError) {
+    console.error("[getLotteryOutcome] guardian", guardianError.message);
+    return null;
+  }
+  if (!guardians || guardians.length === 0) return null;
+  const guardianIds = guardians.map((g: Record<string, unknown>) => g.id as string);
 
   const { data: app, error } = await supabase
     .from("application")
     .select(
       `
-      id, campus_id, status,
+      id, campus_id, status, guardian_id,
       student:student_id (first_name),
       campus:campus_id (name)
     `
     )
     .eq("id", applicationId)
+    .in("guardian_id", guardianIds)
     .maybeSingle();
 
   if (error || !app) return null; // ownership fails closed
@@ -1084,6 +1149,24 @@ export async function getLotteryOutcome(applicationId: string): Promise<LotteryO
   const campusName = campus?.name ?? "";
 
   const service = createServiceRoleClient();
+
+  // "Your result isn't posted yet" — the honest answer for an application
+  // with no snapshot, and for one whose only snapshot belongs to a run that
+  // is not an official result. Shared so both paths say the same thing.
+  const noResultYet: LotteryOutcome = {
+    hasResult: false,
+    studentFirstName,
+    campusName,
+    isSelected: false,
+    gradeLabel: "",
+    totalApplicants: 0,
+    totalSeats: 0,
+    tierLabel: "",
+    randomNumber: null,
+    seedFingerprint: null,
+    executedAt: null,
+    waitlist: null,
+  };
 
   const { data: snapshot, error: snapshotError } = await service
     .from("lottery_entry_snapshot")
@@ -1097,28 +1180,14 @@ export async function getLotteryOutcome(applicationId: string): Promise<LotteryO
     console.error("[getLotteryOutcome] snapshot", snapshotError.message);
   }
 
-  if (!snapshot) {
-    return {
-      hasResult: false,
-      studentFirstName,
-      campusName,
-      isSelected: false,
-      gradeLabel: "",
-      totalApplicants: 0,
-      totalSeats: 0,
-      tierLabel: "",
-      randomNumber: null,
-      seedFingerprint: null,
-      executedAt: null,
-      waitlist: null,
-    };
-  }
+  if (!snapshot) return noResultYet;
 
   const { data: run, error: runError } = await service
     .from("lottery_run")
     .select(
       `
-      id, executed_at, random_seed, total_applicants, total_seats, lottery_rule_set_id,
+      id, status, is_rehearsal, policy_snapshot,
+      executed_at, random_seed, total_applicants, total_seats, lottery_rule_set_id,
       grade_level:grade_level_id (grade)
     `
     )
@@ -1130,25 +1199,48 @@ export async function getLotteryOutcome(applicationId: string): Promise<LotteryO
   }
 
   const runRow = run as Record<string, unknown> | null;
-  const runGrade = runRow?.grade_level as unknown as Record<string, string> | null;
-  const gradeLabel = runGrade?.grade ? getGradeLabel(runGrade.grade) : "";
 
-  let tierLabels: string[] = [DEFAULT_TIER_LABEL];
-  if (runRow?.lottery_rule_set_id) {
-    const { data: ruleSet } = await service
-      .from("lottery_rule_set")
-      .select("priority_tiers")
-      .eq("id", runRow.lottery_rule_set_id as string)
-      .maybeSingle();
-    tierLabels = extractTierLabels((ruleSet as Record<string, unknown> | null)?.priority_tiers);
+  // A snapshot row existing is NOT the same as a family having a result.
+  // Preview draws and dress rehearsals write snapshots too, and staff re-run
+  // them freely before going official — showing those to a parent tells them
+  // they got a seat (or did not) from a draw that carries no standing and may
+  // be re-run tomorrow with a different outcome. Only an official,
+  // non-rehearsal run is a result. Anything else, including a run row that
+  // failed to load, reads as not posted yet.
+  if (
+    !runRow ||
+    (runRow.status as string) !== "official" ||
+    (runRow.is_rehearsal as boolean) === true
+  ) {
+    return noResultYet;
   }
 
+  const runGrade = runRow.grade_level as unknown as Record<string, string> | null;
+  const gradeLabel = runGrade?.grade ? getGradeLabel(runGrade.grade) : "";
+
   const tierIndex = snapshot.priority_tier as number;
-  const tierLabel =
-    tierIndex >= 0 && tierIndex < tierLabels.length ? tierLabels[tierIndex] : "General pool";
+  let tierLabel: string;
+
+  if (runRow.policy_snapshot) {
+    // Governed run: priority_tier is a fixed band, not an index into the
+    // rule set's custom tier array. See GOVERNED_BAND_LABELS above.
+    tierLabel = GOVERNED_BAND_LABELS[tierIndex] ?? GOVERNED_BAND_LABELS[TIER_GENERAL];
+  } else {
+    let tierLabels: string[] = [DEFAULT_TIER_LABEL];
+    if (runRow.lottery_rule_set_id) {
+      const { data: ruleSet } = await service
+        .from("lottery_rule_set")
+        .select("priority_tiers")
+        .eq("id", runRow.lottery_rule_set_id as string)
+        .maybeSingle();
+      tierLabels = extractTierLabels((ruleSet as Record<string, unknown> | null)?.priority_tiers);
+    }
+    tierLabel =
+      tierIndex >= 0 && tierIndex < tierLabels.length ? tierLabels[tierIndex] : "General pool";
+  }
 
   const isSelected = snapshot.is_selected as boolean;
-  const randomSeed = runRow?.random_seed as string | null;
+  const randomSeed = runRow.random_seed as string | null;
 
   let waitlist: WaitlistStanding | null = null;
   if (!isSelected) {
@@ -1162,12 +1254,12 @@ export async function getLotteryOutcome(applicationId: string): Promise<LotteryO
     campusName,
     isSelected,
     gradeLabel,
-    totalApplicants: (runRow?.total_applicants as number) ?? 0,
-    totalSeats: (runRow?.total_seats as number) ?? 0,
+    totalApplicants: (runRow.total_applicants as number) ?? 0,
+    totalSeats: (runRow.total_seats as number) ?? 0,
     tierLabel,
     randomNumber: (snapshot.random_number as number) ?? null,
     seedFingerprint: randomSeed ? randomSeed.slice(0, 8) : null,
-    executedAt: (runRow?.executed_at as string) ?? null,
+    executedAt: (runRow.executed_at as string) ?? null,
     waitlist,
   };
 }

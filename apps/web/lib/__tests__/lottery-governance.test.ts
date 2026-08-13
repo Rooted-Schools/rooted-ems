@@ -18,9 +18,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { supabaseMock, hasEqFilter, type RecordedOp } from "./helpers/supabase-mock";
 
+// Default: a channel actually delivered, so the fan-out counts these as
+// "sent". Individual tests override with mockRejectedValueOnce / a
+// no-delivery object to exercise the failure path.
 const { notifyOfferMock, notifyWaitlistMock } = vi.hoisted(() => ({
-  notifyOfferMock: vi.fn(async () => {}),
-  notifyWaitlistMock: vi.fn(async () => {}),
+  notifyOfferMock: vi.fn(async () => ({ inApp: true, email: true, sms: false })),
+  notifyWaitlistMock: vi.fn(async () => ({ inApp: true, email: true, sms: false })),
 }));
 
 vi.mock("@rooted-ems/database/server", async () => {
@@ -67,6 +70,11 @@ vi.mock("@/lib/audit", () => ({
 vi.mock("@/lib/notify", () => ({
   notifyFamilyOfOffer: notifyOfferMock,
   notifyFamilyApplicationWaitlisted: notifyWaitlistMock,
+  // The fan-out only marks a ledger row "sent" when a channel actually
+  // delivered — read what notifyOfferMock/notifyWaitlistMock resolve to,
+  // exactly like the real notify.ts helper does.
+  anyChannelDelivered: (delivery: { inApp: boolean; email: boolean; sms: boolean }) =>
+    delivery.inApp || delivery.email || delivery.sms,
 }));
 
 import {
@@ -429,7 +437,9 @@ describe("finalize — commit order and crash recovery", () => {
       ],
       error: null,
     });
-    supabaseMock.queueResult("lottery_run", { data: null, error: null }); // status update
+    // The status-flip update now carries .select("id"); an empty result is
+    // treated as "nothing flipped", so the compare-and-swap must return the row.
+    supabaseMock.queueResult("lottery_run", { data: [{ id: "run-1" }], error: null }); // status update
 
     const result = await finalizeLotteryRun("run-1", "user-1");
     expect(result.error).toBeNull();
@@ -470,7 +480,7 @@ describe("finalize — commit order and crash recovery", () => {
       ],
       error: null,
     });
-    supabaseMock.queueResult("lottery_run", { data: null, error: null });
+    supabaseMock.queueResult("lottery_run", { data: [{ id: "run-1" }], error: null });
 
     await finalizeLotteryRun("run-1", "user-1");
 
@@ -483,7 +493,7 @@ describe("finalize — commit order and crash recovery", () => {
     // The crashed attempt already wrote snapshots; the run is still in preview.
     queueGovernedPreviewRun();
     supabaseMock.queueResult("lottery_entry_snapshot", { data: [{ id: "snap-1" }], error: null });
-    supabaseMock.queueResult("lottery_run", { data: null, error: null });
+    supabaseMock.queueResult("lottery_run", { data: [{ id: "run-1" }], error: null });
 
     const result = await finalizeLotteryRun("run-1", "user-1");
 

@@ -223,7 +223,7 @@ export function EventDetailClient({
                             type="button"
                             onClick={() => checkIn(r.id)}
                             disabled={isPending || r.status === "cancelled"}
-                            className="text-xs px-2 py-1.5 min-h-[32px] rounded border border-stone/30 text-ink/70 hover:border-rooted-green hover:text-rooted-green transition-colors disabled:opacity-40"
+                            className="text-xs px-3 min-h-[44px] rounded-[6px] border border-stone/30 text-ink/70 hover:border-rooted-green hover:text-rooted-green transition-colors disabled:opacity-40"
                           >
                             Check in
                           </button>
@@ -236,7 +236,7 @@ export function EventDetailClient({
                           type="button"
                           onClick={() => setStatus(r.id, "attended")}
                           disabled={isPending}
-                          className={`text-xs px-2 py-1 rounded border transition-colors ${
+                          className={`text-xs px-3 min-h-[44px] rounded-[6px] border transition-colors ${
                             r.status === "attended"
                               ? "bg-rooted-green text-white border-rooted-green"
                               : "border-stone/30 text-ink/70 hover:border-rooted-green"
@@ -248,7 +248,7 @@ export function EventDetailClient({
                           type="button"
                           onClick={() => setStatus(r.id, "no_show")}
                           disabled={isPending}
-                          className={`text-xs px-2 py-1 rounded border transition-colors ${
+                          className={`text-xs px-3 min-h-[44px] rounded-[6px] border transition-colors ${
                             r.status === "no_show"
                               ? "bg-stone/70 text-white border-stone/70"
                               : "border-stone/30 text-ink/70 hover:border-stone/50"

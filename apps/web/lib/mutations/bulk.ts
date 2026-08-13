@@ -2,7 +2,7 @@ import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { isValidTransition, type ApplicationStatusValue } from "@rooted-ems/utils";
 import type { AuthSession } from "@rooted-ems/types";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
-import { requireStaffSession } from "@/lib/auth/get-session";
+import { hasRoleOnCampus, requireStaffSession } from "@/lib/auth/get-session";
 import { sendOffer } from "./offers";
 import {
   notifyFamilyApplicationVerified,
@@ -30,6 +30,14 @@ export const MAX_BULK_ITEMS = 500;
 const OUT_OF_SCOPE = "Not on a campus you can access";
 
 /**
+ * Message for rows on a campus the caller CAN see but at a role below the one
+ * the equivalent single-item action requires. Distinct from OUT_OF_SCOPE
+ * because it is a different fact and a different fix.
+ */
+const BELOW_REQUIRED_ROLE =
+  "Sending offers at this campus requires the enrollment manager role";
+
+/**
  * Campus ids this staff user may act on. An empty list means an org-level
  * admin with no per-campus rows — no restriction, same convention as
  * getAccessibleCampusIds. Read straight off the session here so this module
@@ -43,6 +51,21 @@ function accessibleCampusIds(session: AuthSession): string[] {
 function isOutOfScope(accessible: string[], campusId: unknown): boolean {
   if (accessible.length === 0) return false;
   return typeof campusId !== "string" || !accessible.includes(campusId);
+}
+
+/**
+ * True when the caller holds at least `minRole` on the row's campus. Honors
+ * the same org-level convention as isOutOfScope: a session with no campus
+ * rows is a CMO-level admin and is not restricted per campus.
+ */
+function meetsRoleOnCampus(
+  session: AuthSession,
+  accessible: string[],
+  campusId: unknown,
+  minRole: string
+): boolean {
+  if (accessible.length === 0) return true;
+  return hasRoleOnCampus(session, campusId as string, minRole);
 }
 
 function dedupeAndValidateIds(applicationIds: string[]): string[] {
@@ -190,6 +213,11 @@ export async function bulkChangeApplicationStatus(
  *
  * Per item:
  *   - Items outside the caller's campus access are skipped and reported.
+ *   - Items on an accessible campus where the caller is below
+ *     enrollment_manager are skipped and reported. The single-offer path
+ *     (staffSendOffer) has always required enrollment_manager on the
+ *     application's campus; this ran at any-staff, so selecting rows in the
+ *     applications table was a way around the gate on the button.
  *   - Fetches campus/grade server-side (never trusts client placement data).
  *   - Pre-checks for an existing pending offer and skips with a friendly
  *     message — the production unique index on pending offers would reject
@@ -232,6 +260,12 @@ export async function bulkSendOffers(
       // it must never fire on a campus this user does not administer.
       if (isOutOfScope(accessible, app.campus_id)) {
         results.push({ id: applicationId, ok: false, error: OUT_OF_SCOPE });
+        continue;
+      }
+
+      // ── Role on THIS campus — same bar as the single-offer action ─────────
+      if (!meetsRoleOnCampus(session, accessible, app.campus_id, "enrollment_manager")) {
+        results.push({ id: applicationId, ok: false, error: BELOW_REQUIRED_ROLE });
         continue;
       }
 

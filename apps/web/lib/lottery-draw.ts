@@ -106,6 +106,12 @@ export interface DrawResult {
   /** Tickets in the expanded pool for the weighted portion of the draw. */
   totalPoolEntries: number;
   selectedCount: number;
+  /**
+   * Siblings actually SEATED before the draw. A sibling carrying the
+   * "sibling_auto" placement who fell outside the seat count was not placed —
+   * counting them here told a board that more sibling seats were awarded than
+   * the grade even has.
+   */
   siblingAutoPlaced: number;
   siblingPriorityWaitlisted: number;
   linkedSiblingActivated: number;
@@ -303,7 +309,7 @@ export function runPolicyDraw(
     totalApplicants: entries.length,
     totalPoolEntries: expandWeightedPool(remaining).length,
     selectedCount: ranked.filter((r) => r.is_selected).length,
-    siblingAutoPlaced: ranked.filter((r) => r.placement === "sibling_auto").length,
+    siblingAutoPlaced: ranked.filter((r) => r.placement === "sibling_auto" && r.is_selected).length,
     siblingPriorityWaitlisted: ranked.filter((r) => r.placement === "sibling_priority_waitlist")
       .length,
     linkedSiblingActivated,

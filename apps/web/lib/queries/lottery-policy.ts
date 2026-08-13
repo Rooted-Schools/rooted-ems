@@ -30,19 +30,22 @@ export interface LotteryPolicyRow {
 }
 
 /**
- * True when a PostgREST error is "this relation does not exist" — i.e. the
- * migration has not been applied. Anything else is a real failure and must not
- * be swallowed into a false "no policy" answer.
+ * Error codes that mean "the schema does not have this yet":
+ *   42P01    undefined_table
+ *   42703    undefined_column
+ *   PGRST205 PostgREST could not find the table in its schema cache
+ *
+ * Matched on code alone, deliberately. The previous version also matched any
+ * message containing "does not exist", which swallowed real failures — a
+ * missing row, a missing function, a foreign key pointing at a record that
+ * does not exist — and reported them all as "no adopted policy". A campus
+ * would then look ungoverned because of an unrelated database error.
  */
+const MISSING_RELATION_CODES = new Set(["42P01", "42703", "PGRST205"]);
+
 export function isMissingRelation(error: { message?: string; code?: string } | null): boolean {
   if (!error) return false;
-  if (error.code === "42P01") return true;
-  const message = (error.message ?? "").toLowerCase();
-  return (
-    message.includes("does not exist") ||
-    message.includes("could not find the table") ||
-    message.includes("schema cache")
-  );
+  return !!error.code && MISSING_RELATION_CODES.has(error.code);
 }
 
 export interface AdoptedPolicy {

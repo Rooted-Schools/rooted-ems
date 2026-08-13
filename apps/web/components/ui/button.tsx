@@ -15,7 +15,7 @@ export interface ButtonProps
 
 const buttonVariants = {
   default: "bg-rooted-green text-white hover:bg-deep-green",
-  destructive: "bg-red-600 text-white hover:bg-red-700",
+  destructive: "bg-error text-white hover:bg-error/90",
   outline:
     "border border-stone/30 bg-white text-ink hover:bg-rooted-gray-light",
   secondary: "bg-rooted-gray-light text-ink hover:bg-rooted-gray",
@@ -23,11 +23,15 @@ const buttonVariants = {
   link: "text-rooted-green hover:text-deep-green",
 };
 
+// Heights meet the 44px touch-target minimum at `default`, `lg`, and `icon`.
+// `sm` stays below it deliberately: it exists for dense table rows where a
+// 44px control would break the row rhythm. A `sm` button that is the primary
+// action of its row should carry its own min-h-[44px], not shrink the rest.
 const buttonSizes = {
-  default: "h-10 px-4 py-2",
-  sm: "h-8 px-3 text-sm",
+  default: "h-11 px-4 py-2",
+  sm: "h-9 px-3 text-sm",
   lg: "h-12 px-6 text-lg",
-  icon: "h-10 w-10",
+  icon: "h-11 w-11",
 };
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -35,7 +39,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         className={cn(
-          "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rooted-green focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+          "inline-flex items-center justify-center whitespace-nowrap rounded-[6px] text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rooted-green focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
           buttonVariants[variant],
           buttonSizes[size],
           className

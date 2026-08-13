@@ -67,7 +67,95 @@ export const POLICY_COLLECTED_ANSWER_KEYS: readonly string[] = [
   "e_signature_name",
   "e_signature_date",
   "guardian_relationship_other",
+  "is_staff_child",
+  "is_frl_qualifying",
 ];
+
+/**
+ * Answer keys that exist ONLY because a board-adopted policy declares a
+ * weighted tier sourced from them. The family form asks these questions on a
+ * campus whose adopted policy declares them, and nowhere else: a campus whose
+ * board has not adopted the tier must not be quietly collecting the data for
+ * it. See policyQuestionFlags below for the gate.
+ */
+export const POLICY_TIER_QUESTION_KEYS = ["is_staff_child", "is_frl_qualifying"] as const;
+
+export type PolicyTierQuestionKey = (typeof POLICY_TIER_QUESTION_KEYS)[number];
+
+/** Which policy-driven questions a campus's form should render. */
+export type PolicyQuestionFlags = Record<PolicyTierQuestionKey, boolean>;
+
+/** No adopted policy, or an adopted policy that declares neither tier. */
+export const NO_POLICY_QUESTIONS: PolicyQuestionFlags = {
+  is_staff_child: false,
+  is_frl_qualifying: false,
+};
+
+// ─── Answer value encoding ─────────────────────────────────────────────────
+
+/**
+ * Normalize one application_answer.value into the value it was meant to be.
+ *
+ * application_answer.value is JSONB. Three encodings exist in the wild because
+ * the write path used to JSON.stringify before handing the value to
+ * supabase-js, which then serialized the result a second time:
+ *
+ *   1. raw            -> boolean true            (what the fixed writes store)
+ *   2. legacy boolean -> the string "true"       (JSONB string, not a boolean)
+ *   3. legacy string  -> the string "\"Ada\""    (double-encoded text)
+ *
+ * All three read back as the same fact, and the reader must not care which one
+ * it got: a family whose consent was stored under encoding 2 had that consent,
+ * and a form that compares it to `true` and finds a string erases it.
+ *
+ * Booleans (and the strings "true"/"false") come back as booleans; everything
+ * else comes back as a string with any legacy JSON quoting peeled off.
+ */
+export function normalizeAnswerValue(value: unknown): boolean | string {
+  if (typeof value === "boolean") return value;
+  if (value === null || value === undefined) return "";
+  if (typeof value !== "string") return String(value);
+
+  // Peel at most two layers of JSON quoting. Two is the depth the old
+  // double-encoding could produce; more than that is not something this system
+  // ever wrote, and guessing further would be inventing data.
+  let current = value;
+  for (let depth = 0; depth < 2; depth++) {
+    const trimmed = current.trim();
+    if (trimmed === "true") return true;
+    if (trimmed === "false") return false;
+    if (trimmed.length < 2 || !trimmed.startsWith('"') || !trimmed.endsWith('"')) {
+      return current;
+    }
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      if (typeof parsed === "boolean") return parsed;
+      if (typeof parsed !== "string") return current;
+      current = parsed;
+    } catch {
+      return current;
+    }
+  }
+  return current;
+}
+
+/**
+ * True when an answer reads as yes. Matches the lottery matcher's accepted
+ * values (yes / true) so a form checkbox and a weighted tier never disagree
+ * about the same stored answer.
+ */
+export function isAffirmativeAnswer(value: unknown): boolean {
+  const normalized = normalizeAnswerValue(value);
+  if (typeof normalized === "boolean") return normalized;
+  const text = normalized.trim().toLowerCase();
+  return text === "true" || text === "yes";
+}
+
+/** An answer read back as display/edit text. Booleans render as true/false. */
+export function answerAsText(value: unknown): string {
+  const normalized = normalizeAnswerValue(value);
+  return typeof normalized === "boolean" ? String(normalized) : normalized;
+}
 
 // ─── Absolute preferences ──────────────────────────────────────────────────
 
@@ -536,6 +624,38 @@ export function isLotteryPolicyConfigValid(raw: unknown): boolean {
 /** Weighted tiers that are switched on, in declaration order. */
 export function enabledWeightedTiers(config: LotteryPolicyConfig): LotteryPolicyWeightedTier[] {
   return config.weightedTiers.filter((t) => t.enabled);
+}
+
+/**
+ * True when an enabled weighted tier in this policy is sourced from the named
+ * application_answer key. This is the ONLY thing that turns a policy-driven
+ * question on in the family form: the question follows the board's adopted
+ * text, not a hard-coded campus list.
+ */
+export function policyDeclaresAnswerField(
+  config: LotteryPolicyConfig,
+  field: string
+): boolean {
+  return enabledWeightedTiers(config).some(
+    (tier) => tier.source.kind === "application_answer" && tier.source.field === field
+  );
+}
+
+/**
+ * Which policy-driven questions the family form should ask for a campus.
+ *
+ * Pass the campus's ADOPTED policy config, or null. A draft policy is not a
+ * policy: a board that has not adopted the tier has not authorized asking the
+ * question, so a null config asks nothing.
+ */
+export function policyQuestionFlags(
+  config: LotteryPolicyConfig | null | undefined
+): PolicyQuestionFlags {
+  if (!config) return { ...NO_POLICY_QUESTIONS };
+  return {
+    is_staff_child: policyDeclaresAnswerField(config, "is_staff_child"),
+    is_frl_qualifying: policyDeclaresAnswerField(config, "is_frl_qualifying"),
+  };
 }
 
 /** The sibling absolute preference, when the policy has one enabled. */

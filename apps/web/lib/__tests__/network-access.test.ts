@@ -16,13 +16,12 @@ vi.mock("@rooted-ems/database/server", () => ({
 const { hasNetworkAccess } = await import("@/lib/auth/get-session");
 
 /**
- * hasNetworkAccess gates /staff/network. The convention it relies on
- * (zero campus_role rows = org-wide/CMO access) is already load-bearing
- * across app/staff/{today,pipeline,recruitment,applications,equity,funnel}
- * — those pages all bypass their campus filter on
- * `accessibleIds.length === 0`. This pins the same read for the network
- * page's gate, including the case a naive "highest role" check would get
- * wrong: a system_admin scoped to exactly one campus is NOT network-wide.
+ * hasNetworkAccess gates /staff/network and the sidebar's Network item.
+ *
+ * It used to read "zero campus_role rows = org-wide access". That was wrong
+ * in both directions and these tests now pin the corrected convention:
+ * org-wide / CMO access is system_admin on 2 or more campuses, and zero
+ * campus roles is no access at all.
  */
 function session(campusRoles: Record<string, string[]>): AuthSession {
   return {
@@ -35,17 +34,48 @@ function session(campusRoles: Record<string, string[]>): AuthSession {
 }
 
 describe("hasNetworkAccess", () => {
-  it("grants access to a session with zero campus_role rows", () => {
-    expect(hasNetworkAccess(session({}))).toBe(true);
+  it("grants a system_admin on two campuses", () => {
+    expect(
+      hasNetworkAccess(session({ "campus-a": ["system_admin"], "campus-b": ["system_admin"] }))
+    ).toBe(true);
+  });
+
+  it("grants the real CMO: system_admin on all three campuses", () => {
+    expect(
+      hasNetworkAccess(
+        session({
+          "campus-a": ["system_admin"],
+          "campus-b": ["system_admin"],
+          "campus-c": ["system_admin"],
+        })
+      )
+    ).toBe(true);
+  });
+
+  it("denies a session with zero campus_role rows", () => {
+    // The half-provisioned / half-deprovisioned shape. Under the old reading
+    // this was the one session that saw everything.
+    expect(hasNetworkAccess(session({}))).toBe(false);
   });
 
   it("denies a system_admin scoped to exactly one campus", () => {
     expect(hasNetworkAccess(session({ "campus-a": ["system_admin"] }))).toBe(false);
   });
 
-  it("denies a staff member scoped to multiple campuses", () => {
+  it("denies a staff member on multiple campuses without system_admin on two", () => {
     expect(
-      hasNetworkAccess(session({ "campus-a": ["enrollment_manager"], "campus-b": ["enrollment_staff"] }))
+      hasNetworkAccess(
+        session({ "campus-a": ["enrollment_manager"], "campus-b": ["enrollment_staff"] })
+      )
+    ).toBe(false);
+  });
+
+  it("denies a system_admin on one campus who is merely staff on another", () => {
+    // Breadth is not the test — two system_admin rows are.
+    expect(
+      hasNetworkAccess(
+        session({ "campus-a": ["system_admin"], "campus-b": ["enrollment_manager"] })
+      )
     ).toBe(false);
   });
 });

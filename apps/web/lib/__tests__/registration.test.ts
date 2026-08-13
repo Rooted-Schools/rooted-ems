@@ -150,7 +150,16 @@ describe("submitRegistrationPacket", () => {
         error: null,
       }
     );
-    supabaseMock.queueResult("packet_requirement", { data: [], error: null });
+    // Two separate packet_requirement queries, in order: (1) the active-
+    // requirements guard — must be non-empty or submission is refused
+    // outright (NO_REQUIREMENTS_ERROR); (2) the is_required-only lookup used
+    // to decide whether anything still blocks. Here nothing is marked
+    // required, so the pending-items check is skipped entirely.
+    supabaseMock.queueResult(
+      "packet_requirement",
+      { data: [{ item_type: "immunization_record" }], error: null }, // active requirements guard
+      { data: [], error: null } // required-only lookup — nothing required
+    );
     supabaseMock.queueResult("registration_packet", { data: null, error: null });
 
     const result = await submitRegistrationPacket(ENROLLMENT_ID);
@@ -173,10 +182,11 @@ describe("submitRegistrationPacket", () => {
         error: null,
       }
     );
-    supabaseMock.queueResult("packet_requirement", {
-      data: [{ item_type: "immunization_record" }],
-      error: null,
-    });
+    supabaseMock.queueResult(
+      "packet_requirement",
+      { data: [{ item_type: "immunization_record" }], error: null }, // active requirements guard
+      { data: [{ item_type: "immunization_record" }], error: null } // required-only lookup
+    );
     supabaseMock.queueResult("registration_item", {
       data: [{ id: "item-9", item_type: "immunization_record" }],
       error: null,
@@ -185,6 +195,30 @@ describe("submitRegistrationPacket", () => {
     const result = await submitRegistrationPacket(ENROLLMENT_ID);
 
     expect(result.error).toBe("1 required item(s) still need to be completed.");
+    expect(supabaseMock.writes()).toHaveLength(0);
+  });
+
+  it("refuses to submit — and treats the packet as complete on nothing — when the campus/year has zero active packet requirements", async () => {
+    // The hard error this refusal exists for: an empty requirement set makes
+    // every "nothing is still pending" check pass vacuously, so a packet
+    // with zero items would otherwise read as complete and the family would
+    // be marked fully registered without submitting anything.
+    supabaseMock.setUser(OWNER);
+    supabaseMock.queueResult(
+      "enrollment",
+      enrollmentOwnershipRow(OWNER.id),
+      {
+        data: { campus_id: "c-1", school_year_id: "sy-1", application_id: "app-1" },
+        error: null,
+      }
+    );
+    supabaseMock.queueResult("packet_requirement", { data: [], error: null }); // active requirements guard — empty
+
+    const result = await submitRegistrationPacket(ENROLLMENT_ID);
+
+    expect(result.error).toBe(
+      "No registration requirements are configured for this school year. Add them in Settings before registering families."
+    );
     expect(supabaseMock.writes()).toHaveLength(0);
   });
 });

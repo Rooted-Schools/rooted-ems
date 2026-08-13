@@ -99,9 +99,11 @@ const WITHDRAWABLE = ["draft", "submitted", "needs_info", "verified", "lottery_a
 
 interface FamilyApplicationDetailClientProps {
   detail: ApplicationDetail;
+  /** Auth uid of the signed-in guardian — the key Storage upload paths are keyed on. */
+  userId: string;
 }
 
-export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetailClientProps) {
+export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicationDetailClientProps) {
   const router = useRouter();
   const { t, locale } = useLocale();
   const [isPending, startTransition] = useTransition();
@@ -196,7 +198,11 @@ export function FamilyApplicationDetailClient({ detail }: FamilyApplicationDetai
       }
       // Upload file if provided
       if (responseFile) {
-        const uploadResult = await uploadFile(responseFile, detail.guardian_id);
+        // uploadFile keys the storage path on the AUTH uid, which is what the
+        // bucket's INSERT policy compares against. Passing detail.guardian_id
+        // here (a guardian row id, never an auth uid) meant every needs-info
+        // reply upload was rejected by the policy. Mirrors documents-client.
+        const uploadResult = await uploadFile(responseFile, userId);
         if (uploadResult.error) {
           setInlineResponseFeedback({ type: "error", message: uploadResult.error });
           return;
