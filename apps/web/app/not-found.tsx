@@ -6,13 +6,21 @@ import { LanguageToggle } from "@/components/ui/language-toggle";
 import { IconSearch } from "@/components/ui/icons";
 
 /**
- * Public 404. These URLs end up on printed flyers and QR codes, so a
+ * App-wide 404. These URLs end up on printed flyers and QR codes, so a
  * mistyped or stale campus slug used to hit Next's bare unbranded English
- * 404 with no way back in. No initialLocale — this boundary can render for
- * any request, so the language toggle detects the saved preference
- * client-side after hydration, same as the ISR-cached landing pages.
+ * 404 with no way back in.
+ *
+ * This lives at the app root, NOT under (public), on purpose. A nested
+ * not-found boundary renders with a 200 status: Next only returns a real
+ * 404 from the root one. The e2e smoke suite asserts that status, because
+ * a soft 404 tells search engines and link checkers that a dead campus URL
+ * is a live page.
+ *
+ * No initialLocale: this boundary can render for any request, so the
+ * language toggle detects the saved preference client-side after
+ * hydration, same as the ISR-cached landing pages.
  */
-export default function PublicNotFound() {
+export default function NotFound() {
   return (
     <LocaleProvider>
       <NotFoundContent />
