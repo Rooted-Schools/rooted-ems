@@ -3,12 +3,13 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@rooted-ems/database";
+import { verifyStaffAccess } from "@/app/(public)/staff-login/actions";
 
 const ERROR_MESSAGES: Record<string, string> = {
   no_campus_access:
     "Your account is not assigned to any school campus. Please contact your school administrator to request access.",
   not_staff:
-    "This Google account is not set up as a staff account. Please contact your administrator to provision your access.",
+    "This account is not set up as a staff account. Staff access is granted by an administrator. Please contact your school administrator to request access.",
   auth_failed:
     "Authentication failed. Please try again or contact your administrator.",
 };
@@ -49,9 +50,25 @@ export function StaffLoginForm() {
       if (authError) {
         setError(authError.message);
         setLoading(false);
-      } else {
-        router.push("/staff/dashboard");
+        return;
       }
+
+      // Authenticating proves who someone is, not that they work here. A
+      // family with a password on this site, or anyone who has signed up,
+      // can reach this point. Confirm they are a provisioned staff member
+      // before letting the session stand, and sign them back out if not, so
+      // a rejected attempt does not leave a live session behind.
+      const access = await verifyStaffAccess();
+      if (!access.ok) {
+        await supabase.auth.signOut();
+        setError(
+          ERROR_MESSAGES[access.reason ?? "not_staff"] ?? ERROR_MESSAGES.not_staff
+        );
+        setLoading(false);
+        return;
+      }
+
+      router.push("/staff/today");
     } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);

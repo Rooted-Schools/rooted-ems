@@ -89,12 +89,10 @@ function LandingContent({ schools }: LandingClientProps) {
             >
               {t("public.familyLogin")}
             </Link>
-            <Link
-              href="/staff-login"
-              className="inline-flex min-h-[44px] items-center justify-center text-sm font-medium text-white bg-rooted-green hover:bg-deep-green transition-colors px-4 rounded-[6px]"
-            >
-              {t("public.staffLogin")}
-            </Link>
+            {/* No staff entry point on family-facing pages. Staff access is
+                granted by an administrator and reached at /staff-login
+                directly, so families are not offered a door that is not
+                theirs and cannot mistake it for their own sign-in. */}
           </div>
         </div>
       </header>
@@ -261,9 +259,6 @@ function LandingContent({ schools }: LandingClientProps) {
           <div className="flex items-center gap-6 text-xs text-white/60">
             <Link href="/login" className="hover:text-white transition-colors">
               {t("public.familyPortal")}
-            </Link>
-            <Link href="/staff-login" className="hover:text-white transition-colors">
-              {t("public.staffPortal")}
             </Link>
             <span>
               &copy; {new Date().getFullYear()} <span className="font-bold">rooted</span>schools

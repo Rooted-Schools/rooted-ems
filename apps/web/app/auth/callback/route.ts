@@ -60,20 +60,34 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}${errorRedirect}?error=auth_failed`);
   }
 
-  // For staff routes: verify the authenticated user has is_staff = true.
-  // A valid Google account is not the same as a provisioned staff account.
+  // For staff routes: a valid Google account is not a provisioned staff
+  // account. Staff access is granted by an administrator and requires BOTH
+  // the is_staff flag and at least one campus assignment, the same pair
+  // requireStaffSession enforces on every staff page. Checking only is_staff
+  // here let a flagged-but-unassigned account through the door and bounce
+  // later, which reads as a broken app rather than a denied account.
   if (!isFamily && sessionData?.user) {
     const adminClient = createServiceRoleClient();
     const { data: profile } = await adminClient
       .from("user_profile")
       .select("is_staff")
       .eq("id", sessionData.user.id)
-      .single();
+      .maybeSingle();
 
     if (!profile?.is_staff) {
       // Sign the user back out so they don't remain logged into a staff-less session
       await supabase.auth.signOut();
       return NextResponse.redirect(`${origin}/staff-login?error=not_staff`);
+    }
+
+    const { count: roleCount } = await adminClient
+      .from("user_campus_role")
+      .select("user_id", { count: "exact", head: true })
+      .eq("user_id", sessionData.user.id);
+
+    if (!roleCount || roleCount === 0) {
+      await supabase.auth.signOut();
+      return NextResponse.redirect(`${origin}/staff-login?error=no_campus_access`);
     }
   }
 

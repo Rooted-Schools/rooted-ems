@@ -119,12 +119,8 @@ function CampusLandingContent({ identity, campus, windowState }: CampusLandingCl
           >
             {t("public.familyLogin")}
           </Link>
-          <Link
-            href="/staff-login"
-            className="text-sm font-medium text-ink/60 hover:text-ink transition-colors px-2 py-2"
-          >
-            {t("public.staffLogin")}
-          </Link>
+          {/* Staff sign-in is not advertised on family-facing pages. See the
+              note in app/(public)/landing-client.tsx. */}
         </div>
       </header>
 
@@ -246,9 +242,6 @@ function CampusLandingContent({ identity, campus, windowState }: CampusLandingCl
           <div className="mt-6 flex items-center justify-center gap-6 text-xs text-white/60">
             <Link href="/login" className="hover:text-white transition-colors">
               {t("public.familyPortal")}
-            </Link>
-            <Link href="/staff-login" className="hover:text-white transition-colors">
-              {t("public.staffPortal")}
             </Link>
             <span>&copy; {new Date().getFullYear()} {campus.name}</span>
           </div>

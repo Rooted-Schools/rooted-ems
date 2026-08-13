@@ -382,14 +382,8 @@ export function FamilyLoginForm() {
           </form>
         )}
 
-        <div className="mt-6 text-center">
-          <a
-            href="/staff-login"
-            className="text-sm text-stone hover:text-ink/60 hover:underline"
-          >
-            {t("login.staffLogin")}
-          </a>
-        </div>
+        {/* The family sign-in page offers no staff link: this page belongs to
+            families, and a second sign-in option here invited the wrong one. */}
 
         <p className="mt-5 text-xs text-center text-stone/70 leading-relaxed">
           {t("login.ferpa")}
