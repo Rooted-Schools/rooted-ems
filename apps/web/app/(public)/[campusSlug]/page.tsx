@@ -1,9 +1,28 @@
 import { notFound } from "next/navigation";
 import { createServiceClient } from "@rooted-ems/database/service";
-import { getCampusIdentityBySlug } from "@/lib/campus-identity";
+import { getCampusIdentityBySlug, CAMPUS_IDENTITY_LIST } from "@/lib/campus-identity";
 import { CampusLandingClient, type CampusWindowState } from "./campus-landing-client";
 
 export const revalidate = 300; // revalidate every 5 minutes — same cadence as the network landing page
+
+/**
+ * The campus slugs are a closed set: lib/campus-identity.ts is the single
+ * source of truth and adding a campus is already a code change, so enumerate
+ * them rather than resolving arbitrary slugs at request time.
+ *
+ * dynamicParams = false is what makes an unknown slug a real HTTP 404. This
+ * segment matches ANY single-path URL, and notFound() inside a revalidating
+ * route renders the not-found boundary with a 200 status, so every mistyped
+ * or stale flyer URL was answering 200 OK with 404 content. Unknown params
+ * are now rejected by the router before this file runs. The production smoke
+ * suite asserts the status; a soft 404 tells search engines and link
+ * checkers that a dead campus URL is a live page.
+ */
+export function generateStaticParams() {
+  return CAMPUS_IDENTITY_LIST.map((identity) => ({ campusSlug: identity.slug }));
+}
+
+export const dynamicParams = false;
 
 interface CampusRow {
   id: string;
