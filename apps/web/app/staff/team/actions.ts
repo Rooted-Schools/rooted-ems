@@ -82,13 +82,25 @@ export async function addTeamMember(
     };
   }
 
-  // ── Insert campus role assignments FIRST, then flip is_staff ──
-  // Order matters. A staff account with is_staff = true and zero campus role
-  // rows is the half-provisioned state the session layer must reject, so it
-  // must never exist even transiently: if the role insert fails after
-  // is_staff was already set, the account is left stranded at exactly that
-  // shape. Writing the roles first means the worst failure leaves orphaned
-  // role rows on a non-staff profile, which grants nothing.
+  // ── Profile, then roles, then staff ──
+  // Three steps, and the order of all three matters.
+  //
+  // user_campus_role.user_id references user_profile(id), so the profile row
+  // has to exist before any role can point at it. But a profile carrying
+  // is_staff = true with zero campus roles is the half-provisioned state the
+  // session layer rejects, and it must not exist even briefly. So the profile
+  // is created NOT staff, the roles are written against it, and only then is
+  // the flag raised.
+  //
+  // Every failure between the steps leaves something harmless: a profile that
+  // grants nothing, or roles hanging off a non-staff profile that the session
+  // layer ignores. Neither is an account with access nobody intended.
+  const { error: profileError } = await supabase
+    .from("user_profile")
+    .upsert({ id: userId, email: email.toLowerCase(), is_staff: false }, { onConflict: "id" });
+
+  if (profileError) return { error: "Failed to create staff profile: " + profileError.message };
+
   const rows = campusAssignments.map(({ campusId, role }) => ({
     user_id: userId as string,
     campus_id: campusId,
@@ -101,12 +113,17 @@ export async function addTeamMember(
 
   if (roleError) return { error: "Failed to assign campus roles: " + roleError.message };
 
-  // ── Upsert user_profile with is_staff = true ──
-  const { error: profileError } = await supabase
+  const { error: staffFlagError } = await supabase
     .from("user_profile")
-    .upsert({ id: userId, email: email.toLowerCase(), is_staff: true }, { onConflict: "id" });
+    .update({ is_staff: true })
+    .eq("id", userId);
 
-  if (profileError) return { error: "Failed to create staff profile: " + profileError.message };
+  if (staffFlagError) {
+    return {
+      error:
+        "Campus roles were assigned, but the account could not be marked as staff. They will not be able to sign in until this is retried.",
+    };
+  }
 
   revalidatePath("/staff/team");
   return { error: null };
@@ -249,11 +266,20 @@ export async function inviteStaffMember(
     return { error: "This person already has that role on the selected campus(es)." };
   }
 
-  // ── Insert campus role assignments FIRST, then flip is_staff ──
-  // Same ordering invariant as addTeamMember: is_staff = true with zero
-  // campus role rows is the half-provisioned state the session layer rejects,
-  // so it must never be written, not even transiently. Roles land first; if
-  // that insert fails we return without ever touching is_staff.
+  // ── Profile, then roles, then staff ──
+  // Same three-step ordering as addTeamMember, and it matters more here: an
+  // invited person has no user_profile row at all, and user_campus_role
+  // references it, so writing a role first fails outright on the foreign key.
+  // The profile is created NOT staff so the half-provisioned shape the
+  // session layer rejects is never written, even briefly.
+  const { error: profileSeedError } = await supabase
+    .from("user_profile")
+    .upsert({ id: userId, email: email.toLowerCase(), is_staff: false }, { onConflict: "id" });
+
+  if (profileSeedError) {
+    return { error: "Failed to create staff profile: " + profileSeedError.message };
+  }
+
   if (newAssignments.length > 0) {
     const rows = newAssignments.map(({ campusId, role }) => ({
       user_id: userId,
