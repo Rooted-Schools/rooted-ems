@@ -811,6 +811,9 @@ export interface FamilyOfferDetail {
   campus_id: string;
   /** Campus IANA timezone — the client formats the deadline in this fixed zone. */
   campus_timezone: string | null;
+  /** Campus contact email — powers the mailto on the offer dead-end screens.
+   *  Populated for every pilot campus; null-safe on the client all the same. */
+  campus_email: string | null;
   grade_level_id: string;
   application_id: string;
   guardian_id: string;
@@ -852,7 +855,7 @@ export async function getFamilyOfferDetail(
     .select(`
       id, status, offered_at, expires_at,
       campus_id, grade_level_id,
-      campus:campus_id (name, timezone),
+      campus:campus_id (name, timezone, email),
       grade_level:grade_level_id (grade),
       application:application_id (
         id, guardian_id,
@@ -896,6 +899,7 @@ export async function getFamilyOfferDetail(
     campus_name: campus?.name ?? "",
     campus_id: offer.campus_id as string,
     campus_timezone: (campus?.timezone as string | undefined) ?? null,
+    campus_email: (campus?.email as string | undefined) ?? null,
     grade_level_id: offer.grade_level_id as string,
     application_id: app?.id as string,
     guardian_id: guardianId,

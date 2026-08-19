@@ -23,7 +23,7 @@ import { getPolicyText } from "./policy-content";
 import { SignaturePad } from "@/components/ui/signature-pad";
 import { useLocale } from "@/lib/i18n/locale-context";
 import { type TranslationKey } from "@/lib/i18n/translations";
-import { uploadFile, validateFile, formatFileSize, formatFileValidationError, type FileValidationError } from "@/lib/storage/upload";
+import { uploadFile, validateFile, formatFileSize, formatFileValidationError, UPLOAD_ERROR_TRANSLATION_KEY, type FileValidationError, type UploadErrorCode } from "@/lib/storage/upload";
 import { compressImageFile } from "@/lib/storage/compress-image";
 import { familyCreateDocumentRecord } from "@/app/family/applications/actions";
 import {
@@ -607,7 +607,11 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
       const uploadResult = await uploadFile(uploadSelectedFile, userId);
       if (uploadResult.error) {
         // Keep the dialog and everything they entered; show why it failed here.
-        setCompletionError(uploadResult.error);
+        // Map the stable upload code to a translated message rather than
+        // showing the family a raw code like "upload_failed".
+        setCompletionError(
+          t(UPLOAD_ERROR_TRANSLATION_KEY[uploadResult.error as UploadErrorCode] ?? "docs.error.uploadFailed")
+        );
         setLoadingItem(null);
         return;
       }

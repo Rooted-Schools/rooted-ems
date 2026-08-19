@@ -2,8 +2,8 @@
  * Security-contract tests for document mutations.
  *
  * createDocumentRecord (family-facing):
- *   1. Unauthenticated  → "Not authenticated", NO write
- *   2. Non-owner        → "Not authorized",    NO write
+ *   1. Unauthenticated  → "not_signed_in", NO write
+ *   2. Non-owner        → "not_authorized",  NO write
  *   3. Owner            → guard passes, insert proceeds
  *
  * reviewDocument (staff-only): requireStaffSession rejection propagates,
@@ -93,7 +93,7 @@ describe("createDocumentRecord", () => {
 
     const result = await createDocumentRecord(makeUploadInput(OWNER.id));
 
-    expect(result.error).toBe("Not authenticated");
+    expect(result.error).toBe("not_signed_in");
     expect(supabaseMock.writes()).toHaveLength(0);
   });
 
@@ -102,7 +102,7 @@ describe("createDocumentRecord", () => {
 
     const result = await createDocumentRecord(makeUploadInput(ATTACKER.id));
 
-    expect(result.error).toBe("Not authorized");
+    expect(result.error).toBe("not_authorized");
     expect(supabaseMock.writes("document")).toHaveLength(0);
   });
 
@@ -112,7 +112,7 @@ describe("createDocumentRecord", () => {
 
     const result = await createDocumentRecord(makeUploadInput(ATTACKER.id));
 
-    expect(result.error).toBe("Not authorized");
+    expect(result.error).toBe("not_authorized");
     expect(supabaseMock.writes("document")).toHaveLength(0);
   });
 

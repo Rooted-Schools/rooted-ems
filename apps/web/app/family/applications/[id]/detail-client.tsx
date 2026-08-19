@@ -17,9 +17,20 @@ import {
 import { useRef } from "react";
 import { getStatusConfig, getFamilyStatusLabel, getGradeLabel } from "@/lib/application-helpers";
 import type { ApplicationDetail } from "@/lib/queries";
-import { uploadFile, getSignedUrl, validateFile, formatFileSize, formatFileValidationError, type FileValidationError } from "@/lib/storage/upload";
+import {
+  uploadFile,
+  getSignedUrl,
+  validateFile,
+  formatFileSize,
+  formatFileValidationError,
+  UPLOAD_ERROR_TRANSLATION_KEY,
+  DOCUMENT_RECORD_ERROR_TRANSLATION_KEY,
+  type FileValidationError,
+  type UploadErrorCode,
+} from "@/lib/storage/upload";
 import { compressImageFile } from "@/lib/storage/compress-image";
 import { familyWithdrawApplication, familyAcceptOffer, familyDeclineOffer, familyAcceptDirect, familyDeclineDirect, familySubmitResponse, familyCreateDocumentRecord } from "../actions";
+import type { DocumentRecordErrorCode } from "@/lib/mutations/documents";
 import type { ReactNode } from "react";
 import { useLocale } from "@/lib/i18n/locale-context";
 import type { TranslationKey } from "@/lib/i18n/translations";
@@ -78,6 +89,33 @@ const docStatusConfig: Record<string, { labelKey: TranslationKey; variant: "succ
   rejected: { labelKey: "docs.status.rejected", variant: "destructive" },
 };
 
+// Document types a family can tag a needs-info attachment with (A7). Mirrors
+// the list on /family/documents so the reply carries the real type instead of
+// always filing as "other". Labels resolve through the shared docs.type.* keys.
+// "Other" leads and is the default, since a needs-info request is free text and
+// may not map to a specific type.
+const RESPONSE_DOC_TYPES: { value: string; labelKey: TranslationKey }[] = [
+  { value: "other", labelKey: "docs.type.other" },
+  { value: "birth_certificate", labelKey: "docs.type.birth_certificate" },
+  { value: "proof_of_residency", labelKey: "docs.type.proof_of_residency" },
+  { value: "parent_id", labelKey: "docs.type.parent_id" },
+  { value: "custody_docs", labelKey: "docs.type.custody_docs" },
+  { value: "immunization_records", labelKey: "docs.type.immunization_records" },
+  { value: "health_exam", labelKey: "docs.type.health_exam" },
+  { value: "dental_screening", labelKey: "docs.type.dental_screening" },
+  { value: "medication_auth", labelKey: "docs.type.medication_auth" },
+  { value: "food_allergy_plan", labelKey: "docs.type.food_allergy_plan" },
+  { value: "lthc_form", labelKey: "docs.type.lthc_form" },
+  { value: "sports_physical", labelKey: "docs.type.sports_physical" },
+  { value: "school_records", labelKey: "docs.type.school_records" },
+  { value: "iep_records", labelKey: "docs.type.iep_records" },
+  { value: "504_plan", labelKey: "docs.type.504_plan" },
+  { value: "mckinney_vento", labelKey: "docs.type.mckinney_vento" },
+  { value: "income_verification", labelKey: "docs.type.income_verification" },
+  { value: "military_family", labelKey: "docs.type.military_family" },
+  { value: "student_photo", labelKey: "docs.type.student_photo" },
+];
+
 function formatDate(dateStr: string | null, locale: "en" | "es" = "en") {
   if (!dateStr) return "—";
   return new Date(dateStr + (dateStr.includes("T") ? "" : "T00:00:00")).toLocaleDateString(
@@ -111,6 +149,10 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
   const [showDeclineDialog, setShowDeclineDialog] = useState(false);
   const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
   const [responseText, setResponseText] = useState("");
+  // A7: the document type a needs-info attachment is filed under. Defaults to
+  // "other"; the family picks the real type when they attach a file so staff
+  // receive it correctly typed rather than always as "other".
+  const [responseDocType, setResponseDocType] = useState("other");
   const [responseFile, setResponseFile] = useState<File | null>(null);
   const [responseFileCompressed, setResponseFileCompressed] = useState(false);
   const [responseFileCompressing, setResponseFileCompressing] = useState(false);
@@ -137,11 +179,22 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
   const needsAction = isDraft || detail.status === "needs_info" || (isOffered && !offerExpired);
   const canWithdraw = WITHDRAWABLE.includes(detail.status);
 
+  // Map the stable codes from uploadFile / createDocumentRecord to a bilingual
+  // message. Unknown codes fall back so a family never sees a raw code.
+  function uploadErrorMessage(code: string): string {
+    return t(UPLOAD_ERROR_TRANSLATION_KEY[code as UploadErrorCode] ?? "docs.error.uploadFailed");
+  }
+  function docRecordErrorMessage(code: string): string {
+    return t(DOCUMENT_RECORD_ERROR_TRANSLATION_KEY[code as DocumentRecordErrorCode] ?? "docs.error.recordFailed");
+  }
+
   async function handleViewDocument(storagePath: string) {
     if (!storagePath) return;
     const { url, error } = await getSignedUrl(storagePath);
     if (error) {
-      setFeedback({ type: "error", message: `${t("docs.couldNotOpen")}: ${error}` });
+      // error is a stable code, never raw provider text — show the plain
+      // family-facing message with nothing technical appended.
+      setFeedback({ type: "error", message: t("docs.couldNotOpen") });
       return;
     }
     if (url) window.open(url, "_blank");
@@ -204,25 +257,28 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
         // reply upload was rejected by the policy. Mirrors documents-client.
         const uploadResult = await uploadFile(responseFile, userId);
         if (uploadResult.error) {
-          setInlineResponseFeedback({ type: "error", message: uploadResult.error });
+          setInlineResponseFeedback({ type: "error", message: uploadErrorMessage(uploadResult.error) });
           return;
         }
         const docResult = await familyCreateDocumentRecord({
           application_id: detail.id,
           student_id: detail.student_id,
-          document_type: "other",
+          // A7: carry the type the family chose (defaults to "other") so a
+          // requested document is filed as that type, not always "other".
+          document_type: responseDocType,
           file_name: uploadResult.fileName,
           file_size: uploadResult.fileSize,
           mime_type: uploadResult.mimeType,
           storage_path: uploadResult.storagePath,
         });
         if (docResult.error) {
-          setInlineResponseFeedback({ type: "error", message: docResult.error });
+          setInlineResponseFeedback({ type: "error", message: docRecordErrorMessage(docResult.error) });
           return;
         }
       }
       setInlineResponseFeedback({ type: "success", message: t("apps.detail.responseSent") });
       setResponseText("");
+      setResponseDocType("other");
       setResponseFile(null);
       setResponseFileCompressed(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -409,6 +465,25 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
                     {responseFile.name} ({formatFileSize(responseFile.size)}
                     {responseFileCompressed ? ` · ${t("docs.compressed")}` : ""})
                   </p>
+                )}
+                {/* A7: when a file is attached, let the family tag its type so
+                    the reply is filed correctly instead of always as "Other". */}
+                {responseFile && !fileError && (
+                  <div className="mt-2">
+                    <label className="block text-sm font-medium text-amber-900 mb-1">{t("docs.docType")}</label>
+                    <select
+                      value={responseDocType}
+                      onChange={(e) => setResponseDocType(e.target.value)}
+                      disabled={submittingResponse}
+                      className="w-full px-3 py-2 border border-amber-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    >
+                      {RESPONSE_DOC_TYPES.map((dt) => (
+                        <option key={dt.value} value={dt.value}>
+                          {t(dt.labelKey)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 )}
               </div>
               <Button
