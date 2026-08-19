@@ -78,7 +78,7 @@ export async function addTeamMember(
   if (!userId) {
     return {
       error:
-        "No account found for this email. Ask them to visit the staff login page and sign in with Google first — even if they get an error, that creates their account. Then try adding them again.",
+        "This person does not have an account yet. Use Invite staff member instead: it creates the account, emails them a link to set a password, and assigns the same campus roles in one step.",
     };
   }
 
