@@ -684,22 +684,174 @@ export function unsourcedWeightedTiers(
   });
 }
 
-/** Offer expiry timestamp for a lottery offer, from the policy acceptance window. */
-export function acceptanceExpiryFrom(
-  config: LotteryPolicyConfig,
-  from: Date = new Date()
-): string {
-  return new Date(from.getTime() + config.acceptanceWindowDays * 24 * 60 * 60 * 1000).toISOString();
+// ─── Timezone-aware deadline math ──────────────────────────────────────────
+//
+// A board sets a deadline as a wall-clock time on a calendar day: "4:00 PM on
+// day N." Turning that promise into a single stored UTC instant is the only
+// way to make the crons, the accept guard, the email, the SMS, and the in-app
+// screen all agree on the moment a seat expires. No date library is available,
+// so this is done with Intl alone: read a calendar date in a timezone, then
+// convert a wall clock on that date back to a UTC instant.
+
+/** Offset (ms) that `timeZone` has at instant `date`. */
+function tzOffsetMs(timeZone: string, date: Date): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const p: Record<string, string> = {};
+  for (const part of dtf.formatToParts(date)) p[part.type] = part.value;
+  // Some engines emit hour "24" at midnight; normalize so Date.UTC stays sane.
+  const hour = p.hour === "24" ? 0 : Number(p.hour);
+  const asIfUtc = Date.UTC(
+    Number(p.year),
+    Number(p.month) - 1,
+    Number(p.day),
+    hour,
+    Number(p.minute),
+    Number(p.second)
+  );
+  return asIfUtc - date.getTime();
 }
 
-/** Offer expiry timestamp for a waitlist promotion, from the policy waitlist window. */
+/**
+ * The UTC instant for wall-clock Y-M-D HH:MM in `timeZone`. Two-pass so a DST
+ * day resolves with the offset in effect at the target wall clock, not the
+ * offset that happened to hold at the midnight-UTC guess.
+ */
+export function zonedWallClockToUtc(
+  y: number,
+  mo: number,
+  d: number,
+  h: number,
+  mi: number,
+  timeZone: string
+): Date {
+  const guess = Date.UTC(y, mo - 1, d, h, mi);
+  let inst = guess - tzOffsetMs(timeZone, new Date(guess));
+  inst = guess - tzOffsetMs(timeZone, new Date(inst)); // refine once
+  return new Date(inst);
+}
+
+/** The calendar date (year/month/day) an instant falls on, read in `timeZone`. */
+function calendarDateInZone(
+  instant: Date,
+  timeZone: string
+): { year: number; month: number; day: number } {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const p: Record<string, string> = {};
+  for (const part of dtf.formatToParts(instant)) p[part.type] = part.value;
+  return { year: Number(p.year), month: Number(p.month), day: Number(p.day) };
+}
+
+/** Parse a "HH:MM" cutoff into hours/minutes, or null when unparseable. */
+function parseCutoffTime(
+  value: string | null | undefined
+): { hours: number; minutes: number } | null {
+  if (!value) return null;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!m) return null;
+  const hours = Number(m[1]);
+  const minutes = Number(m[2]);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return { hours, minutes };
+}
+
+/**
+ * Resolve an offer expiry from a starting instant, a whole number of days, an
+ * optional wall-clock cutoff, and the campus timezone.
+ *
+ *   - With a cutoff AND a timezone: the deadline is `cutoff` on the calendar
+ *     day `days` after `from`, read in the campus timezone. "A seat not
+ *     accepted by 4:00 PM on day N is released" becomes exactly that instant,
+ *     regardless of what time of day offers were sent or what zone the server
+ *     runs in.
+ *   - With no cutoff, OR no timezone: the deadline is the raw end-of-window
+ *     instant (`from + days`), preserving the prior behavior. A cutoff that
+ *     cannot be honored because the timezone is missing is logged, matching the
+ *     no-policy fallback style, rather than silently inventing a time.
+ */
+function windowExpiry(
+  from: Date,
+  days: number,
+  cutoffTime: string | null | undefined,
+  timeZone: string | null | undefined,
+  logTag: string
+): string {
+  const rawInstant = new Date(from.getTime() + days * 24 * 60 * 60 * 1000);
+  const cutoff = parseCutoffTime(cutoffTime);
+  if (!cutoff) {
+    // No cutoff declared — keep the end-of-window instant. Do not invent 16:00.
+    return rawInstant.toISOString();
+  }
+  if (!timeZone) {
+    console.warn(
+      "[%s] policy declares a %s cutoff but the campus has no timezone — falling back to the end-of-window instant",
+      logTag,
+      cutoffTime
+    );
+    return rawInstant.toISOString();
+  }
+  const { year, month, day } = calendarDateInZone(rawInstant, timeZone);
+  return zonedWallClockToUtc(
+    year,
+    month,
+    day,
+    cutoff.hours,
+    cutoff.minutes,
+    timeZone
+  ).toISOString();
+}
+
+/**
+ * Offer expiry timestamp for a lottery/direct offer, from the policy acceptance
+ * window. Pass the campus IANA timezone so the acceptanceCutoffTime is applied
+ * on the correct calendar day; omit it (or pass null) to keep the raw
+ * end-of-window instant.
+ */
+export function acceptanceExpiryFrom(
+  config: LotteryPolicyConfig,
+  from: Date = new Date(),
+  timeZone: string | null = null
+): string {
+  return windowExpiry(
+    from,
+    config.acceptanceWindowDays,
+    config.acceptanceCutoffTime,
+    timeZone,
+    "acceptanceExpiryFrom"
+  );
+}
+
+/**
+ * Offer expiry timestamp for a waitlist promotion, from the policy waitlist
+ * offer window. Pass the campus IANA timezone so the window's cutoffTime is
+ * applied on the correct calendar day; omit it to keep the raw end-of-window
+ * instant.
+ */
 export function waitlistOfferExpiryFrom(
   config: LotteryPolicyConfig,
-  from: Date = new Date()
+  from: Date = new Date(),
+  timeZone: string | null = null
 ): string {
-  return new Date(
-    from.getTime() + config.waitlistOfferWindow.days * 24 * 60 * 60 * 1000
-  ).toISOString();
+  return windowExpiry(
+    from,
+    config.waitlistOfferWindow.days,
+    config.waitlistOfferWindow.cutoffTime,
+    timeZone,
+    "waitlistOfferExpiryFrom"
+  );
 }
 
 // ─── Plain-English rendering ───────────────────────────────────────────────

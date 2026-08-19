@@ -723,8 +723,8 @@ export async function notifyFamilyOfOffer({
   const deadlineEs = formatDeadline(expiresAt, "es-US", campusTimezone);
   const studentFirstName = firstNameOf(studentName);
   const template = viaWaitlist
-    ? emailTemplates.waitlistPromoted({ studentFirstName, campusName, campusLogoUrl })
-    : emailTemplates.offerExtended({ studentFirstName, campusName, expiresAt, campusLogoUrl });
+    ? emailTemplates.waitlistPromoted({ studentFirstName, campusName, campusLogoUrl, expiresAt, offerId, timeZone: campusTimezone })
+    : emailTemplates.offerExtended({ studentFirstName, campusName, expiresAt, campusLogoUrl, offerId, timeZone: campusTimezone });
   const [inApp, emailed, texted] = await Promise.all([
     userId
       ? notify({
@@ -743,7 +743,7 @@ export async function notifyFamilyOfOffer({
     }),
     smsGuardian(
       contact,
-      `Rooted Schools: A seat has been offered${studentFirstName ? ` for ${studentFirstName}` : ""} at ${campusName}! Respond by ${deadline}: ${APP_LINK}/family/offers\nSe ofreció un cupo. Responda antes del ${deadlineEs}.`,
+      `Rooted Schools: A seat has been offered${studentFirstName ? ` for ${studentFirstName}` : ""} at ${campusName}! Respond by ${deadline}: ${APP_LINK}/family/offers/${offerId}\nSe ofreció un cupo. Responda antes del ${deadlineEs}.`,
       "notifyFamilyOfOffer",
       {
         campusId,
@@ -797,14 +797,14 @@ export async function notifyFamilyOfferExpiringSoon({
       : Promise.resolve(),
     emailGuardian(
       email,
-      emailTemplates.offerExpiringSoon({ studentFirstName: firstNameOf(studentName), campusName, expiresAt, campusLogoUrl }),
+      emailTemplates.offerExpiringSoon({ studentFirstName: firstNameOf(studentName), campusName, expiresAt, campusLogoUrl, offerId, timeZone: campusTimezone }),
       "notifyFamilyOfferExpiringSoon",
       campusEmail,
       { campusId, recipientUserId: userId, templateKey: "offerExpiringSoon" }
     ),
     smsGuardian(
       contact,
-      `Rooted Schools: Your seat offer at ${campusName} expires ${deadline}. Respond now to keep your spot: ${APP_LINK}/family/offers\nSu oferta de cupo vence el ${deadlineEs}. Responda ahora.`,
+      `Rooted Schools: Your seat offer at ${campusName} expires ${deadline}. Respond now to keep your spot: ${APP_LINK}/family/offers/${offerId}\nSu oferta de cupo vence el ${deadlineEs}. Responda ahora.`,
       "notifyFamilyOfferExpiringSoon",
       { campusId, recipientUserId: userId, templateKey: "offerExpiringSoonSms" }
     ),

@@ -12,6 +12,7 @@
  * and they log that they are being used rather than substituting silently.
  */
 
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { getAdoptedPolicyForCampus } from "@/lib/queries/lottery-policy";
 import { acceptanceExpiryFrom, waitlistOfferExpiryFrom } from "@/lib/lottery-policy";
 
@@ -21,6 +22,34 @@ export const FALLBACK_ACCEPTANCE_DAYS = 14;
 
 function daysFrom(days: number, from: Date): string {
   return new Date(from.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+/**
+ * The campus IANA timezone (campus.timezone), or null when the campus row has
+ * no timezone or cannot be read. The policy cutoff time is a wall clock in this
+ * zone, so it must reach the expiry math for "4:00 PM on day N" to mean the
+ * family's 4:00 PM and not the server's. A read failure is logged, never
+ * thrown — a deadline still resolves (to the end-of-window instant) rather than
+ * blocking an offer.
+ */
+export async function getCampusTimezone(
+  campusId: string | null | undefined
+): Promise<string | null> {
+  if (!campusId) return null;
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from("campus")
+    .select("timezone")
+    .eq("id", campusId)
+    .single();
+  if (error) {
+    console.warn("[getCampusTimezone] could not read campus timezone", {
+      campusId,
+      error: error.message,
+    });
+    return null;
+  }
+  return (data as { timezone: string | null } | null)?.timezone ?? null;
 }
 
 /**
@@ -38,7 +67,10 @@ export async function resolveWaitlistOfferExpiry(
     );
     return daysFrom(FALLBACK_WAITLIST_OFFER_DAYS, from);
   }
-  const adopted = await getAdoptedPolicyForCampus(campusId);
+  const [adopted, timezone] = await Promise.all([
+    getAdoptedPolicyForCampus(campusId),
+    getCampusTimezone(campusId),
+  ]);
   if (!adopted) {
     console.warn(
       "[resolveWaitlistOfferExpiry] no adopted lottery policy for campus — falling back to a %d day response window",
@@ -47,7 +79,7 @@ export async function resolveWaitlistOfferExpiry(
     );
     return daysFrom(FALLBACK_WAITLIST_OFFER_DAYS, from);
   }
-  return waitlistOfferExpiryFrom(adopted.config, from);
+  return waitlistOfferExpiryFrom(adopted.config, from, timezone);
 }
 
 /**
@@ -64,7 +96,10 @@ export async function resolveAcceptanceExpiry(
     );
     return daysFrom(FALLBACK_ACCEPTANCE_DAYS, from);
   }
-  const adopted = await getAdoptedPolicyForCampus(campusId);
+  const [adopted, timezone] = await Promise.all([
+    getAdoptedPolicyForCampus(campusId),
+    getCampusTimezone(campusId),
+  ]);
   if (!adopted) {
     console.warn(
       "[resolveAcceptanceExpiry] no adopted lottery policy for campus — falling back to a %d day acceptance window",
@@ -73,5 +108,5 @@ export async function resolveAcceptanceExpiry(
     );
     return daysFrom(FALLBACK_ACCEPTANCE_DAYS, from);
   }
-  return acceptanceExpiryFrom(adopted.config, from);
+  return acceptanceExpiryFrom(adopted.config, from, timezone);
 }

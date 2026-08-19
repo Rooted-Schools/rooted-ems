@@ -23,27 +23,50 @@ export interface EmailTemplate {
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────
 
-function formatDateEn(iso: string): string {
+/**
+ * Render a deadline for an email.
+ *
+ * A deadline stored as UTC must be shown in the campus timezone or a family on
+ * a UTC server (Vercel) can be told a different calendar day than the SMS and
+ * in-app screen show. Pass `timeZone` (the campus IANA zone) to fix the day;
+ * pass `withTime` to also show the wall-clock cutoff and zone (for example
+ * "4:00 PM PST"), which is what the family is actually held to.
+ */
+function formatDateEn(iso: string, timeZone?: string | null, withTime?: boolean): string {
   try {
-    return new Intl.DateTimeFormat("en-US", {
+    const options: Intl.DateTimeFormatOptions = {
       weekday: "long",
       month: "long",
       day: "numeric",
       year: "numeric",
-    }).format(new Date(iso));
+    };
+    if (timeZone) options.timeZone = timeZone;
+    if (withTime) {
+      options.hour = "numeric";
+      options.minute = "2-digit";
+      options.timeZoneName = "short";
+    }
+    return new Intl.DateTimeFormat("en-US", options).format(new Date(iso));
   } catch {
     return iso;
   }
 }
 
-function formatDateEs(iso: string): string {
+function formatDateEs(iso: string, timeZone?: string | null, withTime?: boolean): string {
   try {
-    return new Intl.DateTimeFormat("es-US", {
+    const options: Intl.DateTimeFormatOptions = {
       weekday: "long",
       month: "long",
       day: "numeric",
       year: "numeric",
-    }).format(new Date(iso));
+    };
+    if (timeZone) options.timeZone = timeZone;
+    if (withTime) {
+      options.hour = "numeric";
+      options.minute = "2-digit";
+      options.timeZoneName = "short";
+    }
+    return new Intl.DateTimeFormat("es-US", options).format(new Date(iso));
   } catch {
     return iso;
   }
@@ -247,14 +270,21 @@ export function offerExtended({
   campusName,
   expiresAt,
   campusLogoUrl,
+  offerId,
+  timeZone,
 }: {
   studentFirstName?: string;
   campusName: string;
   expiresAt: string;
   campusLogoUrl?: string;
+  /** Deep-links the CTA to the specific offer so it renders even after expiry. */
+  offerId?: string;
+  /** Campus IANA timezone — renders the deadline in the family's own zone. */
+  timeZone?: string | null;
 }): EmailTemplate {
-  const deadlineEn = formatDateEn(expiresAt);
-  const deadlineEs = formatDateEs(expiresAt);
+  const deadlineEn = formatDateEn(expiresAt, timeZone, !!timeZone);
+  const deadlineEs = formatDateEs(expiresAt, timeZone, !!timeZone);
+  const offerUrl = offerId ? `${APP_URL}/family/offers/${offerId}` : `${APP_URL}/family/offers`;
   const { html, text } = renderEmail(
     {
       greeting: "Congratulations!",
@@ -262,7 +292,7 @@ export function offerExtended({
         `A seat has been offered for ${studentEn(studentFirstName)} at ${campusName}.`,
         `Please respond by ${deadlineEn} to secure the spot. If we don't hear from you by then, the seat may be offered to another family.`,
       ],
-      cta: { label: "Respond to your offer", url: `${APP_URL}/family/offers` },
+      cta: { label: "Respond to your offer", url: offerUrl },
       closing: "We hope to welcome you soon, the Rooted Schools Enrollment Team",
     },
     {
@@ -271,7 +301,7 @@ export function offerExtended({
         `Se ha ofrecido un cupo para ${studentEs(studentFirstName)} en ${campusName}.`,
         `Por favor responda antes del ${deadlineEs} para asegurar el cupo. Si no recibimos su respuesta para esa fecha, el cupo podría ofrecerse a otra familia.`,
       ],
-      cta: { label: "Responder a su oferta", url: `${APP_URL}/family/offers` },
+      cta: { label: "Responder a su oferta", url: offerUrl },
       closing: "Esperamos darle la bienvenida pronto, el Equipo de Inscripción de Rooted Schools",
     },
     { campusLogoUrl, campusName }
@@ -288,14 +318,21 @@ export function offerExpiringSoon({
   campusName,
   expiresAt,
   campusLogoUrl,
+  offerId,
+  timeZone,
 }: {
   studentFirstName?: string;
   campusName: string;
   expiresAt: string;
   campusLogoUrl?: string;
+  /** Deep-links the CTA to the specific offer so it renders even after expiry. */
+  offerId?: string;
+  /** Campus IANA timezone — renders the deadline in the family's own zone. */
+  timeZone?: string | null;
 }): EmailTemplate {
-  const deadlineEn = formatDateEn(expiresAt);
-  const deadlineEs = formatDateEs(expiresAt);
+  const deadlineEn = formatDateEn(expiresAt, timeZone, !!timeZone);
+  const deadlineEs = formatDateEs(expiresAt, timeZone, !!timeZone);
+  const offerUrl = offerId ? `${APP_URL}/family/offers/${offerId}` : `${APP_URL}/family/offers`;
   const { html, text } = renderEmail(
     {
       greeting: "Hello,",
@@ -303,7 +340,7 @@ export function offerExpiringSoon({
         `A friendly reminder: the seat offer for ${studentEn(studentFirstName)} at ${campusName} expires on ${deadlineEn}.`,
         "We'd love to save this spot for your family, but we need your response before the deadline. It only takes a minute to accept or decline online.",
       ],
-      cta: { label: "Respond to your offer", url: `${APP_URL}/family/offers` },
+      cta: { label: "Respond to your offer", url: offerUrl },
       closing: "We're here if you have questions, the Rooted Schools Enrollment Team",
     },
     {
@@ -312,7 +349,7 @@ export function offerExpiringSoon({
         `Un recordatorio amistoso: la oferta de cupo para ${studentEs(studentFirstName)} en ${campusName} vence el ${deadlineEs}.`,
         "Nos encantaría guardar este cupo para su familia, pero necesitamos su respuesta antes de la fecha límite. Solo toma un minuto aceptar o rechazar en línea.",
       ],
-      cta: { label: "Responder a su oferta", url: `${APP_URL}/family/offers` },
+      cta: { label: "Responder a su oferta", url: offerUrl },
       closing: "Estamos aquí si tiene preguntas, el Equipo de Inscripción de Rooted Schools",
     },
     { campusLogoUrl, campusName }
@@ -402,28 +439,46 @@ export function waitlistPromoted({
   studentFirstName,
   campusName,
   campusLogoUrl,
+  expiresAt,
+  offerId,
+  timeZone,
 }: {
   studentFirstName?: string;
   campusName: string;
   campusLogoUrl?: string;
+  /** When present, the email states the real response deadline. */
+  expiresAt?: string;
+  /** Deep-links the CTA to the specific offer so it renders even after expiry. */
+  offerId?: string;
+  /** Campus IANA timezone — renders the deadline in the family's own zone. */
+  timeZone?: string | null;
 }): EmailTemplate {
+  const offerUrl = offerId ? `${APP_URL}/family/offers/${offerId}` : `${APP_URL}/family/offers`;
+  const deadlineEn = expiresAt ? formatDateEn(expiresAt, timeZone, !!timeZone) : null;
+  const deadlineEs = expiresAt ? formatDateEs(expiresAt, timeZone, !!timeZone) : null;
+  const respondLineEn = deadlineEn
+    ? `Please log in to review your offer and respond by ${deadlineEn}. Seats from the waitlist move quickly.`
+    : "Please log in to review your offer and respond before the deadline. Seats from the waitlist move quickly.";
+  const respondLineEs = deadlineEs
+    ? `Por favor inicie sesión para revisar su oferta y responder antes del ${deadlineEs}. Los cupos de la lista de espera se asignan rápidamente.`
+    : "Por favor inicie sesión para revisar su oferta y responder antes de la fecha límite. Los cupos de la lista de espera se asignan rápidamente.";
   const { html, text } = renderEmail(
     {
       greeting: "Great news!",
       paragraphs: [
         `A seat has opened at ${campusName}, and ${studentEn(studentFirstName)} has been offered a spot from the waitlist.`,
-        "Please log in to review your offer and respond before the deadline. Seats from the waitlist move quickly.",
+        respondLineEn,
       ],
-      cta: { label: "Check your offers", url: `${APP_URL}/family/offers` },
+      cta: { label: "Check your offers", url: offerUrl },
       closing: "We hope to welcome you soon, the Rooted Schools Enrollment Team",
     },
     {
       greeting: "¡Buenas noticias!",
       paragraphs: [
         `Se ha abierto un cupo en ${campusName}, y a ${studentEs(studentFirstName)} se le ha ofrecido un lugar desde la lista de espera.`,
-        "Por favor inicie sesión para revisar su oferta y responder antes de la fecha límite. Los cupos de la lista de espera se asignan rápidamente.",
+        respondLineEs,
       ],
-      cta: { label: "Ver sus ofertas", url: `${APP_URL}/family/offers` },
+      cta: { label: "Ver sus ofertas", url: offerUrl },
       closing: "Esperamos darle la bienvenida pronto, el Equipo de Inscripción de Rooted Schools",
     },
     { campusLogoUrl, campusName }

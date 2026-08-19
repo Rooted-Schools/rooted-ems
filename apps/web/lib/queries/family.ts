@@ -809,6 +809,8 @@ export interface FamilyOfferDetail {
   grade: string;
   campus_name: string;
   campus_id: string;
+  /** Campus IANA timezone — the client formats the deadline in this fixed zone. */
+  campus_timezone: string | null;
   grade_level_id: string;
   application_id: string;
   guardian_id: string;
@@ -850,7 +852,7 @@ export async function getFamilyOfferDetail(
     .select(`
       id, status, offered_at, expires_at,
       campus_id, grade_level_id,
-      campus:campus_id (name),
+      campus:campus_id (name, timezone),
       grade_level:grade_level_id (grade),
       application:application_id (
         id, guardian_id,
@@ -893,6 +895,7 @@ export async function getFamilyOfferDetail(
     grade: grade?.grade ? `Grade ${grade.grade}` : "",
     campus_name: campus?.name ?? "",
     campus_id: offer.campus_id as string,
+    campus_timezone: (campus?.timezone as string | undefined) ?? null,
     grade_level_id: offer.grade_level_id as string,
     application_id: app?.id as string,
     guardian_id: guardianId,
@@ -923,6 +926,13 @@ export async function getFamilyPendingOffers(
   if (!apps || apps.length === 0) return [];
   const appIds = apps.map((a: Record<string, unknown>) => a.id as string);
 
+  // A pending offer past its deadline is NOT actionable, even if the daily
+  // sweep cron has not yet flipped its status to expired. Showing it as
+  // "Expires today" with a working Respond button hands the family an action
+  // that then fails at the accept guard. Excluding it here keeps the list
+  // honest; the deep link from the email still reaches the expired detail view.
+  const nowIso = new Date().toISOString();
+
   const { data, error } = await supabase
     .from("offer")
     .select(`
@@ -936,6 +946,7 @@ export async function getFamilyPendingOffers(
     `)
     .in("application_id", appIds)
     .eq("status", "pending")
+    .gt("expires_at", nowIso)
     .order("expires_at", { ascending: true });
 
   if (error || !data) return [];
