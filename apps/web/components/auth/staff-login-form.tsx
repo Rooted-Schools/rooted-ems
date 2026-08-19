@@ -9,7 +9,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   no_campus_access:
     "Your account is not assigned to any school campus. Please contact your school administrator to request access.",
   not_staff:
-    "This account is not set up as a staff account. Staff access is granted by an administrator. Please contact your school administrator to request access.",
+    "That account is not set up as staff. If you were invited, sign in with the exact email address the invitation was sent to, which may not be the Google account your browser picked. Otherwise contact your school administrator.",
   auth_failed:
     "Authentication failed. Please try again or contact your administrator.",
 };
@@ -104,9 +104,13 @@ export function StaffLoginForm() {
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback?next=/staff/dashboard`,
-          queryParams: {
-            hd: "*", // Allow any Google Workspace domain
-          },
+          // No `hd` restriction. It was set to "*", which sounds permissive but
+          // means "any Google WORKSPACE domain" and excludes ordinary
+          // @gmail.com accounts, so invited partners and consultants signing in
+          // with their own Google account were refused by Google before this
+          // app ever saw them. Domain is not the gate here and never was: staff
+          // access requires an administrator to grant a campus role, which is
+          // checked in /auth/callback and again on every staff request.
         },
       });
 
