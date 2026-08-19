@@ -231,14 +231,14 @@ export async function familyDeclineDirect(applicationId: string) {
 }
 
 export async function familySubmitResponse(applicationId: string, message: string) {
-  await requireSession();
+  const session = await requireSession();
 
   // Prove ownership before writing a note onto the application — the note is
   // visible to staff and attributed to this family, so it must be theirs.
   const owner = await requireApplicationOwner(applicationId);
   if (owner.error) return { data: null, error: owner.error };
 
-  const result = await createFamilyResponse(applicationId, message);
+  const result = await createFamilyResponse(applicationId, message, session.user_id);
   if (!result.error) {
     // Move status back to submitted so staff can see the family responded
     // and so the "needs info" form disappears for the family

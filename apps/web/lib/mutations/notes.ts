@@ -70,11 +70,15 @@ export async function createNote(input: {
  */
 export async function createFamilyResponse(
   applicationId: string,
-  message: string
+  message: string,
+  userId: string
 ): Promise<MutationResult<{ id: string }>> {
-  const authClient = await createServerClient();
-  const { data: { user } } = await authClient.auth.getUser();
-  if (!user) return { data: null, error: "Not authenticated" };
+  // The authenticated family user id is passed in by the caller, which already
+  // resolved the session and proved ownership. Opening a second auth client
+  // and calling getUser again returned null in the server-action context, the
+  // same reason createNote never saved a row, so a family responding to a
+  // needs-info request always failed before the write.
+  if (!userId) return { data: null, error: "Not authenticated" };
 
   const supabase = createServiceRoleClient();
 
@@ -84,7 +88,7 @@ export async function createFamilyResponse(
     .eq("id", applicationId)
     .single();
   const appGuardian = appCheck?.guardian as unknown as { user_id: string } | null;
-  if (!appGuardian || appGuardian.user_id !== user.id) {
+  if (!appGuardian || appGuardian.user_id !== userId) {
     return { data: null, error: "Not authorized" };
   }
 
@@ -95,7 +99,7 @@ export async function createFamilyResponse(
       entity_id: applicationId,
       content: message,
       is_internal: false,
-      created_by: user.id,
+      created_by: userId,
     })
     .select("id")
     .single();
