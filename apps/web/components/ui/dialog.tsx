@@ -36,11 +36,15 @@ function Dialog({ open: controlledOpen, defaultOpen = false, onOpenChange, child
     [isControlled, onOpenChange]
   );
 
-  return (
-    <DialogContext.Provider value={{ open: isOpen, onOpenChange: handleChange }}>
-      {children}
-    </DialogContext.Provider>
+  // Memoized so the context value is not a fresh object on every render.
+  // Consumers read onOpenChange out of it, and an unstable identity there is
+  // what made DialogContent's focus effect re-run mid-typing.
+  const value = React.useMemo(
+    () => ({ open: isOpen, onOpenChange: handleChange }),
+    [isOpen, handleChange]
   );
+
+  return <DialogContext.Provider value={value}>{children}</DialogContext.Provider>;
 }
 
 function DialogTrigger({
@@ -88,6 +92,14 @@ function DialogContent({
   // restored on close rather than dropping focus to the top of the document.
   const restoreFocusRef = React.useRef<HTMLElement | null>(null);
 
+  // Focus management depends ONLY on `open`.
+  //
+  // It also depended on onOpenChange, and callers define that handler inside
+  // their own render, so its identity changed on every keystroke. The effect
+  // tore down and re-ran on each character, and re-running it re-focused the
+  // first control in the panel. Typing in any field other than the first threw
+  // focus back to the first one, which made a multi-field dialog impossible to
+  // fill in. Anything that reads onOpenChange belongs in the effect below.
   React.useEffect(() => {
     if (!open) return;
 
@@ -98,6 +110,20 @@ function DialogContent({
     const panel = panelRef.current;
     const first = panel?.querySelector<HTMLElement>(FOCUSABLE);
     (first ?? panel)?.focus();
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      restoreFocusRef.current?.focus?.();
+    };
+  }, [open]);
+
+  // Escape and the Tab trap. Safe to re-attach whenever the handler identity
+  // changes: adding and removing a listener never moves focus.
+  React.useEffect(() => {
+    if (!open) return;
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -123,14 +149,7 @@ function DialogContent({
     }
 
     document.addEventListener("keydown", onKeyDown, true);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.removeEventListener("keydown", onKeyDown, true);
-      document.body.style.overflow = previousOverflow;
-      restoreFocusRef.current?.focus?.();
-    };
+    return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [open, onOpenChange]);
 
   if (!open) return null;
