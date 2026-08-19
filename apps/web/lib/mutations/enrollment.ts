@@ -15,6 +15,17 @@ export interface CreateEnrollmentInput {
   application_id?: string;
 }
 
+// ─── Activation predicates (pure) ──────────────────────
+// Live in lib/enrollment-rules.ts so they can be tested without pulling in
+// the server client. Re-exported here so existing importers keep working.
+export {
+  ACTIVATABLE_ENROLLMENT_STATUSES,
+  AUDIT_REACTIVATABLE_ENROLLMENT_STATUSES,
+  isEnrollmentActivatable,
+  isEnrollmentAuditReactivatable,
+  resolveEnrolledAt,
+} from "@/lib/enrollment-rules";
+
 // ─── Mutations ─────────────────────────────────────────
 
 /**
