@@ -30,15 +30,25 @@ interface Props {
   guardianId: string;
 }
 
-function formatExpiry(isoString: string, localeTag: string): string {
-  return new Date(isoString).toLocaleDateString(localeTag, {
+// Format the deadline in the campus's fixed IANA timezone. Passing an explicit
+// timeZone is what makes the server (UTC) and the browser (device zone) agree,
+// which both shows the family the real 4:00 PM cutoff and removes the
+// SSR/hydration mismatch on this highest-stakes screen. timeZoneName: "short"
+// spells out the zone (for example "PST") so the time is unambiguous.
+function formatExpiry(isoString: string, localeTag: string, timeZone: string | null): string {
+  const options: Intl.DateTimeFormatOptions = {
     weekday: "long",
     month: "long",
     day: "numeric",
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
-  });
+  };
+  if (timeZone) {
+    options.timeZone = timeZone;
+    options.timeZoneName = "short";
+  }
+  return new Date(isoString).toLocaleDateString(localeTag, options);
 }
 
 export function OfferResponseClient({ offer, guardianId }: Props) {
@@ -219,7 +229,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
             <p className="text-xs text-stone-text">
               {t("offers.respondBy")}{" "}
               <span className={`font-semibold ${offer.is_urgent ? "text-red-600" : "text-ink"}`}>
-                {formatExpiry(offer.expires_at, localeTag)}
+                {formatExpiry(offer.expires_at, localeTag, offer.campus_timezone)}
               </span>
             </p>
           </div>

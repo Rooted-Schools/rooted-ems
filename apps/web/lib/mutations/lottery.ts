@@ -23,6 +23,7 @@ import {
   type LotteryPolicyConfig,
 } from "@/lib/lottery-policy";
 import { getAdoptedPolicyForCampus, isMissingRelation } from "@/lib/queries/lottery-policy";
+import { getCampusTimezone } from "@/lib/offer-deadlines";
 import {
   deriveSiblingOfEnrolled,
   deriveLinkedSiblings,
@@ -1332,7 +1333,8 @@ export async function sendOffersFromLottery(
           "No response deadline was given and this run has no governing policy to take one from. Choose a deadline explicitly.",
       };
     }
-    resolvedExpiresAt = acceptanceExpiryFrom(binding.config);
+    const campusTimezone = await getCampusTimezone(run.campus_id as string);
+    resolvedExpiresAt = acceptanceExpiryFrom(binding.config, new Date(), campusTimezone);
   }
 
   const { data: selectedEntries, error: entriesError } = await supabase

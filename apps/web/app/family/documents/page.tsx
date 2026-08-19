@@ -24,11 +24,16 @@ export default async function FamilyDocumentsPage() {
   // Get applications (non-draft) for the family
   const guardianIds = (guardians ?? []).map((g: Record<string, string>) => g.id);
   let applications: { id: string; student_name: string; student_id: string }[] = [];
+  // The family's campus timezone. Formatting dates in a fixed zone (rather than
+  // the browser's) is what keeps server and client renders identical, removing
+  // the SSR/hydration mismatch on upload dates. A family with applications at
+  // more than one campus resolves to the first campus that declares a zone.
+  let campusTimeZone: string | null = null;
 
   if (guardianIds.length > 0) {
     const { data: apps } = await db
       .from("application")
-      .select("id, student:student_id (id, first_name, last_name)")
+      .select("id, student:student_id (id, first_name, last_name), campus:campus_id (timezone)")
       .in("guardian_id", guardianIds)
       .neq("status", "withdrawn");
 
@@ -40,6 +45,14 @@ export default async function FamilyDocumentsPage() {
         student_id: student?.id ?? "",
       };
     });
+
+    for (const a of apps ?? []) {
+      const campus = (a as Record<string, unknown>).campus as Record<string, string> | null;
+      if (campus?.timezone) {
+        campusTimeZone = campus.timezone;
+        break;
+      }
+    }
   }
 
   return (
@@ -47,6 +60,7 @@ export default async function FamilyDocumentsPage() {
       documents={documents}
       applications={applications}
       userId={user.id}
+      timeZone={campusTimeZone}
     />
   );
 }

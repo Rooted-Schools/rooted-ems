@@ -48,6 +48,10 @@ interface DocumentsClientProps {
   documents: DocumentRow[];
   applications: FamilyApp[];
   userId: string;
+  /** Campus IANA timezone. Formatting dates in this fixed zone keeps the server
+   *  (UTC) and client (device zone) renders identical, removing the hydration
+   *  mismatch. Null when no campus declares a zone — falls back to local. */
+  timeZone: string | null;
 }
 
 // ─── Constants ──────────────────────────────────────────
@@ -87,12 +91,14 @@ const documentTypes = [
   { value: "other", labelKey: "docs.type.other" },
 ] as const;
 
-function formatDate(dateStr: string, localeTag: string) {
-  return new Date(dateStr).toLocaleDateString(localeTag, {
+function formatDate(dateStr: string, localeTag: string, timeZone: string | null) {
+  const options: Intl.DateTimeFormatOptions = {
     month: "short",
     day: "numeric",
     year: "numeric",
-  });
+  };
+  if (timeZone) options.timeZone = timeZone;
+  return new Date(dateStr).toLocaleDateString(localeTag, options);
 }
 
 function formatDocType(type: string, t: (key: TranslationKey) => string): string {
@@ -105,7 +111,7 @@ function formatDocType(type: string, t: (key: TranslationKey) => string): string
 
 // ─── Main Component ─────────────────────────────────────
 
-export function DocumentsClient({ documents, applications, userId }: DocumentsClientProps) {
+export function DocumentsClient({ documents, applications, userId, timeZone }: DocumentsClientProps) {
   const { t, locale } = useLocale();
   const localeTag = locale === "es" ? "es-US" : "en-US";
   const router = useRouter();
@@ -272,7 +278,7 @@ export function DocumentsClient({ documents, applications, userId }: DocumentsCl
                               <p className="text-xs text-stone-text">
                                 {formatDocType(doc.document_type, t)}
                                 {sizeStr && <> &middot; {sizeStr}</>}
-                                {" "}&middot; {t("docs.uploadedOn")} {formatDate(doc.created_at, localeTag)}
+                                {" "}&middot; {t("docs.uploadedOn")} {formatDate(doc.created_at, localeTag, timeZone)}
                                 {/* only repeat name inline when not shown as group header */}
                                 {studentNames.length === 1 && <> &middot; {doc.student_name}</>}
                               </p>
