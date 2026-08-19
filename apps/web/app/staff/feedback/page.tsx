@@ -1,4 +1,6 @@
-export const runtime = "edge";
+// No edge runtime here. The submit action in this segment performs a
+// service-role write, and this is the one staff surface where that write has
+// never once succeeded in production.
 export const dynamic = "force-dynamic";
 
 import { requireStaffSession } from "@/lib/auth/get-session";
