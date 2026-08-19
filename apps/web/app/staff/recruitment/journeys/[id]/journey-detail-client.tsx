@@ -19,6 +19,7 @@ import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { IconAlertTriangle, IconBan, IconRotateCw } from "@/components/ui/icons";
 import type { JourneyDetail, JourneyEnrollmentRow, EnrollableLead } from "@/lib/queries/journeys";
+import { JourneyStepEditor } from "./step-editor";
 import {
   staffPauseJourney,
   staffResumeJourney,
@@ -261,39 +262,31 @@ export function JourneyDetailClient({ journey, roster, campuses }: JourneyDetail
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Steps</CardTitle>
           <CardDescription>
-            In send order. Previews render the real template with this step&apos;s saved content — actual sends use
-            each family&apos;s own campus name; this preview uses {journey.campus_name ?? "“your school”"}.
+            In send order. Each preview renders the real template with this step&apos;s content. Actual sends use
+            each family&apos;s own campus name; these previews use {journey.preview_campus_name}.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          {journey.is_active && journey.steps.some((s) => s.is_editable) && (
+            <p className="flex items-start gap-1.5 rounded-[6px] border border-warn/30 bg-warn/10 px-3 py-2 text-xs font-medium text-warn-text">
+              <IconAlertTriangle size={14} aria-hidden className="mt-0.5 shrink-0" />
+              <span>
+                This journey is active. Anything you save here goes out to every family who has not reached
+                that step yet, starting with the next daily run. Families who already received a step keep
+                the version that was sent to them.
+              </span>
+            </p>
+          )}
           {journey.steps.length === 0 ? (
             <p className="text-sm text-stone text-center py-6">No steps configured yet.</p>
           ) : (
-            journey.steps.map((step, i) => (
-              <div key={step.id} className="rounded-[6px] border border-line bg-white p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-ink">
-                      Step {i + 1}: {step.template_label}
-                    </p>
-                    <p className="mt-0.5 text-xs text-stone-text">Sends {step.delay_label}</p>
-                  </div>
-                </div>
-                {step.preview_unavailable ? (
-                  <p className="mt-3 text-xs text-stone-text italic">
-                    Preview unavailable — &ldquo;{step.template_key}&rdquo; isn&apos;t a recognized template.
-                  </p>
-                ) : (
-                  <div className="mt-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-stone">Subject</p>
-                    <p className="mt-0.5 text-sm font-medium text-ink">{step.subject}</p>
-                    <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-stone">Body</p>
-                    <pre className="mt-1 whitespace-pre-wrap rounded-[6px] bg-sunken p-3 font-mono text-[12.5px] leading-relaxed text-ink/80">
-                      {step.preview_text}
-                    </pre>
-                  </div>
-                )}
-              </div>
+            journey.steps.map((step) => (
+              <JourneyStepEditor
+                key={step.id}
+                journeyId={journey.id}
+                step={step}
+                previewCampusName={journey.preview_campus_name}
+              />
             ))
           )}
         </CardContent>

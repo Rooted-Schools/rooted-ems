@@ -335,7 +335,10 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
               const templateLabel = CAMPAIGN_TEMPLATES[c.template_key as CampaignTemplateKey]?.label ?? c.template_key;
               return (
                 <div key={c.id} className="flex items-center gap-3 rounded-lg border border-stone/15 px-3 py-2">
-                  <div className="min-w-0 flex-1">
+                  <Link
+                    href={`/staff/recruitment/campaigns/${c.id}`}
+                    className="min-w-0 flex-1 no-underline hover:opacity-80"
+                  >
                     <p className="text-sm font-medium text-ink truncate">
                       {c.name}
                       <span className="text-stone font-normal"> · {templateLabel} · {c.campus_name}</span>
@@ -351,7 +354,7 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
                         {c.sent_count.toLocaleString()}/{c.total_recipients.toLocaleString()} sent
                       </span>
                     </div>
-                  </div>
+                  </Link>
                   {c.status === "sending" ? (
                     <Button variant="outline" size="sm" onClick={() => cancelCampaign(c.id)} disabled={isPending}>
                       Cancel

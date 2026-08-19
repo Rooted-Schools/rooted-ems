@@ -27,6 +27,11 @@ import {
   type CreateGradeLevelInput,
   type CreateCapacityPlanInput,
 } from "@/lib/mutations/settings";
+import {
+  saveCampusMessageOverride,
+  resetCampusMessageOverride,
+  type SaveCampusMessageOverrideInput,
+} from "@/lib/mutations/message-overrides";
 
 /**
  * Settings actions inherit the gate the settings page itself applies:
@@ -217,6 +222,33 @@ export async function staffDeleteGradeLevel(gradeLevelId: string) {
 export async function staffSetWelcomeMessages(enabled: boolean) {
   const session = await requireMinRole("system_admin");
   const result = await setWelcomeMessagingEnabled(enabled, session.user_id);
+  if (!result.error) {
+    revalidatePath("/staff/settings");
+    revalidatePath("/staff/communications/automated-messages");
+  }
+  return result;
+}
+
+/**
+ * Per-campus message overrides. Gated on enrollment_manager for the campus
+ * the row lands on, not merely on being a manager somewhere — this copy is
+ * mailed to that campus's families the moment it saves. The mutations check
+ * the same thing independently; these calls just fail fast.
+ */
+
+export async function staffSaveMessageOverride(input: SaveCampusMessageOverrideInput) {
+  await requireRoleOnCampus(input.campusId, "enrollment_manager");
+  const result = await saveCampusMessageOverride(input);
+  if (!result.error) {
+    revalidatePath("/staff/settings");
+    revalidatePath("/staff/communications/automated-messages");
+  }
+  return result;
+}
+
+export async function staffResetMessageOverride(campusId: string, templateKey: string) {
+  await requireRoleOnCampus(campusId, "enrollment_manager");
+  const result = await resetCampusMessageOverride(campusId, templateKey);
   if (!result.error) {
     revalidatePath("/staff/settings");
     revalidatePath("/staff/communications/automated-messages");

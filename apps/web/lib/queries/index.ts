@@ -87,6 +87,13 @@ export {
   type LotteryNotificationProgress,
 } from "./lottery-policy";
 
+// Per-campus message overrides (campus_message_override)
+export {
+  getCampusMessageOverride,
+  getCampusMessageOverrides,
+  type CampusMessageOverrideRow,
+} from "./message-overrides";
+
 // Staff management queries (lottery, offers, waitlist, enrollment, comms, settings)
 export {
   getStaffPendingDocuments,

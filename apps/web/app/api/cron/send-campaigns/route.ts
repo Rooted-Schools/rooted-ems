@@ -9,6 +9,9 @@ import {
   type CampaignTemplateKey,
 } from "@/lib/email-templates";
 import { getSuppressedEmails, unsubscribeUrl } from "@/lib/email-compliance";
+import { getCampusLogoAbsoluteUrl } from "@/lib/campus-identity";
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
 /**
  * Cron endpoint that drains active email campaigns at each campaign's
@@ -39,7 +42,7 @@ export async function GET(request: NextRequest) {
 
   const { data: campaigns, error: fetchErr } = await supabase
     .from("lead_campaign")
-    .select("id, campus_id, name, template_key, payload, daily_limit, sent_count, total_recipients, campus:campus_id (name, email)")
+    .select("id, campus_id, name, template_key, payload, daily_limit, sent_count, total_recipients, campus:campus_id (name, email, short_code)")
     .eq("status", "sending")
     .order("created_at", { ascending: true });
 
@@ -56,12 +59,15 @@ export async function GET(request: NextRequest) {
   for (const campaign of campaigns ?? []) {
     if (totalSent >= RUN_CAP) break;
 
-    const campus = campaign.campus as unknown as { name: string; email: string | null } | null;
+    const campus = campaign.campus as unknown as { name: string; email: string | null; short_code: string | null } | null;
     const campusName = campus?.name ?? "your school";
     const template = renderCampaignEmail(
       campaign.template_key as CampaignTemplateKey,
       (campaign.payload ?? {}) as CampaignPayload,
-      campusName
+      campusName,
+      // Without this a campaign arrives with no campus mark while every
+      // transactional email carries one.
+      getCampusLogoAbsoluteUrl(campus?.short_code, APP_URL)
     );
 
     const batchSize = Math.min(campaign.daily_limit as number, RUN_CAP - totalSent);

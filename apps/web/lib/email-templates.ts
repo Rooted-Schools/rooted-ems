@@ -149,11 +149,14 @@ export function staffComposedEmail({
   message,
   campusName,
   senderName,
+  campusLogoUrl,
 }: {
   subject: string;
   message: string;
   campusName: string;
   senderName?: string;
+  /** Absolute campus logo URL. Omitted, the mark degrades to the campus name. */
+  campusLogoUrl?: string;
 }): EmailTemplate {
   const paragraphs = message
     .split(/\n{2,}/)
@@ -165,9 +168,18 @@ export function staffComposedEmail({
     .map((p) => `<p style="margin:0 0 16px 0;">${escapeHtml(p).replace(/\n/g, "<br />")}</p>`)
     .join("\n");
 
+  // This template keeps its own shell rather than calling renderEmail, because
+  // a staff member writes one language and renderEmail lays out two. It still
+  // has to carry the campus mark, or a message from a school arrives looking
+  // like it came from nowhere.
+  const mark = campusLogoUrl
+    ? `<img src="${campusLogoUrl}" alt="${escapeHtml(campusName)}" width="120" style="display:block;margin:0 0 20px 0;max-width:120px;height:auto;" />`
+    : `<p style="margin:0 0 20px 0;font-size:14px;font-weight:bold;color:${TEXT_COLOR};">${escapeHtml(campusName)}</p>`;
+
   const html = `
 <div style="margin:0 auto;max-width:600px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:${TEXT_COLOR};padding:24px;">
   <div style="border-top:4px solid ${BRAND_GREEN};padding-top:24px;">
+    ${mark}
     ${bodyHtml}
     <p style="margin:24px 0 0 0;">${escapeHtml(closing)}</p>
   </div>
@@ -540,8 +552,17 @@ export const CAMPAIGN_TEMPLATES: Record<CampaignTemplateKey, { label: string; de
 export function renderCampaignEmail(
   templateKey: CampaignTemplateKey,
   payload: CampaignPayload,
-  campusName: string
+  campusName: string,
+  /**
+   * Absolute URL of the campus logo. Optional only so an old call site cannot
+   * break at compile time; every real send path should pass it. Without it a
+   * campaign or journey email arrives with no campus mark, while every
+   * transactional email carries one, which is why campaign sends looked
+   * unbranded next to the rest of the system.
+   */
+  campusLogoUrl?: string
 ): EmailTemplate {
+  const header = { campusLogoUrl, campusName };
   switch (templateKey) {
     case "reintroduction": {
       const { html, text } = renderEmail(
@@ -564,7 +585,8 @@ export function renderCampaignEmail(
           ],
           cta: { label: "Iniciar su solicitud", url: `${APP_URL}/login` },
           closing: `Sería un honor darle la bienvenida a su familia. El Equipo de Inscripción de ${campusName}`,
-        }
+        },
+        header
       );
       return withCampaignFooter({
         subject: `Your seat at ${campusName} is waiting / Su cupo en ${campusName} le espera`,
@@ -598,7 +620,8 @@ export function renderCampaignEmail(
           ],
           cta: { label: "Conozca más y aplique", url: `${APP_URL}` },
           closing: `¡Esperamos verle allí! El Equipo de ${campusName}`,
-        }
+        },
+        header
       );
       return withCampaignFooter({
         subject: `You're invited: ${eventName} at ${campusName} / Está invitado/a`,
@@ -629,7 +652,8 @@ export function renderCampaignEmail(
           ],
           cta: { label: "Aplique antes de la fecha límite", url: `${APP_URL}/login` },
           closing: `Estamos para ayudarle. El Equipo de Inscripción de ${campusName}`,
-        }
+        },
+        header
       );
       return withCampaignFooter({
         subject: `Applications close ${deadline} at ${campusName} / Las solicitudes cierran pronto`,
@@ -657,7 +681,8 @@ export function renderCampaignEmail(
           paragraphs: [...(paragraphsEs.length > 0 ? paragraphsEs : paragraphsEn), OPT_OUT_ES],
           cta,
           closing: `Cordialmente, el Equipo de ${campusName}`,
-        }
+        },
+        header
       );
       return withCampaignFooter({
         subject: payload.subject || `A note from ${campusName}`,
@@ -873,38 +898,137 @@ export function eventFollowupNoShow({
   };
 }
 
+// ─── Inquiry welcome (the one campus-editable message) ───────────────────────
+
+/** Campus-authored replacement for the inquiry welcome's subject and body. */
+export interface InquiryWelcomeOverride {
+  subjectEn: string;
+  subjectEs: string;
+  bodyEn: string;
+  bodyEs: string;
+}
+
+/**
+ * Merge fields substituted in an edited subject or body. Anything else in
+ * double braces is left as typed rather than blanked, so a misspelled token
+ * shows up as itself instead of vanishing from the family's email.
+ * Exported so the settings editor names exactly the tokens that work.
+ */
+export const INQUIRY_WELCOME_MERGE_FIELDS = [
+  { token: "{{first_name}}", label: "the family's first name" },
+  { token: "{{campus_name}}", label: "the campus name" },
+] as const;
+
+/** Stand-in used to build INQUIRY_WELCOME_DEFAULT_TEXT below. */
+const CAMPUS_NAME_TOKEN = "{{campus_name}}";
+
+/**
+ * The built-in copy, written once as a function of the campus name. The email
+ * that sends and the default text the settings editor pre-fills both come
+ * from these literals — the send passes the real campus name, the editor
+ * default passes the {{campus_name}} token — so the two cannot drift.
+ */
+function inquiryWelcomeSubjects(campusName: string): { en: string; es: string } {
+  return {
+    en: `Great to meet you at ${campusName}!`,
+    es: `¡Un gusto conocerle en ${campusName}!`,
+  };
+}
+
+function inquiryWelcomeParagraphs(campusName: string): { en: string[]; es: string[] } {
+  return {
+    en: [
+      `Thank you for your interest in ${campusName}! We're excited to tell you more about what makes our school special: career-connected learning, real industry partnerships, and a personalized pathway for every student.`,
+      "Someone from our enrollment team will reach out personally soon. In the meantime, you can start an application anytime. It takes just a few minutes on your phone.",
+    ],
+    es: [
+      `¡Gracias por su interés en ${campusName}! Nos encantaría contarle más sobre lo que hace especial a nuestra escuela: aprendizaje conectado con carreras, alianzas reales con la industria y un camino personalizado para cada estudiante.`,
+      "Alguien de nuestro equipo de inscripción se comunicará con usted personalmente pronto. Mientras tanto, puede iniciar una solicitud en cualquier momento. Toma solo unos minutos desde su teléfono.",
+    ],
+  };
+}
+
+/**
+ * The built-in copy in storage shape: paragraphs separated by a blank line,
+ * matching campus_message_override.body_en / body_es. This is what the editor
+ * shows a campus that has never overridden the message.
+ */
+export const INQUIRY_WELCOME_DEFAULT_TEXT: InquiryWelcomeOverride = {
+  subjectEn: inquiryWelcomeSubjects(CAMPUS_NAME_TOKEN).en,
+  subjectEs: inquiryWelcomeSubjects(CAMPUS_NAME_TOKEN).es,
+  bodyEn: inquiryWelcomeParagraphs(CAMPUS_NAME_TOKEN).en.join("\n\n"),
+  bodyEs: inquiryWelcomeParagraphs(CAMPUS_NAME_TOKEN).es.join("\n\n"),
+};
+
+/**
+ * A stored body is plain text whose paragraphs are separated by a blank line.
+ * CRLF is normalized first: a textarea posted from a Windows browser sends
+ * \r\n, and "\r\n\r\n" has to split the same way "\n\n" does.
+ */
+export function splitBodyIntoParagraphs(body: string): string[] {
+  return body
+    .replace(/\r\n?/g, "\n")
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter((paragraph) => paragraph.length > 0);
+}
+
+export function applyInquiryMergeFields(
+  value: string,
+  values: { firstName?: string; campusName: string }
+): string {
+  return value.replace(/\{\{\s*(first_name|campus_name)\s*\}\}/g, (_match, field: string) =>
+    field === "first_name" ? values.firstName ?? "" : values.campusName
+  );
+}
+
 export function inquiryWelcome({
   guardianFirstName,
   campusName,
   campusLogoUrl,
+  override,
 }: {
   guardianFirstName?: string;
   campusName: string;
   campusLogoUrl?: string;
+  /**
+   * Campus-authored subject and body. The greeting, the button, and the
+   * closing are never taken from an override: the call-to-action link and the
+   * branding around it cannot be broken by an edit. With no override the
+   * output is byte-identical to the built-in message.
+   */
+  override?: InquiryWelcomeOverride;
 }): EmailTemplate {
+  const subjects = inquiryWelcomeSubjects(campusName);
+  const defaults = inquiryWelcomeParagraphs(campusName);
+  const merge = (value: string) =>
+    applyInquiryMergeFields(value, { firstName: guardianFirstName, campusName });
+
+  // An override that trims down to nothing falls back to the built-in copy.
+  // Validation in lib/mutations/message-overrides.ts already refuses to store
+  // one, but a send is not the place to discover a bad row.
+  const overrideEn = override ? splitBodyIntoParagraphs(merge(override.bodyEn)) : [];
+  const overrideEs = override ? splitBodyIntoParagraphs(merge(override.bodyEs)) : [];
+  const subjectEn = (override && merge(override.subjectEn).trim()) || subjects.en;
+  const subjectEs = (override && merge(override.subjectEs).trim()) || subjects.es;
+
   const { html, text } = renderEmail(
     {
       greeting: guardianFirstName ? `Hello ${guardianFirstName},` : "Hello,",
-      paragraphs: [
-        `Thank you for your interest in ${campusName}! We're excited to tell you more about what makes our school special: career-connected learning, real industry partnerships, and a personalized pathway for every student.`,
-        "Someone from our enrollment team will reach out personally soon. In the meantime, you can start an application anytime. It takes just a few minutes on your phone.",
-      ],
+      paragraphs: overrideEn.length > 0 ? overrideEn : defaults.en,
       cta: { label: "Start an application", url: `${APP_URL}/login` },
       closing: "Warmly, the Rooted Schools Enrollment Team",
     },
     {
       greeting: guardianFirstName ? `Hola ${guardianFirstName},` : "Hola,",
-      paragraphs: [
-        `¡Gracias por su interés en ${campusName}! Nos encantaría contarle más sobre lo que hace especial a nuestra escuela: aprendizaje conectado con carreras, alianzas reales con la industria y un camino personalizado para cada estudiante.`,
-        "Alguien de nuestro equipo de inscripción se comunicará con usted personalmente pronto. Mientras tanto, puede iniciar una solicitud en cualquier momento. Toma solo unos minutos desde su teléfono.",
-      ],
+      paragraphs: overrideEs.length > 0 ? overrideEs : defaults.es,
       cta: { label: "Iniciar una solicitud", url: `${APP_URL}/login` },
       closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
     },
     { campusLogoUrl, campusName }
   );
   return {
-    subject: `Great to meet you at ${campusName}! / ¡Un gusto conocerle en ${campusName}!`,
+    subject: `${subjectEn} / ${subjectEs}`,
     html,
     text,
   };

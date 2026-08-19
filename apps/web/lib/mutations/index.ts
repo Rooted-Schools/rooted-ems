@@ -91,6 +91,16 @@ export {
   type AdoptPolicyInput,
 } from "./lottery-policy";
 
+// Per-campus message override mutations
+export {
+  saveCampusMessageOverride,
+  resetCampusMessageOverride,
+  validateMessageOverride,
+  MESSAGE_OVERRIDE_SUBJECT_MAX,
+  MESSAGE_OVERRIDE_BODY_MAX,
+  type SaveCampusMessageOverrideInput,
+} from "./message-overrides";
+
 // Lead (CRM) mutations
 export {
   createLeadFromInquiry,

@@ -44,6 +44,7 @@ import type { EmailTemplate } from "@/lib/email-templates";
 import { recordWaitlistPositionHistory } from "@/lib/mutations/waitlist-history";
 import { registrationNudgeSubject, registrationNudgeBody, registrationNudgeSms } from "@/lib/nudge-copy";
 import { getCampusLogoAbsoluteUrl } from "@/lib/campus-identity";
+import { getCampusMessageOverride } from "@/lib/queries/message-overrides";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -1226,6 +1227,32 @@ interface LeadContact {
 }
 
 /**
+ * The campus's edited welcome copy, or undefined for the built-in message.
+ *
+ * Wrapped rather than called inline because this whole file's contract is
+ * that it never throws: a customization a campus may not even have made must
+ * never be the reason a family's first email fails to send. Both outcomes —
+ * no row, and a lookup that blew up — land on the built-in default.
+ */
+async function resolveInquiryWelcomeOverride(
+  campusId: string
+): Promise<emailTemplates.InquiryWelcomeOverride | undefined> {
+  try {
+    const row = await getCampusMessageOverride(campusId, "inquiryWelcome");
+    if (!row) return undefined;
+    return {
+      subjectEn: row.subject_en,
+      subjectEs: row.subject_es,
+      bodyEn: row.body_en,
+      bodyEs: row.body_es,
+    };
+  } catch (err) {
+    console.error("[notifyLeadWelcome] message override lookup failed", err);
+    return undefined;
+  }
+}
+
+/**
  * Response-engine first touch: a new inquiry gets a warm bilingual welcome
  * within minutes (email + SMS when consented), and campus staff get an
  * in-app ping so a human call follows. Speed-to-lead is the point — Harmony
@@ -1243,10 +1270,11 @@ export async function notifyLeadWelcome({
   leadId?: string;
 }): Promise<void> {
   const { name: campusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
+  const override = await resolveInquiryWelcomeOverride(campusId);
   const [emailSent, smsSent] = await Promise.all([
     emailGuardian(
       lead.email,
-      emailTemplates.inquiryWelcome({ guardianFirstName: lead.first_name, campusName, campusLogoUrl }),
+      emailTemplates.inquiryWelcome({ guardianFirstName: lead.first_name, campusName, campusLogoUrl, override }),
       "notifyLeadWelcome",
       campusEmail,
       { campusId, templateKey: "inquiryWelcome", leadId, kind: "welcome" }

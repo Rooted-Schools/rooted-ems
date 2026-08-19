@@ -3,7 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { requireMinRole, hasRoleOnCampus } from "@/lib/auth/get-session";
-import { pauseJourney, resumeJourney, exitEnrollment, enrollLeadInJourneyById } from "@/lib/mutations/journeys";
+import {
+  pauseJourney,
+  resumeJourney,
+  exitEnrollment,
+  enrollLeadInJourneyById,
+  updateJourneyStepContent,
+  type UpdateJourneyStepContentInput,
+} from "@/lib/mutations/journeys";
 import { getEnrollableLeads, type EnrollableLead } from "@/lib/queries/journeys";
 
 /**
@@ -105,4 +112,26 @@ export async function staffSearchEnrollableLeads(
 ): Promise<EnrollableLead[]> {
   await requireMinRole("enrollment_manager");
   return getEnrollableLeads(journeyId, options);
+}
+
+/**
+ * Save one journey step's wording.
+ *
+ * Note what is NOT here: no campus id, and no role gate in this function.
+ * Both live inside updateJourneyStepContent, which resolves the step's own
+ * journey and campus from the database before checking the caller's role
+ * against it. A gate here would only be checking a role the caller holds
+ * somewhere, which is the exact gap requireRoleOnCampus exists to close.
+ */
+export async function staffUpdateJourneyStepContent(
+  journeyId: string,
+  input: UpdateJourneyStepContentInput
+) {
+  const result = await updateJourneyStepContent(input);
+  if (!result.error) {
+    revalidatePath("/staff/recruitment/journeys");
+    revalidatePath(`/staff/recruitment/journeys/${journeyId}`);
+    revalidatePath("/staff/communications/automated-messages");
+  }
+  return result;
 }
