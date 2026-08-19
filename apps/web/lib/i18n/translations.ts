@@ -783,6 +783,13 @@ const dict = {
   "offers.declinedPost":      { en: "If this was a mistake, please contact the school directly.", es: "Si esto fue un error, por favor comuníquese directamente con la escuela." },
   "offers.expiredPre":        { en: "The offer deadline for", es: "La fecha límite de la oferta para" },
   "offers.expiredPost":       { en: "has passed. Please contact the school to ask about your options.", es: "ha pasado. Por favor comuníquese con la escuela para conocer sus opciones." },
+  // Contact block shown on the offer dead-end screens (declined / expired) so a
+  // family always has a real way to reach the school.
+  "offers.needHelp":          { en: "Need help?",            es: "¿Necesita ayuda?" },
+  "offers.emailSchool":       { en: "Email",                 es: "Escriba a" },
+  "offers.contactOr":         { en: "or",                    es: "o" },
+  "offers.sendMessage":       { en: "send us a message",     es: "envíenos un mensaje" },
+  "offers.sendMessageCap":    { en: "Send us a message",     es: "Envíenos un mensaje" },
   "offers.offeredSeatAt":     { en: "has been offered a seat at", es: "ha recibido una oferta de cupo en" },
   "offers.acceptingFor":      { en: "You are accepting the enrollment offer for", es: "Está aceptando la oferta de inscripción para" },
   "offers.directedToPacket":  { en: "You will be directed to complete the registration packet.", es: "Será dirigido/a a completar el paquete de registro." },
@@ -842,6 +849,17 @@ const dict = {
   "docs.couldNotOpen":        { en: "Could not open document", es: "No se pudo abrir el documento" },
   "docs.fileTooLarge":        { en: "File is too large ({size}). Maximum size is {maxMb}MB.", es: "El archivo es demasiado grande ({size}). El tamaño máximo es {maxMb}MB." },
   "docs.fileTypeUnsupported": { en: "File type \"{type}\" is not supported. Please upload a PDF or image file (JPEG, PNG).", es: "El tipo de archivo \"{type}\" no es compatible. Por favor cargue un PDF o una imagen (JPEG, PNG)." },
+  // Stable-code error messages. Storage upload (lib/storage/upload.ts) and the
+  // createDocumentRecord mutation return codes, never raw provider text; the
+  // client maps each code to one of these via UPLOAD_ERROR_TRANSLATION_KEY /
+  // DOCUMENT_RECORD_ERROR_TRANSLATION_KEY.
+  "docs.error.uploadFailed":    { en: "We could not upload your file. Please check your connection and try again.", es: "No pudimos cargar su archivo. Por favor revise su conexión e intente de nuevo." },
+  "docs.error.fileTooLarge":    { en: "That file is too large. The maximum size is 10 MB. Please choose a smaller file.", es: "Ese archivo es demasiado grande. El tamaño máximo es 10 MB. Por favor elija un archivo más pequeño." },
+  "docs.error.unsupportedType": { en: "That file type is not supported. Please upload a PDF or an image (JPEG or PNG).", es: "Ese tipo de archivo no es compatible. Por favor cargue un PDF o una imagen (JPEG o PNG)." },
+  "docs.error.notSignedIn":     { en: "Your session has ended. Please sign in again and try once more.", es: "Su sesión ha terminado. Por favor inicie sesión de nuevo e intente otra vez." },
+  "docs.error.notAuthorized":   { en: "We could not add this document to your application. Please try again, or contact the enrollment team if it keeps happening.", es: "No pudimos agregar este documento a su solicitud. Por favor intente de nuevo, o comuníquese con el equipo de inscripción si el problema continúa." },
+  "docs.error.noStudent":       { en: "This application does not have a student on file yet. Please finish the application first, then upload your documents.", es: "Esta solicitud aún no tiene un estudiante registrado. Por favor complete la solicitud primero y luego cargue sus documentos." },
+  "docs.error.recordFailed":    { en: "We could not save your document. Please try again in a moment.", es: "No pudimos guardar su documento. Por favor intente de nuevo en un momento." },
   "docs.emptyNoApps":         { en: "Start an enrollment application to upload documents.", es: "Inicie una solicitud de inscripción para cargar documentos." },
   "docs.emptyWithApps":       { en: "Use the Upload Document button to add files to your application.", es: "Use el botón Cargar Documento para agregar archivos a su solicitud." },
   "docs.acrossApps":          { en: "document(s) across your applications.", es: "documento(s) en sus solicitudes." },

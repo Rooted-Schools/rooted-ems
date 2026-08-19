@@ -16,9 +16,19 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import { IconFileText, IconAlertTriangle, IconInfo, IconX } from "@/components/ui/icons";
-import { uploadFile, getSignedUrl, formatFileSize, validateFile, formatFileValidationError } from "@/lib/storage/upload";
+import {
+  uploadFile,
+  getSignedUrl,
+  formatFileSize,
+  validateFile,
+  formatFileValidationError,
+  UPLOAD_ERROR_TRANSLATION_KEY,
+  DOCUMENT_RECORD_ERROR_TRANSLATION_KEY,
+  type UploadErrorCode,
+} from "@/lib/storage/upload";
 import { compressImageFile } from "@/lib/storage/compress-image";
 import { familyCreateDocumentRecord } from "@/app/family/applications/actions";
+import type { DocumentRecordErrorCode } from "@/lib/mutations/documents";
 import { useLocale } from "@/lib/i18n/locale-context";
 import { type TranslationKey } from "@/lib/i18n/translations";
 
@@ -165,7 +175,9 @@ export function DocumentsClient({ documents, applications, userId, timeZone }: D
     if (!storagePath) return;
     const { url, error } = await getSignedUrl(storagePath);
     if (error) {
-      toast({ variant: "error", title: t("docs.couldNotOpen"), description: error, dismissLabel: t("common.dismiss") });
+      // error is a stable code, never raw provider text; the title alone is
+      // the family-facing message.
+      toast({ variant: "error", title: t("docs.couldNotOpen"), dismissLabel: t("common.dismiss") });
       return;
     }
     if (url) {
@@ -384,18 +396,21 @@ function UploadDialog({
   const [compressing, setCompressing] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Item 10: filter out doc types already successfully uploaded for the selected app.
-  // "Other" is always available (multiple other docs can exist). Re-upload (initialDocType)
-  // is always included even if it's already on file (that's the whole point of re-uploading).
-  // Also include docs where application_id is null (unscoped / globally uploaded docs).
+  // Item 10: filter out doc types already ON FILE AND VERIFIED for the selected app.
+  // Only a VERIFIED document is protected from replacement — a still-pending
+  // upload can be redone (A6: a family who uploaded a blurry file must be able
+  // to replace it before staff review instead of being forced into "Other").
+  // "Other" is always available (multiple other docs can exist). Re-upload
+  // (initialDocType) is always included even if it's already on file (that's the
+  // whole point of re-uploading). Also include docs where application_id is null
+  // (unscoped / globally uploaded docs).
   const availableDocTypes = useMemo(() => {
     const uploadedForApp = new Set(
       documents
         .filter(
           (d) =>
             (d.application_id === selectedApp || !d.application_id) &&
-            d.status !== "rejected" &&
-            d.status !== "expired"
+            d.status === "verified"
         )
         .map((d) => d.document_type)
     );
@@ -462,6 +477,16 @@ function UploadDialog({
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
+  // Map the stable codes returned by uploadFile / createDocumentRecord to a
+  // bilingual message. Unknown codes fall back to a generic failure so a family
+  // never sees a raw code.
+  function uploadErrorMessage(code: string): string {
+    return t(UPLOAD_ERROR_TRANSLATION_KEY[code as UploadErrorCode] ?? "docs.error.uploadFailed");
+  }
+  function docRecordErrorMessage(code: string): string {
+    return t(DOCUMENT_RECORD_ERROR_TRANSLATION_KEY[code as DocumentRecordErrorCode] ?? "docs.error.recordFailed");
+  }
+
   async function handleUpload() {
     if (selectedFiles.length === 0 || !selectedApp) return;
 
@@ -480,7 +505,7 @@ function UploadDialog({
       for (const { file } of selectedFiles) {
         const result = await uploadFile(file, userId);
         if (result.error) {
-          failures.push(`${file.name}: ${result.error}`);
+          failures.push(`${file.name}: ${uploadErrorMessage(result.error)}`);
           continue;
         }
 
@@ -495,7 +520,7 @@ function UploadDialog({
         });
 
         if (dbResult.error) {
-          failures.push(`${file.name}: ${dbResult.error}`);
+          failures.push(`${file.name}: ${docRecordErrorMessage(dbResult.error)}`);
           continue;
         }
 

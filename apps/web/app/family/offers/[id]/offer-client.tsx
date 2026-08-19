@@ -65,6 +65,36 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
   const [declineReason, setDeclineReason] = useState<DeclineReason | null>(null);
   const [declineNote, setDeclineNote] = useState("");
 
+  // B9: the offer dead-end screens (declined / expired) told families to
+  // "contact the school" with no way to do it. Give them a real path: the
+  // campus email as a mailto (populated for every pilot campus, null-safe here)
+  // and a link into the in-portal messages. Bilingual via translations.ts.
+  const contactHelp = (
+    <p className="text-sm text-stone-text max-w-xs mx-auto">
+      {t("offers.needHelp")}{" "}
+      {offer.campus_email ? (
+        <>
+          {t("offers.emailSchool")}{" "}
+          <a href={`mailto:${offer.campus_email}`} className="text-rooted-green underline hover:no-underline">
+            {offer.campus_email}
+          </a>{" "}
+          {t("offers.contactOr")}{" "}
+          <Link href="/family/messages" className="text-rooted-green underline hover:no-underline">
+            {t("offers.sendMessage")}
+          </Link>
+          .
+        </>
+      ) : (
+        <>
+          <Link href="/family/messages" className="text-rooted-green underline hover:no-underline">
+            {t("offers.sendMessageCap")}
+          </Link>
+          .
+        </>
+      )}
+    </p>
+  );
+
   // ── Already-handled states ─────────────────────────────────────────────────
 
   if (offer.status === "accepted") {
@@ -100,6 +130,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
           <p className="text-sm text-stone-text max-w-xs mx-auto">
             {t("offers.declinedPre")} {offer.student_name}. {t("offers.declinedPost")}
           </p>
+          {contactHelp}
           <Link href="/family/dashboard">
             <Button variant="outline">{t("common.backToDashboard")}</Button>
           </Link>
@@ -119,6 +150,7 @@ export function OfferResponseClient({ offer, guardianId }: Props) {
           <p className="text-sm text-stone-text max-w-xs mx-auto">
             {t("offers.expiredPre")} {offer.student_name} {t("offers.expiredPost")}
           </p>
+          {contactHelp}
           <Link href="/family/dashboard">
             <Button variant="outline">{t("common.backToDashboard")}</Button>
           </Link>

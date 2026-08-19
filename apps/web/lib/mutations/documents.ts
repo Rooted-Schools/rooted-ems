@@ -121,6 +121,18 @@ export async function reviewDocument(
 // ─── Create Document Record ────────────────────────────
 
 /**
+ * Stable, family-facing error codes returned by createDocumentRecord. A server
+ * mutation cannot call the client-side translator, so it returns a code and the
+ * two display sites (documents-client, detail-client) map it to a bilingual
+ * message via DOCUMENT_RECORD_ERROR_TRANSLATION_KEY in lib/storage/upload.ts.
+ */
+export type DocumentRecordErrorCode =
+  | "not_signed_in"
+  | "not_authorized"
+  | "no_student"
+  | "record_failed";
+
+/**
  * True when `storagePath` sits inside the authenticated user's own upload
  * folder — the `{userId}/...` layout lib/storage/upload.ts writes.
  *
@@ -164,13 +176,13 @@ export async function createDocumentRecord(input: {
 }): Promise<MutationResult<{ id: string }>> {
   const authClient = await createServerClient();
   const { data: { user } } = await authClient.auth.getUser();
-  if (!user) return { data: null, error: "Not authenticated" };
+  if (!user) return { data: null, error: "not_signed_in" };
 
   const supabase = createServiceRoleClient();
 
   // The uploader may only claim a file stored under their own user folder.
   if (!isOwnStoragePath(input.storage_path, user.id)) {
-    return { data: null, error: "Not authorized" };
+    return { data: null, error: "not_authorized" };
   }
 
   // Verify calling user owns this application, and take the student from it
@@ -181,12 +193,12 @@ export async function createDocumentRecord(input: {
     .single();
   const appGuardian = appOwner?.guardian as unknown as { user_id: string } | null;
   if (!appGuardian || appGuardian.user_id !== user.id) {
-    return { data: null, error: "Not authorized" };
+    return { data: null, error: "not_authorized" };
   }
 
   const studentId = (appOwner?.student_id as string | null) ?? null;
   if (!studentId) {
-    return { data: null, error: "This application has no student on file." };
+    return { data: null, error: "no_student" };
   }
 
   const { data: doc, error } = await supabase
@@ -206,7 +218,7 @@ export async function createDocumentRecord(input: {
 
   if (error || !doc) {
     console.error("[createDocumentRecord]", error?.message);
-    return { data: null, error: "Failed to create document record" };
+    return { data: null, error: "record_failed" };
   }
 
   await logAuditEvent({
