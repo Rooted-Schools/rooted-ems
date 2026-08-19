@@ -1,5 +1,11 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
-import { requireMinRole, requireRoleOnCampus } from "@/lib/auth/get-session";
+import {
+  requireMinRole,
+  requireRoleOnCampus,
+  requireNetworkAccess,
+  requireStaffSession,
+  hasRoleOnCampus,
+} from "@/lib/auth/get-session";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
 import type { MutationResult } from "./applications";
 
@@ -22,7 +28,7 @@ export interface CreateEnrollmentWindowInput {
 export async function createEnrollmentWindow(
   input: CreateEnrollmentWindowInput
 ): Promise<MutationResult<{ id: string }>> {
-  await requireMinRole("enrollment_manager");
+  await requireRoleOnCampus(input.campus_id, "enrollment_manager");
   try {
     const supabase = createServiceRoleClient();
 
@@ -51,10 +57,23 @@ export async function updateEnrollmentWindowStatus(
   windowId: string,
   status: "draft" | "open" | "closed" | "archived"
 ): Promise<MutationResult> {
-  await requireMinRole("enrollment_manager");
-  try {
-    const supabase = createServiceRoleClient();
+  const supabase = createServiceRoleClient();
 
+  // The id is a windowId, not a campus_id — resolve the record's real campus
+  // and gate on THAT before writing, so a manager on one campus cannot flip
+  // another campus's window state by supplying its id. The lookup + gate sit
+  // outside the try so requireRoleOnCampus's redirect propagates instead of
+  // being swallowed into a generic error.
+  const { data: windowRow } = await supabase
+    .from("enrollment_window")
+    .select("campus_id")
+    .eq("id", windowId)
+    .single();
+  if (!windowRow) return { data: null, error: "Enrollment window not found." };
+
+  await requireRoleOnCampus(windowRow.campus_id as string, "enrollment_manager");
+
+  try {
     const { error } = await supabase
       .from("enrollment_window")
       .update({ status })
@@ -85,7 +104,21 @@ export async function updateEnrollmentWindow(
   windowId: string,
   input: UpdateEnrollmentWindowInput
 ): Promise<MutationResult> {
-  const session = await requireMinRole("enrollment_manager");
+  const supabase = createServiceRoleClient();
+
+  // Resolve the record's real campus and gate on THAT before any write. The
+  // id is a windowId, not a campus_id, so a manager on one campus could edit
+  // another campus's window by supplying its id. Lookup + gate sit outside the
+  // try so requireRoleOnCampus's redirect propagates rather than being caught.
+  const { data: before, error: beforeError } = await supabase
+    .from("enrollment_window")
+    .select("name, open_date, close_date, campus_id")
+    .eq("id", windowId)
+    .single();
+  if (beforeError || !before) return { data: null, error: "Enrollment window not found." };
+
+  const session = await requireRoleOnCampus(before.campus_id as string, "enrollment_manager");
+
   try {
     const name = input.name.trim();
     if (!name) return { data: null, error: "Name is required." };
@@ -95,15 +128,6 @@ export async function updateEnrollmentWindow(
     if (new Date(input.close_date).getTime() <= new Date(input.open_date).getTime()) {
       return { data: null, error: "Close date must be after open date." };
     }
-
-    const supabase = createServiceRoleClient();
-
-    const { data: before, error: beforeError } = await supabase
-      .from("enrollment_window")
-      .select("name, open_date, close_date, campus_id")
-      .eq("id", windowId)
-      .single();
-    if (beforeError) return { data: null, error: beforeError.message };
 
     const { error } = await supabase
       .from("enrollment_window")
@@ -309,10 +333,21 @@ export async function updatePacketRequirement(
   requirementId: string,
   updates: { is_active?: boolean; is_required?: boolean }
 ): Promise<MutationResult> {
-  await requireMinRole("enrollment_manager");
-  try {
-    const supabase = createServiceRoleClient();
+  const supabase = createServiceRoleClient();
 
+  // The id is a requirement id, not a campus_id — resolve the record's real
+  // campus and gate on THAT before writing. Lookup + gate sit outside the try
+  // so requireRoleOnCampus's redirect is not swallowed into a generic error.
+  const { data: reqRow } = await supabase
+    .from("packet_requirement")
+    .select("campus_id")
+    .eq("id", requirementId)
+    .single();
+  if (!reqRow) return { data: null, error: "Packet requirement not found." };
+
+  await requireRoleOnCampus(reqRow.campus_id as string, "enrollment_manager");
+
+  try {
     const { error } = await supabase
       .from("packet_requirement")
       .update({
@@ -332,10 +367,38 @@ export async function bulkUpdatePacketRequirements(
   requirementIds: string[],
   updates: { is_active?: boolean; is_required?: boolean }
 ): Promise<MutationResult> {
-  await requireMinRole("enrollment_manager");
-  try {
-    const supabase = createServiceRoleClient();
+  const session = await requireStaffSession();
+  const supabase = createServiceRoleClient();
 
+  if (requirementIds.length === 0) {
+    return { data: null, error: "No requirements were selected." };
+  }
+
+  // Resolve every selected row's campus. If ANY row belongs to a campus the
+  // caller is not an enrollment_manager on, reject the whole call rather than
+  // silently updating the subset they are allowed to touch — a partial write
+  // driven by a crafted id list is exactly the cross-campus gap being closed.
+  const { data: rows, error: rowsError } = await supabase
+    .from("packet_requirement")
+    .select("campus_id")
+    .in("id", requirementIds);
+  if (rowsError) return { data: null, error: rowsError.message };
+  if (!rows || rows.length === 0) {
+    return { data: null, error: "No matching packet requirements were found." };
+  }
+
+  const campusIds = Array.from(new Set(rows.map((r) => r.campus_id as string)));
+  const unauthorized = campusIds.some(
+    (campusId) => !hasRoleOnCampus(session, campusId, "enrollment_manager")
+  );
+  if (unauthorized) {
+    return {
+      data: null,
+      error: "You are not an enrollment manager on every campus in this selection.",
+    };
+  }
+
+  try {
     const { error } = await supabase
       .from("packet_requirement")
       .update({
@@ -663,7 +726,10 @@ export async function updateSchoolYearCurrent(
   schoolYearId: string,
   isCurrent: boolean
 ): Promise<MutationResult> {
-  const session = await requireMinRole("system_admin");
+  // school_year is network-wide state (organization_id, no campus_id): flipping
+  // the current year affects every campus, so this requires true network access
+  // (system_admin on 2+ campuses), not merely system_admin somewhere.
+  const session = await requireNetworkAccess();
   try {
     const supabase = createServiceRoleClient();
 
@@ -708,7 +774,7 @@ export interface CreateGradeLevelInput {
 export async function createGradeLevel(
   input: CreateGradeLevelInput
 ): Promise<MutationResult<{ inserted: number; skipped: string[] }>> {
-  const session = await requireMinRole("system_admin");
+  const session = await requireRoleOnCampus(input.campus_id, "system_admin");
   try {
     const requested = Array.from(new Set(input.grades)).filter((g) =>
       (GRADE_LEVEL_CODES as readonly string[]).includes(g)
@@ -773,10 +839,22 @@ export async function createGradeLevel(
  * delete, with a count so staff know exactly what's in the way.
  */
 export async function deleteGradeLevel(gradeLevelId: string): Promise<MutationResult> {
-  const session = await requireMinRole("system_admin");
-  try {
-    const supabase = createServiceRoleClient();
+  const supabase = createServiceRoleClient();
 
+  // Resolve the record's real campus and gate on THAT before deleting. The id
+  // is a grade_level id, not a campus_id, so gating on the caller's role
+  // anywhere would let a single-campus admin delete another campus's grade
+  // levels. Lookup + gate sit outside the try so the redirect propagates.
+  const { data: gradeRow } = await supabase
+    .from("grade_level")
+    .select("campus_id, school_year_id, grade")
+    .eq("id", gradeLevelId)
+    .single();
+  if (!gradeRow) return { data: null, error: "Grade level not found." };
+
+  const session = await requireRoleOnCampus(gradeRow.campus_id as string, "system_admin");
+
+  try {
     const [
       { count: capacityCount, error: capError },
       { count: applicationCount, error: appError },
@@ -806,12 +884,6 @@ export async function deleteGradeLevel(gradeLevelId: string): Promise<MutationRe
         error: `Cannot delete: in use by ${applicationCount} application${applicationCount === 1 ? "" : "s"}.`,
       };
     }
-
-    const { data: gradeRow } = await supabase
-      .from("grade_level")
-      .select("campus_id, school_year_id, grade")
-      .eq("id", gradeLevelId)
-      .single();
 
     const { error } = await supabase.from("grade_level").delete().eq("id", gradeLevelId);
     if (error) {
@@ -852,7 +924,7 @@ export interface CreateCapacityPlanInput {
 export async function createCapacityPlan(
   input: CreateCapacityPlanInput
 ): Promise<MutationResult<{ id: string }>> {
-  const session = await requireMinRole("system_admin");
+  const session = await requireRoleOnCampus(input.campus_id, "system_admin");
   try {
     if (!Number.isFinite(input.total_seats) || input.total_seats < 0) {
       return { data: null, error: "Total seats must be zero or a positive number." };

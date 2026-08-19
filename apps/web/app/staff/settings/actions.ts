@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireMinRole, requireRoleOnCampus } from "@/lib/auth/get-session";
+import {
+  requireMinRole,
+  requireRoleOnCampus,
+  requireNetworkAccess,
+} from "@/lib/auth/get-session";
 import { setWelcomeMessagingEnabled } from "@/lib/messaging-flags";
 import {
   createEnrollmentWindow,
@@ -47,7 +51,9 @@ import {
  */
 
 export async function staffCreateEnrollmentWindow(input: CreateEnrollmentWindowInput) {
-  await requireMinRole("enrollment_manager");
+  // The campus this window lands on is known here, so gate on it directly —
+  // the mutation checks the same thing independently.
+  await requireRoleOnCampus(input.campus_id, "enrollment_manager");
   const result = await createEnrollmentWindow(input);
   if (!result.error) {
     revalidatePath("/staff/settings");
@@ -59,7 +65,9 @@ export async function staffUpdateWindowStatus(
   windowId: string,
   status: "draft" | "open" | "closed" | "archived"
 ) {
-  await requireMinRole("enrollment_manager");
+  // windowId is opaque here — the mutation resolves the window's real campus
+  // and gates enrollment_manager on THAT. Keeping the gate singular there
+  // avoids a weaker requireMinRole check masking the per-campus one.
   const result = await updateEnrollmentWindowStatus(windowId, status);
   if (!result.error) {
     revalidatePath("/staff/settings");
@@ -71,7 +79,8 @@ export async function staffUpdateEnrollmentWindow(
   windowId: string,
   input: UpdateEnrollmentWindowInput
 ) {
-  await requireMinRole("enrollment_manager");
+  // windowId is opaque here — the mutation resolves the window's real campus
+  // and gates enrollment_manager on THAT.
   const result = await updateEnrollmentWindow(windowId, input);
   if (!result.error) {
     revalidatePath("/staff/settings");
@@ -116,7 +125,8 @@ export async function staffUpdatePacketRequirement(
   requirementId: string,
   updates: { is_active?: boolean; is_required?: boolean }
 ) {
-  await requireMinRole("enrollment_manager");
+  // requirementId is opaque here — the mutation resolves the requirement's
+  // real campus and gates enrollment_manager on THAT.
   const result = await updatePacketRequirement(requirementId, updates);
   if (!result.error) {
     revalidatePath("/staff/settings");
@@ -129,7 +139,9 @@ export async function staffBulkUpdatePacketRequirements(
   requirementIds: string[],
   updates: { is_active?: boolean; is_required?: boolean }
 ) {
-  await requireMinRole("enrollment_manager");
+  // The ids are opaque here — the mutation resolves every row's campus and
+  // rejects the whole call if any falls outside the caller's enrollment_manager
+  // campuses.
   const result = await bulkUpdatePacketRequirements(requirementIds, updates);
   if (!result.error) {
     revalidatePath("/staff/settings");
@@ -170,10 +182,11 @@ export async function staffCopyPacketRequirements(
 }
 
 /**
- * School-year setup actions. All gated system_admin — the mutation layer
- * enforces this independently (see lib/mutations/settings.ts), the gate here
- * just fails fast before any DB round trip. The settings UI hides these
- * controls for lower roles, but that is a courtesy, not the boundary.
+ * School-year setup actions. Creating a year is system_admin; flipping which
+ * year is current is network-wide state and requires network access. The
+ * mutation layer enforces each independently (see lib/mutations/settings.ts);
+ * the gate here just fails fast before any DB round trip. The settings UI hides
+ * these controls for lower roles, but that is a courtesy, not the boundary.
  */
 
 export async function staffCreateSchoolYear(input: CreateSchoolYearInput) {
@@ -186,7 +199,10 @@ export async function staffCreateSchoolYear(input: CreateSchoolYearInput) {
 }
 
 export async function staffUpdateSchoolYearCurrent(schoolYearId: string, isCurrent: boolean) {
-  await requireMinRole("system_admin");
+  // school_year is network-wide (no campus_id): flipping the current year moves
+  // it for every campus, so this requires network access, not system_admin on
+  // any single campus. The mutation enforces the same independently.
+  await requireNetworkAccess();
   const result = await updateSchoolYearCurrent(schoolYearId, isCurrent);
   if (!result.error) {
     revalidatePath("/staff/settings");
@@ -196,7 +212,9 @@ export async function staffUpdateSchoolYearCurrent(schoolYearId: string, isCurre
 }
 
 export async function staffCreateGradeLevel(input: CreateGradeLevelInput) {
-  await requireMinRole("system_admin");
+  // The campus is known here, so gate on it directly — the mutation checks the
+  // same thing independently.
+  await requireRoleOnCampus(input.campus_id, "system_admin");
   const result = await createGradeLevel(input);
   if (!result.error) {
     revalidatePath("/staff/settings");
@@ -205,7 +223,8 @@ export async function staffCreateGradeLevel(input: CreateGradeLevelInput) {
 }
 
 export async function staffDeleteGradeLevel(gradeLevelId: string) {
-  await requireMinRole("system_admin");
+  // gradeLevelId is opaque here — the mutation resolves the grade level's real
+  // campus and gates system_admin on THAT.
   const result = await deleteGradeLevel(gradeLevelId);
   if (!result.error) {
     revalidatePath("/staff/settings");
@@ -215,12 +234,14 @@ export async function staffDeleteGradeLevel(gradeLevelId: string) {
 
 /**
  * Owner-facing pause switch for the instant bilingual welcome (see
- * lib/messaging-flags.ts). system_admin only — this is a network-wide
- * on/off, not an operational setting an enrollment_manager should be able
- * to flip while a campus team is mid-training.
+ * lib/messaging-flags.ts). Network access only — this is a network-wide
+ * on/off, not an operational setting a single-campus admin or an
+ * enrollment_manager should be able to flip while a campus team is mid-training.
  */
 export async function staffSetWelcomeMessages(enabled: boolean) {
-  const session = await requireMinRole("system_admin");
+  // Network-wide on/off switch — requires network access (system_admin on 2+
+  // campuses), not merely system_admin on one campus.
+  const session = await requireNetworkAccess();
   const result = await setWelcomeMessagingEnabled(enabled, session.user_id);
   if (!result.error) {
     revalidatePath("/staff/settings");
@@ -257,7 +278,9 @@ export async function staffResetMessageOverride(campusId: string, templateKey: s
 }
 
 export async function staffCreateCapacityPlan(input: CreateCapacityPlanInput) {
-  await requireMinRole("system_admin");
+  // The campus is known here, so gate on it directly — the mutation checks the
+  // same thing independently.
+  await requireRoleOnCampus(input.campus_id, "system_admin");
   const result = await createCapacityPlan(input);
   if (!result.error) {
     revalidatePath("/staff/settings");

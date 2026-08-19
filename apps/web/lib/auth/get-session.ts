@@ -262,17 +262,6 @@ export async function requireMinRole(minRole: string): Promise<AuthSession> {
 }
 
 /**
- * Require CMO-level access (system_admin on 2+ campuses).
- */
-export async function requireCMOAccess(): Promise<AuthSession> {
-  const session = await requireStaffSession();
-  if (!isCMOAdmin(session)) {
-    redirect("/staff/today?denied=1"); // Authenticated but insufficient role
-  }
-  return session;
-}
-
-/**
  * Check if the user holds at least minRole on a SPECIFIC campus.
  *
  * This is NOT the same question as hasMinRole, which checks the caller's
