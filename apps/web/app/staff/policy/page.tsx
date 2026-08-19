@@ -27,7 +27,14 @@ export default async function StaffPolicyPage({
     (c) => accessibleIds.length === 0 || accessibleIds.includes(c.id)
   );
 
-  const campusId = activeCampus ?? visibleCampuses[0]?.id ?? null;
+  // Never guess a campus for an org-wide admin with no active lens. getCampuses
+  // orders alphabetically, so falling back to visibleCampuses[0] silently bound
+  // a drafted or adopted lottery policy to C.R. Neal — the wrong campus, with no
+  // warning. Use the active selection when present; otherwise resolve to a
+  // campus only when the caller has exactly one visible, and pass null so the
+  // editor renders a "choose a campus" prompt instead of binding to a guess.
+  const campusId =
+    activeCampus ?? (visibleCampuses.length === 1 ? visibleCampuses[0].id : null);
   const campus = visibleCampuses.find((c) => c.id === campusId) ?? null;
 
   const versions: PolicyVersionView[] = campusId
