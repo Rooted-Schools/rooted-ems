@@ -58,6 +58,24 @@ interface MessageTemplate {
   channel: string;
   merge_fields: string[];
   is_active: boolean;
+  /** Owning campus; null is a network-level template mailing from every campus. */
+  campus_id: string | null;
+  /** Resolved campus name for the scope label, null for a network template. */
+  campus_name: string | null;
+}
+
+/** Sentinel for the "All campuses (network)" option — only a CMO admin sees it. */
+const NETWORK_CAMPUS = "__network__";
+
+/**
+ * Scope label for a template row: the campus name, or "All campuses" when the
+ * template is network-level (null campus_name). Mirrors templateScopeLabel in
+ * lib/queries/staff.ts; duplicated here because that module is server-only and
+ * cannot be imported into a client component.
+ */
+function scopeLabel(campusName: string | null): string {
+  const name = campusName?.trim();
+  return name && name.length > 0 ? name : "All campuses";
 }
 
 interface Recipient {
@@ -78,6 +96,15 @@ interface CommsClientProps {
   recipients: Recipient[];
   campuses: { id: string; name: string }[];
   staffUserId: string;
+  /**
+   * True when the viewer is a CMO admin (system_admin on 2+ campuses). Only a
+   * CMO admin may create a network-level template, so only they see the
+   * "All campuses (network)" option in the New Template dialog. Defaults to
+   * false so a page that has not wired the flag yet never offers the network
+   * option — every template is created campus-scoped, which is the safe
+   * default. The mutation's authorizeTemplate gate is the real enforcement.
+   */
+  isCMOAdmin?: boolean;
 }
 
 // ─── Constants ──────────────────────────────────────────
@@ -141,6 +168,7 @@ export function CommsClient({
   recipients,
   campuses,
   staffUserId,
+  isCMOAdmin = false,
 }: CommsClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -428,6 +456,9 @@ export function CommsClient({
                             <ChannelIcon channel={tpl.channel} size={12} />
                             {channelLabels[tpl.channel] ?? tpl.channel}
                           </Badge>
+                          <span className="text-[10px] rounded-[6px] bg-sunken px-1.5 py-0.5 font-medium text-stone-text">
+                            {scopeLabel(tpl.campus_name)}
+                          </span>
                           {!tpl.is_active && (
                             <Badge variant="secondary" className="text-[10px]">Archived</Badge>
                           )}
@@ -542,6 +573,7 @@ export function CommsClient({
         onOpenChange={setShowNewTemplate}
         campuses={campuses}
         staffUserId={staffUserId}
+        isCMOAdmin={isCMOAdmin}
         isPending={isPending}
         onSave={(input) => {
           startTransition(async () => {
@@ -905,6 +937,7 @@ function NewTemplateDialog({
   onOpenChange,
   campuses,
   staffUserId,
+  isCMOAdmin,
   isPending,
   onSave,
 }: {
@@ -912,6 +945,7 @@ function NewTemplateDialog({
   onOpenChange: (open: boolean) => void;
   campuses: { id: string; name: string }[];
   staffUserId: string;
+  isCMOAdmin: boolean;
   isPending: boolean;
   onSave: (input: {
     campusId?: string;
@@ -927,6 +961,16 @@ function NewTemplateDialog({
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [channel, setChannel] = useState<"in_app" | "email" | "sms">("in_app");
+  // A single-campus staffer's one campus is preselected; anyone with a real
+  // choice must pick before saving so a template is never silently created
+  // network-wide. Only a CMO admin can choose NETWORK_CAMPUS.
+  const [campusChoice, setCampusChoice] = useState<string>(
+    campuses.length === 1 ? campuses[0].id : ""
+  );
+
+  // Whether the campus field is a real choice, or just the one campus this
+  // staffer can act on.
+  const needsCampusChoice = campuses.length > 1 || isCMOAdmin;
 
   // Reset form when dialog closes
   useEffect(() => {
@@ -935,11 +979,12 @@ function NewTemplateDialog({
       setSubject("");
       setBody("");
       setChannel("in_app");
+      setCampusChoice(campuses.length === 1 ? campuses[0].id : "");
     }
-  }, [open]);
+  }, [open, campuses]);
 
   function handleSave() {
-    if (!name.trim() || !body.trim()) return;
+    if (!name.trim() || !body.trim() || !campusChoice) return;
     // Detect merge fields from body ({{field_name}} pattern)
     const mergeFieldMatches = body.match(/\{\{(\w+)\}\}/g);
     const mergeFields = mergeFieldMatches
@@ -947,6 +992,9 @@ function NewTemplateDialog({
       : [];
 
     onSave({
+      // NETWORK_CAMPUS -> undefined, which the mutation treats as a
+      // network-level template (and gates on CMO admin).
+      campusId: campusChoice === NETWORK_CAMPUS ? undefined : campusChoice,
       name: name.trim(),
       subject: subject.trim() || undefined,
       body: body.trim(),
@@ -967,6 +1015,40 @@ function NewTemplateDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Campus scope — a template belongs to one campus, or (CMO admin
+              only) to the whole network. Never defaulted silently. */}
+          {needsCampusChoice ? (
+            <div>
+              <label htmlFor="comms-new-template-campus" className="block text-sm font-medium text-ink/70 mb-1">
+                Campus
+              </label>
+              <select
+                id="comms-new-template-campus"
+                value={campusChoice}
+                onChange={(e) => setCampusChoice(e.target.value)}
+                className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50"
+              >
+                <option value="">Select a campus...</option>
+                {campuses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+                {isCMOAdmin && (
+                  <option value={NETWORK_CAMPUS}>All campuses (network)</option>
+                )}
+              </select>
+              <p className="text-xs text-stone mt-1">
+                {isCMOAdmin
+                  ? "A network template mails from every campus. Pick a single campus unless this is meant for the whole network."
+                  : "This template belongs to the selected campus."}
+              </p>
+            </div>
+          ) : campuses.length === 1 ? (
+            <div>
+              <label className="block text-sm font-medium text-ink/70 mb-1">Campus</label>
+              <p className="text-sm text-ink">{campuses[0].name}</p>
+            </div>
+          ) : null}
+
           <div>
             <label htmlFor="comms-new-template-name" className="block text-sm font-medium text-ink/70 mb-1">
               Template Name
@@ -1042,7 +1124,7 @@ function NewTemplateDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={isPending || !name.trim() || !body.trim()}>
+          <Button onClick={handleSave} disabled={isPending || !name.trim() || !body.trim() || !campusChoice}>
             {isPending ? "Saving..." : "Create Template"}
           </Button>
         </DialogFooter>

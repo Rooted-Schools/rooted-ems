@@ -2,16 +2,28 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { requireStaffSession } from "@/lib/auth/get-session";
+import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 import { IconMail, IconPhone, IconBell, IconAlertTriangle } from "@/components/ui/icons";
 import {
   AUTOMATED_MESSAGES,
   FUNNEL_STAGE_ORDER,
+  CUSTOMIZABLE_EMAIL_KEY,
+  renderInquiryWelcomeForCampus,
   type AutomatedMessageEntry,
   type MessageChannel,
 } from "@/lib/automated-messages";
+import type { EmailTemplate, InquiryWelcomeOverride } from "@/lib/email-templates";
 import { isWelcomeMessagingEnabled } from "@/lib/messaging-flags";
 import { getPausedJourneyCount } from "@/lib/queries/journeys";
+import { getCampuses } from "@/lib/queries";
+import { getCampusMessageOverrides } from "@/lib/queries/message-overrides";
+
+/** One campus's live inquiry-welcome email, override applied when it has one. */
+interface CampusWelcomePreview {
+  campusName: string;
+  email: EmailTemplate;
+  customized: boolean;
+}
 
 /**
  * Read-only catalog of every automated family-facing message the system
@@ -21,9 +33,44 @@ import { getPausedJourneyCount } from "@/lib/queries/journeys";
  * family get?" without paging a developer.
  */
 export default async function AutomatedMessagesPage() {
-  await requireStaffSession();
-  const welcomeMessagingEnabled = await isWelcomeMessagingEnabled();
-  const pausedJourneyCount = await getPausedJourneyCount();
+  const session = await requireStaffSession();
+  const accessibleIds = getAccessibleCampusIds(session);
+  const [welcomeMessagingEnabled, pausedJourneyCount, allCampuses] = await Promise.all([
+    isWelcomeMessagingEnabled(),
+    getPausedJourneyCount(),
+    getCampuses(),
+  ]);
+
+  // The viewer's campuses (empty accessibleIds = org-wide = all campuses).
+  const scopedCampuses =
+    accessibleIds.length === 0
+      ? allCampuses
+      : allCampuses.filter((c) => accessibleIds.includes(c.id));
+
+  // Inquiry welcome is the one message a campus can customize. Load each
+  // accessible campus's override so the catalog shows the real per-campus text
+  // instead of only the built-in default. getCampusMessageOverrides feature-
+  // detects a missing table and returns [] — a campus that never customized
+  // simply renders the built-in copy.
+  const overrideRows = await getCampusMessageOverrides(scopedCampuses.map((c) => c.id));
+  const overrideByCampus = new Map<string, InquiryWelcomeOverride>();
+  for (const row of overrideRows) {
+    if (row.template_key !== CUSTOMIZABLE_EMAIL_KEY) continue;
+    overrideByCampus.set(row.campus_id, {
+      subjectEn: row.subject_en,
+      subjectEs: row.subject_es,
+      bodyEn: row.body_en,
+      bodyEs: row.body_es,
+    });
+  }
+  const campusWelcomes: CampusWelcomePreview[] = scopedCampuses.map((c) => {
+    const override = overrideByCampus.get(c.id);
+    return {
+      campusName: c.name,
+      email: renderInquiryWelcomeForCampus(c.name, override),
+      customized: override !== undefined,
+    };
+  });
 
   const groups = FUNNEL_STAGE_ORDER.map((stage) => ({
     stage,
@@ -43,8 +90,13 @@ export default async function AutomatedMessagesPage() {
       <div className="rounded-[6px] border border-line bg-sunken/60 p-4 text-sm text-ink/80">
         <p>
           Exactly what families receive, rendered with sample data. Sample family: Jordan Rivera.
-          These are read-only previews of the real templates &mdash; the same code that sends is
-          the code that rendered this page.
+          These are read-only previews of the real templates, built from the same code that sends
+          them.
+        </p>
+        <p className="mt-2 text-xs text-stone-text">
+          The welcome message can be customized per campus in Settings, Automated messages. It is
+          shown below for each of your campuses with any customization already applied; every other
+          message reads the same at every campus.
         </p>
         <p className="mt-2 text-xs text-stone-text">
           Text messages send only to families who opted in, once texting is connected.
@@ -84,7 +136,13 @@ export default async function AutomatedMessagesPage() {
           )}
           <div className="space-y-3">
             {entries.map((entry) => (
-              <MessageCard key={entry.key} entry={entry} />
+              <MessageCard
+                key={entry.key}
+                entry={entry}
+                campusWelcomes={
+                  entry.key === CUSTOMIZABLE_EMAIL_KEY ? campusWelcomes : undefined
+                }
+              />
             ))}
           </div>
         </section>
@@ -116,8 +174,20 @@ function ChannelBadge({ channel }: { channel: MessageChannel }) {
   );
 }
 
-function MessageCard({ entry }: { entry: AutomatedMessageEntry }) {
-  const email = entry.channels.includes("email") ? entry.renderEmail?.() : undefined;
+function MessageCard({
+  entry,
+  campusWelcomes,
+}: {
+  entry: AutomatedMessageEntry;
+  /** Per-campus renders for the one customizable message; when present they
+   *  replace the single generic email preview below. */
+  campusWelcomes?: CampusWelcomePreview[];
+}) {
+  const claimsEmail = entry.channels.includes("email");
+  // Per-campus previews only stand in for the generic email when we actually
+  // have campuses to show; otherwise fall back to the sample render.
+  const perCampus = campusWelcomes && campusWelcomes.length > 0 ? campusWelcomes : undefined;
+  const email = claimsEmail && !perCampus ? entry.renderEmail?.() : undefined;
   const sms = entry.channels.includes("sms") ? entry.renderSms?.() : undefined;
   const hasInApp = entry.channels.includes("in_app");
 
@@ -134,6 +204,27 @@ function MessageCard({ entry }: { entry: AutomatedMessageEntry }) {
           ))}
         </div>
       </div>
+
+      {perCampus && (
+        <div className="mt-3 space-y-3">
+          {perCampus.map((cw) => (
+            <div key={cw.campusName}>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-stone">
+                  {cw.campusName}
+                </p>
+                <span className="rounded-[6px] bg-sunken px-1.5 py-0.5 text-[10px] font-medium text-stone-text">
+                  {cw.customized ? "Customized" : "Built-in default"}
+                </span>
+              </div>
+              <p className="mt-1 text-sm font-medium text-ink">{cw.email.subject}</p>
+              <pre className="mt-1 whitespace-pre-wrap rounded-[6px] bg-sunken p-3 font-mono text-[12.5px] leading-relaxed text-ink/80">
+                {cw.email.text}
+              </pre>
+            </div>
+          ))}
+        </div>
+      )}
 
       {email && (
         <div className="mt-3">

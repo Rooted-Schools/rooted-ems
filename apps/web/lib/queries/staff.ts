@@ -937,6 +937,21 @@ export interface MessageTemplateRow {
   channel: string;
   merge_fields: string[];
   is_active: boolean;
+  /** Owning campus. null is a network-level template that mails from every
+   *  campus — the scope staff could not previously see in the Templates list. */
+  campus_id: string | null;
+  /** Resolved campus name for display, null for a network-level template. */
+  campus_name: string | null;
+}
+
+/**
+ * Human label for a template's campus scope: the campus's own name, or
+ * "All campuses" when the template is network-level (null campus_id). Pure and
+ * exported so the Templates list and its unit test share one definition.
+ */
+export function templateScopeLabel(campusName: string | null | undefined): string {
+  const name = campusName?.trim();
+  return name && name.length > 0 ? name : "All campuses";
 }
 
 // ─── Communication Queries ──────────────────────────────
@@ -944,9 +959,11 @@ export interface MessageTemplateRow {
 export async function getStaffMessageTemplates(): Promise<MessageTemplateRow[]> {
   const supabase = await createServerClient();
 
+  // RLS already scopes which templates come back; the campus join only surfaces
+  // the scope so staff can tell a campus template from a network one.
   const { data, error } = await supabase
     .from("message_template")
-    .select("id, name, subject, body, channel, merge_fields, is_active")
+    .select("id, name, subject, body, channel, merge_fields, is_active, campus_id, campus:campus_id (name)")
     .eq("is_active", true)
     .order("name");
 
@@ -955,15 +972,20 @@ export async function getStaffMessageTemplates(): Promise<MessageTemplateRow[]> 
     return [];
   }
 
-  return (data ?? []).map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    name: row.name as string,
-    subject: (row.subject as string) ?? null,
-    body: row.body as string,
-    channel: row.channel as string,
-    merge_fields: (row.merge_fields as string[]) ?? [],
-    is_active: (row.is_active as boolean) ?? true,
-  }));
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const campus = row.campus as Record<string, string> | null;
+    return {
+      id: row.id as string,
+      name: row.name as string,
+      subject: (row.subject as string) ?? null,
+      body: row.body as string,
+      channel: row.channel as string,
+      merge_fields: (row.merge_fields as string[]) ?? [],
+      is_active: (row.is_active as boolean) ?? true,
+      campus_id: (row.campus_id as string) ?? null,
+      campus_name: campus?.name ?? null,
+    };
+  });
 }
 
 export async function getNotificationRecipients(

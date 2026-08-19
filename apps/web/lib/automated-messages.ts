@@ -22,7 +22,7 @@
  */
 
 import * as emailTemplates from "@/lib/email-templates";
-import type { EmailTemplate } from "@/lib/email-templates";
+import type { EmailTemplate, InquiryWelcomeOverride } from "@/lib/email-templates";
 import { registrationNudgeSms as realRegistrationNudgeSms } from "@/lib/nudge-copy";
 
 // ─── Sample data ────────────────────────────────────────────────────────────
@@ -521,6 +521,33 @@ export const AUTOMATED_MESSAGES: AutomatedMessageEntry[] = [
       ),
   },
 ];
+
+/**
+ * Registry key of the one automated message a campus can actually customize
+ * (Settings > Automated messages, via campus_message_override). Every other
+ * template in this registry has no per-campus override path, so its sample
+ * render IS the live copy; only this one can differ campus to campus.
+ */
+export const CUSTOMIZABLE_EMAIL_KEY = "inquiryWelcome";
+
+/**
+ * Render the inquiry-welcome email for a specific campus, applying that
+ * campus's override when it has one. This is what makes the catalog honest:
+ * after a campus edits its welcome message, this renders the campus's real
+ * text rather than the built-in default. With no override (undefined) the
+ * output is byte-identical to the built-in message — the same fallback the
+ * real send path (lib/notify.ts) uses.
+ */
+export function renderInquiryWelcomeForCampus(
+  campusName: string,
+  override?: InquiryWelcomeOverride
+): EmailTemplate {
+  return emailTemplates.inquiryWelcome({
+    guardianFirstName: SAMPLE.guardianFirstName,
+    campusName,
+    override,
+  });
+}
 
 /** Grouping order for the staff preview page. */
 export const FUNNEL_STAGE_ORDER: FunnelStage[] = [

@@ -1,7 +1,7 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus } from "@/lib/auth/get-session";
+import { requireStaffSession, getAccessibleCampusIds, resolveActiveCampus, isCMOAdmin } from "@/lib/auth/get-session";
 import { getCampusLensId } from "@/lib/campus-lens";
 import {
   getStaffCommunications,
@@ -46,6 +46,7 @@ export default async function StaffCommunicationsPage({
       recipients={recipients}
       campuses={campuses}
       staffUserId={session.user_id}
+      isCMOAdmin={isCMOAdmin(session)}
     />
   );
 }
