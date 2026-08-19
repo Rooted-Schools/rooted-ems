@@ -1,6 +1,7 @@
 import { createServerClient } from "@rooted-ems/database/server";
 import { renderCampaignEmail, CAMPAIGN_TEMPLATES, type CampaignPayload, type CampaignTemplateKey } from "@/lib/email-templates";
 import { getSuppressedEmails } from "@/lib/email-compliance";
+import { isEditableTemplateKey } from "@/app/staff/recruitment/journeys/step-content-rules";
 
 /**
  * Nurture journey management queries (LG-2 management UI). Owner complaint
@@ -41,8 +42,22 @@ export interface JourneyStepPreview {
   subject: string | null;
   /** Rendered plain-text body via the real renderCampaignEmail — same function the send cron uses. */
   preview_text: string | null;
+  /** Rendered HTML via the same call. Shown in a sandboxed iframe for read-only steps. */
+  preview_html: string | null;
   /** Set when template_key isn't a recognized CampaignTemplateKey — preview couldn't be rendered honestly. */
   preview_unavailable: boolean;
+  /**
+   * The step's saved payload, exactly as stored. This is what the editor
+   * pre-fills from, so staff start from the real current wording rather than
+   * from a blank box that would silently wipe the text on save.
+   */
+  payload: CampaignPayload;
+  /**
+   * True only for template_key "custom" — the one template whose wording is
+   * stored in the database. Everything else is a built-in whose text lives in
+   * lib/email-templates.ts and is read-only here.
+   */
+  is_editable: boolean;
 }
 
 export interface JourneyDetail {
@@ -53,6 +68,12 @@ export interface JourneyDetail {
   is_active: boolean;
   campus_id: string | null;
   campus_name: string | null;
+  /**
+   * The campus name previews render with. Campus-specific journeys use their
+   * own campus; a network-default journey uses the same generic fallback the
+   * send cron uses, so a preview never invents a name the real send wouldn't.
+   */
+  preview_campus_name: string;
   steps: JourneyStepPreview[];
   active: number;
   completed: number;
@@ -213,6 +234,7 @@ export async function getJourneyDetail(journeyId: string): Promise<JourneyDetail
   const stepRows: JourneyStepPreview[] = (steps ?? []).map((s: Record<string, unknown>) => {
     const templateKey = s.template_key as string;
     const stepOrder = s.step_order as number;
+    const payload = (s.payload ?? {}) as CampaignPayload;
     if (!isCampaignTemplateKey(templateKey)) {
       return {
         id: s.id as string,
@@ -223,10 +245,15 @@ export async function getJourneyDetail(journeyId: string): Promise<JourneyDetail
         template_label: templateKey,
         subject: null,
         preview_text: null,
+        preview_html: null,
         preview_unavailable: true,
+        payload,
+        // Unrecognized key. Not editable, and honestly so: we can't render it,
+        // so we can't show anyone what their edit would produce.
+        is_editable: false,
       };
     }
-    const rendered = renderCampaignEmail(templateKey, (s.payload ?? {}) as CampaignPayload, previewCampusName);
+    const rendered = renderCampaignEmail(templateKey, payload, previewCampusName);
     return {
       id: s.id as string,
       step_order: stepOrder,
@@ -236,7 +263,10 @@ export async function getJourneyDetail(journeyId: string): Promise<JourneyDetail
       template_label: CAMPAIGN_TEMPLATES[templateKey].label,
       subject: rendered.subject,
       preview_text: rendered.text,
+      preview_html: rendered.html,
       preview_unavailable: false,
+      payload,
+      is_editable: isEditableTemplateKey(templateKey),
     };
   });
 
@@ -262,6 +292,7 @@ export async function getJourneyDetail(journeyId: string): Promise<JourneyDetail
     is_active: row.is_active === true,
     campus_id: (row.campus_id as string | null) ?? null,
     campus_name: campus?.name ?? null,
+    preview_campus_name: previewCampusName,
     steps: stepRows,
     active,
     completed,

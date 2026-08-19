@@ -14,7 +14,9 @@ import {
   IconGraduationCap,
   IconX,
   IconPenLine,
+  IconMail,
 } from "@/components/ui/icons";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
 import {
@@ -40,6 +42,8 @@ import {
   staffCreateGradeLevel,
   staffDeleteGradeLevel,
   staffCreateCapacityPlan,
+  staffSaveMessageOverride,
+  staffResetMessageOverride,
 } from "./actions";
 // Reused directly rather than duplicated: this is the same mutation and the
 // same access gate the Seats tab's inline seat-total editor already uses.
@@ -88,6 +92,28 @@ interface CapacityPlanRow {
   total_seats: number;
 }
 
+/**
+ * One campus's inquiry welcome, already resolved server-side: either the
+ * campus's own saved override or the built-in default text. Editing therefore
+ * always starts from the real message rather than an empty box.
+ */
+interface CampusWelcomeMessage {
+  campus_id: string;
+  campus_name: string;
+  subject_en: string;
+  subject_es: string;
+  body_en: string;
+  body_es: string;
+  /** True when a saved override exists, so Reset has something to remove. */
+  is_customized: boolean;
+  updated_at: string | null;
+}
+
+interface MergeField {
+  token: string;
+  label: string;
+}
+
 interface SettingsClientProps {
   campuses: CampusRow[];
   windows: EnrollmentWindowRow[];
@@ -97,6 +123,8 @@ interface SettingsClientProps {
   gradeLevels?: GradeLevel[];
   capacityPlans?: CapacityPlanRow[];
   systemSettings?: Record<string, string>;
+  welcomeMessages?: CampusWelcomeMessage[];
+  welcomeMergeFields?: MergeField[];
   staffUserId: string;
   activeCampusId?: string;
   /**
@@ -119,6 +147,8 @@ export function SettingsClient({
   gradeLevels = [],
   capacityPlans = [],
   systemSettings = {},
+  welcomeMessages = [],
+  welcomeMergeFields = [],
   staffUserId,
   activeCampusId,
   isSystemAdmin = false,
@@ -139,6 +169,7 @@ export function SettingsClient({
           <TabsTrigger value="grades">School Years & Grades</TabsTrigger>
           <TabsTrigger value="registration">Registration</TabsTrigger>
           <TabsTrigger value="users">Staff Users</TabsTrigger>
+          <TabsTrigger value="messages">Automated messages</TabsTrigger>
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
         </TabsList>
 
@@ -179,6 +210,13 @@ export function SettingsClient({
             users={users}
             campuses={campuses}
             staffUserId={staffUserId}
+          />
+        </TabsContent>
+
+        <TabsContent value="messages">
+          <AutomatedMessagesTab
+            welcomeMessages={welcomeMessages}
+            mergeFields={welcomeMergeFields}
           />
         </TabsContent>
 
@@ -2037,6 +2075,261 @@ function SchoolYearsGradesTab({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ─── Automated Messages Tab ─────────────────────────────
+
+/** The one template this tab edits today. Matches campus_message_override.template_key. */
+const INQUIRY_WELCOME_KEY = "inquiryWelcome";
+
+function AutomatedMessagesTab({
+  welcomeMessages,
+  mergeFields,
+}: {
+  welcomeMessages: CampusWelcomeMessage[];
+  mergeFields: MergeField[];
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Inquiry welcome</CardTitle>
+        <CardDescription>
+          The first email a family gets after they ask about a campus. Edit it per campus, in
+          English and Spanish.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {welcomeMessages.length === 0 ? (
+          <EmptyState
+            icon={<IconMail size={40} />}
+            title="No campuses available"
+            description="You do not have access to a campus whose messages you can edit."
+          />
+        ) : (
+          <div className="space-y-8">
+            {welcomeMessages.map((message) => (
+              // Keyed on the saved timestamp so a save or a reset remounts the
+              // editor against the refreshed server text. Without it, Reset
+              // would clear the row while the boxes still showed the wording
+              // that was just deleted.
+              <WelcomeMessageEditor
+                key={`${message.campus_id}:${message.updated_at ?? "default"}`}
+                message={message}
+                mergeFields={mergeFields}
+              />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function WelcomeMessageEditor({
+  message,
+  mergeFields,
+}: {
+  message: CampusWelcomeMessage;
+  mergeFields: MergeField[];
+}) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
+
+  const [subjectEn, setSubjectEn] = useState(message.subject_en);
+  const [subjectEs, setSubjectEs] = useState(message.subject_es);
+  const [bodyEn, setBodyEn] = useState(message.body_en);
+  const [bodyEs, setBodyEs] = useState(message.body_es);
+
+  // Spanish counts exactly as much as English here: a blank Spanish field
+  // would mail Spanish-speaking families the English version, so Save stays
+  // disabled until all four have text. The server enforces the same rule.
+  const complete =
+    !!subjectEn.trim() && !!subjectEs.trim() && !!bodyEn.trim() && !!bodyEs.trim();
+
+  function handleSave() {
+    if (!complete) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await staffSaveMessageOverride({
+        campusId: message.campus_id,
+        templateKey: INQUIRY_WELCOME_KEY,
+        subjectEn,
+        subjectEs,
+        bodyEn,
+        bodyEs,
+      });
+      if (result.error) {
+        setError(result.error);
+      } else {
+        toast({ variant: "success", title: `Welcome message saved for ${message.campus_name}` });
+        router.refresh();
+      }
+    });
+  }
+
+  function handleReset() {
+    setError(null);
+    startTransition(async () => {
+      const result = await staffResetMessageOverride(message.campus_id, INQUIRY_WELCOME_KEY);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setResetOpen(false);
+        toast({ variant: "success", title: `${message.campus_name} is back to the standard message` });
+        router.refresh();
+      }
+    });
+  }
+
+  return (
+    <div className="rounded-[6px] border border-line p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium text-ink">{message.campus_name}</p>
+          <p className="text-xs text-stone-text">
+            {message.is_customized
+              ? "Using this campus's own wording."
+              : "Using the standard wording. Editing and saving replaces it for this campus only."}
+          </p>
+        </div>
+        <Badge variant={message.is_customized ? "success" : "secondary"}>
+          {message.is_customized ? "Customized" : "Standard"}
+        </Badge>
+      </div>
+
+      <div className="mt-4 rounded-[6px] border border-line bg-sunken/60 p-3 text-xs text-ink/80">
+        <p>
+          These are substituted when the email sends:{" "}
+          {mergeFields.map((field, index) => (
+            <span key={field.token}>
+              {index > 0 ? ", " : ""}
+              <code className="rounded-[6px] bg-white px-1 py-0.5">{field.token}</code> for{" "}
+              {field.label}
+            </span>
+          ))}
+          .
+        </p>
+        <p className="mt-2">
+          The greeting, the button and its link, the closing, and the campus logo are added
+          automatically and cannot be edited here, so a saved message can never lose the way a
+          family starts an application.
+        </p>
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div>
+          <label
+            htmlFor={`subject-en-${message.campus_id}`}
+            className="block text-sm font-medium text-ink/70 mb-1"
+          >
+            Subject (English)
+          </label>
+          <Input
+            id={`subject-en-${message.campus_id}`}
+            value={subjectEn}
+            onChange={(e) => setSubjectEn(e.target.value)}
+          />
+        </div>
+        <div>
+          <label
+            htmlFor={`subject-es-${message.campus_id}`}
+            className="block text-sm font-medium text-ink/70 mb-1"
+          >
+            Subject (Spanish)
+          </label>
+          <Input
+            id={`subject-es-${message.campus_id}`}
+            value={subjectEs}
+            onChange={(e) => setSubjectEs(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div>
+          <label
+            htmlFor={`body-en-${message.campus_id}`}
+            className="block text-sm font-medium text-ink/70 mb-1"
+          >
+            Body (English)
+          </label>
+          <textarea
+            id={`body-en-${message.campus_id}`}
+            value={bodyEn}
+            onChange={(e) => setBodyEn(e.target.value)}
+            rows={12}
+            className="w-full rounded-[6px] border border-stone/30 px-3 py-2 text-sm leading-body focus:border-rooted-green focus:outline-none focus:ring-1 focus:ring-rooted-green"
+          />
+          <p className="mt-1 text-xs text-stone-text">
+            Separate paragraphs with a blank line.
+          </p>
+        </div>
+        <div>
+          <label
+            htmlFor={`body-es-${message.campus_id}`}
+            className="block text-sm font-medium text-ink/70 mb-1"
+          >
+            Body (Spanish)
+          </label>
+          <textarea
+            id={`body-es-${message.campus_id}`}
+            value={bodyEs}
+            onChange={(e) => setBodyEs(e.target.value)}
+            rows={12}
+            className="w-full rounded-[6px] border border-stone/30 px-3 py-2 text-sm leading-body focus:border-rooted-green focus:outline-none focus:ring-1 focus:ring-rooted-green"
+          />
+          <p className="mt-1 text-xs text-stone-text">
+            Separate paragraphs with a blank line.
+          </p>
+        </div>
+      </div>
+
+      <p className="mt-3 text-xs text-stone-text">
+        Spanish is required. Families who chose Spanish receive the Spanish version, so leaving it
+        blank would send them English.
+      </p>
+
+      {error && (
+        <p className="mt-3 rounded-[6px] border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">
+          {error}
+        </p>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Button onClick={handleSave} disabled={isPending || !complete}>
+          {isPending ? "Saving…" : "Save"}
+        </Button>
+        <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" disabled={isPending || !message.is_customized}>
+              Reset to default
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reset {message.campus_name} to the standard message?</DialogTitle>
+              <DialogDescription>
+                This deletes {message.campus_name}&rsquo;s wording. From now on, families who
+                inquire at {message.campus_name} will receive the standard Rooted Schools welcome
+                message again, in English and Spanish.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setResetOpen(false)} disabled={isPending}>
+                Cancel
+              </Button>
+              <Button onClick={handleReset} disabled={isPending}>
+                {isPending ? "Resetting…" : "Reset to default"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   );
 }

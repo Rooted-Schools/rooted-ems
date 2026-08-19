@@ -7,6 +7,7 @@ import { isCMOAdmin, requireRoleOnCampus, requireStaffSession } from "@/lib/auth
 import { sendSms, isSmsConfigured } from "@/lib/sms";
 import { sendEmail, isEmailConfigured } from "@/lib/email";
 import { staffComposedEmail } from "@/lib/email-templates";
+import { getCampusLogoAbsoluteUrl } from "@/lib/campus-identity";
 import { getSuppressedEmails } from "@/lib/email-compliance";
 import { logLeadActivity } from "./leads";
 import { createNote } from "./notes";
@@ -625,13 +626,21 @@ export async function sendOneOffEmail(
 
   const { data: campus } = await supabase
     .from("campus")
-    .select("name, email")
+    .select("name, email, short_code")
     .eq("id", recipientCampusId ?? "")
     .single();
   const campusName = (campus?.name as string | null) ?? "Rooted Schools";
   const campusEmail = (campus?.email as string | null) ?? undefined;
 
-  const template = staffComposedEmail({ subject, message, campusName });
+  const template = staffComposedEmail({
+    subject,
+    message,
+    campusName,
+    campusLogoUrl: getCampusLogoAbsoluteUrl(
+      (campus?.short_code as string | null) ?? null,
+      process.env.NEXT_PUBLIC_APP_URL ?? ""
+    ),
+  });
 
   const sendResult = await sendEmail({
     to: recipientEmail,

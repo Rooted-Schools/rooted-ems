@@ -9,6 +9,9 @@ import {
 } from "@/lib/email-templates";
 import { getSuppressedEmails, unsubscribeUrl } from "@/lib/email-compliance";
 import { recordCronRun } from "@/lib/cron-heartbeat";
+import { getCampusLogoAbsoluteUrl } from "@/lib/campus-identity";
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
 /**
  * Journey engine daily runner (LG-2). Advances every active enrollment whose
@@ -42,7 +45,7 @@ export async function GET(request: NextRequest) {
     .select(
       `id, journey_id, lead_id, current_step,
        journey:journey_id (name, is_active),
-       lead:lead_id (email, unsubscribed_at, unsubscribe_token, campus_id, first_name, application_id, campus:campus_id (name, email))`
+       lead:lead_id (email, unsubscribed_at, unsubscribe_token, campus_id, first_name, application_id, campus:campus_id (name, email, short_code))`
     )
     .eq("status", "active")
     .lte("next_step_at", nowIso)
@@ -84,7 +87,7 @@ export async function GET(request: NextRequest) {
       unsubscribed_at: string | null;
       unsubscribe_token: string | null;
       first_name: string | null;
-      campus: { name: string; email: string | null } | null;
+      campus: { name: string; email: string | null; short_code: string | null } | null;
     } | null;
 
     // Backstop exit checks.
@@ -118,7 +121,8 @@ export async function GET(request: NextRequest) {
     const template = renderCampaignEmail(
       step.template_key as CampaignTemplateKey,
       (step.payload ?? {}) as CampaignPayload,
-      campusName
+      campusName,
+      getCampusLogoAbsoluteUrl(lead.campus?.short_code, APP_URL)
     );
     const unsub = unsubscribeUrl(lead.unsubscribe_token ?? "");
 

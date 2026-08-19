@@ -1,6 +1,13 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import type { MutationResult } from "./applications";
 import { AuditAction, logAuditEvent } from "@/lib/audit";
+import { requireRoleOnCampus, requireNetworkAccess } from "@/lib/auth/get-session";
+import {
+  refusalForTemplateKey,
+  validateStepContent,
+  mergeStepPayload,
+  type JourneyStepContentInput,
+} from "@/app/staff/recruitment/journeys/step-content-rules";
 
 /**
  * Journey engine (LG-2). Auto-enroll a lead into a nurture sequence; advance
@@ -314,4 +321,96 @@ export async function enrollLeadInJourneyById(
   });
 
   return { data: { enrolled: true }, error: null };
+}
+
+// ─── Step content editing ────────────────────────────────────────────────
+
+export interface UpdateJourneyStepContentInput extends JourneyStepContentInput {
+  stepId: string;
+}
+
+/**
+ * Edit the wording of ONE nurture journey step.
+ *
+ * Authorization order matters and is the whole point of the first half of
+ * this function: the caller supplies only a stepId, so the step's journey and
+ * that journey's campus_id are resolved from the database FIRST, and the role
+ * check runs against that resolved campus. A campus id from the client is
+ * never trusted, and never even accepted — same rule the offers and lottery
+ * mutations follow (see requireRoleOnCampus in lib/auth/get-session.ts).
+ *
+ * A journey with campus_id NULL is a network default: its emails go to
+ * families at every campus, so editing it takes org-wide standing rather than
+ * enrollment_manager at one campus. Both branches redirect on denial, which is
+ * how requireRoleOnCampus and requireNetworkAccess signal refusal.
+ *
+ * Only a "custom" step can be edited. A built-in template's wording is written
+ * in lib/email-templates.ts, so this refuses with an explanation rather than
+ * flipping template_key to "custom" to make the edit fit.
+ */
+export async function updateJourneyStepContent(
+  input: UpdateJourneyStepContentInput
+): Promise<MutationResult> {
+  const supabase = createServiceRoleClient();
+
+  // 1. Resolve the step, its journey, and the journey's real campus.
+  const { data: step, error: stepError } = await supabase
+    .from("journey_step")
+    .select("id, journey_id, step_order, template_key, payload, journey:journey_id (campus_id, name, is_active)")
+    .eq("id", input.stepId)
+    .maybeSingle();
+
+  if (stepError) {
+    console.error("[updateJourneyStepContent] lookup", stepError.message);
+    return { data: null, error: "Failed to load this step." };
+  }
+  if (!step) return { data: null, error: "That step no longer exists." };
+
+  const journey = step.journey as unknown as
+    | { campus_id: string | null; name: string | null; is_active: boolean | null }
+    | null;
+  const campusId = journey?.campus_id ?? null;
+
+  // 2. Authorize against the resolved campus, never a client-supplied one.
+  const session = campusId
+    ? await requireRoleOnCampus(campusId, "enrollment_manager")
+    : await requireNetworkAccess();
+
+  // 3. Refuse built-in templates outright.
+  const refusal = refusalForTemplateKey(step.template_key as string);
+  if (refusal) return { data: null, error: refusal };
+
+  // 4. Validate content.
+  const validation = validateStepContent(input);
+  if (!validation.ok) return { data: null, error: validation.error };
+
+  const existingPayload = (step.payload ?? {}) as Record<string, unknown>;
+  const nextPayload = mergeStepPayload(existingPayload, validation.values);
+
+  const { error: updateError } = await supabase
+    .from("journey_step")
+    .update({ payload: nextPayload })
+    .eq("id", input.stepId);
+
+  if (updateError) {
+    console.error("[updateJourneyStepContent] update", updateError.message);
+    return { data: null, error: "Failed to save this step." };
+  }
+
+  await logAuditEvent({
+    table_name: "journey_step",
+    record_id: input.stepId,
+    action: AuditAction.Update,
+    actor_id: session.user_id,
+    campus_id: campusId,
+    old_data: { payload: existingPayload },
+    new_data: { payload: nextPayload },
+    metadata: {
+      journey_id: step.journey_id as string,
+      step_order: step.step_order as number,
+      template_key: step.template_key as string,
+    },
+  });
+
+  return { data: null, error: null };
 }
