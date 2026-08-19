@@ -1,4 +1,5 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
+import { getSession } from "@/lib/auth/get-session";
 import type { MutationResult } from "./applications";
 
 // ─── Create Note ───────────────────────────────────────
@@ -14,9 +15,14 @@ export async function createNote(input: {
   content: string;
   is_internal?: boolean;
 }): Promise<MutationResult<{ id: string }>> {
-  const authClient = await createServerClient();
-  const { data: { user } } = await authClient.auth.getUser();
-  if (!user) return { data: null, error: "Not authenticated" };
+  // Resolve the actor from the request-cached session rather than opening a
+  // second Supabase auth client. Every caller of createNote is a staff action
+  // that already resolved the session; a second createServerClient().auth
+  // .getUser() here returned null in the server-action context (the first
+  // client had already rotated the session token), so createNote failed before
+  // the insert and no note ever saved, for any feature that used it.
+  const session = await getSession();
+  if (!session) return { data: null, error: "Not authenticated" };
 
   const supabase = createServiceRoleClient();
 
@@ -28,7 +34,7 @@ export async function createNote(input: {
       campus_id: input.campus_id ?? null,
       content: input.content,
       is_internal: input.is_internal ?? true,
-      created_by: user.id,
+      created_by: session.user_id,
     })
     .select("id")
     .single();

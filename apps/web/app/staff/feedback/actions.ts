@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireStaffSession } from "@/lib/auth/get-session";
-import { createNote } from "@/lib/mutations/notes";
+import { createServiceRoleClient } from "@rooted-ems/database/server";
 
 export const FEEDBACK_CATEGORIES = ["Bug", "Confusing", "Idea", "Working well"] as const;
 export type FeedbackCategory = (typeof FEEDBACK_CATEGORIES)[number];
@@ -44,19 +44,26 @@ export async function submitPilotFeedback(input: {
   const tag = where ? `[${category}] (${where})` : `[${category}]`;
   const content = `${tag} ${body}`;
 
-  const result = await createNote({
+  // Write directly with the service-role client and the session we already
+  // validated above. The generic createNote helper re-authenticated with its
+  // own auth.getUser() round-trip, which returned null in the server-action
+  // context and made every submission fail before the insert was ever
+  // attempted. requireStaffSession already proved who this is, so both
+  // entity_id and created_by come from that session.
+  const supabase = createServiceRoleClient();
+  const { error } = await supabase.from("note").insert({
     entity_type: "pilot_feedback",
     entity_id: session.user_id,
     content,
     is_internal: true,
+    created_by: session.user_id,
   });
 
-  if (result.error) {
-    // The generic message hid every real cause. Pilot feedback is how Tim and
-    // Lalah tell us what is broken, so a failure here has to say what happened
-    // rather than send them away with nothing to report.
-    console.error("[submitPilotFeedback]", result.error);
-    return { error: result.error };
+  if (error) {
+    // Pilot feedback is how Tim and Lalah tell us what is broken, so a failure
+    // here has to say what happened rather than send them away with nothing.
+    console.error("[submitPilotFeedback]", error.message);
+    return { error: `Could not save your feedback: ${error.message}` };
   }
 
   revalidatePath("/staff/feedback");
