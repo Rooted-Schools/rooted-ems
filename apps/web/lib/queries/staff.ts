@@ -1040,7 +1040,7 @@ export async function getStaffCommunications(campusIds?: string[]): Promise<{
 
   let q = supabase
     .from("communication_log")
-    .select("id, subject, channel, status, sent_at, recipient_address, recipient_count")
+    .select("id, subject, channel, status, sent_at, recipient_address")
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -1073,7 +1073,8 @@ export async function getStaffCommunications(campusIds?: string[]): Promise<{
           year: "numeric",
         })
       : null,
-    recipient_count: (row.recipient_count as number) ?? 1,
+    // communication_log has no recipient_count column; each row is one send.
+    recipient_count: 1,
     recipient_address: (row.recipient_address as string) ?? null,
   }));
 

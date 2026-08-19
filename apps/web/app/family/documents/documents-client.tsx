@@ -568,8 +568,9 @@ function UploadDialog({
             </select>
           </div>
 
-          {/* File input — camera-first on phones: capture="environment" opens
-              the rear camera directly; desktop still shows the normal picker.
+          {/* File input. No capture attribute: the native chooser offers
+              camera, photo library, and files, so a family can attach an existing
+              document or take a new photo.
               `multiple` + append-on-select supports capturing several pages
               for one requirement (re-trigger this control for page 2, etc). */}
           <div>
@@ -580,7 +581,6 @@ function UploadDialog({
               ref={fileInputRef}
               type="file"
               accept="image/*,application/pdf"
-              capture="environment"
               multiple
               disabled={compressing}
               onChange={handleFileSelect}

@@ -56,7 +56,7 @@ const dict = {
   "statusMsg.registered":       { en: "Registration is done. Your student is set.", es: "El registro está completo. Su estudiante está listo." },
   "statusMsg.placement_review": { en: "We're doing final checks. Nothing is needed from you right now.", es: "Estamos haciendo las últimas verificaciones. No necesita hacer nada por ahora." },
   "statusMsg.enrolled":         { en: "Your student is enrolled. Welcome!", es: "Su estudiante está matriculado. ¡Bienvenidos!" },
-  "statusMsg.declined":         { en: "This application was declined. Contact your school with any questions.", es: "Esta solicitud fue rechazada. Contacte a su escuela si tiene preguntas." },
+  "statusMsg.declined":         { en: "You declined this seat offer. If that was a mistake, contact your school and we can help.", es: "Usted rechazo esta oferta de cupo. Si fue un error, comuniquese con su escuela y podemos ayudar." },
   "statusMsg.expired":          { en: "This offer's deadline passed. Contact the school if you still want the seat.", es: "El plazo de esta oferta venció. Contacte a la escuela si aún desea el cupo." },
   "statusMsg.withdrawn":        { en: "This application was withdrawn.", es: "Esta solicitud fue retirada." },
 
@@ -72,7 +72,7 @@ const dict = {
   "statusExplain.registered":       { en: "Your student is registered. Welcome to the Rooted Schools family!", es: "Su estudiante está registrado. ¡Bienvenidos a la familia de Rooted Schools!" },
   "statusExplain.placement_review": { en: "Our team is doing final checks on your student's placement. Nothing is needed from you right now.", es: "Nuestro equipo está haciendo las últimas verificaciones de la asignación de su estudiante. No necesita hacer nada por ahora." },
   "statusExplain.enrolled":         { en: "Your student is officially enrolled. Watch your messages for orientation details and next steps.", es: "Su estudiante está oficialmente matriculado. Esté atento a sus mensajes para detalles de orientación y próximos pasos." },
-  "statusExplain.declined":         { en: "This application was declined. If you have questions, contact your school and we'll walk you through it.", es: "Esta solicitud fue rechazada. Si tiene preguntas, contacte a su escuela y le explicaremos todo." },
+  "statusExplain.declined":         { en: "You declined this seat offer. If that was a mistake or you have questions, contact your school and we will walk you through it.", es: "Usted rechazo esta oferta de cupo. Si fue un error o tiene preguntas, comuniquese con su escuela y le explicaremos todo." },
   "statusExplain.expired":          { en: "This offer's deadline passed. Contact your school if you still want the seat; sometimes one is still available.", es: "El plazo de esta oferta venció. Contacte a su escuela si aún desea el cupo; a veces todavía hay disponibilidad." },
   "statusExplain.withdrawn":        { en: "This application has been withdrawn. If that was a mistake, contact your school and we'll help.", es: "Esta solicitud fue retirada. Si fue un error, contacte a su escuela y le ayudaremos." },
 
