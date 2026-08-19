@@ -52,6 +52,10 @@ export async function submitPilotFeedback(input: {
   });
 
   if (result.error) {
+    // The generic message hid every real cause. Pilot feedback is how Tim and
+    // Lalah tell us what is broken, so a failure here has to say what happened
+    // rather than send them away with nothing to report.
+    console.error("[submitPilotFeedback]", result.error);
     return { error: result.error };
   }
 

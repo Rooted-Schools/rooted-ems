@@ -34,8 +34,15 @@ export async function createNote(input: {
     .single();
 
   if (error || !note) {
-    console.error("[createNote]", error?.message);
-    return { data: null, error: "Failed to create note" };
+    console.error("[createNote]", error?.message, {
+      entity_type: input.entity_type,
+    });
+    // Carry the database's own words. "Failed to create note" told a staff
+    // member nothing and told whoever they reported it to even less.
+    return {
+      data: null,
+      error: error?.message ? `Could not save the note: ${error.message}` : "Could not save the note.",
+    };
   }
 
   return { data: { id: note.id }, error: null };

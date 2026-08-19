@@ -303,13 +303,23 @@ export function StaffNewApplicationForm({
                 onChange={(e) => updateField("enrollmentWindowId", e.target.value)}
                 disabled={!form.campusId}
               >
-                <option value="">Select window...</option>
+                <option value="">
+                  {form.campusId && campusWindows.length === 0
+                    ? "No open window for this campus"
+                    : "Select window..."}
+                </option>
                 {campusWindows.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.name} ({w.status})
                   </option>
                 ))}
               </Select>
+              {form.campusId && campusWindows.length === 0 && (
+                <p className="mt-1 text-xs text-warn-text">
+                  Only a window whose status is Open can take an application.
+                  Open one for this campus in Settings, under Enrollment Windows.
+                </p>
+              )}
             </div>
             <div>
               <label htmlFor="new-app-grade-level" className="block text-sm font-medium text-ink/70 mb-1">
