@@ -36,7 +36,7 @@ export async function staffCreateEnrollment(
     if (app?.campus_id) realCampusId = app.campus_id as string;
   }
 
-  await requireRoleOnCampus(realCampusId, "compliance_auditor");
+  await requireRoleOnCampus(realCampusId, "enrollment_manager");
 
   const result = await createEnrollment({
     student_id: studentId,
@@ -68,7 +68,7 @@ export async function staffWithdrawEnrollment(
     .eq("id", enrollmentId)
     .single();
 
-  await requireRoleOnCampus(enrollment?.campus_id as string | undefined, "compliance_auditor");
+  await requireRoleOnCampus(enrollment?.campus_id as string | undefined, "enrollment_manager");
   const result = await withdrawEnrollment(enrollmentId, reason);
 
   if (!result.error) {
@@ -93,7 +93,7 @@ export async function staffSyncSIS(
     .eq("id", enrollmentId)
     .single();
 
-  await requireRoleOnCampus(enrollment?.campus_id as string | undefined, "compliance_auditor");
+  await requireRoleOnCampus(enrollment?.campus_id as string | undefined, "enrollment_staff");
   const result = await syncEnrollmentSIS(enrollmentId, sisStudentId);
 
   if (!result.error) {
@@ -116,15 +116,30 @@ export async function staffActivateEnrollment(
     .eq("id", enrollmentId)
     .single();
 
-  await requireRoleOnCampus(enrollmentForAuth?.campus_id as string | undefined, "compliance_auditor");
+  await requireRoleOnCampus(enrollmentForAuth?.campus_id as string | undefined, "enrollment_manager");
 
-  const { error } = await supabase
+  // Compare-and-set: only a still-pending row flips to active. Returning the
+  // changed rows (matching the pattern in offers.ts expireOffer) lets us tell
+  // "activated" apart from "matched nothing" — without this, a non-pending row
+  // matched zero rows, returned error:null, and the code below still flipped
+  // the application to enrolled and emailed the family about an activation that
+  // never happened. enrolled_at is stamped here (the row was pending, so it had
+  // no earlier real date to overwrite) — it is the date an authorizer reads.
+  const { data: activated, error } = await supabase
     .from("enrollment")
-    .update({ status: "active", updated_at: new Date().toISOString() })
+    .update({
+      status: "active",
+      enrolled_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", enrollmentId)
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .select("id");
 
   if (error) return { data: null, error: error.message };
+  if (!activated || activated.length === 0) {
+    return { data: null, error: "This enrollment is no longer pending." };
+  }
 
   // Also sync application status to enrolled if linked
   if (applicationId) {

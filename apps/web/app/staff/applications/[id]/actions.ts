@@ -232,7 +232,7 @@ export async function staffCompleteAcademicAudit(
   }
 ) {
   const realCampusId = await resolveApplicationCampus(applicationId);
-  await requireRoleOnCampus(realCampusId, "compliance_auditor");
+  await requireRoleOnCampus(realCampusId, "enrollment_manager");
   // Record audit as an internal note
   const noteContent = [
     `ACADEMIC AUDIT COMPLETE`,
@@ -271,12 +271,27 @@ export async function staffCompleteAcademicAudit(
     .eq("id", applicationId)
     .single();
 
-  // Activate the enrollment record — try application_id first, fall back to student+campus match
+  // Activate the enrollment record — try application_id first, fall back to student+campus match.
+  // Only a pending or active enrollment may be (re)activated here: without the
+  // status precondition, a withdrawn or transferred enrollment was silently
+  // resurrected to active by an audit. Matching nothing is fine — the audit's
+  // other effects still proceed.
+  const stampEnrolledAt = new Date().toISOString();
   const primaryUpdate = await supabase
     .from("enrollment")
-    .update({ status: "active", updated_at: new Date().toISOString() })
+    .update({ status: "active", updated_at: stampEnrolledAt })
     .eq("application_id", applicationId)
+    .in("status", ["pending", "active"])
     .select("id");
+
+  // Stamp enrolled_at only where it is still null, so a real earlier enrollment
+  // date is never overwritten. enrolled_at is the date an authorizer reads.
+  await supabase
+    .from("enrollment")
+    .update({ enrolled_at: stampEnrolledAt })
+    .eq("application_id", applicationId)
+    .eq("status", "active")
+    .is("enrolled_at", null);
 
   const noneUpdated = !primaryUpdate.data || primaryUpdate.data.length === 0;
   if (noneUpdated && app?.student_id) {
@@ -294,7 +309,14 @@ export async function staffCompleteAcademicAudit(
     if (fallbackEnrollment) {
       await supabase
         .from("enrollment")
-        .update({ status: "active", application_id: applicationId, updated_at: new Date().toISOString() })
+        .update({
+          status: "active",
+          application_id: applicationId,
+          // Fallback matches only status="pending", which never carries a real
+          // enrolled_at, so stamping it directly cannot overwrite an earlier date.
+          enrolled_at: stampEnrolledAt,
+          updated_at: stampEnrolledAt,
+        })
         .eq("id", fallbackEnrollment.id);
     }
   }
@@ -303,11 +325,14 @@ export async function staffCompleteAcademicAudit(
   const studentName = student ? `${student.first_name} ${student.last_name}` : undefined;
   const gradeLabel = auditData.confirmedGrade ?? undefined;
 
-  // Fire celebratory notification — never block on this
+  // Fire celebratory notification — never block on this. Use the resolved real
+  // campus (falling back to the client-supplied campusId only if resolution
+  // returned nothing) so the family email carries the correct campus name,
+  // logo, and reply-to rather than a campus the caller could have spoofed.
   notifyFamilyStudentEnrolled({
     applicationId,
     studentName,
-    campusId,
+    campusId: realCampusId ?? campusId,
     gradeLabel,
   }).catch(() => {});
 
