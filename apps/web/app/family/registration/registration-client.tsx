@@ -1205,15 +1205,14 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
                           : "border-stone/30 hover:border-stone/50"
                       }`}
                     >
-                      {/* Camera-first (Phase 5A): capture="environment" opens the rear
-                          camera directly on phones; desktop still shows the normal
-                          picker. Selected images are compressed client-side before
-                          validation so the 10MB limit is rarely the blocker. */}
+                      {/* No capture attribute: the native chooser offers
+                          camera, photo library, and files. Selected images are
+                          compressed client-side before validation, so the 10MB
+                          limit is rarely the blocker. */}
                       <input
                         type="file"
                         id="reg-upload-input"
                         accept="image/*,application/pdf"
-                        capture="environment"
                         disabled={uploadCompressing}
                         className="hidden"
                         onChange={async (e) => {

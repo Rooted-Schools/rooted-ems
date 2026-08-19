@@ -369,14 +369,13 @@ export function FamilyApplicationDetailClient({ detail, userId }: FamilyApplicat
               />
               <div>
                 <label className="block text-sm font-medium text-amber-900 mb-1">{t("apps.detail.attachFile")}</label>
-                {/* Camera-first (Phase 5A): capture="environment" opens the rear
-                    camera directly on phones; images are compressed client-side
-                    before validation. */}
+                {/* No capture attribute: the native chooser offers
+                    camera, photo library, and files. Images are compressed
+                    client-side before validation. */}
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*,application/pdf"
-                  capture="environment"
                   disabled={submittingResponse || responseFileCompressing}
                   onChange={async (e) => {
                     const f = e.target.files?.[0] ?? null;
