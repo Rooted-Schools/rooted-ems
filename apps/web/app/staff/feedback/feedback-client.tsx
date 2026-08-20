@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import { formatRelativeTime } from "@/lib/queries/utils";
-import { FEEDBACK_CATEGORIES, submitPilotFeedback, type FeedbackCategory } from "./actions";
+import { submitPilotFeedback } from "./actions";
+import { FEEDBACK_CATEGORIES, type FeedbackCategory } from "./feedback-constants";
 
 export interface FeedbackEntry {
   id: string;
