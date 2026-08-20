@@ -55,24 +55,21 @@ Leave the "Reset Password" template as it is. That flow uses a link on purpose, 
 
 ## 3. Google sign-in
 
-Sign-in with a Google account already works for staff, because staff use rootedschool.org Workspace accounts and the Google app is set to Internal, meaning "this Workspace only." Families sign in from outside that Workspace, so for them Google is blocked until the app is set to External. Family email sign-in works regardless, so Google is a convenience, not a requirement.
+Google sign-in works for staff and for families. It runs through a dedicated Google Cloud project named "Rooted EMS Login" that the school owns. This project was created fresh (August 2026) because the original Google client was set to Internal, meaning "this Workspace only," which let staff sign in but blocked families whose Google accounts are outside the Workspace.
 
-**Finding the right Google project.** Sign-in runs through one specific Google project, the one whose OAuth consent screen lists enroll.rootedschool.org as its App domain home page. Its name may be misleading (it was seen as "RSF Claude Integration"), so identify it by that home page, not the name. If in doubt, in Supabase, Authentication, Providers, Google, copy the Client ID, then search that Client ID in the Google Cloud top search bar to jump straight to the right project.
+**What is configured** (Google Cloud, project "Rooted EMS Login"):
+- OAuth consent screen: User type External, published to Production.
+- App name Rooted Schools Enrollment, home page https://enroll.rootedschool.org, privacy policy https://enroll.rootedschool.org/privacy, authorized domain rootedschool.org.
+- No logo uploaded, which is deliberate: it keeps the app clear of Google's branding-verification step. The app uses only basic sign-in permissions, so no Google review is required.
+- An OAuth client of type Web application, named Supabase, with authorized JavaScript origin https://enroll.rootedschool.org and authorized redirect URI https://szockdlohlmkyloubgtd.supabase.co/auth/v1/callback.
 
-**For a few named testers, today (no privacy policy needed):**
-1. In that Google project, left menu, Audience.
-2. Set User type to External. Do not click Publish. Leave the status on Testing.
-3. Add users, and add each tester's Google address (for example a personal gmail).
-Those specific accounts can now sign in with Google. Everyone else still uses email.
+**And in Supabase** (Authentication, Providers, Google): the Client ID and Client Secret from that OAuth client are pasted in, and Google is enabled.
 
-**For all families (production):**
-1. Same Audience page, click Publish app to move it to Production.
-2. When asked for a privacy policy link, use https://enroll.rootedschool.org/privacy.
-3. The app uses only basic sign-in permissions, so no lengthy Google review is required. If Google asks to verify branding because of the uploaded logo, either remove the logo to publish immediately and add it back later, or complete branding verification.
+**First-time note for families.** A newly published Google app can show a "Google hasn't verified this app" screen on first sign-in. Choosing Advanced, then Continue completes the sign-in. This is expected for basic sign-in and clears over time.
 
-Do the counsel review of the privacy policy (see section 5) before publishing to production.
+**If you ever need to recreate the client** (for example the secret is lost): in the "Rooted EMS Login" project, APIs and Services, Credentials, create a new OAuth client of type Web application with the same redirect URI above, then paste its new Client ID and Secret into Supabase, Authentication, Providers, Google. Do not delete the old client until the new one is confirmed working.
 
----
+Have counsel review the privacy policy (see section 5); it backs the production Google app and families rely on it.
 
 ## 4. Reactivating a stuck account
 
