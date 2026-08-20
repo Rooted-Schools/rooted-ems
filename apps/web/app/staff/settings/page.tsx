@@ -10,6 +10,7 @@ import { isSmsConfigured } from "@/lib/sms";
 import { isEmailConfigured } from "@/lib/email";
 import { ChannelStatus } from "./_components/channel-status";
 import { AutomationHealth } from "./_components/automation-health";
+import { LeadSyncCard } from "./_components/lead-sync-card";
 import { WelcomeMessagingToggle } from "./_components/welcome-messaging-toggle";
 import { getAutomationHealth, getOverdueJourneySteps } from "@/lib/queries/automation-health";
 import { isWelcomeMessagingEnabled } from "@/lib/messaging-flags";
@@ -124,6 +125,7 @@ export default async function StaffSettingsPage({
         rows={automationHealth}
         overdueJourneySteps={overdueJourneySteps}
       />
+      {hasMinRole(session, "system_admin") && <LeadSyncCard />}
       <SettingsClient
       campuses={campuses}
       windows={windows}
