@@ -260,6 +260,9 @@ function LandingContent({ schools }: LandingClientProps) {
             <Link href="/login" className="hover:text-white transition-colors">
               {t("public.familyPortal")}
             </Link>
+            <Link href="/privacy" className="hover:text-white transition-colors">
+              {t("public.privacy")}
+            </Link>
             <span>
               &copy; {new Date().getFullYear()} <span className="font-bold">rooted</span>schools
             </span>
