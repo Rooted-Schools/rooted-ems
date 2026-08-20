@@ -1049,6 +1049,7 @@ const dict = {
   "public.step5Title":       { en: "Register",              es: "Registrarse" },
   "public.step5Desc":        { en: "Complete registration to finalize enrollment.", es: "Complete el registro para finalizar la inscripción." },
   "public.familyPortal":     { en: "Family Portal",         es: "Portal Familiar" },
+  "public.privacy":          { en: "Privacy",               es: "Privacidad" },
   "public.staffPortal":      { en: "Staff Portal",          es: "Portal del Personal" },
 
   // ─── Per-campus landing page (app/(public)/[campusSlug]) ──────────────────
