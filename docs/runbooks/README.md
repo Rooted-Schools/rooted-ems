@@ -17,6 +17,7 @@ If you work more than one campus, the "Campus:" selector in the header controls 
 | [when-something-breaks.md](when-something-breaks.md) | First checks when automation looks stuck, families report they heard nothing, or someone is locked out, plus who to call. |
 | [wrong-message-sent.md](wrong-message-sent.md) | What to do when an offer, document request, or campaign goes to the wrong family, list, or with the wrong content, including what counts as a privacy incident. |
 | [email-outage.md](email-outage.md) | How to tell email is actually down, what to do about ticking offer deadlines while it's out, and what not to do once it's back. |
+| [auth-and-email-setup.md](auth-and-email-setup.md) | The Supabase and Google dashboard settings behind family and staff sign-in: custom SMTP, the verification code email, Google sign-in, and the privacy policy. |
 | [funnel-1-inquiry-recruitment.md](funnel-1-inquiry-recruitment.md) | The inquiry and recruitment stage: what happens automatically, what staff do, and how a family moves forward. |
 | [funnel-2-application-review.md](funnel-2-application-review.md) | The application review stage: what happens automatically, what staff do, and how a family moves forward. |
 | [funnel-3-lottery.md](funnel-3-lottery.md) | The lottery stage: what happens automatically, what staff do, and how a family moves forward. |
