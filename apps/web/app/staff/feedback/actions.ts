@@ -3,9 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireStaffSession } from "@/lib/auth/get-session";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
-
-export const FEEDBACK_CATEGORIES = ["Bug", "Confusing", "Idea", "Working well"] as const;
-export type FeedbackCategory = (typeof FEEDBACK_CATEGORIES)[number];
+import { FEEDBACK_CATEGORIES, type FeedbackCategory } from "./feedback-constants";
 
 /**
  * Record a pilot feedback entry as a `note` row (entity_type "pilot_feedback").
