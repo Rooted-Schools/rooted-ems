@@ -6,25 +6,23 @@ import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { FEEDBACK_CATEGORIES, type FeedbackCategory } from "./feedback-constants";
 
 /**
- * Record a pilot feedback entry as a `note` row (entity_type "pilot_feedback").
- * There is no natural parent record for a standalone feedback item, so
- * entity_id is the author's own user id — `note.entity_id` is a bare NOT NULL
- * UUID column with no foreign key, so this is a safe, always-valid value.
- * campus_id is left null on purpose: pilot feedback is meant to be read
- * across campuses (the RLS note_staff policy already grants every staff
- * member read/write on null-campus rows), so scoping it to the author's
- * campus would just make it harder for Tim, Lalah, and Steven to see each
- * other's notes.
+ * Pilot feedback lives in its own `pilot_feedback` table (see migration 00053)
+ * rather than the generic `note` table, so it can carry a status, an optional
+ * screenshot, and a thread of staff replies. Every write here goes through the
+ * service-role client after requireStaffSession has proven who the actor is;
+ * the table's RLS is a second line of defense, not the primary gate.
  *
- * The category and optional "where" context are folded into the note body
- * as a leading structured tag (e.g. "[Bug] (Recruitment follow-up queue) …")
- * rather than new columns, per the no-migration constraint. The feed page
- * parses the tag back out for display.
+ * NOTE: every export in this "use server" file must be an async server action.
+ * The category list and its type deliberately live in ./feedback-constants so
+ * a client component can import them without corrupting the action wiring.
  */
+
 export async function submitPilotFeedback(input: {
   category: string;
   where?: string;
   body: string;
+  screenshotPath?: string;
+  campusId?: string | null;
 }): Promise<{ error: string | null }> {
   const session = await requireStaffSession();
 
@@ -38,30 +36,90 @@ export async function submitPilotFeedback(input: {
     return { error: "Feedback can't be empty." };
   }
 
-  const where = input.where?.trim();
-  const tag = where ? `[${category}] (${where})` : `[${category}]`;
-  const content = `${tag} ${body}`;
+  const where = input.where?.trim() || null;
+  const screenshotPath = input.screenshotPath?.trim() || null;
+  const campusId = input.campusId || null;
 
-  // Write directly with the service-role client and the session we already
-  // validated above. The generic createNote helper re-authenticated with its
-  // own auth.getUser() round-trip, which returned null in the server-action
-  // context and made every submission fail before the insert was ever
-  // attempted. requireStaffSession already proved who this is, so both
-  // entity_id and created_by come from that session.
   const supabase = createServiceRoleClient();
-  const { error } = await supabase.from("note").insert({
-    entity_type: "pilot_feedback",
-    entity_id: session.user_id,
-    content,
-    is_internal: true,
-    created_by: session.user_id,
+  const { error } = await supabase.from("pilot_feedback").insert({
+    author_id: session.user_id,
+    campus_id: campusId,
+    category,
+    context: where,
+    body,
+    screenshot_path: screenshotPath,
   });
 
   if (error) {
-    // Pilot feedback is how Tim and Lalah tell us what is broken, so a failure
-    // here has to say what happened rather than send them away with nothing.
     console.error("[submitPilotFeedback]", error.message);
     return { error: `Could not save your feedback: ${error.message}` };
+  }
+
+  revalidatePath("/staff/feedback");
+  return { error: null };
+}
+
+/**
+ * Add a staff reply to a feedback item. Any staff member can weigh in — the
+ * point of the thread is a shared triage conversation.
+ */
+export async function replyToFeedback(input: {
+  feedbackId: string;
+  body: string;
+}): Promise<{ error: string | null }> {
+  const session = await requireStaffSession();
+
+  const body = input.body.trim();
+  if (!body) {
+    return { error: "Reply can't be empty." };
+  }
+  if (!input.feedbackId) {
+    return { error: "Missing the feedback item." };
+  }
+
+  const supabase = createServiceRoleClient();
+  const { error } = await supabase.from("pilot_feedback_reply").insert({
+    feedback_id: input.feedbackId,
+    author_id: session.user_id,
+    body,
+  });
+
+  if (error) {
+    console.error("[replyToFeedback]", error.message);
+    return { error: `Could not save your reply: ${error.message}` };
+  }
+
+  revalidatePath("/staff/feedback");
+  return { error: null };
+}
+
+/**
+ * Flip a feedback item between open and resolved. Records who resolved it and
+ * when; clears both when reopened so a stale resolver name never lingers.
+ */
+export async function setFeedbackResolved(input: {
+  feedbackId: string;
+  resolved: boolean;
+}): Promise<{ error: string | null }> {
+  const session = await requireStaffSession();
+
+  if (!input.feedbackId) {
+    return { error: "Missing the feedback item." };
+  }
+
+  const supabase = createServiceRoleClient();
+  const { error } = await supabase
+    .from("pilot_feedback")
+    .update(
+      input.resolved
+        ? { status: "resolved", resolved_by: session.user_id, resolved_at: new Date().toISOString() }
+        : { status: "open", resolved_by: null, resolved_at: null }
+    )
+    .eq("id", input.feedbackId);
+
+  if (error) {
+    console.error("[setFeedbackResolved]", error.message);
+    return { error: `Could not update the status: ${error.message}` };
   }
 
   revalidatePath("/staff/feedback");

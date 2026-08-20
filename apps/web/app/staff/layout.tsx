@@ -23,6 +23,7 @@ import {
   getDuplicateSuspects,
 } from "@/lib/queries";
 import { ToastProvider } from "@/components/ui/toast";
+import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 
 export const metadata = {
   title: "Staff Console | Rooted EMS",
@@ -140,6 +141,9 @@ export default async function StaffLayout({
         <Suspense fallback={null}>
           <StaffMobileNav highestRole={highestRole} todayCount={todayCount} />
         </Suspense>
+        {/* Pop-up feedback widget, present on every staff page so a tester
+            can flag something the moment they hit it. */}
+        <FeedbackWidget staffUserId={session.user_id} activeCampusId={lens?.campusId ?? null} />
         {/* Converges the lens cookie onto explicit ?campus= selections made
             outside the header select (in-page filters, shared links) so the
             shell can never wear one campus's color over another's data. */}
