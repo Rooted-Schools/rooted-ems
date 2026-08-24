@@ -36,17 +36,35 @@ export default async function NewApplicationPage({
   );
   const campuses = allCampuses.filter((c) => openCampusIds.has(c.id));
 
-  // Fetch grade levels
+  // Grade levels, scoped to each campus's OPEN enrollment window's school year.
+  // A pilot campus carries grade_level rows for more than one year (e.g. 2026-27
+  // and 2027-28), so an unscoped list shows the same grade twice. Match each
+  // campus to the school year of its open window and keep only those grades.
+  const { data: openWins } = await supabase
+    .from("enrollment_window")
+    .select("campus_id, school_year_id")
+    .eq("status", "open")
+    .gte("close_date", new Date().toISOString());
+  const yearByCampus = new Map<string, string>();
+  for (const w of (openWins ?? []) as { campus_id: string; school_year_id: string }[]) {
+    yearByCampus.set(w.campus_id, w.school_year_id);
+  }
+
   const { data: gradeLevels } = await supabase
     .from("grade_level")
-    .select("id, grade, campus_id")
+    .select("id, grade, campus_id, school_year_id")
     .order("grade");
 
-  const grades = (gradeLevels ?? []).map((g: Record<string, unknown>) => ({
-    id: g.id as string,
-    grade: g.grade as string,
-    campus_id: g.campus_id as string,
-  }));
+  const grades = (gradeLevels ?? [])
+    .filter(
+      (g: Record<string, unknown>) =>
+        yearByCampus.get(g.campus_id as string) === (g.school_year_id as string)
+    )
+    .map((g: Record<string, unknown>) => ({
+      id: g.id as string,
+      grade: g.grade as string,
+      campus_id: g.campus_id as string,
+    }));
 
   // Which extra lottery questions each campus asks. Driven entirely by that
   // campus's board-ADOPTED policy: a weighted tier sourced from an

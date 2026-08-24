@@ -19,6 +19,19 @@ export default async function FamilyAccountPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // The phone lives on the guardian record the family entered during their
+  // application, not on the Supabase auth user (which only carries a phone for
+  // phone-based signups). Read it from there so the account page reflects what
+  // the family actually provided.
+  const { data: guardian } = await supabase
+    .from("guardian")
+    .select("phone")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const phone = guardian?.phone || user.phone || null;
+
   const locale = await getLocale();
   const t = (key: Parameters<typeof tx>[0]) => tx(key, locale);
 
@@ -39,7 +52,7 @@ export default async function FamilyAccountPage() {
             <div className="flex items-center justify-between gap-4">
               <span className="text-sm text-stone-text">{t("account.phone")}</span>
               <span className="text-sm text-ink font-medium truncate">
-                {user.phone ?? t("account.notProvided")}
+                {phone ?? t("account.notProvided")}
               </span>
             </div>
           </CardContent>
