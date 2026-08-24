@@ -99,6 +99,9 @@ function isDueToday(dateStr: string): boolean {
 interface RecruitmentClientProps {
   queue: LeadRow[];
   summary: LeadPipelineSummary;
+  /** Student-level counts for this campus: how many prospective students exist
+   *  and how many families carry more than one. */
+  studentSummary: { prospective_students: number; families_multi_student: number };
   leads: LeadRow[];
   campaigns: CampaignRow[];
   journeys: JourneySummary[];
@@ -122,7 +125,7 @@ const EMPTY_LEAD = {
   notes: "",
 };
 
-export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, campuses, activeCampusId, staffUserId }: RecruitmentClientProps) {
+export function RecruitmentClient({ queue, summary, studentSummary, leads, campaigns, journeys, campuses, activeCampusId, staffUserId }: RecruitmentClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
@@ -232,6 +235,14 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
           <h1 className="text-2xl font-bold text-ink">Recruitment</h1>
           <p className="text-sm text-stone mt-1">
             Every prospective family, from first hello to submitted application.
+          </p>
+          <p className="text-sm text-ink/70 mt-1">
+            <span className="font-semibold text-ink">{leads.length.toLocaleString()}</span> families
+            {" · "}
+            <span className="font-semibold text-ink">{studentSummary.prospective_students.toLocaleString()}</span> prospective students
+            {studentSummary.families_multi_student > 0 && (
+              <span className="text-stone"> · {studentSummary.families_multi_student} with more than one</span>
+            )}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -535,8 +546,18 @@ export function RecruitmentClient({ queue, summary, leads, campaigns, journeys, 
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-sm">
                         {lead.student_first_name ?? "—"}
-                        {lead.entry_grade && (
+                        {lead.student_grades.length > 0 ? (
+                          <span className="text-stone">
+                            {" · "}
+                            {lead.student_grades.map((g) => (g === "K" ? "K" : `Gr ${g}`)).join(", ")}
+                          </span>
+                        ) : lead.entry_grade ? (
                           <span className="text-stone"> · {lead.entry_grade === "K" ? "K" : `Gr ${lead.entry_grade}`}</span>
+                        ) : null}
+                        {lead.student_grades.length > 1 && (
+                          <span className="ml-1.5 inline-flex items-center rounded-[6px] border border-amber-300 bg-amber-100 px-1 py-0.5 text-[10px] font-medium text-amber-800">
+                            {lead.student_grades.length} students
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className="hidden lg:table-cell text-sm">{lead.campus_name}</TableCell>

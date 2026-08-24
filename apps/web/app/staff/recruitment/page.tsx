@@ -8,7 +8,7 @@ import {
 } from "@/lib/auth/get-session";
 import { getCampusLensId } from "@/lib/campus-lens";
 import { createServerClient } from "@rooted-ems/database/server";
-import { getCampaigns, getFollowUpQueue, getLeadPipelineSummary, getLeads } from "@/lib/queries";
+import { getCampaigns, getFollowUpQueue, getLeadPipelineSummary, getLeadStudentSummary, getLeads } from "@/lib/queries";
 import { getJourneys } from "@/lib/queries/journeys";
 import { RecruitmentClient } from "./recruitment-client";
 
@@ -28,9 +28,10 @@ export default async function StaffRecruitmentPage({
   const lensCampusId = await getCampusLensId(accessibleIds);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus, lensCampusId);
   const supabase = await createServerClient();
-  const [queue, summary, leads, campaigns, journeys, { data: campusRows }] = await Promise.all([
+  const [queue, summary, studentSummary, leads, campaigns, journeys, { data: campusRows }] = await Promise.all([
     getFollowUpQueue(activeCampus),
     getLeadPipelineSummary(activeCampus),
+    getLeadStudentSummary(activeCampus),
     getLeads({ campusId: activeCampus }),
     getCampaigns(activeCampus),
     getJourneys(activeCampus),
@@ -48,6 +49,7 @@ export default async function StaffRecruitmentPage({
     <RecruitmentClient
       queue={queue}
       summary={summary}
+      studentSummary={studentSummary}
       leads={leads}
       campaigns={campaigns}
       journeys={journeys}
