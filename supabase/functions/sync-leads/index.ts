@@ -1,19 +1,20 @@
 // Weekly (and on-demand) sync of the C.R. Neal lead tracker.
 //
 // Source of truth: the "[Active].Lead_Tracker" tab of the Google Sheet titled
-// [Source of Truth].CR_Neal_Academy.Lead_Tracker. This function reads that tab
-// with a read-only service account, collapses it to ONE record per email (the
-// tab carries deliberate duplicate rows that must NOT become duplicate leads),
-// maps the fields the app expects, and upserts into `lead` for C.R. Neal.
+// [Source of Truth].CR_Neal_Academy.Lead_Tracker.
 //
-// It never deletes and never inserts a duplicate. Operational columns (stage,
-// assigned_to, application_id, converted_at) are never touched. Phone is
-// backfill-only: a good existing number is never overwritten with the sheet's
-// blanks or junk, and only real 10/11-digit numbers are stored.
+// Two levels:
+//   - A LEAD is a family, keyed by email. The tracker's duplicate rows for one
+//     email collapse to a single lead, so a family is messaged once. Never a
+//     duplicate insert, never a delete, operational columns never touched,
+//     phone backfill-only and normalized.
+//   - A family can have more than one prospective STUDENT (one per distinct
+//     grade in the tracker). Those are written to lead_student, reconciled
+//     each run (missing grades added, grades no longer present removed), so
+//     the app can count and follow up at the student level.
 //
-// Auth: the Authorization Bearer must equal the token in the locked
-// sync_config table (verify_jwt is off because this IS the auth). Pass
-// {"dryRun": true} to compute the diff without writing.
+// Auth: Authorization Bearer must equal the token in the locked sync_config
+// table. Pass {"dryRun": true} to compute the diff without writing.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -53,6 +54,18 @@ function normPhone(v) {
   if (d.length === 11 && d[0] === "1") return d;
   return null;
 }
+async function fetchAll(supabase, table, select, eqCol, eqVal) {
+  let out = [];
+  for (let from = 0; ; from += 1000) {
+    let q = supabase.from(table).select(select).range(from, from + 999);
+    if (eqCol) q = q.eq(eqCol, eqVal);
+    const { data, error } = await q;
+    if (error) throw new Error(`Load ${table} failed: ${error.message}`);
+    out = out.concat(data ?? []);
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
 
 Deno.serve(async (req) => {
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -90,7 +103,9 @@ Deno.serve(async (req) => {
       if (!byEmail.has(email)) byEmail.set(email, []);
       byEmail.get(email).push(r);
     }
+    // Family-level records (one per email) and the distinct grades per family.
     const records = [];
+    const gradesByEmail = new Map();
     for (const [email, group] of byEmail) {
       const score = (r) => (s(r[cPhone]) ? 2 : 0) + (s(r[cZip]) ? 1 : 0);
       const sorted = [...group].sort((a, b) => (score(b) - score(a)) || (Number(b[cTs] || 0) - Number(a[cTs] || 0)));
@@ -99,42 +114,90 @@ Deno.serve(async (req) => {
       let phone = null;
       for (const r of sorted) { const p = normPhone(r[cPhone]); if (p) { phone = p; break; } }
       records.push({ email, campus_id: CAMPUS_ID, first_name: s(best[cFn]), last_name: s(best[cLn]), phone, zip: pick(cZip) || null, entry_grade: mapGrade(s(best[cGrade])) ?? mapGrade(pick(cGrade)), source: /meta/i.test(pick(cSrc)) ? "ad" : "other", source_detail: pick(cSrc) || null, student_first_name: pick(cStudent) || null });
+      const gs = new Set();
+      for (const r of group) { const g = mapGrade(s(r[cGrade])); if (g) gs.add(g); }
+      gradesByEmail.set(email, gs);
     }
-    let existing = [];
-    for (let from = 0; ; from += 1000) {
-      const { data, error } = await supabase.from("lead").select("id, email, first_name, last_name, phone, zip, entry_grade, source, source_detail, student_first_name").eq("campus_id", CAMPUS_ID).range(from, from + 999);
-      if (error) throw new Error(`Load existing leads failed: ${error.message}`);
-      existing = existing.concat(data ?? []);
-      if (!data || data.length < 1000) break;
-    }
+
+    // ── Family (lead) reconciliation ──────────────────────────────────────
+    const existing = await fetchAll(supabase, "lead", "id, email, first_name, last_name, phone, zip, entry_grade, source, source_detail, student_first_name", "campus_id", CAMPUS_ID);
     const existingByEmail = new Map(existing.map((l) => [String(l.email).toLowerCase(), l]));
     const toInsert = [], toUpdate = [];
-    const fieldCounts = {}; const sample = [];
+    const fieldCounts = {};
     for (const rec of records) {
       const cur = existingByEmail.get(rec.email);
       if (!cur) { toInsert.push(rec); continue; }
       const upd = { id: cur.id };
-      const diff = {};
-      for (const f of SYNCED_FIELDS) { if ((cur[f] ?? null) !== (rec[f] ?? null)) { diff[f] = [cur[f] ?? null, rec[f] ?? null]; upd[f] = rec[f]; fieldCounts[f] = (fieldCounts[f] || 0) + 1; } }
-      if (rec.phone && rec.phone !== (cur.phone ?? null)) { diff.phone = [cur.phone ?? null, rec.phone]; upd.phone = rec.phone; fieldCounts.phone = (fieldCounts.phone || 0) + 1; }
-      if (Object.keys(diff).length) { toUpdate.push(upd); if (sample.length < 15) sample.push({ email: rec.email, diff }); }
+      let changed = false;
+      for (const f of SYNCED_FIELDS) { if ((cur[f] ?? null) !== (rec[f] ?? null)) { upd[f] = rec[f]; fieldCounts[f] = (fieldCounts[f] || 0) + 1; changed = true; } }
+      if (rec.phone && rec.phone !== (cur.phone ?? null)) { upd.phone = rec.phone; fieldCounts.phone = (fieldCounts.phone || 0) + 1; changed = true; }
+      if (changed) toUpdate.push(upd);
     }
     const sheetEmails = new Set(records.map((r) => r.email));
     const inAppNotInSheet = existing.filter((l) => !sheetEmails.has(String(l.email).toLowerCase())).length;
-    const summary = { dryRun, tab: title, sheet_rows: rows.length, unique_emails: records.length, blank_email_rows: blankEmail, already_in_app: existing.length, to_insert: toInsert.length, to_update: toUpdate.length, unchanged: records.length - toInsert.length - toUpdate.length, in_app_not_in_sheet: inAppNotInSheet, field_change_counts: fieldCounts };
-    if (dryRun) return new Response(JSON.stringify({ ...summary, sample }, null, 2), { headers: { "Content-Type": "application/json" } });
-    if (toInsert.length) {
-      for (let i = 0; i < toInsert.length; i += 500) {
-        const { error } = await supabase.from("lead").insert(toInsert.slice(i, i + 500));
-        if (error) throw new Error(`Insert failed: ${error.message}`);
+
+    if (!dryRun) {
+      if (toInsert.length) {
+        for (let i = 0; i < toInsert.length; i += 500) {
+          const { error } = await supabase.from("lead").insert(toInsert.slice(i, i + 500));
+          if (error) throw new Error(`Insert failed: ${error.message}`);
+        }
+      }
+      for (const u of toUpdate) {
+        const { id, ...fields } = u;
+        const { error } = await supabase.from("lead").update(fields).eq("id", id);
+        if (error) throw new Error(`Update ${id} failed: ${error.message}`);
       }
     }
-    for (const u of toUpdate) {
-      const { id, ...fields } = u;
-      const { error } = await supabase.from("lead").update(fields).eq("id", id);
-      if (error) throw new Error(`Update ${id} failed: ${error.message}`);
+
+    // ── Student (lead_student) reconciliation ─────────────────────────────
+    // Re-read leads so newly-inserted families get an id for their students.
+    const idRows = await fetchAll(supabase, "lead", "id, email", "campus_id", CAMPUS_ID);
+    const idByEmail = new Map(idRows.map((l) => [String(l.email).toLowerCase(), l.id]));
+    const leadIds = idRows.map((l) => l.id);
+    const desired = new Set(); const desiredList = [];
+    for (const [email, gs] of gradesByEmail) {
+      const lid = idByEmail.get(email);
+      if (!lid) continue; // family not yet in app (only possible in dryRun before insert)
+      for (const g of gs) { const k = `${lid}|${g}`; if (!desired.has(k)) { desired.add(k); desiredList.push({ lead_id: lid, grade: g }); } }
     }
-    return new Response(JSON.stringify({ ...summary, applied: true }, null, 2), { headers: { "Content-Type": "application/json" } });
+    // Fetch all lead_student rows (paginated) and keep this campus's — a
+    // 1,000-id IN filter overflows the request URL.
+    const leadIdSet = new Set(leadIds);
+    const allStudents = await fetchAll(supabase, "lead_student", "id, lead_id, grade");
+    const existingStudents = allStudents.filter((r) => leadIdSet.has(r.lead_id));
+    const existingKeys = new Set(existingStudents.map((r) => `${r.lead_id}|${r.grade}`));
+    const studentsToInsert = desiredList.filter((d) => !existingKeys.has(`${d.lead_id}|${d.grade}`));
+    const studentsToDelete = existingStudents.filter((r) => !desired.has(`${r.lead_id}|${r.grade}`));
+
+    if (!dryRun) {
+      for (let i = 0; i < studentsToInsert.length; i += 500) {
+        const { error } = await supabase.from("lead_student").insert(studentsToInsert.slice(i, i + 500));
+        if (error) throw new Error(`Student insert failed: ${error.message}`);
+      }
+      const delIds = studentsToDelete.map((r) => r.id);
+      for (let i = 0; i < delIds.length; i += 500) {
+        const { error } = await supabase.from("lead_student").delete().in("id", delIds.slice(i, i + 500));
+        if (error) throw new Error(`Student delete failed: ${error.message}`);
+      }
+    }
+
+    const summary = {
+      dryRun, tab: title,
+      sheet_rows: rows.length,
+      families_unique: records.length,
+      families_in_app: existing.length,
+      families_to_insert: toInsert.length,
+      families_to_update: toUpdate.length,
+      families_unchanged: records.length - toInsert.length - toUpdate.length,
+      in_app_not_in_sheet: inAppNotInSheet,
+      field_change_counts: fieldCounts,
+      prospective_students: dryRun ? desiredList.length : (existingStudents.length - studentsToDelete.length + studentsToInsert.length),
+      students_to_insert: studentsToInsert.length,
+      students_to_delete: studentsToDelete.length,
+      applied: !dryRun,
+    };
+    return new Response(JSON.stringify(summary, null, 2), { headers: { "Content-Type": "application/json" } });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e instanceof Error ? e.message : e) }), { status: 500, headers: { "Content-Type": "application/json" } });
   }

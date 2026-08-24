@@ -25,6 +25,10 @@ export interface LeadRow {
   phone: string | null;
   student_first_name: string | null;
   entry_grade: string | null;
+  /** Every prospective student's grade for this family (from lead_student),
+   *  low to high. A family can have more than one; entry_grade is only the
+   *  primary. Empty when no grade is known. */
+  student_grades: string[];
   pathway_interest: string | null;
   stage: string;
   source: string;
@@ -86,6 +90,7 @@ function toLeadRow(row: Record<string, unknown>): LeadRow {
     phone: (row.phone as string | null) ?? null,
     student_first_name: (row.student_first_name as string | null) ?? null,
     entry_grade: (row.entry_grade as string | null) ?? null,
+    student_grades: [],
     pathway_interest: (row.pathway_interest as string | null) ?? null,
     stage: row.stage as string,
     source: row.source as string,
@@ -139,7 +144,62 @@ export async function getLeads(options?: {
     if (!data || data.length < PAGE) break;
   }
 
-  return rows.map((row) => toLeadRow(row));
+  const leadRows = rows.map((row) => toLeadRow(row));
+  const gradeMap = await getStudentGradesByLead(supabase, options?.campusId);
+  return leadRows.map((r) => ({ ...r, student_grades: gradeMap.get(r.id) ?? [] }));
+}
+
+/**
+ * Every prospective student's grade, grouped by family (lead), for a campus.
+ * Built by scanning lead_student under RLS (which already scopes to the
+ * caller's campuses). Filtering by an explicit list of lead ids would overflow
+ * the request URL on a large pipeline, so we scope by campus via the embedded
+ * lead relationship instead.
+ */
+async function getStudentGradesByLead(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  campusId?: string
+): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  const rows: { lead_id: string; grade: string }[] = [];
+  for (let from = 0; from < 20000; from += 1000) {
+    let q = campusId
+      ? supabase.from("lead_student").select("lead_id, grade, lead:lead_id!inner(campus_id)").eq("lead.campus_id", campusId)
+      : supabase.from("lead_student").select("lead_id, grade");
+    const { data, error } = await q.range(from, from + 999);
+    if (error) {
+      console.error("[getStudentGradesByLead]", error.message);
+      break;
+    }
+    rows.push(...((data ?? []) as unknown as { lead_id: string; grade: string }[]));
+    if (!data || data.length < 1000) break;
+  }
+  for (const r of rows) {
+    const arr = map.get(r.lead_id) ?? [];
+    arr.push(String(r.grade));
+    map.set(r.lead_id, arr);
+  }
+  for (const grades of map.values()) grades.sort((a, b) => Number(a) - Number(b));
+  return map;
+}
+
+/**
+ * Family/student headline counts for the recruitment page: how many
+ * prospective students exist (student-level count) and how many families have
+ * more than one, so staff can see a family may yield more than one application.
+ */
+export async function getLeadStudentSummary(
+  campusId?: string
+): Promise<{ prospective_students: number; families_multi_student: number }> {
+  const supabase = await createServerClient();
+  const map = await getStudentGradesByLead(supabase, campusId);
+  let prospective = 0;
+  let multi = 0;
+  for (const grades of map.values()) {
+    prospective += grades.length;
+    if (grades.length > 1) multi += 1;
+  }
+  return { prospective_students: prospective, families_multi_student: multi };
 }
 
 /**
@@ -388,7 +448,7 @@ export async function getJourneyStats(campusId?: string): Promise<JourneyStat[]>
 export async function getLeadDetail(leadId: string): Promise<LeadDetail | null> {
   const supabase = await createServerClient();
 
-  const [{ data: lead, error }, { data: activities }, { data: referred }] = await Promise.all([
+  const [{ data: lead, error }, { data: activities }, { data: referred }, { data: students }] = await Promise.all([
     supabase
       .from("lead")
       .select(
@@ -404,6 +464,8 @@ export async function getLeadDetail(leadId: string): Promise<LeadDetail | null> 
       .limit(100),
     // Families this lead referred, with whether each applied.
     supabase.from("lead").select("application_id").eq("referred_by_lead_id", leadId),
+    // This family's prospective students (one row per grade).
+    supabase.from("lead_student").select("grade").eq("lead_id", leadId),
   ]);
 
   if (error || !lead) {
@@ -416,6 +478,9 @@ export async function getLeadDetail(leadId: string): Promise<LeadDetail | null> 
   const referredBy = row.referred_by as Record<string, string> | null;
   return {
     ...toLeadRow(row),
+    student_grades: ((students ?? []) as { grade: string }[])
+      .map((s) => String(s.grade))
+      .sort((a, b) => Number(a) - Number(b)),
     sms_consent: row.sms_consent === true,
     preferred_language: (row.preferred_language as string) ?? "en",
     source_detail: (row.source_detail as string | null) ?? null,

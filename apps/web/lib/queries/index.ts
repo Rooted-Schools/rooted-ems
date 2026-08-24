@@ -167,6 +167,7 @@ export {
   getLeads,
   getFollowUpQueue,
   getLeadPipelineSummary,
+  getLeadStudentSummary,
   getLeadDetail,
   getCampaigns,
   getJourneyStats,

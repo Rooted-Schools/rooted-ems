@@ -294,11 +294,28 @@ export function LeadDetailClient({
               </p>
             </div>
             <div>
-              <p className="text-xs text-stone">Student</p>
-              <p className="text-ink">
-                {lead.student_first_name ?? "—"}
-                {lead.entry_grade && ` · entering ${lead.entry_grade === "K" ? "Kindergarten" : `Grade ${lead.entry_grade}`}`}
+              <p className="text-xs text-stone">
+                {lead.student_grades.length > 1 ? "Prospective students" : "Student"}
               </p>
+              <p className="text-ink">
+                {lead.student_first_name ? `${lead.student_first_name} · ` : ""}
+                {lead.student_grades.length > 0
+                  ? lead.student_grades
+                      .map((g) => (g === "K" ? "Kindergarten" : `Grade ${g}`))
+                      .join(", ")
+                  : lead.entry_grade
+                    ? lead.entry_grade === "K"
+                      ? "Kindergarten"
+                      : `Grade ${lead.entry_grade}`
+                    : lead.student_first_name
+                      ? ""
+                      : "—"}
+              </p>
+              {lead.student_grades.length > 1 && (
+                <p className="text-xs text-amber-800 mt-1">
+                  This family could submit up to {lead.student_grades.length} applications. Follow up if fewer have come in.
+                </p>
+              )}
             </div>
             <div>
               <p className="text-xs text-stone">Pathway interest</p>
