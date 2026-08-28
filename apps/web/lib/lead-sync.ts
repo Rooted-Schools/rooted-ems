@@ -70,6 +70,17 @@ const SHEET_CONFIGS: SheetConfig[] = [
     campusShortCode: "RSC",
     spreadsheetId: "1JiQs2fSYaFVnDWo0s-jiJXavi_SxZySaofLXK2Uumzg",
     tabs: [
+      // Cleveland's consolidated source of truth, same column shape as CR
+      // Neal's sheet (hence the shared crn_consolidated kind). Addressed by
+      // gid, not name: it is currently also the spreadsheet's default tab,
+      // so a name-based lookup that stopped matching would silently keep
+      // "working" by falling back here and mask the break.
+      { gid: "1955723953", sheetName: "Cleveland Interest Sheet", kind: "crn_consolidated" },
+      // The three legacy form tabs still exist and still resolve. Measured
+      // against the consolidated tab: 111 of their 115 families are already
+      // in it, but 4 are not, so these stay to avoid dropping those. Overlap
+      // is harmless — the duplicate handling below merges rather than
+      // double-inserts.
       { sheetName: "Interest Form", kind: "interest_form" },
       { sheetName: "Scholarlead Interest Form", kind: "scholarlead" },
       { sheetName: "Contact Form", kind: "contact_form" },
@@ -236,10 +247,12 @@ export function extractRows(kind: TabKind, header: string[], rows: string[][], f
         submitted_at: parseTimestamp(get(row, "Timestamp")),
       });
     } else {
-      // crn_consolidated — CR Neal's single real interest-list tab. The four
-      // tab names this campus used to be configured with don't exist in the
-      // spreadsheet; this is the one real tab (see SHEET_CONFIGS), and its
-      // columns are its own shape, matching none of the cases above.
+      // crn_consolidated — the consolidated interest-sheet shape, now used by
+      // BOTH campuses (CR Neal and Cleveland each moved their real source of
+      // truth onto this same column layout). Named for where it first
+      // appeared; nothing in here is CR Neal-specific, so keep it campus
+      // agnostic — use formName for any campus-facing label rather than
+      // hardcoding a school name.
       const email = normEmail(get(row, "Parent/Guardian Email"));
       if (!email) continue;
       const notes = cleanCell(get(row, "Notes"));
@@ -278,7 +291,7 @@ export function extractRows(kind: TabKind, header: string[], rows: string[][], f
         zip: cleanCell(get(row, "ZipCode")).slice(0, 10) || undefined,
         notes: [status && `Status: ${status}`, notes, graduatedNote].filter(Boolean).join("\n") || undefined,
         source: isAd ? "ad" : "other",
-        source_detail: leadSource || "CR Neal interest form",
+        source_detail: leadSource || `${formName} interest form`,
         submitted_at: parseTimestamp(get(row, "Timestamp")),
       });
     }
