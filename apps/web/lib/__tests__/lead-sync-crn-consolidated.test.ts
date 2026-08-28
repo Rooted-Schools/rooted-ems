@@ -134,11 +134,20 @@ describe("extractRows: crn_consolidated", () => {
     expect(result.source_detail).toBe("Word of Mouth");
   });
 
-  it("falls back to a sensible source_detail default when Lead Source is blank", () => {
+  it("falls back to a campus-specific source_detail when Lead Source is blank", () => {
     const row = realRow({ "Lead Source": "" });
     const [result] = extractRows("crn_consolidated", REAL_HEADER, [row], "C.R. Neal Academy");
     expect(result.source).toBe("other");
-    expect(result.source_detail).toBe("CR Neal interest form");
+    expect(result.source_detail).toBe("C.R. Neal Academy interest form");
+  });
+
+  it("uses the calling campus's name in the fallback — this shape is shared, not CR Neal-only", () => {
+    // Cleveland moved onto the same consolidated column shape, so this
+    // extraction case now runs for both campuses. A hardcoded school name in
+    // the fallback would mislabel the other campus's leads.
+    const row = realRow({ "Lead Source": "" });
+    const [result] = extractRows("crn_consolidated", REAL_HEADER, [row], "Rooted Schools Cleveland");
+    expect(result.source_detail).toBe("Rooted Schools Cleveland interest form");
   });
 
   it("combines Notes and Status into a single notes field", () => {
