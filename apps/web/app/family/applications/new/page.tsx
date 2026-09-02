@@ -5,7 +5,7 @@ import { createServerClient } from "@rooted-ems/database/server";
 import { redirect } from "next/navigation";
 import { getActiveEnrollmentWindows, getCampuses, getExistingHouseholdForUser } from "@/lib/queries";
 import { getAdoptedPolicyForCampus } from "@/lib/queries/lottery-policy";
-import { policyQuestionFlags, type PolicyQuestionFlags } from "@/lib/lottery-policy";
+import { policyQuestionFlags, siblingAbsolutePreference, type PolicyQuestionFlags } from "@/lib/lottery-policy";
 import { NewApplicationForm } from "./new-application-form";
 
 export default async function NewApplicationPage({
@@ -72,11 +72,19 @@ export default async function NewApplicationPage({
   // draft policy is not an adopted one, so a campus whose board has not acted
   // stays dormant and its families are asked nothing extra.
   const policyQuestions: Record<string, PolicyQuestionFlags> = {};
+  // The sibling question is a preference just like the weighted tiers, so it is
+  // only asked where the campus's board ADOPTED a sibling preference. A campus
+  // on a draft policy (or none) asks nothing about siblings, so its application
+  // reads as a neutral intake with no hint of admission criteria or priority.
+  const siblingPreference: Record<string, boolean> = {};
   const adoptedPolicies = await Promise.all(
     campuses.map(async (c) => [c.id, await getAdoptedPolicyForCampus(c.id)] as const)
   );
   for (const [campusId, adopted] of adoptedPolicies) {
     policyQuestions[campusId] = policyQuestionFlags(adopted?.config ?? null);
+    siblingPreference[campusId] = adopted?.config
+      ? siblingAbsolutePreference(adopted.config) !== null
+      : false;
   }
 
   // Item 9: if dashboard passed ?campus=RSV, pre-select that campus.
@@ -111,6 +119,7 @@ export default async function NewApplicationPage({
       initialCampusId={preselectedCampus?.id}
       existingHousehold={existingHousehold}
       policyQuestions={policyQuestions}
+      siblingPreference={siblingPreference}
     />
   );
 }

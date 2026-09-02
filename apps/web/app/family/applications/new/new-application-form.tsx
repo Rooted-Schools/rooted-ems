@@ -49,6 +49,10 @@ interface NewApplicationFormProps {
    * ADOPTED policy only.
    */
   policyQuestions?: Record<string, PolicyQuestionFlags>;
+  /** Campuses whose adopted policy includes a sibling preference — the only
+   *  campuses where the sibling question is asked. Absent/false everywhere else
+   *  keeps the application a neutral intake. */
+  siblingPreference?: Record<string, boolean>;
 }
 
 /** Yes/No answers are stored as the strings the policy matchers accept. */
@@ -383,6 +387,7 @@ export function NewApplicationForm({
   initialCampusId,
   existingHousehold,
   policyQuestions,
+  siblingPreference,
 }: NewApplicationFormProps) {
   const { t, locale } = useLocale();
   const router = useRouter();
@@ -423,6 +428,10 @@ export function NewApplicationForm({
   // disappear when the family changes their mind on step 1.
   const questionFlags = questionFlagsFor(policyQuestions, form.campusId);
   const showPolicyQuestions = questionFlags.is_staff_child || questionFlags.is_frl_qualifying;
+  // Only ask about siblings where the selected campus's board adopted a sibling
+  // preference. Elsewhere the question is hidden so nothing on the application
+  // implies a priority or admission criterion.
+  const showSibling = form.campusId ? (siblingPreference?.[form.campusId] ?? false) : false;
 
   // Debounced auto-save (~2s after the last change) once the draft row exists.
   // The server action re-verifies auth + guardian ownership on every save.
@@ -678,22 +687,25 @@ export function NewApplicationForm({
               </Select>
             </Field>
 
-            {/* Sibling priority question — affects lottery weighting */}
-            <div className="flex items-start gap-2.5 pt-1">
-              <input
-                type="checkbox"
-                id="has-sibling"
-                checked={form.hasSibling}
-                onChange={(e) => update({ hasSibling: e.target.checked })}
-                className="mt-1 h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
-              />
-              <label htmlFor="has-sibling" className="text-sm text-ink/70">
-                {t("appForm.siblingLabel")}
-                <span className="block text-xs text-stone-text mt-0.5">
-                  {t("appForm.siblingNote")}
-                </span>
-              </label>
-            </div>
+            {/* Sibling preference question — only where the campus's board
+                adopted a sibling preference (see showSibling). */}
+            {showSibling && (
+              <div className="flex items-start gap-2.5 pt-1">
+                <input
+                  type="checkbox"
+                  id="has-sibling"
+                  checked={form.hasSibling}
+                  onChange={(e) => update({ hasSibling: e.target.checked })}
+                  className="mt-1 h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
+                />
+                <label htmlFor="has-sibling" className="text-sm text-ink/70">
+                  {t("appForm.siblingLabel")}
+                  <span className="block text-xs text-stone-text mt-0.5">
+                    {t("appForm.siblingNote")}
+                  </span>
+                </label>
+              </div>
+            )}
 
             {/* Policy-driven lottery questions. Rendered only where the
                 selected campus's board has ADOPTED a policy declaring the
@@ -912,7 +924,9 @@ export function NewApplicationForm({
               <ReviewSection title={t("appForm.step.campus")}>
                 <ReviewRow label={t("appForm.campus")} value={campuses.find((c) => c.id === form.campusId)?.name || "—"} />
                 <ReviewRow label={t("apps.grade")} value={form.gradeLevel ? GRADE_LABELS[form.gradeLevel] || `${t("apps.grade")} ${form.gradeLevel}` : "—"} />
-                <ReviewRow label={t("appForm.review.siblingAtCampus")} value={form.hasSibling ? t("common.yes") : t("common.no")} />
+                {showSibling && (
+                  <ReviewRow label={t("appForm.review.siblingAtCampus")} value={form.hasSibling ? t("common.yes") : t("common.no")} />
+                )}
                 {questionFlags.is_staff_child && (
                   <ReviewRow
                     label={t("appForm.review.staffChild")}
