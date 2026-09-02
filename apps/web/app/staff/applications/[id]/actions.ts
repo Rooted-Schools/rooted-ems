@@ -112,8 +112,11 @@ export async function staffReviewDocument(
   if (!result.error) {
     revalidatePath(`/staff/applications/${applicationId}`);
 
-    // On rejection, notify the family to re-upload — fire and forget
-    if (decision === "rejected" && rejectionReason) {
+    // On rejection, notify the family to re-upload — fire and forget. This
+    // fires on EVERY rejection, not only when a reason was typed: a rejected
+    // document the family is never told about is a document that never gets
+    // re-uploaded. When no reason is given, send a neutral re-upload prompt.
+    if (decision === "rejected") {
       const supabase = createServiceRoleClient();
       const { data: doc } = await supabase
         .from("document")
@@ -128,7 +131,7 @@ export async function staffReviewDocument(
         notifyFamilyDocumentRejected({
           applicationId,
           documentType: docRow.document_type,
-          reason: rejectionReason,
+          reason: rejectionReason?.trim() || "Please re-upload this document.",
           campusId: docRow.application?.campus_id,
         }).catch((err) =>
           console.error("[staffReviewDocument] rejection notification failed", err)
