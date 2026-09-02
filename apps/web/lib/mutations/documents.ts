@@ -173,15 +173,24 @@ export async function createDocumentRecord(input: {
   file_size: number;
   mime_type: string;
   storage_path: string;
-}): Promise<MutationResult<{ id: string }>> {
-  const authClient = await createServerClient();
-  const { data: { user } } = await authClient.auth.getUser();
-  if (!user) return { data: null, error: "not_signed_in" };
+}, actorUserId?: string): Promise<MutationResult<{ id: string }>> {
+  // Prefer the already-verified user id the caller passes in. Resolving the
+  // session a second time here with a fresh auth client returns null once the
+  // caller's client has rotated the token — which is exactly why family
+  // document uploads landed in storage but were silently never recorded. Fall
+  // back to getUser only when no id is supplied (e.g. unit tests).
+  let userId = actorUserId;
+  if (!userId) {
+    const authClient = await createServerClient();
+    const { data: { user } } = await authClient.auth.getUser();
+    if (!user) return { data: null, error: "not_signed_in" };
+    userId = user.id;
+  }
 
   const supabase = createServiceRoleClient();
 
   // The uploader may only claim a file stored under their own user folder.
-  if (!isOwnStoragePath(input.storage_path, user.id)) {
+  if (!isOwnStoragePath(input.storage_path, userId)) {
     return { data: null, error: "not_authorized" };
   }
 
@@ -192,7 +201,7 @@ export async function createDocumentRecord(input: {
     .eq("id", input.application_id)
     .single();
   const appGuardian = appOwner?.guardian as unknown as { user_id: string } | null;
-  if (!appGuardian || appGuardian.user_id !== user.id) {
+  if (!appGuardian || appGuardian.user_id !== userId) {
     return { data: null, error: "not_authorized" };
   }
 
@@ -225,7 +234,7 @@ export async function createDocumentRecord(input: {
     table_name: "document",
     record_id: doc.id,
     action: AuditAction.Create,
-    actor_id: user.id,
+    actor_id: userId,
     campus_id: null, // not available without a join — low-risk omission for uploads
     new_data: {
       application_id: input.application_id,

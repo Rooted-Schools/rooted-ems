@@ -6,7 +6,7 @@ import { sendOffer } from "@/lib/mutations/offers";
 import { verifyRegistrationItem, skipRegistrationItem } from "@/lib/mutations/registration";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { requireStaffSession, requireRoleOnCampus, getAccessibleCampusIds } from "@/lib/auth/get-session";
-import { notifyFamilyStudentEnrolled, notifyFamilyDocumentRejected } from "@/lib/notify";
+import { notifyFamilyStudentEnrolled } from "@/lib/notify";
 
 /**
  * Every action in this file previously gated on requireStaffSession() alone
@@ -111,35 +111,10 @@ export async function staffReviewDocument(
 
   if (!result.error) {
     revalidatePath(`/staff/applications/${applicationId}`);
-
-    // On rejection, notify the family to re-upload — fire and forget. This
-    // fires on EVERY rejection, not only when a reason was typed: a rejected
-    // document the family is never told about is a document that never gets
-    // re-uploaded. When no reason is given, send a neutral re-upload prompt.
-    if (decision === "rejected") {
-      const supabase = createServiceRoleClient();
-      const { data: doc } = await supabase
-        .from("document")
-        .select("document_type, application:application_id (campus_id)")
-        .eq("id", documentId)
-        .single();
-      const docRow = doc as unknown as {
-        document_type: string;
-        application: { campus_id: string } | null;
-      } | null;
-      if (docRow?.document_type) {
-        notifyFamilyDocumentRejected({
-          applicationId,
-          documentType: docRow.document_type,
-          reason: rejectionReason?.trim() || "Please re-upload this document.",
-          campusId: docRow.application?.campus_id,
-        }).catch((err) =>
-          console.error("[staffReviewDocument] rejection notification failed", err)
-        );
-      } else {
-        console.warn("[staffReviewDocument] skipped rejection notification — document_type not found for document", documentId);
-      }
-    }
+    // The family notification (verify AND reject, always, with a fallback
+    // reason) is sent inside reviewDocument itself — deliberately centralized
+    // there so every review path notifies exactly once. Do NOT also send it
+    // here, or a rejection would double-email the family.
   }
 
   return result;

@@ -153,8 +153,12 @@ export async function familyCreateDocumentRecord(input: {
   mime_type: string;
   storage_path: string;
 }) {
-  await requireSession();
-  const result = await createDocumentRecord(input);
+  // Pass the verified user id through so createDocumentRecord does not resolve
+  // the session a second time — that second lookup returned null and silently
+  // dropped every family document upload (the file reached storage, no record
+  // was written).
+  const session = await requireSession();
+  const result = await createDocumentRecord(input, session.user_id);
 
   if (!result.error) {
     revalidatePath("/family/documents");
