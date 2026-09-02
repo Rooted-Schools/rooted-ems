@@ -676,7 +676,7 @@ export async function submitApplication(
   // become a submission after the window closes.
   const { data: app } = await supabase
     .from("application")
-    .select("id, status, enrollment_window:enrollment_window_id (status, close_date)")
+    .select("id, status, campus_id, enrollment_window:enrollment_window_id (status, close_date)")
     .eq("id", applicationId)
     .single();
 
@@ -721,6 +721,16 @@ export async function submitApplication(
     console.error("[submitApplication]", error.message);
     return { data: null, error: "Failed to submit application" };
   }
+
+  // Send the "Application received" confirmation. The family's initial submit
+  // goes through this mutation, not applyApplicationStatusChange, so without
+  // this call a first-time applicant got no confirmation at all — the single
+  // most common family question is "did you get my application?". Fire and
+  // forget: a mail hiccup must not fail a submission that already landed.
+  notifyFamilyApplicationReceived({
+    applicationId,
+    campusId: (app as { campus_id: string }).campus_id,
+  }).catch((e) => console.error("[submitApplication] confirmation", e));
 
   return { data: null, error: null };
 }

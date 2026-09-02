@@ -272,7 +272,13 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
   function confirmRejectApp() {
     setShowRejectAppDialog(false);
     startTransition(async () => {
-      const result = await changeApplicationStatus(detail.id, "rejected", rejectAppReason.trim() || undefined);
+      // There is no separate "rejected" status in the application lifecycle:
+      // the terminal "removed from consideration" state is "withdrawn". Reject
+      // routes through the same withdraw mutation as the Withdraw action, but
+      // carries the staff reason so the audit trail records why. (The old code
+      // set status "rejected", which is not a valid enum value or transition,
+      // so Reject always errored.)
+      const result = await staffWithdrawApplication(detail.id, rejectAppReason.trim() || undefined);
       if (result.error) showFeedback("error", result.error);
       else {
         showFeedback("success", "Application rejected");
