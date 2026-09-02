@@ -226,6 +226,9 @@ export async function sendNotification(
       body,
       link: link ?? null,
       is_read: false,
+      // Stamp the campus this notification is about (the recipient's own, else
+      // the caller's) so the staff bell can be scoped to the selected campus.
+      campus_id: logCampusFor(userId),
     }));
 
     const { error: notifError } = await supabase

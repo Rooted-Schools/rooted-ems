@@ -9,7 +9,7 @@ import {
   hasNetworkAccess,
 } from "@/lib/auth/get-session";
 import { NEUTRAL_LENS_THEME } from "@/lib/campus-identity";
-import { getCampusLens } from "@/lib/campus-lens";
+import { getCampusLens, getCampusLensId } from "@/lib/campus-lens";
 import { setCampusLens } from "@/app/staff/lens-actions";
 import { LensSync } from "@/components/layout/lens-sync";
 import {
@@ -42,6 +42,10 @@ export default async function StaffLayout({
   // Scope campus list to what the user can access
   const accessibleIds = getAccessibleCampusIds(session);
   const scopedCampusIds = accessibleIds.length > 0 ? accessibleIds : undefined;
+  // The campus selected in the header lens (null = All campuses). The bell
+  // is scoped to it so a multi-campus staff member viewing one school does
+  // not see every school's notifications.
+  const notifCampusId = await getCampusLensId(accessibleIds);
 
   // Fetch unread notification count (bell badge), the most recent
   // notifications (bell dropdown preview), and the real "Today" exception
@@ -60,8 +64,8 @@ export default async function StaffLayout({
   ] = await Promise.all([
     // Staff context only: a dual-role user (staff who is also a guardian on
     // an application) must not get family-portal links in the staff bell.
-    getUnreadNotificationCount(session.user_id, "staff"),
-    getFamilyMessages(session.user_id, 10, "staff"),
+    getUnreadNotificationCount(session.user_id, "staff", notifCampusId),
+    getFamilyMessages(session.user_id, 10, "staff", notifCampusId),
     getExpiringOffers(120, scopedCampusIds),
     getStaffPendingDocuments(scopedCampusIds),
     getStalledRegistrations(5, scopedCampusIds),

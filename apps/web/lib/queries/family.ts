@@ -742,7 +742,10 @@ function applyContextFilter<Q extends { or(filters: string): Q }>(
 export async function getFamilyMessages(
   userId: string,
   limit: number = 50,
-  context?: NotificationContext
+  context?: NotificationContext,
+  // When set (a specific campus is selected in the staff lens), only that
+  // campus's notifications are returned. Null/undefined = every campus.
+  campusId?: string | null
 ): Promise<FamilyMessageRow[]> {
   const supabase = createServiceRoleClient();
 
@@ -751,6 +754,7 @@ export async function getFamilyMessages(
     .select("id, title, body, link, is_read, created_at")
     .eq("user_id", userId);
   query = applyContextFilter(query, context);
+  if (campusId) query = query.eq("campus_id", campusId);
   const { data, error } = await query
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -777,7 +781,8 @@ export async function getFamilyMessages(
  */
 export async function getUnreadNotificationCount(
   userId: string,
-  context: NotificationContext
+  context: NotificationContext,
+  campusId?: string | null
 ): Promise<number> {
   const supabase = createServiceRoleClient();
   let query = supabase
@@ -786,6 +791,7 @@ export async function getUnreadNotificationCount(
     .eq("user_id", userId)
     .eq("is_read", false);
   query = applyContextFilter(query, context);
+  if (campusId) query = query.eq("campus_id", campusId);
   const { count, error } = await query;
   if (error) {
     console.error("[getUnreadNotificationCount]", error.message);
