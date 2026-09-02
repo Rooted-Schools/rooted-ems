@@ -83,12 +83,21 @@ export default async function NewApplicationPage({
   // Try short_code first, then fall back to partial name match so the pre-selection
   // is resilient to DB short_code mismatches.
   const preselectedCampus = searchParams.campus
-    ? campuses.find(
-        (c) => c.short_code?.toLowerCase() === searchParams.campus!.toLowerCase()
-      ) ??
-      campuses.find((c) =>
-        c.name.toLowerCase().includes(searchParams.campus!.toLowerCase())
-      )
+    ? (() => {
+        // The param arrives in several shapes depending on the entry path: a
+        // short_code ("RSV"), a full campus UUID (from the landing school
+        // links), or that UUID with its dashes stripped (the family-login form
+        // sanitizes to alphanumerics). Match all of them, plus a partial name,
+        // so the school the family already picked is always pre-selected and
+        // they never choose twice.
+        const raw = searchParams.campus!.toLowerCase();
+        const rawNoDash = raw.replace(/-/g, "");
+        return (
+          campuses.find((c) => c.id.toLowerCase() === raw || c.id.replace(/-/g, "").toLowerCase() === rawNoDash) ??
+          campuses.find((c) => c.short_code?.toLowerCase() === raw) ??
+          campuses.find((c) => c.name.toLowerCase().includes(raw))
+        );
+      })()
     : // If only one campus has an open window, auto-select it regardless of param
       campuses.length === 1
       ? campuses[0]

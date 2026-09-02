@@ -727,10 +727,19 @@ export async function submitApplication(
   // this call a first-time applicant got no confirmation at all — the single
   // most common family question is "did you get my application?". Fire and
   // forget: a mail hiccup must not fail a submission that already landed.
-  notifyFamilyApplicationReceived({
-    applicationId,
-    campusId: (app as { campus_id: string }).campus_id,
-  }).catch((e) => console.error("[submitApplication] confirmation", e));
+  const submittedCampusId = (app as { campus_id: string }).campus_id;
+  notifyFamilyApplicationReceived({ applicationId, campusId: submittedCampusId }).catch((e) =>
+    console.error("[submitApplication] family confirmation", e)
+  );
+  // Staff bell notification. Same gap as the family confirmation: it was only
+  // fired from applyApplicationStatusChange, so a first-time submit through
+  // this mutation never notified staff — a submitted application silently
+  // missing from the notifications list.
+  if (submittedCampusId) {
+    notifyStaffNewApplication({ campusId: submittedCampusId, applicationId }).catch((e) =>
+      console.error("[submitApplication] staff notification", e)
+    );
+  }
 
   return { data: null, error: null };
 }
