@@ -97,6 +97,10 @@ interface Section {
 interface EmailHeaderOptions {
   campusLogoUrl?: string;
   campusName?: string;
+  /** Shown in a contact footer so a family can reach the actual school by
+   *  phone or email, not just reply. Either may be null/absent. */
+  campusEmail?: string | null;
+  campusPhone?: string | null;
 }
 
 /**
@@ -134,6 +138,23 @@ function renderEmail(
       </div>`
     : "";
 
+  // Contact footer: give the family a real way to reach the school (phone
+  // when known, email always if resolved), in both languages. Omitted entirely
+  // when neither is available, so nothing empty is shown.
+  const contactName = header?.campusName ?? "the enrollment team";
+  const contactNameEs = header?.campusName ?? "el equipo de inscripción";
+  const emailLink = header?.campusEmail
+    ? `<a href="mailto:${escapeHtml(header.campusEmail)}" style="color:${BRAND_GREEN};">${escapeHtml(header.campusEmail)}</a>`
+    : "";
+  const phoneText = header?.campusPhone ? escapeHtml(header.campusPhone) : "";
+  const contactHtml =
+    header?.campusEmail || header?.campusPhone
+      ? `<p style="margin:28px 0 0 0;font-size:13px;color:${TEXT_COLOR};">
+    Questions about your application? Contact ${escapeHtml(contactName)}${phoneText ? ` at ${phoneText}` : ""}${emailLink ? `${phoneText ? " or " : " at "}${emailLink}` : ""}.<br />
+    ¿Preguntas sobre su solicitud? Comuníquese con ${escapeHtml(contactNameEs)}${phoneText ? ` al ${phoneText}` : ""}${emailLink ? `${phoneText ? " o " : " en "}${emailLink}` : ""}.
+  </p>`
+      : "";
+
   const html = `
 <div style="margin:0 auto;max-width:600px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:${TEXT_COLOR};padding:24px;">
   <div style="border-top:4px solid ${BRAND_GREEN};padding-top:24px;">
@@ -144,7 +165,8 @@ function renderEmail(
   <div>
     ${renderSection(es)}
   </div>
-  <p style="margin:32px 0 0 0;font-size:12px;color:${MUTED_COLOR};">
+  ${contactHtml}
+  <p style="margin:28px 0 0 0;font-size:12px;color:${MUTED_COLOR};">
     Rooted Schools Enrollment · <a href="${APP_URL}" style="color:${BRAND_GREEN};">${APP_URL.replace(/^https?:\/\//, "")}</a>
   </p>
 </div>`.trim();
@@ -154,7 +176,11 @@ function renderEmail(
       .filter(Boolean)
       .join("\n\n");
 
-  const text = `${renderTextSection(en)}\n\n----------\n\n${renderTextSection(es)}`;
+  const contactText =
+    header?.campusEmail || header?.campusPhone
+      ? `\n\n----------\n\nQuestions? Contact ${contactName}${header?.campusPhone ? ` at ${header.campusPhone}` : ""}${header?.campusEmail ? `${header?.campusPhone ? " or " : " at "}${header.campusEmail}` : ""}.`
+      : "";
+  const text = `${renderTextSection(en)}\n\n----------\n\n${renderTextSection(es)}${contactText}`;
 
   return { html, text };
 }
@@ -230,10 +256,14 @@ export function applicationReceived({
   studentFirstName,
   campusName,
   campusLogoUrl,
+  campusEmail,
+  campusPhone,
 }: {
   studentFirstName?: string;
   campusName: string;
   campusLogoUrl?: string;
+  campusEmail?: string | null;
+  campusPhone?: string | null;
 }): EmailTemplate {
   const { html, text } = renderEmail(
     {
@@ -256,7 +286,7 @@ export function applicationReceived({
       cta: { label: "Ver su solicitud", url: `${APP_URL}/family/applications` },
       closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
     },
-    { campusLogoUrl, campusName }
+    { campusLogoUrl, campusName, campusEmail, campusPhone }
   );
   return {
     subject: `Application received for ${studentEn(studentFirstName)} / Solicitud recibida`,
