@@ -73,7 +73,6 @@ export default async function FamilyDashboardPage() {
     return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
   });
   const primary = sortedCards[0] as FamilyJourneyCard | undefined;
-  const others = sortedCards.slice(1);
 
   // For a registering primary child, load the real outstanding items so the
   // headline and card can name exactly what's left (the app id is RLS-proven
@@ -454,32 +453,43 @@ export default async function FamilyDashboardPage() {
         )}
       </div>
 
-      {/* ─── Other children — one quiet line each, not an equal-weight card ─── */}
-      {others.length > 0 && (
-        <div className="space-y-0.5">
-          {others.map((card) => {
-            const statusLabel = getFamilyStatusLabel(card.status, locale);
+      {/* ─── Your applications — every application as an equal, clearly-labeled
+           card, each individually viewable, so a family with more than one
+           child is never unsure which is which or which one they're working
+           on. Shown only when there is more than one; a single-child family
+           has the guided card above. Includes the primary so the list is the
+           complete set, not "the others." ─── */}
+      {sortedCards.length > 1 && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold text-ink">{t("dashboard.yourApplications")}</h2>
+          <div className="space-y-2">
+            {sortedCards.map((card) => {
+              const statusLabel = getFamilyStatusLabel(card.status, locale);
 
-            return (
-              <div
-                key={card.id}
-                className="flex items-center justify-between gap-3 text-sm py-2 border-b border-line last:border-0"
-              >
-                <span className="text-ink/80 min-w-0 truncate">
-                  {nameOf(card)}
-                  {card.grade ? ` · ${t("offers.grade")} ${card.grade}` : ""}
-                  {" — "}
-                  {statusLabel} · {shortNoteFor(card)}
-                </span>
-                <Link
-                  href={`/family/applications/${card.id}`}
-                  className="text-rooted-green hover:underline shrink-0 text-xs font-semibold"
+              return (
+                <div
+                  key={card.id}
+                  className="flex items-center justify-between gap-3 rounded-[8px] border border-line bg-white px-4 py-3"
                 >
-                  {t("dashboard.view")}
-                </Link>
-              </div>
-            );
-          })}
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-ink truncate">
+                      {nameOf(card)}
+                      {card.grade ? ` · ${t("offers.grade")} ${card.grade}` : ""}
+                    </p>
+                    <p className="text-xs text-ink/60 mt-0.5">
+                      {statusLabel} · {shortNoteFor(card)}
+                    </p>
+                  </div>
+                  <Link
+                    href={`/family/applications/${card.id}`}
+                    className="shrink-0 rounded-[6px] border border-rooted-green/40 px-3 py-1.5 text-xs font-semibold text-rooted-green hover:bg-rooted-green/10"
+                  >
+                    {t("apps.viewDetails")}
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
