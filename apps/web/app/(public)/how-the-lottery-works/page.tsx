@@ -1,6 +1,7 @@
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { LocaleProvider } from "@/lib/i18n/locale-context";
 import { getLocaleCookie } from "@/lib/i18n/get-locale";
+import { getSession } from "@/lib/auth/get-session";
 import { LotteryExplainerClient, type ExplainerCampus } from "./explainer-client";
 
 export const metadata = {
@@ -31,6 +32,17 @@ function extractTierLabels(raw: unknown): string[] {
 
 export default async function HowTheLotteryWorksPage() {
   const initialLocale = await getLocaleCookie();
+
+  // This page is public (linked from emails and the public site), but families
+  // also reach it from inside their portal. Send the "back to home" link to the
+  // right place: a logged-in family returns to their dashboard rather than being
+  // dropped on the public landing page, which would look like a forced logout.
+  const session = await getSession();
+  const backHref = !session
+    ? "/"
+    : session.is_staff
+      ? "/staff/dashboard"
+      : "/family/dashboard";
 
   // Service role: campus, lottery_rule_set, and enrollment_window rows are
   // RLS-visible to authenticated users only, and this page is public.
@@ -79,7 +91,7 @@ export default async function HowTheLotteryWorksPage() {
 
   return (
     <LocaleProvider initialLocale={initialLocale}>
-      <LotteryExplainerClient campuses={explainerCampuses} />
+      <LotteryExplainerClient campuses={explainerCampuses} backHref={backHref} />
     </LocaleProvider>
   );
 }
