@@ -18,6 +18,10 @@ export interface CreateCampaignInput {
   /** 'open' (new+contacted+engaged) or a single stage. */
   audience_stage: "open" | "new" | "contacted" | "engaged";
   daily_limit: number;
+  /** When provided, the audience is exactly these leads (individually selected
+   *  in the recruitment list) instead of a whole stage. Still filtered to
+   *  emailable, non-unsubscribed, non-suppressed addresses. */
+  lead_ids?: string[];
 }
 
 const AUDIENCE_STAGES: Record<string, string[]> = {
@@ -41,19 +45,27 @@ export async function createCampaign(
 ): Promise<MutationResult<{ id: string; recipients: number }>> {
   const supabase = await createServerClient();
 
+  const individual = (input.lead_ids ?? []).filter(Boolean);
+  const byIndividual = individual.length > 0;
   const stages = AUDIENCE_STAGES[input.audience_stage];
-  if (!stages) return { data: null, error: "Unknown audience." };
+  if (!byIndividual && !stages) return { data: null, error: "Unknown audience." };
   const dailyLimit = Math.min(Math.max(input.daily_limit || 150, 10), 500);
 
   // Snapshot the audience (RLS restricts to the caller's campuses).
   // LG-0.1: unsubscribed and suppressed addresses never enter a campaign.
-  const { data: rawLeads, error: leadErr } = await supabase
+  // Individually-selected recipients replace the stage filter; the same
+  // emailable/unsubscribed/suppressed guards still apply so a hand-picked list
+  // can never message someone who opted out.
+  let audienceQuery = supabase
     .from("lead")
     .select("id, email")
     .eq("campus_id", input.campus_id)
-    .in("stage", stages)
     .not("email", "is", null)
     .is("unsubscribed_at", null);
+  audienceQuery = byIndividual
+    ? audienceQuery.in("id", individual)
+    : audienceQuery.in("stage", stages);
+  const { data: rawLeads, error: leadErr } = await audienceQuery;
 
   if (leadErr) {
     console.error("[createCampaign] audience", leadErr.message);

@@ -132,6 +132,10 @@ export function RecruitmentClient({ queue, summary, studentSummary, leads, campa
   const [stageFilter, setStageFilter] = useState("open");
   const [addOpen, setAddOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
+  // Individually selected leads to message, and the set handed to the dialog
+  // when "Message selected" is clicked.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sendSelectedIds, setSendSelectedIds] = useState<string[] | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [newLead, setNewLead] = useState({ ...EMPTY_LEAD });
   const [error, setError] = useState<string | null>(null);
@@ -191,6 +195,29 @@ export function RecruitmentClient({ queue, summary, studentSummary, leads, campa
       );
     });
   }, [leads, search, stageFilter]);
+
+  // Selection helpers for messaging hand-picked families. Selection is scoped
+  // to the currently filtered rows (status filter + search), so "both" ways of
+  // narrowing — by status and by individual — compose.
+  const allFilteredSelected = filtered.length > 0 && filtered.every((l) => selectedIds.has(l.id));
+  function toggleLead(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function toggleAllFiltered() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allFilteredSelected) filtered.forEach((l) => next.delete(l.id));
+      else filtered.forEach((l) => next.add(l.id));
+      return next;
+    });
+  }
+  const sendCampusId = sendSelectedIds
+    ? leads.find((l) => sendSelectedIds.includes(l.id))?.campus_id
+    : undefined;
 
   function submitNewLead() {
     if (!newLead.first_name.trim() || !newLead.last_name.trim() || !newLead.campus_id) {
@@ -493,8 +520,21 @@ export function RecruitmentClient({ queue, summary, studentSummary, leads, campa
               <option value="applied">Applied</option>
               <option value="closed">Closed</option>
             </Select>
-            <span className="text-xs text-stone self-center sm:ml-auto whitespace-nowrap">
+            {selectedIds.size > 0 && (
+              <Button
+                size="sm"
+                onClick={() => {
+                  setSendSelectedIds([...selectedIds]);
+                  setCampaignOpen(true);
+                }}
+                className="self-center sm:ml-auto whitespace-nowrap bg-rooted-green hover:bg-rooted-green/90 text-white"
+              >
+                Message {selectedIds.size} selected
+              </Button>
+            )}
+            <span className={`text-xs text-stone self-center whitespace-nowrap ${selectedIds.size > 0 ? "" : "sm:ml-auto"}`}>
               {filtered.length.toLocaleString()} lead{filtered.length === 1 ? "" : "s"}
+              {selectedIds.size > 0 ? ` · ${selectedIds.size} selected` : ""}
             </span>
           </div>
         </CardHeader>
@@ -511,6 +551,15 @@ export function RecruitmentClient({ queue, summary, studentSummary, leads, campa
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      onChange={toggleAllFiltered}
+                      aria-label="Select all shown"
+                      className="h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
+                    />
+                  </TableHead>
                   <TableHead>Family</TableHead>
                   <TableHead className="hidden md:table-cell">Student</TableHead>
                   <TableHead className="hidden lg:table-cell">Campus</TableHead>
@@ -525,6 +574,15 @@ export function RecruitmentClient({ queue, summary, studentSummary, leads, campa
                   const cfg = STAGE_CONFIG[lead.stage] ?? STAGE_CONFIG.new;
                   return (
                     <TableRow key={lead.id}>
+                      <TableCell className="w-8">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(lead.id)}
+                          onChange={() => toggleLead(lead.id)}
+                          aria-label={`Select ${lead.first_name} ${lead.last_name}`}
+                          className="h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
+                        />
+                      </TableCell>
                       <TableCell>
                         <p className="font-medium text-ink">
                           {lead.first_name} {lead.last_name}
@@ -590,9 +648,17 @@ export function RecruitmentClient({ queue, summary, studentSummary, leads, campa
       {/* Email Families wizard */}
       <CampaignDialog
         open={campaignOpen}
-        onOpenChange={setCampaignOpen}
+        onOpenChange={(o) => {
+          setCampaignOpen(o);
+          if (!o) {
+            setSendSelectedIds(null);
+            setSelectedIds(new Set());
+          }
+        }}
         campuses={campuses}
         staffUserId={staffUserId}
+        preselectedLeadIds={sendSelectedIds ?? undefined}
+        preselectedCampusId={sendCampusId}
       />
 
       {/* Share & QR generator (Capture Kit) */}

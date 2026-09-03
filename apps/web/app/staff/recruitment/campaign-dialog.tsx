@@ -33,13 +33,19 @@ interface CampaignDialogProps {
   onOpenChange: (open: boolean) => void;
   campuses: { id: string; name: string }[];
   staffUserId: string;
+  /** When set, the send goes to exactly these hand-picked leads (from the
+   *  recruitment list selection) rather than a whole stage. */
+  preselectedLeadIds?: string[];
+  /** The campus of the selected leads — fixes the campus in individual mode. */
+  preselectedCampusId?: string;
 }
 
-export function CampaignDialog({ open, onOpenChange, campuses, staffUserId }: CampaignDialogProps) {
+export function CampaignDialog({ open, onOpenChange, campuses, staffUserId, preselectedLeadIds, preselectedCampusId }: CampaignDialogProps) {
   const router = useRouter();
+  const individualMode = (preselectedLeadIds?.length ?? 0) > 0;
   const [isPending, startTransition] = useTransition();
   const [step, setStep] = useState(1);
-  const [campusId, setCampusId] = useState(campuses.length === 1 ? campuses[0].id : "");
+  const [campusId, setCampusId] = useState(preselectedCampusId ?? (campuses.length === 1 ? campuses[0].id : ""));
   const [audience, setAudience] = useState<"open" | "new" | "contacted" | "engaged">("open");
   const [count, setCount] = useState<number | null>(null);
   const [templateKey, setTemplateKey] = useState<CampaignTemplateKey>("reintroduction");
@@ -52,12 +58,18 @@ export function CampaignDialog({ open, onOpenChange, campuses, staffUserId }: Ca
 
   const campusName = campuses.find((c) => c.id === campusId)?.name ?? "your school";
 
-  // Live audience count whenever campus/audience changes
+  // Live audience count whenever campus/audience changes. In individual mode
+  // the count is simply how many were selected.
   useEffect(() => {
-    if (!open || !campusId) return;
+    if (!open) return;
+    if (individualMode) {
+      setCount(preselectedLeadIds?.length ?? 0);
+      return;
+    }
+    if (!campusId) return;
     setCount(null);
     staffCountAudience(campusId, audience).then(setCount).catch(() => setCount(null));
-  }, [open, campusId, audience]);
+  }, [open, campusId, audience, individualMode, preselectedLeadIds]);
 
   // Reset when opened
   useEffect(() => {
@@ -69,8 +81,10 @@ export function CampaignDialog({ open, onOpenChange, campuses, staffUserId }: Ca
       setPayload({});
       setName("");
       setDailyLimit("150");
+      // Individual mode fixes the campus to the selected leads' campus.
+      if (individualMode && preselectedCampusId) setCampusId(preselectedCampusId);
     }
-  }, [open]);
+  }, [open, individualMode, preselectedCampusId]);
 
   const preview = useMemo(() => {
     try {
@@ -112,6 +126,7 @@ export function CampaignDialog({ open, onOpenChange, campuses, staffUserId }: Ca
           payload,
           audience_stage: audience,
           daily_limit: parseInt(dailyLimit, 10) || 150,
+          lead_ids: individualMode ? preselectedLeadIds : undefined,
         },
         staffUserId
       );
@@ -155,7 +170,18 @@ export function CampaignDialog({ open, onOpenChange, campuses, staffUserId }: Ca
             {/* ── Step 1: Audience ── */}
             {step === 1 && (
               <div className="space-y-4 py-2">
-                {campuses.length > 1 && (
+                {individualMode && (
+                  <div className="rounded-lg border border-rooted-green/30 bg-rooted-green/5 px-3 py-2.5">
+                    <p className="text-sm font-medium text-ink">
+                      Sending to {(preselectedLeadIds?.length ?? 0).toLocaleString()} selected famil
+                      {(preselectedLeadIds?.length ?? 0) === 1 ? "y" : "ies"}
+                    </p>
+                    <p className="text-xs text-stone mt-0.5">
+                      Only the families you selected from the list. Anyone who unsubscribed or has no email is skipped.
+                    </p>
+                  </div>
+                )}
+                {!individualMode && campuses.length > 1 && (
                   <div>
                     <label htmlFor="camp-campus" className="block text-sm font-medium text-ink/70 mb-1">Campus</label>
                     <Select id="camp-campus" value={campusId} onChange={(e) => setCampusId(e.target.value)}>
@@ -166,7 +192,7 @@ export function CampaignDialog({ open, onOpenChange, campuses, staffUserId }: Ca
                     </Select>
                   </div>
                 )}
-                <div className="space-y-2">
+                <div className={individualMode ? "hidden" : "space-y-2"}>
                   {AUDIENCE_OPTIONS.map((opt) => (
                     <label
                       key={opt.value}

@@ -18,7 +18,13 @@ export default async function SeatManagementPage({
   const accessibleIds = getAccessibleCampusIds(session);
   const lensCampusId = await getCampusLensId(accessibleIds);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus, lensCampusId);
-  const scopedCampusIds = activeCampus ? [activeCampus] : accessibleIds;
+  // Seat management is a single-campus view: staff see only their own campus's
+  // seat counts, never a cross-campus aggregate of all three schools (that read
+  // as unnecessary CMO-level data to school staff). A multi-campus admin
+  // switches campus with the header selector; with none selected, this defaults
+  // to their first campus rather than showing every school at once.
+  const seatCampus = activeCampus ?? accessibleIds[0] ?? null;
+  const scopedCampusIds = seatCampus ? [seatCampus] : [];
   const supabase = createServiceRoleClient();
 
   // Get current school year(s)
