@@ -339,6 +339,8 @@ interface CampusInfo {
   name: string;
   /** Campus inbox — used as the email Reply-To so family replies reach the school, not RSF central. */
   email: string | null;
+  /** Campus contact phone, shown in the email contact footer when set. */
+  phone: string | null;
   /**
    * IANA timezone for the campus (campus.timezone). Deadlines are rendered in
    * it, so "respond by Friday" means the family's Friday and not the server's.
@@ -361,17 +363,18 @@ interface CampusInfo {
  * threading the campus logo into email headers.
  */
 async function resolveCampus(campusId?: string): Promise<CampusInfo> {
-  if (!campusId) return { name: "your school", email: null, timezone: null, logoUrl: undefined };
+  if (!campusId) return { name: "your school", email: null, phone: null, timezone: null, logoUrl: undefined };
   const supabase = createServiceRoleClient();
   const { data } = await supabase
     .from("campus")
-    .select("name, email, short_code, timezone")
+    .select("name, email, phone, short_code, timezone")
     .eq("id", campusId)
     .single();
   const row = data as unknown as Record<string, string | null> | null;
   return {
     name: row?.name ?? "your school",
     email: row?.email ?? null,
+    phone: row?.phone ?? null,
     timezone: row?.timezone ?? null,
     logoUrl: getCampusLogoAbsoluteUrl(row?.short_code, APP_LINK),
   };
@@ -439,7 +442,7 @@ export async function notifyFamilyApplicationReceived({
 }): Promise<void> {
   const { userId, email } = await getGuardianContact(applicationId);
   if (!userId && !email) return;
-  const { name: campusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
+  const { name: campusName, email: campusEmail, phone: campusPhone, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
   await Promise.all([
     userId
       ? notify({
@@ -453,7 +456,7 @@ export async function notifyFamilyApplicationReceived({
       : Promise.resolve(),
     emailGuardian(
       email,
-      emailTemplates.applicationReceived({ studentFirstName: firstNameOf(studentName), campusName, campusLogoUrl }),
+      emailTemplates.applicationReceived({ studentFirstName: firstNameOf(studentName), campusName, campusLogoUrl, campusEmail, campusPhone }),
       "notifyFamilyApplicationReceived",
       campusEmail,
       { campusId, recipientUserId: userId, templateKey: "applicationReceived" }
