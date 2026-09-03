@@ -16,9 +16,15 @@ export interface ExplainerCampus {
 
 interface LotteryExplainerClientProps {
   campuses: ExplainerCampus[];
+  /** Where the "back to home" link points. This page is public, so an
+   *  anonymous visitor goes to the public landing ("/"), but a logged-in
+   *  family is sent back to their own dashboard instead of being bounced
+   *  out to the public site (which would force a re-login). Resolved
+   *  server-side from the session in page.tsx. */
+  backHref?: string;
 }
 
-export function LotteryExplainerClient({ campuses }: LotteryExplainerClientProps) {
+export function LotteryExplainerClient({ campuses, backHref = "/" }: LotteryExplainerClientProps) {
   const { t, locale } = useLocale();
 
   const steps: { title: TranslationKey; desc: TranslationKey }[] = [
@@ -41,7 +47,7 @@ export function LotteryExplainerClient({ campuses }: LotteryExplainerClientProps
     <div className="min-h-screen bg-gradient-to-b from-rooted-green/5 to-warm-white py-8 px-4">
       <div className="max-w-2xl mx-auto space-y-4">
         <div className="flex items-center justify-between">
-          <Link href="/" className="text-sm text-rooted-green hover:underline">
+          <Link href={backHref} className="text-sm text-rooted-green hover:underline">
             &larr; {t("inquiry.backHome")}
           </Link>
           <LanguageToggle />
