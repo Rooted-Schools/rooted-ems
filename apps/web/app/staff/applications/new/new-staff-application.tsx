@@ -93,7 +93,7 @@ const initialFormData: FormData = {
   specialServicesNotes: "",
   guardianFirstName: "",
   guardianLastName: "",
-  guardianRelationship: "parent",
+  guardianRelationship: "mother",
   guardianEmail: "",
   guardianPhone: "",
   guardianPhoneSecondary: "",
@@ -555,8 +555,12 @@ export function StaffNewApplicationForm({
                   updateField("guardianRelationship", e.target.value)
                 }
               >
-                <option value="parent">Parent</option>
+                <option value="mother">Mother</option>
+                <option value="father">Father</option>
+                <option value="stepmother">Stepmother</option>
+                <option value="stepfather">Stepfather</option>
                 <option value="grandparent">Grandparent</option>
+                <option value="aunt_uncle">Aunt / Uncle</option>
                 <option value="legal_guardian">Legal Guardian</option>
                 <option value="foster_parent">Foster Parent</option>
                 <option value="other">Other</option>
