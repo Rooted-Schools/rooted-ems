@@ -40,10 +40,14 @@ const STATUS_TABS = [
   { value: "submitted", label: "Submitted" },
   { value: "needs_info", label: "Needs Info" },
   { value: "verified", label: "Verified" },
+  { value: "lottery_assigned", label: "Lottery" },
   { value: "offered", label: "Offered" },
   { value: "accepted", label: "Accepted" },
-  { value: "waitlisted", label: "Waitlisted" },
   { value: "registered", label: "Registered" },
+  { value: "enrolled", label: "Enrolled" },
+  { value: "waitlisted", label: "Waitlisted" },
+  { value: "withdrawn", label: "Withdrawn" },
+  { value: "rejected", label: "Rejected" },
 ];
 
 function formatDate(dateStr: string | null) {
