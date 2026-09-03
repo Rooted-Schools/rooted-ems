@@ -31,7 +31,7 @@ export default async function StaffNewApplicationPage({
   // dedicated query with a campus filter yet).
   const { data: gradeLevels } = await supabase
     .from("grade_level")
-    .select("id, grade, campus_id")
+    .select("id, grade, campus_id, school_year_id")
     .order("grade");
 
   // Fetch open enrollment windows for new application creation
@@ -41,13 +41,25 @@ export default async function StaffNewApplicationPage({
     .eq("status", "open")
     .order("name");
 
+  // Scope grades to the school year of each campus's OPEN window, mirroring the
+  // family application page. A pilot campus carries grade_level rows for more
+  // than one year (2026-27 and 2027-28), so without this filter every grade
+  // shows twice in the dropdown.
+  const yearByCampus = new Map<string, string>();
+  for (const w of (allWindows ?? []) as { campus_id: string; school_year_id: string }[]) {
+    if (!yearByCampus.has(w.campus_id)) yearByCampus.set(w.campus_id, w.school_year_id);
+  }
   const grades = (gradeLevels ?? [])
+    .filter(
+      (g: Record<string, unknown>) =>
+        (!scopeToAccessible || accessibleIds.includes(g.campus_id as string)) &&
+        yearByCampus.get(g.campus_id as string) === (g.school_year_id as string)
+    )
     .map((g: Record<string, unknown>) => ({
       id: g.id as string,
       grade: g.grade as string,
       campus_id: g.campus_id as string,
-    }))
-    .filter((g) => !scopeToAccessible || accessibleIds.includes(g.campus_id));
+    }));
 
   const enrollmentWindows = (allWindows ?? [])
     .map((w: Record<string, unknown>) => ({
