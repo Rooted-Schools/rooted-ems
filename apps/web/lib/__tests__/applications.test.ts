@@ -15,6 +15,7 @@ import {
   createApplication,
   type CreateApplicationInput,
 } from "@/lib/mutations/applications";
+import { notifyFamilyApplicationReceived, notifyStaffNewApplication } from "@/lib/notify";
 
 vi.mock("@rooted-ems/database/server", async () => {
   const { supabaseMock } = await import("./helpers/supabase-mock");
@@ -96,7 +97,7 @@ describe("submitApplication", () => {
       "application",
       guardRow(OWNER.id),
       { data: { id: APP_ID, status: "draft", enrollment_window: OPEN_WINDOW }, error: null }, // status + window fetch
-      { data: null, error: null } // update result
+      { data: [{ id: APP_ID }], error: null } // compare-and-set update: one row flipped
     );
 
     const result = await submitApplication(APP_ID);
@@ -107,6 +108,28 @@ describe("submitApplication", () => {
     expect(writes[0].op).toBe("update");
     expect(writes[0].payload).toMatchObject({ status: "submitted" });
     expect(hasEqFilter(writes[0], "id", APP_ID)).toBe(true);
+    // The compare-and-set is guarded on the row still being a draft.
+    expect(hasEqFilter(writes[0], "status", "draft")).toBe(true);
+  });
+
+  it("is idempotent under a concurrent submit: the losing write is a no-op", async () => {
+    // Both requests read status 'draft', but the compare-and-set UPDATE only
+    // matches while the row is still 'draft'. The request that loses the race
+    // gets zero rows back and must succeed as a no-op WITHOUT notifying again,
+    // so a double-tap or window-open burst can never submit or notify twice.
+    supabaseMock.setUser(OWNER);
+    supabaseMock.queueResult(
+      "application",
+      guardRow(OWNER.id),
+      { data: { id: APP_ID, status: "draft", enrollment_window: OPEN_WINDOW }, error: null },
+      { data: [], error: null } // CAS matched nothing: another submit already won
+    );
+
+    const result = await submitApplication(APP_ID);
+
+    expect(result.error).toBeNull();
+    expect(notifyFamilyApplicationReceived).not.toHaveBeenCalled();
+    expect(notifyStaffNewApplication).not.toHaveBeenCalled();
   });
 
   it("refuses to submit a non-draft application (no write)", async () => {
