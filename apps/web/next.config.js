@@ -15,6 +15,15 @@ const nextConfig = {
     "@rooted-ems/types",
     "@rooted-ems/utils",
   ],
+  // Expose the deployment environment to the browser. VERCEL_ENV is a
+  // server-only variable, so the client Sentry config could never read it and
+  // every browser error was mislabeled "development" even in production.
+  // Inlining it here as a NEXT_PUBLIC_ value at build time makes it available
+  // client-side without depending on any Vercel dashboard toggle. On a local
+  // build VERCEL_ENV is unset and this is "development".
+  env: {
+    NEXT_PUBLIC_APP_ENV: process.env.VERCEL_ENV || "development",
+  },
   async headers() {
     // LG-1: the public inquiry form is meant to be embedded on the campus
     // school websites, so it must NOT be frame-denied. It's unauthenticated
