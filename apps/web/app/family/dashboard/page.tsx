@@ -465,26 +465,45 @@ export default async function FamilyDashboardPage() {
           <div className="space-y-2">
             {sortedCards.map((card) => {
               const statusLabel = getFamilyStatusLabel(card.status, locale);
+              // A draft is not a submission. Mark it distinctly (amber chip)
+              // and point its action at finishing it, so a family with one
+              // submitted and one in-progress application never reads the two
+              // as two submissions.
+              const isDraft = card.status === "draft";
 
               return (
                 <div
                   key={card.id}
-                  className="flex items-center justify-between gap-3 rounded-[8px] border border-line bg-white px-4 py-3"
+                  className={`flex items-center justify-between gap-3 rounded-[8px] border px-4 py-3 ${
+                    isDraft ? "border-amber-300 bg-amber-50/50" : "border-line bg-white"
+                  }`}
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-ink truncate">
                       {nameOf(card)}
                       {card.grade ? ` · ${t("offers.grade")} ${card.grade}` : ""}
                     </p>
-                    <p className="text-xs text-ink/60 mt-0.5">
-                      {statusLabel} · {shortNoteFor(card)}
+                    <p className="text-xs mt-1">
+                      {isDraft ? (
+                        <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">
+                          {t("dashboard.draftBadge")}
+                        </span>
+                      ) : (
+                        <span className="text-ink/60">
+                          {statusLabel} · {shortNoteFor(card)}
+                        </span>
+                      )}
                     </p>
                   </div>
                   <Link
                     href={`/family/applications/${card.id}`}
-                    className="shrink-0 rounded-[6px] border border-rooted-green/40 px-3 py-1.5 text-xs font-semibold text-rooted-green hover:bg-rooted-green/10"
+                    className={`shrink-0 rounded-[6px] px-3 py-1.5 text-xs font-semibold ${
+                      isDraft
+                        ? "bg-rooted-green text-white hover:bg-rooted-green/90"
+                        : "border border-rooted-green/40 text-rooted-green hover:bg-rooted-green/10"
+                    }`}
                   >
-                    {t("apps.viewDetails")}
+                    {isDraft ? t("dashboard.finishApplication") : t("apps.viewDetails")}
                   </Link>
                 </div>
               );
