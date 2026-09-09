@@ -487,6 +487,56 @@ export async function notifyFamilyApplicationVerified({
   });
 }
 
+/**
+ * A family saved an application as a draft and has not submitted it while the
+ * enrollment window is still open. One gentle reminder (in-app + bilingual
+ * email) so a saved-but-never-submitted application does not quietly miss the
+ * lottery. The cron (app/api/cron/nudge-drafts) owns the dedupe/throttle via
+ * application.draft_reminder_sent_at, so this function just delivers, matching
+ * how notifyFamilyRegistrationNudge splits responsibility with its cron.
+ */
+export async function notifyFamilyDraftReminder({
+  applicationId,
+  studentName,
+  campusId,
+  closeDate,
+}: {
+  applicationId: string;
+  studentName?: string;
+  campusId?: string;
+  closeDate?: string | null;
+}): Promise<void> {
+  const { userId, email } = await getGuardianContact(applicationId);
+  if (!userId && !email) return;
+  const { name: campusName, email: campusEmail, logoUrl: campusLogoUrl } = await resolveCampus(campusId);
+  const studentFirstName = firstNameOf(studentName);
+  const link = `/family/applications/${applicationId}/edit`;
+  await Promise.all([
+    userId
+      ? notify({
+          userId,
+          subject: `Finish your application${studentName ? ` for ${studentName}` : ""}`,
+          body: `Your application${studentName ? ` for ${studentName}` : ""} at ${campusName} is saved as a draft and has not been submitted yet. An application must be submitted to be entered into the enrollment lottery.`,
+          link,
+          campusId,
+          logTag: "notifyFamilyDraftReminder",
+        })
+      : Promise.resolve(),
+    emailGuardian(
+      email,
+      emailTemplates.draftReminder({
+        studentFirstName,
+        campusName,
+        closeDate: closeDate ?? undefined,
+        campusLogoUrl,
+      }),
+      "notifyFamilyDraftReminder",
+      campusEmail,
+      { campusId, recipientUserId: userId, templateKey: "draftReminder" }
+    ),
+  ]);
+}
+
 /** Staff marks application as needs_info. */
 export async function notifyFamilyNeedsInfo({
   applicationId,
