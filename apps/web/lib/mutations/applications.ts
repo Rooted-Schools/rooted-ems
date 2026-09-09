@@ -708,18 +708,33 @@ export async function submitApplication(
   }
 
   const now = new Date().toISOString();
-  const { error } = await supabase
+  // Compare-and-set: only flip the row while it is STILL 'draft'. The status
+  // check above is a read, so two concurrent submits (a double-tap, or a burst
+  // when the window opens) could both pass it and both write — submitting
+  // twice and firing the confirmation + staff notifications twice. Guarding the
+  // UPDATE on status makes exactly one submit win at the database level.
+  const { data: submittedRows, error } = await supabase
     .from("application")
     .update({
       status: "submitted",
       submitted_at: now,
       locked_at: now,
     })
-    .eq("id", applicationId);
+    .eq("id", applicationId)
+    .eq("status", "draft")
+    .select("id");
 
   if (error) {
     console.error("[submitApplication]", error.message);
     return { data: null, error: "Failed to submit application" };
+  }
+
+  // Zero rows updated means the row was no longer 'draft' when the write
+  // landed: another concurrent submit already won. Treat it as a successful
+  // no-op and, crucially, fall through WITHOUT notifying again, so a
+  // double-submit can never double-notify the family or staff.
+  if (!submittedRows || submittedRows.length === 0) {
+    return { data: null, error: null };
   }
 
   // Notifications are deliberately NOT sent here. The family "Application
