@@ -46,15 +46,13 @@ plus running an actual load test for evidence.
 
 Ranked by likelihood of causing a problem.
 
-1. Supabase Auth email OTP rate limit (highest priority). Family login uses
-   Supabase email one-time codes (`signInWithOtp`). Supabase's built-in email
-   sender is heavily rate-limited and is intended only for testing. If a custom
-   SMTP is not configured for Auth, a burst of families requesting login codes
-   will hit the limit and codes will not arrive, locking families out at the
-   worst possible moment. Action: in the Supabase dashboard, configure a custom
-   SMTP provider for Auth (Resend works, and is already used for transactional
-   mail) and raise the Auth rate limits to match expected concurrent logins.
-   This is separate from the transactional Resend key the app uses.
+1. Supabase Auth email OTP rate limit (highest priority). RESOLVED 2026-09-09.
+   Family login uses Supabase email one-time codes (`signInWithOtp`), and
+   Supabase's built-in email sender is heavily rate-limited and intended only
+   for testing. Custom SMTP is now configured for Auth (Resend,
+   `smtp.resend.com`, sender `enroll@rootedschool.org`) and the email rate limit
+   is raised to 500/hour. The step-by-step runbook and final rate-limit values
+   are in the appendix below. Re-verify after any Auth settings change.
 
 2. Resend transactional throughput. Each submission triggers a confirmation
    email plus staff notification. Sends are fire-and-forget, so they never slow
@@ -93,3 +91,40 @@ driven end to end from a load generator without real inboxes. The idempotent
 submit fix and this document's Auth SMTP item cover that path instead. The k6
 script exercises the public read surface every applicant hits before signing
 in.
+
+## Appendix: Auth email SMTP runbook
+
+Configured 2026-09-09. Repeat this if Auth email ever reverts to the built-in
+sender (symptom: login codes stop arriving, or arrive slowly, under any volume).
+
+Sender and provider:
+
+1. In Resend, confirm the sending domain (`rootedschool.org`) shows Verified
+   under Domains, and that a Sending-access API key exists.
+2. In the Supabase dashboard, project `szockdlohlmkyloubgtd`, open
+   Project Settings, Authentication, SMTP Settings, and enable Custom SMTP:
+   - Sender email: `enroll@rootedschool.org`
+   - Sender name: `Rooted Schools`
+   - Host: `smtp.resend.com`
+   - Port: `465`
+   - Username: `resend`
+   - Password: a Resend API key (`re_...`)
+3. Verify it is actually live: request a login code at
+   `enroll.rootedschool.org/login` with a real inbox, then confirm the email
+   appears in the Resend Logs dashboard (not just that it arrived). If it is not
+   in Resend's logs, Auth is still using the built-in sender and the Host field
+   needs fixing.
+
+Auth rate limits (Authentication, Rate Limits). Final values set 2026-09-09:
+
+| Setting | Value | Notes |
+| --- | --- | --- |
+| Rate limit for sending emails | 500 / hour | Project-wide. The one that prevents a window-open lockout. Only effective with custom SMTP on. |
+| Token verifications | 30 / 5 min per IP | "Enter your code." Per IP, so each family has its own budget. |
+| Sign-ups and sign-ins | 30 / 5 min per IP | "Request a code." Per IP. |
+| Token refreshes | raise from 1 to ~5 / 5 min per IP | 1 is unusually low; on a shared connection it can bounce a signed-in family back to login. Recommended bump. |
+
+Shared-IP caveat: the per-IP limits are sized for families on their own home or
+mobile connections. For an in-person event where many families sign in on one
+shared wifi, temporarily raise sign-ups/sign-ins and token verifications for
+that window.
