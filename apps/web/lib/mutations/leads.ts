@@ -31,6 +31,8 @@ export interface CreateLeadInput {
   student_first_name?: string;
   entry_grade?: string;
   pathway_interest?: string;
+  /** Answer to "What are you interested in?": 'apply_when_open' | 'learn_more'. */
+  intent?: string;
   source?: string;
   source_detail?: string;
   notes?: string;
@@ -145,6 +147,10 @@ export async function createLeadFromInquiry(
       student_first_name: input.student_first_name?.trim() || null,
       entry_grade: input.entry_grade || null,
       pathway_interest: input.pathway_interest || null,
+      inquiry_intent:
+        input.intent === "apply_when_open" || input.intent === "learn_more"
+          ? input.intent
+          : null,
       source: input.source ?? "website",
       source_detail: input.source_detail || null,
       referred_by_lead_id: input.referred_by_lead_id || null,

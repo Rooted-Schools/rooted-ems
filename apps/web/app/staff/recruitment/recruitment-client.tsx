@@ -61,6 +61,12 @@ export const PATHWAY_LABELS: Record<string, string> = {
   entrepreneurship: "Entrepreneurship",
 };
 
+/** "What are you interested in?" answers from the interest-list form. */
+export const INTENT_LABELS: Record<string, string> = {
+  apply_when_open: "Intends to apply when the window opens",
+  learn_more: "Wants to learn more",
+};
+
 const GRADE_OPTIONS = ["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
 
 /** Honest elapsed-time label for the queue clock: "3h since inquiry" / "2d since inquiry". */

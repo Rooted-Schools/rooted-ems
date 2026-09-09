@@ -33,7 +33,7 @@ import type { LeadDetail } from "@/lib/queries/leads";
 import { CALL_OUTCOMES, buildCallOutcomeBody, bodyHasOutcome } from "@/lib/lead-call-outcomes";
 import { formatRelativeTime } from "@/lib/queries/utils";
 import { staffDeleteLead, staffGetReferralLink, staffLogLeadActivity, staffUpdateLead } from "../actions";
-import { PATHWAY_LABELS, SOURCE_LABELS, STAGE_CONFIG } from "../recruitment-client";
+import { PATHWAY_LABELS, INTENT_LABELS, SOURCE_LABELS, STAGE_CONFIG } from "../recruitment-client";
 import { ComposeEmailDialog } from "@/components/staff/compose-email-dialog";
 
 const ACTIVITY_ICONS: Record<string, ReactNode> = {
@@ -323,6 +323,14 @@ export function LeadDetailClient({
                 {lead.pathway_interest ? (PATHWAY_LABELS[lead.pathway_interest] ?? lead.pathway_interest) : "Not sure yet"}
               </p>
             </div>
+            {lead.inquiry_intent && (
+              <div>
+                <p className="text-xs text-stone">Interested in</p>
+                <p className="text-ink">
+                  {INTENT_LABELS[lead.inquiry_intent] ?? lead.inquiry_intent}
+                </p>
+              </div>
+            )}
             {lead.zip && (
               <div>
                 <p className="text-xs text-stone">Zip code</p>
