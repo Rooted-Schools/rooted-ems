@@ -183,23 +183,27 @@ function CampusLandingContent({ identity, campus, windowState }: CampusLandingCl
             )}
           </div>
 
-          {/* CTA — Apply when open, interest list otherwise */}
-          <div className="mt-6">
-            {isOpen ? (
+          {/* CTA — Apply Now is the primary action while the window is open,
+              but the interest list is ALWAYS offered alongside it. A family who
+              is not ready to apply now, or who is looking ahead to a future
+              enrollment year, can still join without submitting an application.
+              The interest list is the same inquiry form embedded on the school
+              websites (/inquire). */}
+          <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+            {isOpen && (
               <Link
                 href={`/login?campus=${campus.id}`}
                 className="inline-flex min-h-[44px] items-center justify-center rounded-[6px] px-6 text-base font-semibold text-white bg-rooted-green hover:bg-deep-green transition-colors shadow-sm"
               >
                 {t("public.applyNow")}
               </Link>
-            ) : (
-              <Link
-                href={`/inquire?campus=${campus.id}`}
-                className="inline-flex min-h-[44px] items-center justify-center rounded-[6px] border border-line bg-white px-6 text-base font-semibold text-ink hover:bg-sunken transition-colors"
-              >
-                {t("public.joinInterestList")}
-              </Link>
             )}
+            <Link
+              href={`/inquire?campus=${campus.id}`}
+              className="inline-flex min-h-[44px] items-center justify-center rounded-[6px] border border-line bg-white px-6 text-base font-semibold text-ink hover:bg-sunken transition-colors"
+            >
+              {t("public.joinInterestList")}
+            </Link>
           </div>
         </div>
       </section>
