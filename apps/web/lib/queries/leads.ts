@@ -30,6 +30,8 @@ export interface LeadRow {
    *  primary. Empty when no grade is known. */
   student_grades: string[];
   pathway_interest: string | null;
+  /** "What are you interested in?" answer: 'apply_when_open' | 'learn_more' | null. */
+  inquiry_intent: string | null;
   stage: string;
   source: string;
   assigned_to: string | null;
@@ -73,7 +75,7 @@ export interface LeadPipelineSummary {
 
 const LEAD_LIST_SELECT = `
   id, campus_id, first_name, last_name, email, phone,
-  student_first_name, entry_grade, pathway_interest,
+  student_first_name, entry_grade, pathway_interest, inquiry_intent,
   stage, source, assigned_to, next_follow_up_at, last_contact_at, created_at,
   campus:campus_id (name)
 `;
@@ -92,6 +94,7 @@ function toLeadRow(row: Record<string, unknown>): LeadRow {
     entry_grade: (row.entry_grade as string | null) ?? null,
     student_grades: [],
     pathway_interest: (row.pathway_interest as string | null) ?? null,
+    inquiry_intent: (row.inquiry_intent as string | null) ?? null,
     stage: row.stage as string,
     source: row.source as string,
     assigned_to: (row.assigned_to as string | null) ?? null,

@@ -58,6 +58,7 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
     sms_consent: false,
     campus_id: lockedCampusId ?? preselectedCampusId ?? (campuses.length === 1 ? campuses[0].id : ""),
     entry_grade: "",
+    intent: "", // "What are you interested in?" — required
     website: "", // honeypot
   });
 
@@ -107,7 +108,12 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
     !form.last_name.trim() ||
     !form.phone.trim() ||
     !form.campus_id ||
-    !form.entry_grade;
+    !form.entry_grade ||
+    !form.intent;
+
+  // The campus name for the "learn more about {campus}" option; falls back to
+  // a generic phrase before a campus is chosen.
+  const selectedCampusName = campuses.find((c) => c.id === form.campus_id)?.name;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -125,6 +131,7 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
         sms_consent: form.sms_consent,
         campus_id: form.campus_id,
         entry_grade: form.entry_grade,
+        intent: form.intent,
         // Step 2 fields — unset here, filled in (or skipped) after the lead
         // already exists. The mutation stores these as null, not fabricated.
         student_first_name: "",
@@ -454,6 +461,27 @@ export function InquiryForm({ campuses, referrerName, referredByLeadId, lockedCa
                       {g === "K" ? t("inquiry.kindergarten") : `${t("inquiry.gradePrefix")} ${g}`}
                     </option>
                   ))}
+                </Select>
+              </div>
+
+              <div>
+                <label htmlFor="inq-intent" className="block text-sm font-medium text-ink/70 mb-1">
+                  {t("inquiry.interestQuestion")} <span className="text-error">*</span>
+                </label>
+                <Select
+                  id="inq-intent"
+                  className={cn("h-11", fieldError(!form.intent))}
+                  value={form.intent}
+                  onChange={(e) => update({ intent: e.target.value })}
+                >
+                  <option value="">{t("inquiry.interestSelect")}</option>
+                  <option value="apply_when_open">{t("inquiry.interestApply")}</option>
+                  <option value="learn_more">
+                    {t("inquiry.interestLearnMore").replace(
+                      "{campus}",
+                      selectedCampusName ?? t("inquiry.interestLearnMoreFallback")
+                    )}
+                  </option>
                 </Select>
               </div>
 
