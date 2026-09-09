@@ -1201,6 +1201,63 @@ export function registrationNudge({
 }
 
 /**
+ * A family started an application, saved it as a draft, and has not submitted
+ * it. One gentle reminder that a draft is not entered into the lottery until
+ * it is submitted, with the window's close date when known. Sent by the
+ * nudge-drafts cron, which owns the throttle
+ * (application.draft_reminder_sent_at).
+ */
+export function draftReminder({
+  studentFirstName,
+  campusName,
+  closeDate,
+  campusLogoUrl,
+}: {
+  studentFirstName?: string;
+  campusName: string;
+  /** ISO date string for the enrollment window's close, when known. */
+  closeDate?: string;
+  campusLogoUrl?: string;
+}): EmailTemplate {
+  // Window dates are stored as UTC midnight; format in UTC so the deadline
+  // never renders a day early for a family west of Greenwich.
+  const dateEn = closeDate
+    ? new Date(closeDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })
+    : null;
+  const dateEs = closeDate
+    ? new Date(closeDate).toLocaleDateString("es-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })
+    : null;
+  const deadlineEn = dateEn ? ` Applications close ${dateEn}.` : "";
+  const deadlineEs = dateEs ? ` Las solicitudes cierran el ${dateEs}.` : "";
+  const { html, text } = renderEmail(
+    {
+      greeting: "Hello,",
+      paragraphs: [
+        `${studentEn(studentFirstName)}'s application at ${campusName} is saved but has not been submitted yet.${deadlineEn}`,
+        "An application has to be submitted to be entered into the enrollment lottery. It only takes a few minutes to finish, and you can pick up right where you left off.",
+      ],
+      cta: { label: "Finish your application", url: `${APP_URL}/family/applications` },
+      closing: "Warmly, the Rooted Schools Enrollment Team",
+    },
+    {
+      greeting: "Hola,",
+      paragraphs: [
+        `La solicitud de ${studentEs(studentFirstName)} en ${campusName} está guardada pero aún no se ha enviado.${deadlineEs}`,
+        "Una solicitud debe enviarse para participar en la lotería de inscripción. Solo toma unos minutos terminarla, y puede continuar donde la dejó.",
+      ],
+      cta: { label: "Terminar su solicitud", url: `${APP_URL}/family/applications` },
+      closing: "Cordialmente, el Equipo de Inscripción de Rooted Schools",
+    },
+    { campusLogoUrl, campusName }
+  );
+  return {
+    subject: `Finish your Rooted Schools application / Termine su solicitud de Rooted Schools`,
+    html,
+    text,
+  };
+}
+
+/**
  * "Keep the seat" — one warm touch during the summer melt window: sent once,
  * 2+ days after registration is fully verified, before the school year
  * starts. The point isn't another task for the family; it's a congratulations
