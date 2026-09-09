@@ -14,7 +14,39 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { PendingDocumentRow, DocumentQueueStats } from "@/lib/queries";
-import { staffApproveDocument, staffRejectDocument } from "./actions";
+import { staffApproveDocument, staffRejectDocument, staffGetDocumentUrl } from "./actions";
+
+// ─── View button ────────────────────────────────────────────────────────────
+// Opens a short-lived signed URL so staff can see the document before deciding.
+// Without this the queue only offered Approve/Reject, forcing a blind decision.
+function ViewDocumentButton({ documentId }: { documentId: string }) {
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function handleClick() {
+    setLoading(true);
+    setFailed(false);
+    const { url, error } = await staffGetDocumentUrl(documentId);
+    setLoading(false);
+    if (error || !url) {
+      setFailed(true);
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={handleClick}
+      disabled={loading}
+      title={failed ? "Could not open the file" : "Open the uploaded file in a new tab"}
+    >
+      {loading ? "Opening…" : failed ? "Try again" : "View"}
+    </Button>
+  );
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -231,6 +263,7 @@ export function DocumentQueueClient({ initialRows, stats, campusOptions }: Props
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 shrink-0">
+                    <ViewDocumentButton documentId={doc.id} />
                     <Button
                       size="sm"
                       className="bg-rooted-green hover:bg-rooted-green/90 text-white"
