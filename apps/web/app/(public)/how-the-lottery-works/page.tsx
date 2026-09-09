@@ -43,6 +43,15 @@ export default async function HowTheLotteryWorksPage() {
     : session.is_staff
       ? "/staff/dashboard"
       : "/family/dashboard";
+  // Same reasoning for the "Start an Application" button. It used to always
+  // point at /login, so a family already signed in was bounced to the code
+  // screen and had to re-authenticate. A logged-in family goes straight to the
+  // new-application form; only an anonymous visitor needs to sign in first.
+  const startHref = !session
+    ? "/login"
+    : session.is_staff
+      ? "/staff/applications/new"
+      : "/family/applications/new";
 
   // Service role: campus, lottery_rule_set, and enrollment_window rows are
   // RLS-visible to authenticated users only, and this page is public.
@@ -91,7 +100,7 @@ export default async function HowTheLotteryWorksPage() {
 
   return (
     <LocaleProvider initialLocale={initialLocale}>
-      <LotteryExplainerClient campuses={explainerCampuses} backHref={backHref} />
+      <LotteryExplainerClient campuses={explainerCampuses} backHref={backHref} startHref={startHref} />
     </LocaleProvider>
   );
 }
