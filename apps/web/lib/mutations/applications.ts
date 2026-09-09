@@ -751,22 +751,39 @@ export async function submitApplication(
  */
 export async function withdrawApplication(
   applicationId: string,
-  reason?: string
+  reason?: string,
+  /**
+   * Staff path. When provided, the calling staff server action has ALREADY
+   * authorized this withdrawal on the application's real campus (via
+   * requireRoleOnCampus), so the family-ownership check below is skipped.
+   * Family callers omit it and keep the ownership guard.
+   *
+   * Without this, staff could never withdraw OR reject an application: both the
+   * Withdraw and Reject controls route through this mutation, which only ever
+   * accepted the owning guardian, so every staff attempt returned
+   * "Not authorized". See app/staff/applications/[id]/actions.ts.
+   */
+  staffActorId?: string
 ): Promise<MutationResult> {
-  const authClient = await createServerClient();
-  const { data: { user } } = await authClient.auth.getUser();
-  if (!user) return { data: null, error: "Not authenticated" };
-
-  // Verify the calling user owns this application
   const serviceClient = createServiceRoleClient();
-  const { data: appCheck } = await serviceClient
-    .from("application")
-    .select("id, guardian:guardian_id (user_id)")
-    .eq("id", applicationId)
-    .single();
-  const appGuardian = appCheck?.guardian as unknown as { user_id: string } | null;
-  if (!appGuardian || appGuardian.user_id !== user.id) {
-    return { data: null, error: "Not authorized" };
+
+  // Family callers must prove they own the application. Staff callers have
+  // already been authorized on the campus by the server action, so they pass
+  // staffActorId and bypass the ownership check (they are not the guardian).
+  if (!staffActorId) {
+    const authClient = await createServerClient();
+    const { data: { user } } = await authClient.auth.getUser();
+    if (!user) return { data: null, error: "Not authenticated" };
+
+    const { data: appCheck } = await serviceClient
+      .from("application")
+      .select("id, guardian:guardian_id (user_id)")
+      .eq("id", applicationId)
+      .single();
+    const appGuardian = appCheck?.guardian as unknown as { user_id: string } | null;
+    if (!appGuardian || appGuardian.user_id !== user.id) {
+      return { data: null, error: "Not authorized" };
+    }
   }
 
   const supabase = serviceClient;

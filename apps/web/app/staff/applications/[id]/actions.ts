@@ -58,8 +58,13 @@ export async function staffWithdrawApplication(
   applicationId: string,
   reason?: string
 ) {
-  await requireRoleOnCampus(await resolveApplicationCampus(applicationId), "compliance_auditor");
-  const result = await withdrawApplication(applicationId, reason);
+  const session = await requireRoleOnCampus(
+    await resolveApplicationCampus(applicationId),
+    "compliance_auditor"
+  );
+  // Pass the authorized staff id so the mutation skips its family-ownership
+  // check — staff are never the guardian, and the campus role was just proven.
+  const result = await withdrawApplication(applicationId, reason, session.user_id);
 
   if (!result.error) {
     revalidatePath(`/staff/applications/${applicationId}`);

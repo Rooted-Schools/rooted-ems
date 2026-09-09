@@ -225,6 +225,29 @@ describe("withdrawApplication", () => {
     expect(result.error).toContain("Cannot withdraw");
     expect(supabaseMock.writes()).toHaveLength(0);
   });
+
+  it("lets a staff actor withdraw without the family-ownership check", async () => {
+    // A staff caller is never the guardian. When the server action passes the
+    // authorized staff id, the mutation must skip the ownership check entirely
+    // (previously this returned "Not authorized" and blocked staff withdraw AND
+    // reject). No auth user is set: the staff path must not call getUser.
+    supabaseMock.setUser(null);
+    supabaseMock.queueResult(
+      "application",
+      { data: { id: APP_ID, status: "verified" }, error: null },
+      { data: null, error: null } // update result
+    );
+
+    const result = await withdrawApplication(APP_ID, "grade not offered", "staff-user-id");
+
+    expect(result.error).toBeNull();
+    const writes = supabaseMock.writes("application");
+    expect(writes).toHaveLength(1);
+    expect(writes[0].payload).toMatchObject({
+      status: "withdrawn",
+      review_notes: "grade not offered",
+    });
+  });
 });
 
 // ─── updateApplication ──────────────────────────────────────────────────────
