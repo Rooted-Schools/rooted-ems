@@ -722,25 +722,15 @@ export async function submitApplication(
     return { data: null, error: "Failed to submit application" };
   }
 
-  // Send the "Application received" confirmation. The family's initial submit
-  // goes through this mutation, not applyApplicationStatusChange, so without
-  // this call a first-time applicant got no confirmation at all — the single
-  // most common family question is "did you get my application?". Fire and
-  // forget: a mail hiccup must not fail a submission that already landed.
-  const submittedCampusId = (app as { campus_id: string }).campus_id;
-  notifyFamilyApplicationReceived({ applicationId, campusId: submittedCampusId }).catch((e) =>
-    console.error("[submitApplication] family confirmation", e)
-  );
-  // Staff bell notification. Same gap as the family confirmation: it was only
-  // fired from applyApplicationStatusChange, so a first-time submit through
-  // this mutation never notified staff — a submitted application silently
-  // missing from the notifications list.
-  if (submittedCampusId) {
-    notifyStaffNewApplication({ campusId: submittedCampusId, applicationId }).catch((e) =>
-      console.error("[submitApplication] staff notification", e)
-    );
-  }
-
+  // Notifications are deliberately NOT sent here. The family "Application
+  // received" confirmation, the staff bell, and the lead->application stitch
+  // are all sent once by notifyOnApplicationSubmit in familySubmitApplication
+  // (app/family/applications/actions.ts), the sole caller of this mutation.
+  // Firing a confirmation here as well double-notified the family: a generic
+  // "Application received" from this mutation (no student name) PLUS the named
+  // "Application received for <student>" from notifyOnApplicationSubmit. Two
+  // confirmations for one submit read to pilot testers as two submitted
+  // applications, so the single notify path lives in the action.
   return { data: null, error: null };
 }
 
