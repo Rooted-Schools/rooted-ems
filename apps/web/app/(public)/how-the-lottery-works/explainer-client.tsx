@@ -22,9 +22,17 @@ interface LotteryExplainerClientProps {
    *  out to the public site (which would force a re-login). Resolved
    *  server-side from the session in page.tsx. */
   backHref?: string;
+  /** Where "Start an Application" points. Anonymous visitors go to /login;
+   *  a logged-in family goes straight to the new-application form instead of
+   *  being sent back through sign-in. Resolved server-side in page.tsx. */
+  startHref?: string;
 }
 
-export function LotteryExplainerClient({ campuses, backHref = "/" }: LotteryExplainerClientProps) {
+export function LotteryExplainerClient({
+  campuses,
+  backHref = "/",
+  startHref = "/login",
+}: LotteryExplainerClientProps) {
   const { t, locale } = useLocale();
 
   const steps: { title: TranslationKey; desc: TranslationKey }[] = [
@@ -165,7 +173,7 @@ export function LotteryExplainerClient({ campuses, backHref = "/" }: LotteryExpl
             <CardDescription>{t("lottery.ctaBody")}</CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <Link href="/login">
+            <Link href={startHref}>
               <Button className="w-full sm:w-auto">{t("lottery.startApplication")}</Button>
             </Link>
           </CardContent>
