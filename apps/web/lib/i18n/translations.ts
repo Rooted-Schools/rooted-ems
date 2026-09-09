@@ -566,6 +566,14 @@ const dict = {
   "msgs.emptyDetail":      { en: "You will receive notifications here when there are updates to your enrollment applications — like status changes, document requests, or seat offers.", es: "Recibirá notificaciones aquí cuando haya actualizaciones sobre sus solicitudes de inscripción, como cambios de estado, solicitudes de documentos, u ofertas de cupo." },
   "msgs.messageCount":     { en: "{n} message(s)",         es: "{n} mensaje(s)" },
   "msgs.unreadBadge":      { en: "{n} unread",             es: "{n} no leído(s)" },
+  "msgs.compose.title":            { en: "Message your school",   es: "Envíe un mensaje a su escuela" },
+  "msgs.compose.subtitle":         { en: "Send a question to your school here in the portal. Staff will see it and reply.", es: "Envíe una pregunta a su escuela aquí en el portal. El personal la verá y responderá." },
+  "msgs.compose.subjectPlaceholder": { en: "Subject (optional)",  es: "Asunto (opcional)" },
+  "msgs.compose.bodyPlaceholder":  { en: "Write your message…",   es: "Escriba su mensaje…" },
+  "msgs.compose.send":             { en: "Send message",          es: "Enviar mensaje" },
+  "msgs.compose.sending":          { en: "Sending…",              es: "Enviando…" },
+  "msgs.compose.sent":             { en: "Your message was sent to your school.", es: "Su mensaje fue enviado a su escuela." },
+  "msgs.compose.emptyError":       { en: "Please write a message before sending.", es: "Escriba un mensaje antes de enviar." },
 
   // ─── Offers (extended) ────────────────────────────────────────────────────
   "offers.congratulations": { en: "Congratulations!",     es: "¡Felicitaciones!" },

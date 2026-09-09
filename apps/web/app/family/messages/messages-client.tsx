@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconMail, IconMailOpen } from "@/components/ui/icons";
-import { markNotificationsRead } from "./actions";
+import { markNotificationsRead, sendMessageToSchool } from "./actions";
 import { useLocale } from "@/lib/i18n/locale-context";
 
 interface FamilyMessage {
@@ -28,6 +28,31 @@ export function MessagesClient({ messages }: MessagesClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [filter, setFilter] = useState<"all" | "unread">("all");
+
+  // Compose ("Message your school") state
+  const [composeSubject, setComposeSubject] = useState("");
+  const [composeBody, setComposeBody] = useState("");
+  const [composeError, setComposeError] = useState<string | null>(null);
+  const [composeSent, setComposeSent] = useState(false);
+
+  function handleSendMessage() {
+    setComposeError(null);
+    if (!composeBody.trim()) {
+      setComposeError(t("msgs.compose.emptyError"));
+      return;
+    }
+    startTransition(async () => {
+      const res = await sendMessageToSchool({ subject: composeSubject, body: composeBody });
+      if (res.error) {
+        setComposeError(res.error);
+        return;
+      }
+      setComposeSubject("");
+      setComposeBody("");
+      setComposeSent(true);
+      router.refresh();
+    });
+  }
 
   const unreadCount = messages.filter((m) => !m.is_read).length;
   const readCount = messages.filter((m) => m.is_read).length;
@@ -70,6 +95,51 @@ export function MessagesClient({ messages }: MessagesClientProps) {
           </Button>
         )}
       </div>
+
+      {/* Message your school — send a message that lands with staff inside the
+          system (no external email client). */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t("msgs.compose.title")}</CardTitle>
+          <CardDescription>{t("msgs.compose.subtitle")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {composeSent && (
+            <div className="rounded-md border border-rooted-green/30 bg-rooted-green/10 px-3 py-2 text-sm text-deep-green">
+              {t("msgs.compose.sent")}
+            </div>
+          )}
+          <input
+            type="text"
+            value={composeSubject}
+            onChange={(e) => {
+              setComposeSubject(e.target.value);
+              setComposeSent(false);
+            }}
+            placeholder={t("msgs.compose.subjectPlaceholder")}
+            className="w-full rounded-md border border-stone/25 px-3 py-2 text-sm focus:border-rooted-green focus:outline-none focus:ring-1 focus:ring-rooted-green"
+            disabled={isPending}
+          />
+          <textarea
+            value={composeBody}
+            onChange={(e) => {
+              setComposeBody(e.target.value);
+              setComposeError(null);
+              setComposeSent(false);
+            }}
+            placeholder={t("msgs.compose.bodyPlaceholder")}
+            rows={4}
+            className="w-full rounded-md border border-stone/25 px-3 py-2 text-sm focus:border-rooted-green focus:outline-none focus:ring-1 focus:ring-rooted-green"
+            disabled={isPending}
+          />
+          {composeError && <p className="text-sm text-error">{composeError}</p>}
+          <div className="flex justify-end">
+            <Button onClick={handleSendMessage} disabled={isPending || !composeBody.trim()}>
+              {isPending ? t("msgs.compose.sending") : t("msgs.compose.send")}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Summary banner */}
       {messages.length > 0 && (
