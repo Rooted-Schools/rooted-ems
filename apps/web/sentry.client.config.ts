@@ -4,7 +4,7 @@ import * as Sentry from "@sentry/nextjs";
 if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
   Sentry.init({
     dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-    environment: process.env.VERCEL_ENV ?? "development",
+    environment: process.env.NEXT_PUBLIC_APP_ENV ?? process.env.VERCEL_ENV ?? "development",
     tracesSampleRate: 0.1,
     // FERPA: this is a student-data system. Never send PII by default.
     sendDefaultPii: false,
