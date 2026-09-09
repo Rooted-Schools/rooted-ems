@@ -74,14 +74,23 @@ function getAvailableActions(status: string): HeaderAction[] {
     case "needs_info":
       return [{ label: "Mark as Verified", variant: "default", targetStatus: "verified" }];
     case "verified":
+      // A seat is never accepted directly from verified: "accepted" is only
+      // reachable from "offered" (the family accepts an offer). The valid next
+      // steps are running the lottery or, when seats are open, a direct offer.
+      // "Accept Application" used to sit here as the highlighted button and
+      // always errored ("Cannot transition from verified to accepted"), so it
+      // is gone rather than demoted — a hidden button that still errors helps
+      // no one.
       return [
-        { label: "Accept Application", variant: "default", targetStatus: "accepted" },
-        { label: "Assign to Lottery", variant: "outline", targetStatus: "lottery_assigned" },
+        { label: "Assign to Lottery", variant: "default", targetStatus: "lottery_assigned" },
+        { label: "Make Offer", variant: "outline", targetStatus: "offered" },
       ];
     case "lottery_assigned":
+      // Same rule: winners get an offer, then the family accepts it; everyone
+      // else can be waitlisted. The old "Accept Application" primary errored
+      // here too (lottery_assigned -> accepted is not a valid transition).
       return [
-        { label: "Accept Application", variant: "default", targetStatus: "accepted" },
-        { label: "Make Offer", variant: "outline", targetStatus: "offered" },
+        { label: "Make Offer", variant: "default", targetStatus: "offered" },
         { label: "Add to Waitlist", variant: "outline", targetStatus: "waitlisted" },
       ];
     case "offered":
