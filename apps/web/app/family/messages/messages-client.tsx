@@ -42,15 +42,22 @@ export function MessagesClient({ messages }: MessagesClientProps) {
       return;
     }
     startTransition(async () => {
-      const res = await sendMessageToSchool({ subject: composeSubject, body: composeBody });
-      if (res.error) {
-        setComposeError(res.error);
-        return;
+      try {
+        const res = await sendMessageToSchool({ subject: composeSubject, body: composeBody });
+        if (res.error) {
+          setComposeError(res.error);
+          return;
+        }
+        setComposeSubject("");
+        setComposeBody("");
+        setComposeSent(true);
+        router.refresh();
+      } catch {
+        // A failed request (e.g. a dropped mobile connection) rejects with a
+        // "Load failed" TypeError. Catch it so the family sees a clear retry
+        // prompt instead of an uncaught error, and nothing is reported as lost.
+        setComposeError(t("msgs.compose.networkError"));
       }
-      setComposeSubject("");
-      setComposeBody("");
-      setComposeSent(true);
-      router.refresh();
     });
   }
 
@@ -63,15 +70,26 @@ export function MessagesClient({ messages }: MessagesClientProps) {
   function handleMarkAllRead() {
     if (unreadIds.length === 0) return;
     startTransition(async () => {
-      await markNotificationsRead(unreadIds);
-      router.refresh();
+      // Best-effort: a dropped connection rejects with a "Load failed"
+      // TypeError. Marking read is non-critical, so swallow it rather than
+      // surfacing an uncaught error; the next load reflects the real state.
+      try {
+        await markNotificationsRead(unreadIds);
+        router.refresh();
+      } catch {
+        /* no-op: retried on next load */
+      }
     });
   }
 
   function handleMarkRead(id: string) {
     startTransition(async () => {
-      await markNotificationsRead([id]);
-      router.refresh();
+      try {
+        await markNotificationsRead([id]);
+        router.refresh();
+      } catch {
+        /* no-op: retried on next load */
+      }
     });
   }
 

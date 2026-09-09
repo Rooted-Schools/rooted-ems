@@ -576,6 +576,7 @@ const dict = {
   "msgs.compose.sending":          { en: "Sending…",              es: "Enviando…" },
   "msgs.compose.sent":             { en: "Your message was sent to your school.", es: "Su mensaje fue enviado a su escuela." },
   "msgs.compose.emptyError":       { en: "Please write a message before sending.", es: "Escriba un mensaje antes de enviar." },
+  "msgs.compose.networkError":     { en: "Something interrupted the send. Please check your connection and try again.", es: "Algo interrumpió el envío. Verifique su conexión e inténtelo de nuevo." },
 
   // ─── Offers (extended) ────────────────────────────────────────────────────
   "offers.congratulations": { en: "Congratulations!",     es: "¡Felicitaciones!" },
