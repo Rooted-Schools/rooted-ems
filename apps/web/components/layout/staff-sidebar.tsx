@@ -325,8 +325,8 @@ export function StaffSidebar({
         className={cn(
           "ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold leading-none",
           isMessages
-            ? "bg-red-500 text-white"
-            : "bg-rooted-green/20 text-deep-green"
+            ? "bg-error text-white"
+            : "bg-light-green text-deep-green"
         )}
       >
         {count > 99 ? "99+" : count}
@@ -349,8 +349,8 @@ export function StaffSidebar({
         className={cn(
           "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors",
           isActive
-            ? "bg-[var(--lens-accent-soft)] text-[var(--lens-accent-text)] border border-[var(--lens-accent-border)]"
-            : "text-ink/60 hover:bg-rooted-gray-light hover:text-ink border border-transparent"
+            ? "bg-white/[0.13] text-white font-semibold"
+            : "text-white/65 hover:bg-white/[0.08] hover:text-white"
         )}
       >
         <NavIcon name={item.icon} />
@@ -366,12 +366,12 @@ export function StaffSidebar({
   });
 
   return (
-    <aside className="hidden md:flex w-64 bg-white border-r border-stone/20 min-h-screen flex-col">
+    <aside className="hidden md:flex w-64 bg-deep-green min-h-screen flex-col">
       {/* Brand — left ring in the lens accent when a campus lens is active */}
       <div
         className={cn(
-          "p-4 border-b border-stone/20",
-          lensIdentity && "border-l-[3px] border-l-[var(--lens-accent-border)]"
+          "p-4 border-b border-white/10",
+          lensIdentity && "border-l-[3px] border-l-[var(--lens-accent)]"
         )}
       >
         <Link
@@ -390,10 +390,10 @@ export function StaffSidebar({
                 />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-sm font-semibold text-ink leading-tight truncate">
+                <span className="text-sm font-semibold text-white leading-tight truncate">
                   {lensIdentity.displayName}
                 </span>
-                <span className="text-[10px] text-stone tracking-wide">
+                <span className="text-[10px] text-light-green/70 tracking-wide">
                   Rooted EMS
                 </span>
               </div>
@@ -401,13 +401,13 @@ export function StaffSidebar({
           ) : (
             <>
               {/* Tree icon */}
-              <div className="w-8 h-8 bg-rooted-green/10 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
                 <svg
                   width="20"
                   height="20"
                   viewBox="0 0 24 24"
                   fill="none"
-                  className="text-rooted-green"
+                  className="text-light-green"
                 >
                   <path
                     d="M12 2C8 2 4 6 4 10c0 2.5 1.5 4.5 3 6h2c-1.5-1.5-3-3.5-3-6 0-3 3-6 6-6s6 3 6 6c0 2.5-1.5 4.5-3 6h2c1.5-1.5 3-3.5 3-6 0-4-4-8-8-8z"
@@ -421,10 +421,10 @@ export function StaffSidebar({
                 </svg>
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-semibold text-ink leading-tight">
+                <span className="text-sm font-semibold text-white leading-tight">
                   Rooted EMS
                 </span>
-                <span className="text-[10px] text-stone tracking-wide">
+                <span className="text-[10px] text-light-green/70 tracking-wide">
                   Enrollment Management
                 </span>
               </div>
@@ -447,7 +447,7 @@ export function StaffSidebar({
             <div key={sIdx} className={cn(sIdx > 0 && "mt-2")}>
               {section.title && (
                 <div className="px-4 py-1.5">
-                  <span className="text-[10px] font-semibold text-stone uppercase tracking-wider">
+                  <span className="text-[10px] font-semibold text-light-green/60 uppercase tracking-wider">
                     {section.title}
                   </span>
                 </div>
@@ -463,14 +463,14 @@ export function StaffSidebar({
 
       {/* Pinned: Settings + Team, visually separated at the bottom of the rail */}
       {visiblePinnedItems.length > 0 && (
-        <div className="px-2 py-2 border-t border-stone/10 space-y-0.5">
+        <div className="px-2 py-2 border-t border-white/10 space-y-0.5">
           {visiblePinnedItems.map(renderLink)}
         </div>
       )}
 
       {/* Version footer */}
-      <div className="p-3 border-t border-stone/10">
-        <span className="text-[10px] text-stone/50 block text-center">
+      <div className="p-3 border-t border-white/10">
+        <span className="text-[10px] text-white/40 block text-center">
           Rooted EMS v1.0
         </span>
       </div>

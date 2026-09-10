@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useRef, useEffect, useTransition } from
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusPill } from "@/components/ui/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -109,7 +109,6 @@ function ApplicationTableRow({
   onToggle: (id: string) => void;
 }) {
   const router = useRouter();
-  const statusConfig = getStatusConfig(app.status);
 
   return (
     <TableRow
@@ -130,7 +129,7 @@ function ApplicationTableRow({
       <TableCell>{getGradeLabel(app.grade)}</TableCell>
       <TableCell>{app.campus_name}</TableCell>
       <TableCell>
-        <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
+        <StatusPill status={app.status} />
       </TableCell>
       <TableCell className="text-stone">
         {formatDate(app.submitted_at)}

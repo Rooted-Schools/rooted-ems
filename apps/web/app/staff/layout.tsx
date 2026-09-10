@@ -112,12 +112,12 @@ export default async function StaffLayout({
 
   return (
     <ToastProvider>
-    <div className="min-h-screen bg-rooted-gray" style={lensStyle}>
+    <div className="min-h-screen bg-warm-white" style={lensStyle}>
       {/* Campus lens hairline — 3px, always mounted (neutral = rooted-green
           default via NEUTRAL_LENS_THEME above, not conditionally rendered). */}
       <div className="h-[3px] w-full bg-[var(--lens-accent)]" aria-hidden="true" />
       <div className="flex">
-        <Suspense fallback={<aside className="hidden md:block w-64 bg-white border-r border-stone/20 min-h-screen" />}>
+        <Suspense fallback={<aside className="hidden md:block w-64 bg-deep-green min-h-screen" />}>
           <StaffSidebar
             highestRole={highestRole}
             todayCount={todayCount}

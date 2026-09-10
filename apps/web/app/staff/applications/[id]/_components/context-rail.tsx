@@ -22,6 +22,7 @@
  * data" feature the spec means.
  */
 import { Badge } from "@/components/ui/badge";
+import { StatusPill } from "@/components/ui/status-pill";
 import { Button } from "@/components/ui/button";
 import { IconMail } from "@/components/ui/icons";
 import { getStatusConfig } from "@/lib/application-helpers";
@@ -176,9 +177,7 @@ export function ContextRail({ detail, noteText, setNoteText, isPending, onAddNot
                             <span className="text-stone text-xs">→</span>
                           </>
                         )}
-                        <Badge variant={toCfg.variant} className="text-[10px]">
-                          {toCfg.label}
-                        </Badge>
+                        <StatusPill status={entry.to_status} label={toCfg.label} className="text-[10px]" />
                       </div>
                       {entry.changed_by_name && (
                         <p className="text-xs text-ink/70 mt-1">
