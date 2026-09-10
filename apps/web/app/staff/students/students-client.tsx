@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { PageHeader } from "@/components/ui/page-header";
 
 interface StudentRow {
   id: string;
@@ -78,7 +79,7 @@ export function StudentsClient({ students, initialSearch = "" }: StudentsClientP
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-ink">Students</h1>
+        <PageHeader eyebrow="Enrollment" title="Students" />
         <p className="text-sm text-stone mt-1">
           {filtered.length} of {students.length} student record
           {students.length !== 1 ? "s" : ""}

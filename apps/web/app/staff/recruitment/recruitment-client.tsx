@@ -32,6 +32,7 @@ import { staffCancelCampaign, staffCreateLead, staffSyncLeadSheets } from "./act
 import { CampaignDialog } from "./campaign-dialog";
 import { ShareDialog } from "./share-dialog";
 import { CAMPAIGN_TEMPLATES, type CampaignTemplateKey } from "@/lib/email-templates";
+import { PageHeader } from "@/components/ui/page-header";
 
 /* ─── Display config ─── */
 
@@ -265,7 +266,7 @@ export function RecruitmentClient({ queue, summary, studentSummary, leads, campa
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-ink">Recruitment</h1>
+          <PageHeader eyebrow="Enrollment" title="Recruitment" />
           <p className="text-sm text-stone mt-1">
             Every prospective family, from first hello to submitted application.
           </p>

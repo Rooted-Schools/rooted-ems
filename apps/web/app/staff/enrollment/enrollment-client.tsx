@@ -26,6 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { staffWithdrawEnrollment, staffSyncSIS, staffActivateEnrollment } from "./actions";
+import { PageHeader } from "@/components/ui/page-header";
 
 interface EnrollmentRow {
   id: string;
@@ -120,7 +121,7 @@ export function EnrollmentClient({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-ink">Registration</h1>
+          <PageHeader eyebrow="Enrollment" title="Registration" />
           <p className="text-sm text-stone mt-1">
             Students who have accepted an offer and are completing or have completed registration.
           </p>
