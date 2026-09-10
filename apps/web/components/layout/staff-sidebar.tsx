@@ -26,6 +26,7 @@ export type IconName =
   | "seats-lottery"
   | "recruitment"
   | "messages"
+  | "communications"
   | "insights"
   | "network"
   | "settings"
@@ -114,6 +115,7 @@ export const NAV_SECTIONS: NavSection[] = [
  */
 export const PINNED_NAV_ITEMS: NavItem[] = [
   { label: "Notifications", href: "/staff/messages", icon: "messages", badgeKey: "messages" },
+  { label: "Communications", href: "/staff/communications", icon: "communications", minRole: "enrollment_manager" },
   { label: "Pilot feedback", href: "/staff/feedback", icon: "feedback" },
   { label: "Team", href: "/staff/team", icon: "team", minRole: "system_admin" },
   { label: "Settings", href: "/staff/settings", icon: "settings", minRole: "enrollment_manager" },
@@ -197,6 +199,14 @@ export function NavIcon({ name }: { name: IconName }) {
       return (
         <svg {...common}>
           <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+      );
+    case "communications":
+      // Paper plane / send — the outbound communications log
+      return (
+        <svg {...common}>
+          <path d="M22 2 11 13" />
+          <path d="M22 2 15 22l-4-9-9-4 20-7z" />
         </svg>
       );
     case "insights":
