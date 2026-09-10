@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -151,26 +152,22 @@ export function DocumentQueueClient({ initialRows, stats, campusOptions }: Props
     <>
       {/* ── Stats bar ── */}
       <div className="grid grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="py-4 text-center">
-            <p className="text-2xl font-bold text-ink">{stats.total_pending}</p>
-            <p className="text-xs text-stone mt-0.5">Pending Review</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-4 text-center">
-            <p className="text-2xl font-bold text-ink">{stats.total_today}</p>
-            <p className="text-xs text-stone mt-0.5">Received Today</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-4 text-center">
-            <p className={`text-2xl font-bold ${stats.oldest_pending_days != null && stats.oldest_pending_days > 3 ? "text-warn-text" : "text-ink"}`}>
-              {stats.oldest_pending_days != null ? `${stats.oldest_pending_days}d` : "—"}
-            </p>
-            <p className="text-xs text-stone mt-0.5">Oldest Pending</p>
-          </CardContent>
-        </Card>
+        <StatCard label="Pending Review" value={stats.total_pending} accent="bg-info" />
+        <StatCard label="Received Today" value={stats.total_today} accent="bg-rooted-green" />
+        <StatCard
+          label="Oldest Pending"
+          value={stats.oldest_pending_days != null ? `${stats.oldest_pending_days}d` : "—"}
+          accent={
+            stats.oldest_pending_days != null && stats.oldest_pending_days > 3
+              ? "bg-warn"
+              : "bg-stone"
+          }
+          valueClassName={
+            stats.oldest_pending_days != null && stats.oldest_pending_days > 3
+              ? "text-warn-text"
+              : undefined
+          }
+        />
       </div>
 
       {/* ── Filter bar ── */}
