@@ -41,6 +41,7 @@ interface CommunicationRow {
   sent_at: string | null;
   recipient_count: number;
   recipient_address: string | null;
+  lead_id: string | null;
 }
 
 interface CommunicationStats {
@@ -366,7 +367,18 @@ export function CommsClient({
                               </span>
                             </TableCell>
                             <TableCell className="text-ink/70 text-sm">
-                              {msg.recipient_address ?? "\u2014"}
+                              {msg.lead_id ? (
+                                <Link
+                                  href={`/staff/recruitment/${msg.lead_id}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-rooted-green hover:underline"
+                                  title="Open this person's record"
+                                >
+                                  {msg.recipient_address ?? "\u2014"}
+                                </Link>
+                              ) : (
+                                (msg.recipient_address ?? "\u2014")
+                              )}
                               {msg.recipient_count > 1 && (
                                 <span className="ml-1 text-[10px] text-stone">
                                   +{msg.recipient_count - 1} more
