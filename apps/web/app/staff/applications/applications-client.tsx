@@ -151,6 +151,9 @@ interface StaffApplicationsClientProps {
   initialStatus?: string;
   initialSearch?: string;
   initialCampus?: string;
+  /** >0 when the list is scoped to a duplicate-household "Compare": the number
+   *  of flagged applications shown. Drives the compare banner. */
+  compareCount?: number;
 }
 
 export function StaffApplicationsClient({
@@ -163,6 +166,7 @@ export function StaffApplicationsClient({
   initialStatus = "all",
   initialSearch = "",
   initialCampus = "all",
+  compareCount = 0,
 }: StaffApplicationsClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -458,6 +462,23 @@ export function StaffApplicationsClient({
       </Card>
 
       {/* Status tabs + table */}
+      {compareCount > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-campus-neal/30 bg-campus-neal/5 px-4 py-3">
+          <p className="text-sm text-ink">
+            <span className="font-semibold">Comparing possible duplicates</span>
+            {" — "}
+            showing {compareCount} application{compareCount === 1 ? "" : "s"} from the flagged
+            household{compareCount === 1 ? "" : "s"}, so you can check for the same family entered twice.
+          </p>
+          <a
+            href="/staff/applications"
+            className="shrink-0 whitespace-nowrap text-sm font-semibold text-campus-neal hover:underline"
+          >
+            Clear
+          </a>
+        </div>
+      )}
+
       <Tabs defaultValue={initialStatus} onValueChange={(v) => {
         setStatusFilter(v);
         pushFilters({ status: v });

@@ -12,7 +12,7 @@ const PAGE_SIZE = 50;
 export default async function StaffApplicationsPage({
   searchParams,
 }: {
-  searchParams: { campus?: string; status?: string; search?: string; page?: string };
+  searchParams: { campus?: string; status?: string; search?: string; page?: string; guardians?: string };
 }) {
   const session = await requireStaffSession();
   const accessibleIds = getAccessibleCampusIds(session);
@@ -23,11 +23,19 @@ export default async function StaffApplicationsPage({
   const parsedPage = Number.parseInt(searchParams?.page ?? "1", 10);
   const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
 
+  // Duplicate-household "Compare": show ONLY the flagged guardians' applications.
+  const guardianIds = searchParams?.guardians
+    ? searchParams.guardians.split(",").map((s) => s.trim()).filter(Boolean)
+    : undefined;
+
   const [{ rows: applications, totalCount }, stats, allCampuses] = await Promise.all([
     getStaffApplications({
-      campusId: activeCampus,
+      // In compare mode we want the flagged guardians regardless of campus lens,
+      // so their duplicate can be seen even across the active-campus filter.
+      campusId: guardianIds ? undefined : activeCampus,
       status: statusParam,
       search: searchParam,
+      guardianIds,
       page,
       pageSize: PAGE_SIZE,
     }),
@@ -51,6 +59,7 @@ export default async function StaffApplicationsPage({
       initialStatus={searchParams?.status ?? "all"}
       initialSearch={searchParams?.search ?? ""}
       initialCampus={searchParams?.campus ?? lensCampusId ?? "all"}
+      compareCount={guardianIds ? totalCount : 0}
     />
   );
 }

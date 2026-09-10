@@ -69,10 +69,13 @@ export interface ApplicationStats {
   submitted: number;
   needs_info: number;
   verified: number;
+  lottery_assigned: number;
   offered: number;
   accepted: number;
   waitlisted: number;
   registered: number;
+  enrolled: number;
+  withdrawn: number;
   draft: number;
 }
 
@@ -99,6 +102,10 @@ export async function getStaffApplications(opts?: {
   statuses?: string[];
   /** Grade level code ("6".."12") — filters via the grade_level join. */
   grade?: string;
+  /** Restrict to applications belonging to these guardians. Powers the
+   *  duplicate-household "Compare" action, which needs to show ONLY the flagged
+   *  guardians' applications rather than a broad name search. */
+  guardianIds?: string[];
   search?: string;
   /** Only rows whose updated_at is at least this many days old — powers the
    *  "Stalled 5+ days" saved view. Real filter, not a client-side illusion. */
@@ -149,6 +156,10 @@ export async function getStaffApplications(opts?: {
 
   if (opts?.grade) {
     query = query.eq("grade_level.grade", opts.grade);
+  }
+
+  if (opts?.guardianIds && opts.guardianIds.length > 0) {
+    query = query.in("guardian_id", opts.guardianIds);
   }
 
   if (opts?.staleDays && opts.staleDays > 0) {
@@ -265,10 +276,13 @@ export async function getApplicationStats(
       submitted: 0,
       needs_info: 0,
       verified: 0,
+      lottery_assigned: 0,
       offered: 0,
       accepted: 0,
       waitlisted: 0,
       registered: 0,
+      enrolled: 0,
+      withdrawn: 0,
       draft: 0,
     };
   }
@@ -286,10 +300,13 @@ export async function getApplicationStats(
     submitted: counts["submitted"] ?? 0,
     needs_info: counts["needs_info"] ?? 0,
     verified: counts["verified"] ?? 0,
+    lottery_assigned: counts["lottery_assigned"] ?? 0,
     offered: counts["offered"] ?? 0,
     accepted: counts["accepted"] ?? 0,
     waitlisted: counts["waitlisted"] ?? 0,
     registered: counts["registered"] ?? 0,
+    enrolled: counts["enrolled"] ?? 0,
+    withdrawn: counts["withdrawn"] ?? 0,
     draft: counts["draft"] ?? 0,
   };
 }
