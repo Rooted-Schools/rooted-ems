@@ -25,6 +25,7 @@ const STATUS_TONE: Record<string, { pill: string; dot: string }> = {
   expired: { pill: "bg-error/10 text-error", dot: "bg-error" },
   rejected: { pill: "bg-error/10 text-error", dot: "bg-error" },
   withdrawn: { pill: "bg-sunken text-stone-text", dot: "bg-stone" },
+  ineligible: { pill: "bg-sunken text-stone-text", dot: "bg-stone" },
 };
 
 const DEFAULT_TONE = { pill: "bg-sunken text-stone-text", dot: "bg-stone" };

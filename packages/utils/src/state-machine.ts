@@ -87,7 +87,8 @@ export type ApplicationStatusValue =
   | "enrolled"
   | "declined"
   | "expired"
-  | "withdrawn";
+  | "withdrawn"
+  | "ineligible";
 
 export interface TransitionResult {
   allowed: boolean;
@@ -103,10 +104,10 @@ export interface TransitionResult {
  */
 const VALID_TRANSITIONS: Record<ApplicationStatusValue, ApplicationStatusValue[]> = {
   draft: ["submitted", "withdrawn"],
-  submitted: ["needs_info", "verified", "withdrawn"],
-  needs_info: ["submitted", "verified", "withdrawn"],
-  verified: ["lottery_assigned", "offered", "withdrawn"],
-  lottery_assigned: ["offered", "waitlisted", "withdrawn"],
+  submitted: ["needs_info", "verified", "withdrawn", "ineligible"],
+  needs_info: ["submitted", "verified", "withdrawn", "ineligible"],
+  verified: ["lottery_assigned", "offered", "withdrawn", "ineligible"],
+  lottery_assigned: ["offered", "waitlisted", "withdrawn", "ineligible"],
   offered: ["accepted", "declined", "expired", "withdrawn"],
   accepted: ["registered", "withdrawn"],
   waitlisted: ["offered", "withdrawn"],
@@ -117,6 +118,10 @@ const VALID_TRANSITIONS: Record<ApplicationStatusValue, ApplicationStatusValue[]
   declined: [],
   expired: [],
   withdrawn: [],
+  // Staff removed the application for objective ineligibility (grade not
+  // offered, age, residency) before any offer. Distinct from a family-initiated
+  // withdrawal so the two can be reported separately.
+  ineligible: [],
 };
 
 /** Status values that are terminal — no further transitions are allowed */
@@ -124,6 +129,7 @@ const TERMINAL_STATUSES: ReadonlySet<ApplicationStatusValue> = new Set([
   "declined",
   "expired",
   "withdrawn",
+  "ineligible",
 ]);
 
 // ─── Public API ───────────────────────────────────────────────────────────────

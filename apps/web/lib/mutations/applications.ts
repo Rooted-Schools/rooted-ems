@@ -1326,6 +1326,13 @@ async function applyApplicationStatusChange(
     if (reason) updates.review_notes = reason;
   }
 
+  // Marking an application ineligible records the reason on the application, the
+  // same place a withdrawal reason lands, so the objective ground (grade not
+  // offered, age, residency) stays on the record for the audit trail.
+  if (newStatus === "ineligible" && reason) {
+    updates.review_notes = reason;
+  }
+
   // Read before the write: the history row this change is about to create is
   // the one created after this timestamp (lib/audit.ts).
   const watermark = await readStatusHistoryWatermark(applicationId);

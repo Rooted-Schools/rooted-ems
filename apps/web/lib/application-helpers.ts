@@ -27,6 +27,7 @@ export const APPLICATION_STATUS_CONFIG: Record<
   declined: { label: "Declined", variant: "destructive" },
   expired: { label: "Expired", variant: "destructive" },
   withdrawn: { label: "Withdrawn", variant: "outline" },
+  ineligible: { label: "Ineligible", variant: "outline" },
 };
 
 export function getStatusConfig(status: string) {
