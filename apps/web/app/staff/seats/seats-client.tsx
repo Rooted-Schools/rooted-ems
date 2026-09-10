@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { IconPenLine, IconX, IconCheckCircle } from "@/components/ui/icons";
@@ -135,65 +136,47 @@ export function SeatsClient({ rows }: SeatsClientProps) {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card className="border-t-4 border-t-rooted-green">
-          <CardContent className="pt-4">
-            <p className="text-xs font-medium text-stone uppercase tracking-wider">
-              Total Seats
-            </p>
-            <p className="text-3xl font-bold text-rooted-green mt-1">{totalSeats}</p>
-            <p className="text-xs text-stone mt-1">across all grades</p>
-          </CardContent>
-        </Card>
-        <Card className="border-t-4 border-t-info">
-          <CardContent className="pt-4">
-            <p className="text-xs font-medium text-stone uppercase tracking-wider">
-              Offered
-            </p>
-            <p className="text-3xl font-bold text-info mt-1">
-              {totalOffered}
-            </p>
-            <p className="text-xs text-stone mt-1">pending acceptance</p>
-          </CardContent>
-        </Card>
-        <Card className="border-t-4 border-t-rooted-green">
-          <CardContent className="pt-4">
-            <p className="text-xs font-medium text-stone uppercase tracking-wider">
-              Accepted
-            </p>
-            <p className="text-3xl font-bold text-rooted-green mt-1">
-              {totalAccepted}
-            </p>
-            <p className="text-xs text-stone mt-1">completing registration</p>
-          </CardContent>
-        </Card>
-        <Card className="border-t-4 border-t-rooted-green">
-          <CardContent className="pt-4">
-            <p className="text-xs font-medium text-stone uppercase tracking-wider">
-              Registered
-            </p>
-            <p className="text-3xl font-bold text-rooted-green mt-1">
-              {totalRegistered}
-            </p>
-            <p className="text-xs text-stone mt-1">
-              {totalSeats > 0
-                ? `${Math.round((totalRegistered / totalSeats) * 100)}% fill rate`
-                : "fully enrolled"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className={`border-t-4 ${totalAvailable <= 5 ? "border-t-warn" : "border-t-stone"}`}>
-          <CardContent className="pt-4">
-            <p className="text-xs font-medium text-stone uppercase tracking-wider">
-              Available
-            </p>
-            <p className={`text-3xl font-bold mt-1 ${totalAvailable <= 0 ? "text-error" : totalAvailable <= 5 ? "text-warn-text" : "text-ink/60"}`}>
-              {totalAvailable}
-            </p>
-            <p className="text-xs text-stone mt-1">
-              {totalAvailable <= 0 ? "at capacity" : "seats remaining"}
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          label="Total Seats"
+          value={totalSeats}
+          sublabel="across all grades"
+          accent="bg-rooted-green"
+          valueClassName="text-rooted-green"
+        />
+        <StatCard
+          label="Offered"
+          value={totalOffered}
+          sublabel="pending acceptance"
+          accent="bg-info"
+          valueClassName="text-info"
+        />
+        <StatCard
+          label="Accepted"
+          value={totalAccepted}
+          sublabel="completing registration"
+          accent="bg-rooted-green"
+          valueClassName="text-rooted-green"
+        />
+        <StatCard
+          label="Registered"
+          value={totalRegistered}
+          sublabel={
+            totalSeats > 0
+              ? `${Math.round((totalRegistered / totalSeats) * 100)}% fill rate`
+              : "fully enrolled"
+          }
+          accent="bg-rooted-green"
+          valueClassName="text-rooted-green"
+        />
+        <StatCard
+          label="Available"
+          value={totalAvailable}
+          sublabel={totalAvailable <= 0 ? "at capacity" : "seats remaining"}
+          accent={totalAvailable <= 5 ? "bg-warn" : "bg-stone"}
+          valueClassName={
+            totalAvailable <= 0 ? "text-error" : totalAvailable <= 5 ? "text-warn-text" : "text-ink/60"
+          }
+        />
       </div>
 
       {/* Capacity by Campus */}
