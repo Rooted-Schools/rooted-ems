@@ -216,7 +216,13 @@ export default async function StaffTodayPage({
   // 5. Duplicate suspects — informational, lowest consequence
   if (duplicateSuspects.length > 0) {
     const count = duplicateSuspects.length;
-    const compareTarget = duplicateSuspects[0]?.guardians[0]?.name.split(" ").slice(-1)[0] ?? "";
+    // Compare must open ONLY the flagged guardians' applications, not a broad
+    // surname search (which pulled in every family with that last name and left
+    // staff unsure what was being compared to what). Pass the exact guardian ids
+    // that share a phone so the applications list shows just those.
+    const dupeGuardianIds = duplicateSuspects.flatMap((s) =>
+      s.guardians.map((g) => g.guardian_id)
+    );
 
     rows.push({
       key: "duplicate_suspects",
@@ -228,7 +234,9 @@ export default async function StaffTodayPage({
         {
           kind: "navigate",
           label: "Compare",
-          href: compareTarget ? `/staff/applications?search=${encodeURIComponent(compareTarget)}` : "/staff/applications",
+          href: dupeGuardianIds.length > 0
+            ? `/staff/applications?guardians=${encodeURIComponent(dupeGuardianIds.join(","))}`
+            : "/staff/applications",
           style: "outline",
         },
       ],
