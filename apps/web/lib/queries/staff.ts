@@ -101,6 +101,9 @@ export interface CommunicationRow {
   sent_at: string | null;
   recipient_count: number;
   recipient_address: string | null;
+  /** When the recipient is a recruitment lead (e.g. a campaign send), the lead
+   *  id so the log row can link straight to that person's record. */
+  lead_id: string | null;
 }
 
 export interface CommunicationStats {
@@ -1062,7 +1065,7 @@ export async function getStaffCommunications(campusIds?: string[]): Promise<{
 
   let q = supabase
     .from("communication_log")
-    .select("id, subject, channel, status, sent_at, recipient_address")
+    .select("id, subject, channel, status, sent_at, recipient_address, lead_id")
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -1098,6 +1101,7 @@ export async function getStaffCommunications(campusIds?: string[]): Promise<{
     // communication_log has no recipient_count column; each row is one send.
     recipient_count: 1,
     recipient_address: (row.recipient_address as string) ?? null,
+    lead_id: (row.lead_id as string | null) ?? null,
   }));
 
   const stats: CommunicationStats = {
