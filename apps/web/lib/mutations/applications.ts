@@ -1291,6 +1291,13 @@ async function applyApplicationStatusChange(
   actorId: string,
   reason?: string
 ): Promise<MutationResult> {
+  if (newStatus === "ineligible") {
+    reason = typeof reason === "string" ? reason.trim() : "";
+    if (!reason) {
+      return { data: null, error: "An eligibility reason is required" };
+    }
+  }
+
   const supabase = createServiceRoleClient();
 
   const { data: app } = await supabase
@@ -1326,13 +1333,6 @@ async function applyApplicationStatusChange(
     if (reason) updates.review_notes = reason;
   }
 
-  // Marking an application ineligible records the reason on the application, the
-  // same place a withdrawal reason lands, so the objective ground (grade not
-  // offered, age, residency) stays on the record for the audit trail.
-  if (newStatus === "ineligible" && reason) {
-    updates.review_notes = reason;
-  }
-
   // Read before the write: the history row this change is about to create is
   // the one created after this timestamp (lib/audit.ts).
   const watermark = await readStatusHistoryWatermark(applicationId);
@@ -1341,16 +1341,27 @@ async function applyApplicationStatusChange(
   // that raced another one silently overwrote it and the two were
   // indistinguishable afterwards — and there would be no way to know whether
   // the history row belonged to this actor or the other one.
-  const { data: changed, error } = await supabase
-    .from("application")
-    .update(updates)
-    .eq("id", applicationId)
-    .eq("status", app.status)
-    .select("id");
+  const { data: changed, error } = newStatus === "ineligible"
+    ? await supabase.rpc("mark_application_ineligible", {
+        p_application_id: applicationId,
+        p_expected_status: app.status,
+        p_actor_id: actorId,
+        p_reason: reason,
+      })
+    : await supabase
+        .from("application")
+        .update(updates)
+        .eq("id", applicationId)
+        .eq("status", app.status)
+        .select("id");
 
   if (error) {
     console.error("[applyApplicationStatusChange]", error.message);
     return { data: null, error: "Failed to update status" };
+  }
+
+  if (newStatus === "ineligible" && !Array.isArray(changed)) {
+    return { data: null, error: "Could not confirm the eligibility decision" };
   }
 
   // An explicitly empty array is PostgREST saying the precondition matched
