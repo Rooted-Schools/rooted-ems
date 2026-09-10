@@ -17,9 +17,9 @@
  * mutation, no new signature.
  */
 import { useState, useRef, useEffect } from "react";
-import { Badge } from "@/components/ui/badge";
+import { StatusPill } from "@/components/ui/status-pill";
 import { Button } from "@/components/ui/button";
-import { getStatusConfig, getGradeLabel } from "@/lib/application-helpers";
+import { getGradeLabel } from "@/lib/application-helpers";
 import { IconMoreHorizontal } from "@/components/ui/icons";
 import { cn, displayClass } from "@/lib/utils";
 import type { ApplicationDetail } from "@/lib/queries";
@@ -81,13 +81,15 @@ export function ReviewHeader({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [menuOpen]);
 
-  const statusCfg = getStatusConfig(detail.status);
+  // When a submitted/needs-info application is still waiting on documents, the
+  // pill says "Needs N things" in the needs-info tone; otherwise it shows the
+  // real status. Same behavior as before, now on the elevated chip.
   const isReviewStage = detail.status === "submitted" || detail.status === "needs_info";
-  const pillLabel =
-    isReviewStage && pendingDocCount > 0
-      ? `Needs ${pendingDocCount} thing${pendingDocCount === 1 ? "" : "s"}`
-      : statusCfg.label;
-  const pillVariant = isReviewStage && pendingDocCount > 0 ? "warning" : statusCfg.variant;
+  const needsThings = isReviewStage && pendingDocCount > 0;
+  const pillStatus = needsThings ? "needs_info" : detail.status;
+  const pillLabel = needsThings
+    ? `Needs ${pendingDocCount} thing${pendingDocCount === 1 ? "" : "s"}`
+    : undefined;
 
   // Short, real, non-fabricated app reference — the actual record id,
   // shortened. There is no formatted "RSV-0248"-style application number
@@ -114,7 +116,7 @@ export function ReviewHeader({
         <div className="min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="font-display text-xl font-bold uppercase tracking-wide text-ink">{detail.student_name}</h1>
-            <Badge variant={pillVariant}>{pillLabel}</Badge>
+            <StatusPill status={pillStatus} label={pillLabel} />
           </div>
           <p className="text-sm text-stone mt-1">{metaParts.join(" · ")}</p>
         </div>
