@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StatusPill } from "@/components/ui/status-pill";
+import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -749,6 +751,26 @@ export function StaffLotteryDetailClient({
         </Card>
       </div>
 
+      {/* Result summary — once a run has produced rankings */}
+      {run.status !== "draft" && entrants.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard label="Applicants" value={run.applicants} accent="bg-info" />
+          <StatCard label="Seats" value={run.seats} accent="bg-deep-green" />
+          <StatCard
+            label="Offered"
+            value={offeredCount}
+            accent="bg-rooted-green"
+            valueClassName="text-rooted-green"
+          />
+          <StatCard
+            label="Waitlisted"
+            value={waitlistedCount}
+            accent="bg-warn"
+            valueClassName="text-warn-text"
+          />
+        </div>
+      )}
+
       {/* Entrants Table */}
       <Card>
         <CardHeader>
@@ -802,7 +824,7 @@ export function StaffLotteryDetailClient({
                         </TableCell>
                       )}
                       <TableCell>
-                        <Badge variant={r.variant}>{r.label}</Badge>
+                        <StatusPill status={entrant.result} label={r.label} />
                       </TableCell>
                     </TableRow>
                   );
