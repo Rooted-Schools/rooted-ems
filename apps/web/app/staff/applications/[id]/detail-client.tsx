@@ -273,28 +273,25 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
     });
   }
 
-  // "Reject application" — an addition surfaced in the header overflow menu.
-  // It calls the exact same generic changeApplicationStatus(id, status, reason)
-  // action already used everywhere else in this file, with targetStatus
-  // "rejected" (a real value in the application status state machine). No
-  // new mutation, no changed signature.
+  // "Mark ineligible" — surfaced in the header overflow menu. This is distinct
+  // from Withdraw: it moves the application to the terminal "ineligible" state
+  // (grade not offered, age, residency) so an objective staff removal is
+  // reported separately from a family-initiated withdrawal. A reason is
+  // required. Routes through the generic changeApplicationStatus action, which
+  // records the reason on the application and in the audit trail.
   function confirmRejectApp() {
+    const reason = rejectAppReason.trim();
+    if (!reason) return; // reason required; the dialog's confirm is disabled without one
     setShowRejectAppDialog(false);
     startTransition(async () => {
-      // There is no separate "rejected" status in the application lifecycle:
-      // the terminal "removed from consideration" state is "withdrawn". Reject
-      // routes through the same withdraw mutation as the Withdraw action, but
-      // carries the staff reason so the audit trail records why. (The old code
-      // set status "rejected", which is not a valid enum value or transition,
-      // so Reject always errored.)
-      const result = await staffWithdrawApplication(detail.id, rejectAppReason.trim() || undefined);
+      const result = await changeApplicationStatus(detail.id, "ineligible", reason);
       if (result.error) showFeedback("error", result.error);
       else {
-        showFeedback("success", "Application rejected");
+        showFeedback("success", "Application marked ineligible");
         router.refresh();
       }
+      setRejectAppReason("");
     });
-    setRejectAppReason("");
   }
 
   function handleAddNote() {
@@ -683,20 +680,22 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reject Application</DialogTitle>
+            <DialogTitle>Mark Application Ineligible</DialogTitle>
             <DialogDescription>
-              Are you sure you want to reject {detail.student_name}&apos;s application? This is a different decision than
-              Withdraw: reject when the application does not meet requirements.
+              Mark {detail.student_name}&apos;s application <strong>ineligible</strong> when it cannot be enrolled for an
+              objective reason (grade not offered, age, residency). This is a different, separately-reported decision than a
+              family Withdrawal.
             </DialogDescription>
           </DialogHeader>
           <div className="py-2 space-y-2">
             <label className="block text-sm font-medium text-ink/70">
-              Reason <span className="text-stone font-normal">(optional, internal only, not shown to the family)</span>
+              Reason <span className="text-error font-normal">(required, internal only, not shown to the family)</span>
             </label>
             <textarea
               value={rejectAppReason}
               onChange={(e) => setRejectAppReason(e.target.value)}
               rows={3}
+              placeholder="e.g. Applied for grade 7, which this campus does not offer"
               className="w-full px-3 py-2 border border-stone/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rooted-green/50 resize-none"
             />
           </div>
@@ -704,8 +703,8 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
             <Button variant="outline" onClick={() => setShowRejectAppDialog(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={confirmRejectApp}>
-              Reject Application
+            <Button variant="destructive" onClick={confirmRejectApp} disabled={!rejectAppReason.trim()}>
+              Mark Ineligible
             </Button>
           </DialogFooter>
         </DialogContent>

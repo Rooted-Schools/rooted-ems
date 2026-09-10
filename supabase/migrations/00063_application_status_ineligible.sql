@@ -1,0 +1,21 @@
+-- ============================================
+-- Ineligible application status
+-- ============================================
+--
+-- Staff need to distinguish an application they removed for INELIGIBILITY
+-- (applied for a grade the campus does not offer, outside the age range,
+-- outside the residency area) from one a FAMILY withdrew. Both were previously
+-- collapsed into "withdrawn", which lost that distinction, confused staff
+-- ("I rejected it and it shows as withdrawn"), and made authorizer reporting
+-- less defensible.
+--
+-- "Ineligible" (not "rejected") is deliberate: a charter lottery cannot
+-- selectively reject, so the label frames this as an objective eligibility
+-- determination, not a judgment on the family. The reason is captured in
+-- application.review_notes, same column the withdraw reason already uses.
+--
+-- Terminal state, reachable from the pre-offer stages (submitted, needs_info,
+-- verified, lottery_assigned) — enforced in the app's state machine
+-- (packages/utils/src/state-machine.ts), not by the enum.
+
+ALTER TYPE application_status ADD VALUE IF NOT EXISTS 'ineligible';

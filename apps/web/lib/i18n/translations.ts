@@ -39,6 +39,7 @@ const dict = {
   "status.registered":       { en: "Registration submitted",        es: "Registro enviado" },
   "status.waitlisted":       { en: "On the waitlist",               es: "En lista de espera" },
   "status.withdrawn":        { en: "Withdrawn",                     es: "Retirada" },
+  "status.ineligible":       { en: "Not eligible",                  es: "No elegible" },
   "status.placement_review": { en: "Almost done: final checks",    es: "Casi listo: últimas verificaciones" },
   "status.enrolled":         { en: "Enrolled",                      es: "Matriculado" },
   "status.declined":         { en: "Declined",                      es: "Rechazada" },

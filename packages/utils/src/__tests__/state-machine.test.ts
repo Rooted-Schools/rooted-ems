@@ -91,6 +91,20 @@ describe("isValidTransition — terminal state enforcement", () => {
     expect(isValidTransition("withdrawn", "expired").allowed).toBe(false);
     expect(isValidTransition("expired", "declined").allowed).toBe(false);
   });
+
+  it("allows marking a pre-offer application ineligible", () => {
+    expect(isValidTransition("submitted", "ineligible").allowed).toBe(true);
+    expect(isValidTransition("needs_info", "ineligible").allowed).toBe(true);
+    expect(isValidTransition("verified", "ineligible").allowed).toBe(true);
+    expect(isValidTransition("lottery_assigned", "ineligible").allowed).toBe(true);
+  });
+
+  it("does not allow ineligible after an offer, and ineligible is terminal", () => {
+    expect(isValidTransition("offered", "ineligible").allowed).toBe(false);
+    expect(isValidTransition("accepted", "ineligible").allowed).toBe(false);
+    expect(isTerminalStatus("ineligible")).toBe(true);
+    expect(getAllowedTransitions("ineligible")).toHaveLength(0);
+  });
 });
 
 // ─── isTerminalStatus ─────────────────────────────────────────────────────────

@@ -47,7 +47,7 @@ const STATUS_TABS = [
   { value: "enrolled", label: "Enrolled" },
   { value: "waitlisted", label: "Waitlisted" },
   { value: "withdrawn", label: "Withdrawn" },
-  { value: "rejected", label: "Rejected" },
+  { value: "ineligible", label: "Ineligible" },
 ];
 
 function formatDate(dateStr: string | null) {

@@ -76,6 +76,7 @@ export interface ApplicationStats {
   registered: number;
   enrolled: number;
   withdrawn: number;
+  ineligible: number;
   draft: number;
 }
 
@@ -283,6 +284,7 @@ export async function getApplicationStats(
       registered: 0,
       enrolled: 0,
       withdrawn: 0,
+      ineligible: 0,
       draft: 0,
     };
   }
@@ -307,6 +309,7 @@ export async function getApplicationStats(
     registered: counts["registered"] ?? 0,
     enrolled: counts["enrolled"] ?? 0,
     withdrawn: counts["withdrawn"] ?? 0,
+    ineligible: counts["ineligible"] ?? 0,
     draft: counts["draft"] ?? 0,
   };
 }
