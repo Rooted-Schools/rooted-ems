@@ -48,6 +48,7 @@ import {
 // Reused directly rather than duplicated: this is the same mutation and the
 // same access gate the Seats tab's inline seat-total editor already uses.
 import { staffUpdateCapacity } from "@/app/staff/seats/actions";
+import { RegistrationFormPreviewButton } from "./_components/registration-form-preview";
 
 /** The real grade_level_code enum values (supabase/migrations/00001_enums.sql). */
 const GRADE_LEVEL_CODES = ["6", "7", "8", "9", "10", "11", "12"];
@@ -893,6 +894,8 @@ function RegistrationRequirementsTab({
                           </div>
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0 ml-4">
+                          {/* See exactly what this form asks the family */}
+                          <RegistrationFormPreviewButton itemType={req.item_type} name={req.name} />
                           {/* Required toggle */}
                           <label className="flex items-center gap-1.5 cursor-pointer" title="Required">
                             <input
