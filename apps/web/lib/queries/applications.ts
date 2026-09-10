@@ -459,7 +459,7 @@ export async function getApplicationDetail(
     created_at: app.created_at,
     reviewed_by: app.reviewed_by,
     reviewed_at: app.reviewed_at,
-    review_notes: app.review_notes,
+    review_notes: userId && app.status !== "needs_info" ? null : app.review_notes,
     has_sibling_enrolled: app.has_sibling_enrolled,
     locked_at: app.locked_at,
     offer_id: pendingOffer?.id ?? null,
@@ -483,7 +483,7 @@ export async function getApplicationDetail(
         changed_by_name: changer
           ? `${changer.first_name} ${changer.last_name}`
           : null,
-        reason: h.reason as string | null,
+        reason: userId && h.to_status === "ineligible" ? null : h.reason as string | null,
         created_at: h.created_at as string,
       };
     }),
