@@ -9,6 +9,8 @@ import { getCampusLensId } from "@/lib/campus-lens";
 import { isSmsConfigured } from "@/lib/sms";
 import { isEmailConfigured } from "@/lib/email";
 import { ChannelStatus } from "./_components/channel-status";
+import { NotificationEmailTests } from "./_components/notification-email-tests";
+import { notificationTestTemplateList } from "@/lib/notification-test-emails";
 import { AutomationHealth } from "./_components/automation-health";
 import { LeadSyncCard } from "./_components/lead-sync-card";
 import { WelcomeMessagingToggle } from "./_components/welcome-messaging-toggle";
@@ -125,6 +127,13 @@ export default async function StaffSettingsPage({
         rows={automationHealth}
         overdueJourneySteps={overdueJourneySteps}
       />
+      {campuses.length > 0 && (
+        <NotificationEmailTests
+          campuses={campuses.map((c) => ({ id: c.id, name: c.name }))}
+          templates={notificationTestTemplateList()}
+          toEmail={session.email ?? null}
+        />
+      )}
       {hasMinRole(session, "system_admin") && <LeadSyncCard />}
       <SettingsClient
       campuses={campuses}
