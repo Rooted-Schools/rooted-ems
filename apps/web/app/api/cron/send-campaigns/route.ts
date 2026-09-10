@@ -151,13 +151,38 @@ export async function GET(request: NextRequest) {
             .from("lead")
             .update({ last_contact_at: nowIso })
             .eq("id", recipient.lead_id as string),
+          // Record the send in the unified communications log so a campaign
+          // blast shows up alongside transactional email, and staff can see at a
+          // glance that their message went out (campaigns were previously only
+          // tracked in lead_campaign_recipient, invisible to the comms log).
+          supabase.from("communication_log").insert({
+            campus_id: campaign.campus_id as string,
+            channel: "email",
+            recipient_address: recipient.email as string,
+            subject: `${campaign.name}: ${template.subject}`,
+            body: `Campaign: ${campaign.name}`,
+            status: "sent",
+            sent_at: nowIso,
+            external_id: result.id ?? null,
+          }),
         ]);
       } else {
         totalFailed++;
-        await supabase
-          .from("lead_campaign_recipient")
-          .update({ status: "failed" })
-          .eq("id", recipient.id as string);
+        await Promise.all([
+          supabase
+            .from("lead_campaign_recipient")
+            .update({ status: "failed" })
+            .eq("id", recipient.id as string),
+          supabase.from("communication_log").insert({
+            campus_id: campaign.campus_id as string,
+            channel: "email",
+            recipient_address: recipient.email as string,
+            subject: `${campaign.name}: ${template.subject}`,
+            body: `Campaign: ${campaign.name}`,
+            status: "failed",
+            error_message: result.error ?? "send failed",
+          }),
+        ]);
         if (result.error === "email not configured") break; // no point continuing
       }
     }
