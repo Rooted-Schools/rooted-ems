@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -277,7 +278,7 @@ export function OffersClient({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-ink">Offers & Waitlist</h1>
+          <PageHeader eyebrow="Enrollment" title="Offers & Waitlist" />
           <p className="text-sm text-stone mt-1">
             Manage seat offers and waitlisted students.
           </p>

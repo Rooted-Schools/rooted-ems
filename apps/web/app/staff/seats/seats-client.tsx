@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
+import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { IconPenLine, IconX, IconCheckCircle } from "@/components/ui/icons";
@@ -108,7 +109,7 @@ export function SeatsClient({ rows }: SeatsClientProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-ink">Seat Management</h1>
+        <PageHeader eyebrow="Enrollment" title="Seat Management" />
         <p className="text-sm text-stone mt-1">
           {/* Item 13: scope description to what the user actually sees */}
           {Object.keys(campusMap).length === 1

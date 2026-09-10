@@ -168,7 +168,7 @@ export function StaffHeader({
       </div>
 
       {/* Action bar */}
-      <header className="h-12 border-b border-stone/20 bg-white flex items-center justify-between px-4 md:px-6">
+      <header className="h-12 border-b border-line bg-white flex items-center justify-between px-4 md:px-6">
         <div className="flex items-center gap-4">
           {/* Mobile hamburger */}
           <button
