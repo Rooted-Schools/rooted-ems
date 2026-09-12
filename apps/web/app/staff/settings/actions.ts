@@ -6,7 +6,7 @@ import {
   requireRoleOnCampus,
   requireNetworkAccess,
 } from "@/lib/auth/get-session";
-import { setWelcomeMessagingEnabled } from "@/lib/messaging-flags";
+import { setWelcomeMessagingEnabled, setAutomatedOutreachEnabled } from "@/lib/messaging-flags";
 import {
   createEnrollmentWindow,
   updateEnrollmentWindowStatus,
@@ -246,6 +246,20 @@ export async function staffSetWelcomeMessages(enabled: boolean) {
   if (!result.error) {
     revalidatePath("/staff/settings");
     revalidatePath("/staff/communications/automated-messages");
+  }
+  return result;
+}
+
+/**
+ * Master pause for automated cron outreach (re-engagement + nurture journeys).
+ * Same network-access gate as the welcome switch — a network-wide kill switch,
+ * not a per-campus operational toggle.
+ */
+export async function staffSetAutomatedOutreach(enabled: boolean) {
+  const session = await requireNetworkAccess();
+  const result = await setAutomatedOutreachEnabled(enabled, session.user_id);
+  if (!result.error) {
+    revalidatePath("/staff/settings");
   }
   return result;
 }

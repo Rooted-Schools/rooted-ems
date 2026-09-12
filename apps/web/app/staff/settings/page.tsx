@@ -16,8 +16,9 @@ import { AutomationHealth } from "./_components/automation-health";
 import { getEmailTrackingHealth } from "@/lib/queries/email-tracking-health";
 import { LeadSyncCard } from "./_components/lead-sync-card";
 import { WelcomeMessagingToggle } from "./_components/welcome-messaging-toggle";
+import { AutomatedOutreachToggle } from "./_components/automated-outreach-toggle";
 import { getAutomationHealth, getOverdueJourneySteps } from "@/lib/queries/automation-health";
-import { isWelcomeMessagingEnabled } from "@/lib/messaging-flags";
+import { isWelcomeMessagingEnabled, isAutomatedOutreachEnabled } from "@/lib/messaging-flags";
 import { getCampusMessageOverrides } from "@/lib/queries/message-overrides";
 import {
   INQUIRY_WELCOME_DEFAULT_TEXT,
@@ -69,6 +70,7 @@ export default async function StaffSettingsPage({
     { data: capacityPlans },
     welcomeMessagingEnabled,
     emailTrackingHealth,
+    automatedOutreachEnabled,
   ] = await Promise.all([
     getCampuses(),
     getStaffEnrollmentWindows(activeCampus),
@@ -82,6 +84,7 @@ export default async function StaffSettingsPage({
     capacityPlanQuery,
     isWelcomeMessagingEnabled(),
     getEmailTrackingHealth(),
+    isAutomatedOutreachEnabled(),
   ]);
 
   // Scope campuses to accessible ones
@@ -126,6 +129,10 @@ export default async function StaffSettingsPage({
       <EmailTrackingStatus health={emailTrackingHealth} />
       <WelcomeMessagingToggle
         enabled={welcomeMessagingEnabled}
+        canEdit={hasMinRole(session, "system_admin")}
+      />
+      <AutomatedOutreachToggle
+        enabled={automatedOutreachEnabled}
         canEdit={hasMinRole(session, "system_admin")}
       />
       <AutomationHealth

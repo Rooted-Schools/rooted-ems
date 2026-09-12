@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { supabaseMock } from "./helpers/supabase-mock";
-import { isWelcomeMessagingEnabled } from "@/lib/messaging-flags";
+import { isWelcomeMessagingEnabled, isAutomatedOutreachEnabled } from "@/lib/messaging-flags";
 
 vi.mock("@rooted-ems/database/server", async () => {
   const { supabaseMock } = await import("./helpers/supabase-mock");
@@ -55,6 +55,38 @@ describe("isWelcomeMessagingEnabled", () => {
     expect(op).toBeDefined();
     const hasKeyFilter = op!.filters.some(
       (f) => f.method === "eq" && f.args[0] === "key" && f.args[1] === KEY
+    );
+    const hasNullCampusFilter = op!.filters.some(
+      (f) => f.method === "is" && f.args[0] === "campus_id" && f.args[1] === null
+    );
+    expect(hasKeyFilter).toBe(true);
+    expect(hasNullCampusFilter).toBe(true);
+  });
+});
+
+describe("isAutomatedOutreachEnabled", () => {
+  it("defaults to true when no row has ever been written", async () => {
+    supabaseMock.queueResult("setting", { data: null, error: null });
+    expect(await isAutomatedOutreachEnabled()).toBe(true);
+  });
+
+  it("fails open (true) when the query errors", async () => {
+    supabaseMock.queueResult("setting", { data: null, error: { message: "connection reset" } });
+    expect(await isAutomatedOutreachEnabled()).toBe(true);
+  });
+
+  it("returns false when the row explicitly disables it (the pre-launch pause)", async () => {
+    supabaseMock.queueResult("setting", { data: { value: { enabled: false } }, error: null });
+    expect(await isAutomatedOutreachEnabled()).toBe(false);
+  });
+
+  it("reads the automated_outreach_enabled null-campus row", async () => {
+    supabaseMock.queueResult("setting", { data: null, error: null });
+    await isAutomatedOutreachEnabled();
+    const op = supabaseMock.ops.find((o) => o.table === "setting");
+    expect(op).toBeDefined();
+    const hasKeyFilter = op!.filters.some(
+      (f) => f.method === "eq" && f.args[0] === "key" && f.args[1] === "automated_outreach_enabled"
     );
     const hasNullCampusFilter = op!.filters.some(
       (f) => f.method === "is" && f.args[0] === "campus_id" && f.args[1] === null

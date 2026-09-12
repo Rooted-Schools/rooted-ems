@@ -2,6 +2,7 @@ import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { NextResponse, type NextRequest } from "next/server";
 import { recordCronRun } from "@/lib/cron-heartbeat";
 import { notifyLeadReengagement } from "@/lib/notify";
+import { isAutomatedOutreachEnabled } from "@/lib/messaging-flags";
 
 /**
  * Cron endpoint that re-engages gone-quiet leads: open leads with no
@@ -25,6 +26,14 @@ export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret || secret !== cronSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Master pause switch (Settings → Automated outreach). When off, do no
+  // outreach at all — the cron still runs and records the skip so the pause is
+  // visible in cron health, but not a single lead is emailed.
+  if (!(await isAutomatedOutreachEnabled())) {
+    await recordCronRun("reengage-leads", { skipped: 1 });
+    return NextResponse.json({ skipped: "automated outreach paused" });
   }
 
   // Service role: cron requests carry no session cookies. CRON_SECRET is

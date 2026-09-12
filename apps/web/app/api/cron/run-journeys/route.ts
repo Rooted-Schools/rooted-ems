@@ -10,6 +10,7 @@ import {
 import { getSuppressedEmails, unsubscribeUrl } from "@/lib/email-compliance";
 import { recordCronRun } from "@/lib/cron-heartbeat";
 import { getCampusLogoAbsoluteUrl } from "@/lib/campus-identity";
+import { isAutomatedOutreachEnabled } from "@/lib/messaging-flags";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
@@ -35,6 +36,13 @@ export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret || secret !== cronSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Master pause switch (Settings → Automated outreach). Paused = no journey
+  // steps sent; the cron records the skip so it stays visible in cron health.
+  if (!(await isAutomatedOutreachEnabled())) {
+    await recordCronRun("run-journeys", { skipped: 1 });
+    return NextResponse.json({ skipped: "automated outreach paused" });
   }
 
   const supabase = createServiceRoleClient();
