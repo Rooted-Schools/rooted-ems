@@ -147,6 +147,44 @@ async function recordEngagementEvent(
   }
 }
 
+/**
+ * Reflect a delivery on the communications log too.
+ *
+ * recordEngagementEvent above stamps `email_event`, which powers the
+ * per-campaign delivery badges and the engagement summary. The Communications
+ * page (/staff/communications) reads a *different* table, `communication_log`,
+ * and derives its "delivered" count from each row's status — and nothing was
+ * moving that status off "sent", so that page's delivered count was stuck at
+ * zero even when mail was delivered. Match the same Resend message id against
+ * communication_log.external_id (the campaign cron records it there on send)
+ * and advance a still-in-flight row to delivered.
+ *
+ * Guarded to rows currently queued/sent so a prior bounce or failure is never
+ * overwritten, and naturally idempotent — a redelivered webhook finds the row
+ * already past those statuses and does nothing.
+ */
+async function markCommunicationDelivered(
+  supabase: ServiceRoleClient,
+  resendId: string | undefined
+): Promise<void> {
+  if (!resendId) return;
+  try {
+    const { error } = await supabase
+      .from("communication_log")
+      .update({ status: "delivered", delivered_at: new Date().toISOString() })
+      .eq("external_id", resendId)
+      .in("status", ["queued", "sent"]);
+    if (error && !isMissingEmailEventTable(error)) {
+      console.error("[webhooks/resend] communication_log delivered update failed", error.message);
+    }
+  } catch (err) {
+    console.error(
+      "[webhooks/resend] communication_log update threw",
+      err instanceof Error ? err.message : err
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   const secret = process.env.RESEND_WEBHOOK_SECRET;
   if (!secret) {
@@ -232,6 +270,7 @@ export async function POST(request: NextRequest) {
     const { createServiceRoleClient } = await import("@rooted-ems/database/server");
     const supabase = createServiceRoleClient();
     await recordEngagementEvent(supabase, event.type, event.data?.email_id);
+    await markCommunicationDelivered(supabase, event.data?.email_id);
     return NextResponse.json({ ok: true });
   }
 

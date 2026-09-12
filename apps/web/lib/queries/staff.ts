@@ -1063,16 +1063,29 @@ export async function getStaffCommunications(campusIds?: string[]): Promise<{
 }> {
   const supabase = await createServerClient();
 
+  // One campus scope, reused by the visible list and the stat counts below:
+  // rows on an accessible campus OR system-generated rows with no campus
+  // (campus_id NULL), which must stay visible to everyone.
+  const campusOr =
+    campusIds && campusIds.length > 0
+      ? `campus_id.in.(${campusIds.join(",")}),campus_id.is.null`
+      : null;
+
+  // Family-facing channels only. In-app notifications also land in
+  // communication_log, but they belong to the separate Notifications surface
+  // (the bell / /staff/messages), not here — including them blended the
+  // count with hundreds of system notifications and made a page about email
+  // campaigns read nothing like the campaign that was actually sent.
+  const OUTBOUND_CHANNELS = ["email", "sms"];
+
   let q = supabase
     .from("communication_log")
     .select("id, subject, channel, status, sent_at, recipient_address, lead_id")
+    .in("channel", OUTBOUND_CHANNELS)
     .order("created_at", { ascending: false })
     .limit(100);
 
-  if (campusIds && campusIds.length > 0) {
-    // Use .or() so rows where campus_id IS NULL (system-generated) are always visible
-    q = q.or(`campus_id.in.(${campusIds.join(",")}),campus_id.is.null`);
-  }
+  if (campusOr) q = q.or(campusOr);
 
   const { data, error } = await q;
 
@@ -1104,16 +1117,35 @@ export async function getStaffCommunications(campusIds?: string[]): Promise<{
     lead_id: (row.lead_id as string | null) ?? null,
   }));
 
-  const stats: CommunicationStats = {
-    total_sent: rows.filter(
-      (r: Record<string, unknown>) => r.status === "sent" || r.status === "delivered"
-    ).length,
-    delivered: rows.filter((r: Record<string, unknown>) => r.status === "delivered").length,
-    queued: rows.filter((r: Record<string, unknown>) => r.status === "queued").length,
-    failed: rows.filter(
-      (r: Record<string, unknown>) => r.status === "failed" || r.status === "bounced"
-    ).length,
+  // Stats are REAL totals across the whole campus-scoped log — NOT derived
+  // from the 100 rows shown above. Counting the capped slice was the bug that
+  // let the "All campuses" total come out *smaller* than a single campus:
+  // each view's most-recent-100 rows had a different status mix, so the number
+  // was really "how many of the last 100 were sent", not a true total.
+  // Count-only queries (head: true) stay exact no matter how large the log is.
+  const countByStatus = async (statuses: string[]): Promise<number> => {
+    let cq = supabase
+      .from("communication_log")
+      .select("*", { count: "exact", head: true })
+      .in("channel", OUTBOUND_CHANNELS)
+      .in("status", statuses);
+    if (campusOr) cq = cq.or(campusOr);
+    const { count, error: countError } = await cq;
+    if (countError) {
+      console.error("[getStaffCommunications stats]", countError.message);
+      return 0;
+    }
+    return count ?? 0;
   };
+
+  const [total_sent, delivered, queued, failed] = await Promise.all([
+    countByStatus(["sent", "delivered"]),
+    countByStatus(["delivered"]),
+    countByStatus(["queued"]),
+    countByStatus(["failed", "bounced"]),
+  ]);
+
+  const stats: CommunicationStats = { total_sent, delivered, queued, failed };
 
   return { messages, stats };
 }

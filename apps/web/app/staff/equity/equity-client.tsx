@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
@@ -149,6 +149,16 @@ export function EquityClient({
   const pathname = usePathname();
   const currentParams = useSearchParams();
   const [campusFilter, setCampusFilter] = useState(initialCampus);
+
+  // Keep the in-page campus filter in step with the campus the shell resolved.
+  // A header campus-lens change re-renders this page with a new initialCampus
+  // prop without remounting the client, so without this the campusFilter state
+  // goes stale and the next pushFilters() writes the old campus back into the
+  // URL. (Same class of bug as the pipeline "picked Vancouver, got sent back
+  // to Cleveland" report.)
+  useEffect(() => {
+    setCampusFilter(initialCampus);
+  }, [initialCampus]);
 
   const pushFilters = useCallback(
     (overrides: { campus?: string }) => {
