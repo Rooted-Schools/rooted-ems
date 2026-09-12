@@ -185,6 +185,16 @@ export function StaffApplicationsClient({
   const [offerExpiry, setOfferExpiry] = useState(defaultExpiryDate);
   const headerCheckboxRef = useRef<HTMLInputElement>(null);
 
+  // Keep the in-page campus filter in step with the campus the shell resolved.
+  // A header campus-lens change re-renders this page with a new initialCampus
+  // prop without remounting the client, so without this the campusFilter state
+  // stays pinned to the campus first mounted with and the next pushFilters()
+  // writes that stale campus back into the URL. (Same class of bug as the
+  // pipeline "picked Vancouver, got sent back to Cleveland" report.)
+  useEffect(() => {
+    setCampusFilter(initialCampus);
+  }, [initialCampus]);
+
   const pushFilters = useCallback(
     (overrides: { status?: string; search?: string; campus?: string }) => {
       const params = new URLSearchParams(currentParams.toString());

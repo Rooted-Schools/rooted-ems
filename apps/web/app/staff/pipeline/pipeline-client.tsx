@@ -195,6 +195,19 @@ export function PipelineClient({
     setSavedViews(loadSavedViews());
   }, []);
 
+  // Keep the in-page campus filter in step with the campus the shell actually
+  // resolved. Changing the campus from the HEADER lens re-renders this page
+  // with a new initialCampus prop but does NOT remount the client, so without
+  // this sync the campusFilter state stays pinned to the campus first mounted
+  // with — and the next pushFilters() (a stage tab, a search, a page change)
+  // writes that stale campus back into the URL, snapping the view to it. That
+  // was the "picked Vancouver, clicked Ready for lottery, got sent back to
+  // Cleveland" bug. Syncing here makes every navigation carry the campus
+  // currently in effect.
+  useEffect(() => {
+    setCampusFilter(initialCampus);
+  }, [initialCampus]);
+
   const pushFilters = useCallback(
     (overrides: { stage?: string; search?: string; campus?: string; staleDays?: string | null; grade?: string }) => {
       const params = new URLSearchParams(currentParams.toString());
