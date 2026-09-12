@@ -11,7 +11,9 @@ import { isEmailConfigured } from "@/lib/email";
 import { ChannelStatus } from "./_components/channel-status";
 import { NotificationEmailTests } from "./_components/notification-email-tests";
 import { notificationTestTemplateList } from "@/lib/notification-test-emails";
+import { EmailTrackingStatus } from "./_components/email-tracking-status";
 import { AutomationHealth } from "./_components/automation-health";
+import { getEmailTrackingHealth } from "@/lib/queries/email-tracking-health";
 import { LeadSyncCard } from "./_components/lead-sync-card";
 import { WelcomeMessagingToggle } from "./_components/welcome-messaging-toggle";
 import { getAutomationHealth, getOverdueJourneySteps } from "@/lib/queries/automation-health";
@@ -66,6 +68,7 @@ export default async function StaffSettingsPage({
     overdueJourneySteps,
     { data: capacityPlans },
     welcomeMessagingEnabled,
+    emailTrackingHealth,
   ] = await Promise.all([
     getCampuses(),
     getStaffEnrollmentWindows(activeCampus),
@@ -78,6 +81,7 @@ export default async function StaffSettingsPage({
     getOverdueJourneySteps(),
     capacityPlanQuery,
     isWelcomeMessagingEnabled(),
+    getEmailTrackingHealth(),
   ]);
 
   // Scope campuses to accessible ones
@@ -119,6 +123,7 @@ export default async function StaffSettingsPage({
         emailConfigured={isEmailConfigured()}
         smsConfigured={isSmsConfigured()}
       />
+      <EmailTrackingStatus health={emailTrackingHealth} />
       <WelcomeMessagingToggle
         enabled={welcomeMessagingEnabled}
         canEdit={hasMinRole(session, "system_admin")}

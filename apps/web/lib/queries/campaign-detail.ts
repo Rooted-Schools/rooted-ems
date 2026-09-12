@@ -206,3 +206,49 @@ export async function getCampaignDeliveryEvidence(
   }
   return map;
 }
+
+export interface CampaignEngagementSummary {
+  delivered: number;
+  opened: number;
+  clicked: number;
+}
+
+/**
+ * Campaign-level delivered/opened/clicked totals, matched to the campaign the
+ * same way the per-recipient badges are (kind + rendered subject + sent-after),
+ * so the summary and the rows agree. Uses count-only queries so it stays
+ * accurate for a large campaign rather than capping at the 1000-row read limit.
+ * All zeros until Resend delivery/open/click tracking is enabled.
+ */
+export async function getCampaignEngagementSummary(
+  subject: string,
+  sentAfter: string
+): Promise<CampaignEngagementSummary> {
+  const supabase = await createServerClient();
+  const base = () =>
+    supabase
+      .from("email_event")
+      .select("*", { count: "exact", head: true })
+      .eq("kind", "campaign")
+      .eq("subject", subject)
+      .gte("sent_at", sentAfter);
+
+  const [delivered, opened, clicked] = await Promise.all([
+    base().not("delivered_at", "is", null),
+    base().not("opened_at", "is", null),
+    base().not("clicked_at", "is", null),
+  ]);
+
+  if (delivered.error || opened.error || clicked.error) {
+    console.error(
+      "[getCampaignEngagementSummary]",
+      delivered.error?.message ?? opened.error?.message ?? clicked.error?.message
+    );
+  }
+
+  return {
+    delivered: delivered.count ?? 0,
+    opened: opened.count ?? 0,
+    clicked: clicked.count ?? 0,
+  };
+}

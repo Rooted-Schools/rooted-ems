@@ -7,6 +7,7 @@ import {
   getCampaignRecipientStatusCounts,
   getCampaignRecipientsPage,
   getCampaignDeliveryEvidence,
+  getCampaignEngagementSummary,
 } from "@/lib/queries/campaign-detail";
 import { renderCampaignEmail, type CampaignPayload, type CampaignTemplateKey } from "@/lib/email-templates";
 import { resolveDeliveryState } from "@/lib/campaign-recipients";
@@ -53,11 +54,14 @@ export default async function CampaignDetailPage({
     getCampaignRecipientsPage(campaign.id, page, RECIPIENTS_PAGE_SIZE),
   ]);
 
-  const evidence = await getCampaignDeliveryEvidence(
-    recipientsPage.rows.map((r) => r.lead_id),
-    rendered.subject,
-    campaign.created_at
-  );
+  const [evidence, engagement] = await Promise.all([
+    getCampaignDeliveryEvidence(
+      recipientsPage.rows.map((r) => r.lead_id),
+      rendered.subject,
+      campaign.created_at
+    ),
+    getCampaignEngagementSummary(rendered.subject, campaign.created_at),
+  ]);
 
   const recipients = recipientsPage.rows.map((r) => ({
     ...r,
@@ -70,6 +74,7 @@ export default async function CampaignDetailPage({
     <CampaignDetailClient
       campaign={campaign}
       statusCounts={statusCounts}
+      engagement={engagement}
       subject={rendered.subject}
       html={rendered.html}
       text={rendered.text}
