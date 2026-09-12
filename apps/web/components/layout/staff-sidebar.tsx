@@ -376,7 +376,7 @@ export function StaffSidebar({
   });
 
   return (
-    <aside className="hidden md:flex w-64 bg-deep-green min-h-screen flex-col">
+    <aside className="hidden md:flex w-64 bg-deep-green sticky top-0 h-screen flex-col">
       {/* Brand — left ring in the lens accent when a campus lens is active */}
       <div
         className={cn(

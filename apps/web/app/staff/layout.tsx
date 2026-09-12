@@ -117,7 +117,7 @@ export default async function StaffLayout({
           default via NEUTRAL_LENS_THEME above, not conditionally rendered). */}
       <div className="h-[3px] w-full bg-[var(--lens-accent)]" aria-hidden="true" />
       <div className="flex">
-        <Suspense fallback={<aside className="hidden md:block w-64 bg-deep-green min-h-screen" />}>
+        <Suspense fallback={<aside className="hidden md:block w-64 bg-deep-green sticky top-0 h-screen" />}>
           <StaffSidebar
             highestRole={highestRole}
             todayCount={todayCount}
