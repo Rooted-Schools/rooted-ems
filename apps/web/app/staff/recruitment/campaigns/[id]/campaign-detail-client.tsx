@@ -11,7 +11,7 @@ import {
   recipientStatusLabel,
   type DeliveryState,
 } from "@/lib/campaign-recipients";
-import type { CampaignDetail } from "@/lib/queries/campaign-detail";
+import type { CampaignDetail, CampaignEngagementSummary } from "@/lib/queries/campaign-detail";
 
 const AUDIENCE_LABELS: Record<string, string> = {
   open: "All open leads",
@@ -72,6 +72,7 @@ interface RecipientWithDelivery {
 interface CampaignDetailClientProps {
   campaign: CampaignDetail;
   statusCounts: { total: number; byStatus: Record<string, number> };
+  engagement: CampaignEngagementSummary;
   subject: string;
   html: string;
   text: string;
@@ -85,6 +86,7 @@ interface CampaignDetailClientProps {
 export function CampaignDetailClient({
   campaign,
   statusCounts,
+  engagement,
   subject,
   html,
   text,
@@ -102,6 +104,19 @@ export function CampaignDetailClient({
 
   const from = recipientsTotal === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, recipientsTotal);
+
+  // Engagement rates are expressed against the number actually sent, the same
+  // denominator Mailchimp uses — "delivered" is a subset of sent, opens/clicks
+  // are subsets of delivered. No sends yet → no rate to show.
+  const sentCount = statusCounts.byStatus["sent"] ?? 0;
+  const rate = (n: number) => (sentCount > 0 ? Math.round((n / sentCount) * 100) : 0);
+  const hasEngagementData =
+    engagement.delivered > 0 || engagement.opened > 0 || engagement.clicked > 0;
+  const engagementTiles = [
+    { label: "Delivered", value: engagement.delivered },
+    { label: "Opened", value: engagement.opened },
+    { label: "Clicked", value: engagement.clicked },
+  ];
 
   return (
     <div className="space-y-6">
@@ -166,6 +181,31 @@ export function CampaignDetailClient({
               </p>
             </div>
           ))}
+      </div>
+
+      {/* Engagement summary — Mailchimp-style delivered/opened/clicked totals
+          for the whole campaign, with rates against the number sent. */}
+      <div>
+        <div className="grid grid-cols-3 gap-3">
+          {engagementTiles.map((tile) => (
+            <div key={tile.label} className="rounded-[6px] border border-line bg-white px-4 py-3">
+              <p className="text-xs text-stone">{tile.label}</p>
+              <p className="text-xl font-semibold text-ink mt-0.5">
+                {tile.value.toLocaleString()}
+                {sentCount > 0 && (
+                  <span className="text-sm font-normal text-stone ml-1.5">{rate(tile.value)}%</span>
+                )}
+              </p>
+            </div>
+          ))}
+        </div>
+        {!hasEngagementData && (
+          <p className="text-xs text-stone flex items-start gap-1.5 mt-2">
+            <IconInfo size={14} className="mt-0.5 shrink-0" />
+            Open and click tracking is recorded once Resend delivery tracking is enabled for this
+            account. Until then these read zero even for mail that was delivered.
+          </p>
+        )}
       </div>
 
       {/* Email preview — the point of this page. */}
