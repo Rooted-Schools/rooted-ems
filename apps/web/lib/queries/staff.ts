@@ -1099,23 +1099,64 @@ export async function getStaffCommunications(campusIds?: string[]): Promise<{
 
   const rows = data ?? [];
 
-  const messages: CommunicationRow[] = rows.map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    subject: (row.subject as string) ?? null,
-    channel: row.channel as string,
-    status: row.status as string,
-    sent_at: row.sent_at
-      ? new Date(row.sent_at as string).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
-      : null,
-    // communication_log has no recipient_count column; each row is one send.
-    recipient_count: 1,
-    recipient_address: (row.recipient_address as string) ?? null,
-    lead_id: (row.lead_id as string | null) ?? null,
+  // Phone calls are logged as lead_activity (via "Log a call" on a lead), not
+  // communication_log, so they never appeared here. Pull recent call activities
+  // for the same campus scope and fold them into the timeline — pilot feedback
+  // (Dr. Yee, RSV): "how will phone calls be tracked in Communications?".
+  let callQuery = supabase
+    .from("lead_activity")
+    .select("id, body, created_at, lead:lead_id!inner(id, first_name, last_name, campus_id)")
+    .eq("activity_type", "call")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (campusIds && campusIds.length > 0) {
+    callQuery = callQuery.in("lead.campus_id", campusIds);
+  }
+  const { data: callData, error: callError } = await callQuery;
+  if (callError) console.error("[getStaffCommunications calls]", callError.message);
+
+  const fmtDate = (iso: string | null): string | null =>
+    iso
+      ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      : null;
+
+  // Merge email/SMS sends and logged calls into one time-ordered timeline.
+  const commEntries = rows.map((row: Record<string, unknown>) => ({
+    ts: row.sent_at ? new Date(row.sent_at as string).getTime() : 0,
+    row: {
+      id: row.id as string,
+      subject: (row.subject as string) ?? null,
+      channel: row.channel as string,
+      status: row.status as string,
+      sent_at: fmtDate(row.sent_at as string | null),
+      recipient_count: 1,
+      recipient_address: (row.recipient_address as string) ?? null,
+      lead_id: (row.lead_id as string | null) ?? null,
+    } as CommunicationRow,
   }));
+
+  const callEntries = (callData ?? []).map((a: Record<string, unknown>) => {
+    const lead = a.lead as { id: string; first_name: string; last_name: string } | null;
+    const name = lead ? `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim() : null;
+    return {
+      ts: a.created_at ? new Date(a.created_at as string).getTime() : 0,
+      row: {
+        id: a.id as string,
+        subject: (a.body as string) ?? "Call logged",
+        channel: "call",
+        status: "logged",
+        sent_at: fmtDate(a.created_at as string | null),
+        recipient_count: 1,
+        recipient_address: name,
+        lead_id: lead?.id ?? null,
+      } as CommunicationRow,
+    };
+  });
+
+  const messages: CommunicationRow[] = [...commEntries, ...callEntries]
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, 100)
+    .map((e) => e.row);
 
   // Stats are REAL totals across the whole campus-scoped log — NOT derived
   // from the 100 rows shown above. Counting the capped slice was the bug that

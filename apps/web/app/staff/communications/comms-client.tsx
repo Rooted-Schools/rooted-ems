@@ -112,6 +112,7 @@ interface CommsClientProps {
 
 function ChannelIcon({ channel, size = 14 }: { channel: string; size?: number }) {
   switch (channel) {
+    case "call":
     case "sms":
       return <IconPhone size={size} />;
     case "in_app":
@@ -125,6 +126,7 @@ function ChannelIcon({ channel, size = 14 }: { channel: string; size?: number })
 const channelLabels: Record<string, string> = {
   email: "Email",
   sms: "SMS",
+  call: "Call",
   in_app: "In-App",
 };
 
@@ -134,6 +136,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "succes
   delivered: { label: "Delivered", variant: "success" },
   failed: { label: "Failed", variant: "destructive" },
   bounced: { label: "Bounced", variant: "warning" },
+  logged: { label: "Logged", variant: "secondary" },
 };
 
 const appStatusLabels: Record<string, string> = {
@@ -316,7 +319,7 @@ export function CommsClient({
                     <CardDescription>Click a row to view message details.</CardDescription>
                   </div>
                   <div className="flex gap-1">
-                    {["all", "in_app", "email", "sms"].map((ch) => (
+                    {["all", "email", "sms", "call"].map((ch) => (
                       <button
                         key={ch}
                         onClick={() => setChannelFilter(ch)}
