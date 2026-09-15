@@ -100,6 +100,41 @@ function isDueToday(dateStr: string): boolean {
   );
 }
 
+/** Sortable recruitment-table columns. */
+type SortKey = "family" | "student" | "campus" | "source" | "stage" | "last_contact";
+
+/** A clickable table header that sorts by its column; shows the active direction. */
+function SortHead({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  className,
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: { key: SortKey; dir: "asc" | "desc" } | null;
+  onSort: (key: SortKey) => void;
+  className?: string;
+}) {
+  const active = sort?.key === sortKey;
+  return (
+    <TableHead className={className}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className="inline-flex items-center gap-1 hover:text-ink"
+        aria-label={`Sort by ${label}`}
+      >
+        {label}
+        <span className="text-[10px] text-stone" aria-hidden>
+          {active ? (sort!.dir === "asc" ? "▲" : "▼") : "↕"}
+        </span>
+      </button>
+    </TableHead>
+  );
+}
+
 /* ─── Component ─── */
 
 interface RecruitmentClientProps {
@@ -201,6 +236,38 @@ export function RecruitmentClient({ queue, summary, studentSummary, leads, campa
       );
     });
   }, [leads, search, stageFilter]);
+
+  // Column sorting (pilot feedback, Tim CLE: make the recruitment columns
+  // sortable). Click a header to sort by it; click again to flip direction.
+  // Null = the natural incoming order, so the table looks unchanged until a
+  // header is clicked. Selection/filter logic stays keyed off `filtered`.
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" } | null>(null);
+  const toggleSort = (key: SortKey) =>
+    setSort((prev) =>
+      prev?.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }
+    );
+
+  const sorted = useMemo(() => {
+    if (!sort) return filtered;
+    const value = (l: LeadRow): string | number => {
+      switch (sort.key) {
+        case "family": return `${l.last_name} ${l.first_name}`.trim().toLowerCase();
+        case "student": return (l.student_first_name ?? "").toLowerCase();
+        case "campus": return l.campus_name.toLowerCase();
+        case "source": return (l.source ?? "").toLowerCase();
+        case "stage": return l.stage.toLowerCase();
+        case "last_contact": return l.last_contact_at ? new Date(l.last_contact_at).getTime() : 0;
+      }
+    };
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      const av = value(a);
+      const bv = value(b);
+      if (av < bv) return -dir;
+      if (av > bv) return dir;
+      return 0;
+    });
+  }, [filtered, sort]);
 
   // Selection helpers for messaging hand-picked families. Selection is scoped
   // to the currently filtered rows (status filter + search), so "both" ways of
@@ -566,17 +633,17 @@ export function RecruitmentClient({ queue, summary, studentSummary, leads, campa
                       className="h-4 w-4 rounded border-stone/30 text-rooted-green focus:ring-rooted-green"
                     />
                   </TableHead>
-                  <TableHead>Family</TableHead>
-                  <TableHead className="hidden md:table-cell">Student</TableHead>
-                  <TableHead className="hidden lg:table-cell">Campus</TableHead>
-                  <TableHead className="hidden md:table-cell">Source</TableHead>
-                  <TableHead>Stage</TableHead>
-                  <TableHead className="hidden lg:table-cell">Last contact</TableHead>
+                  <SortHead label="Family" sortKey="family" sort={sort} onSort={toggleSort} />
+                  <SortHead label="Student" sortKey="student" sort={sort} onSort={toggleSort} className="hidden md:table-cell" />
+                  <SortHead label="Campus" sortKey="campus" sort={sort} onSort={toggleSort} className="hidden lg:table-cell" />
+                  <SortHead label="Source" sortKey="source" sort={sort} onSort={toggleSort} className="hidden md:table-cell" />
+                  <SortHead label="Stage" sortKey="stage" sort={sort} onSort={toggleSort} />
+                  <SortHead label="Last contact" sortKey="last_contact" sort={sort} onSort={toggleSort} className="hidden lg:table-cell" />
                   <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((lead) => {
+                {sorted.map((lead) => {
                   const cfg = STAGE_CONFIG[lead.stage] ?? STAGE_CONFIG.new;
                   return (
                     <TableRow key={lead.id}>
