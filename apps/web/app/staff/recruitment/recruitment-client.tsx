@@ -593,18 +593,15 @@ export function RecruitmentClient({ queue, summary, studentSummary, leads, campa
                         <p className="font-medium text-ink">
                           {lead.first_name} {lead.last_name}
                         </p>
+                        {/* Plain, selectable text — not tel:/mailto: links. Per
+                            pilot feedback (Tim, CLE): clicking a number opened
+                            FaceTime and an email opened Mail; staff want to copy
+                            the raw value (e.g. into Google Voice), so each is
+                            select-all for one-click copy. */}
                         <p className="text-xs text-stone flex flex-wrap items-center gap-x-1">
-                          {lead.email && (
-                            <a href={`mailto:${lead.email}`} className="text-rooted-green hover:text-deep-green">
-                              {lead.email}
-                            </a>
-                          )}
-                          {lead.email && lead.phone && <span>·</span>}
-                          {lead.phone && (
-                            <a href={`tel:${lead.phone}`} className="text-rooted-green hover:text-deep-green">
-                              {lead.phone}
-                            </a>
-                          )}
+                          {lead.email && <span className="select-all">{lead.email}</span>}
+                          {lead.email && lead.phone && <span aria-hidden>·</span>}
+                          {lead.phone && <span className="select-all tabular-nums">{lead.phone}</span>}
                           {!lead.email && !lead.phone && "—"}
                         </p>
                       </TableCell>
