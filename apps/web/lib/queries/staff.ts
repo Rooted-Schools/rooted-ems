@@ -2307,12 +2307,16 @@ export async function getPipelineNeeds(
     }
   }
 
-  // ── Ready for lottery: static, real status text — nothing to batch ──────
+  // ── Lottery states: static, real status text — nothing to batch ─────────
+  // Per pilot feedback (Brook): a verified application is NOT yet in a lottery
+  // — it still has to be *added* to one — and a lottery_assigned application is
+  // in a lottery but has not been run, so "awaiting results" overstated it.
+  // The labels now name the actual next action / true state.
   for (const row of rows) {
     if (row.status === "verified") {
-      result.set(row.id, { needsLabel: "Ready for lottery run", causeKey: "ready_for_lottery", causeLabel: "ready for the lottery run" });
+      result.set(row.id, { needsLabel: "Add to a lottery", causeKey: "ready_for_lottery", causeLabel: "waiting to be added to a lottery" });
     } else if (row.status === "lottery_assigned") {
-      result.set(row.id, { needsLabel: "Awaiting lottery results", causeKey: "lottery_assigned", causeLabel: "waiting on lottery results" });
+      result.set(row.id, { needsLabel: "In a lottery — awaiting run", causeKey: "lottery_assigned", causeLabel: "in a lottery, awaiting the run" });
     }
   }
 
