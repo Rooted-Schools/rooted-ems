@@ -26,6 +26,7 @@ export const ALLOWED_ANSWER_KEYS = new Set([
   "has_sibling_at_school",
   "sibling_name",
   "current_grade",
+  "resides_in_state",
   "data_sharing_consent",
   "agree_terms",
   "e_signature_name",

@@ -7,6 +7,9 @@ export interface CampusRow {
   name: string;
   region_name: string;
   short_code: string;
+  /** 2-letter state the charter operates in (e.g. "WA", "SC", "OH"). Drives the
+   *  campus-aware residency-eligibility question on the application. */
+  state: string;
 }
 
 // ─── Queries ─────────────────────────────────────────────
@@ -23,7 +26,7 @@ export async function getCampuses(): Promise<CampusRow[]> {
     .from("campus")
     .select(
       `
-      id, name, short_code,
+      id, name, short_code, state,
       region:region_id (name)
     `
     )
@@ -41,6 +44,7 @@ export async function getCampuses(): Promise<CampusRow[]> {
       name: row.name as string,
       region_name: region?.name ?? "",
       short_code: (row.short_code as string) ?? "",
+      state: (row.state as string) ?? "",
     };
   });
 }
@@ -57,7 +61,7 @@ export async function getCampusById(
     .from("campus")
     .select(
       `
-      id, name, short_code,
+      id, name, short_code, state,
       region:region_id (name)
     `
     )
@@ -75,5 +79,6 @@ export async function getCampusById(
     name: (data as Record<string, unknown>).name as string,
     region_name: region?.name ?? "",
     short_code: ((data as Record<string, unknown>).short_code as string) ?? "",
+    state: ((data as Record<string, unknown>).state as string) ?? "",
   };
 }

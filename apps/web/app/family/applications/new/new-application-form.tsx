@@ -58,6 +58,15 @@ interface NewApplicationFormProps {
 /** Yes/No answers are stored as the strings the policy matchers accept. */
 type YesNo = "yes" | "no";
 
+/** 2-letter state code -> full name, for the campus-aware residency question. */
+const STATE_NAMES: Record<string, string> = {
+  WA: "Washington",
+  SC: "South Carolina",
+  OH: "Ohio",
+  LA: "Louisiana",
+};
+const stateName = (code: string): string => STATE_NAMES[code] ?? code;
+
 /* ───────────── step definitions ───────────── */
 
 const STEPS = [
@@ -98,6 +107,10 @@ interface FormData {
   // Sibling priority (affects lottery weighting)
   hasSibling: boolean;
   siblingName: string;
+  // Residency eligibility — a charter can only enroll students who reside in
+  // the state it operates in. "" until answered; "no" flags the application
+  // for staff (see resides_in_state answer + the staff out-of-state flag).
+  residesInState: "" | YesNo;
   // Policy-driven lottery questions (only asked where the campus's adopted
   // policy declares the matching weighted tier)
   isStaffChild: YesNo;
@@ -130,6 +143,7 @@ const INITIAL: FormData = {
   smsConsent: false,
   hasSibling: false,
   siblingName: "",
+  residesInState: "",
   isStaffChild: "no",
   isFrlQualifying: "no",
   dataSharingConsent: false,
@@ -319,6 +333,7 @@ function buildCreateInput(
   answers.has_sibling_at_school = form.hasSibling;
   if (form.hasSibling && form.siblingName.trim()) answers.sibling_name = form.siblingName.trim();
   if (form.currentGrade.trim()) answers.current_grade = form.currentGrade.trim();
+  if (form.residesInState) answers.resides_in_state = form.residesInState;
 
   return {
     enrollment_window_id: windowId,
@@ -356,6 +371,7 @@ function buildAutosaveInput(
     has_sibling_at_school: form.hasSibling,
     sibling_name: form.hasSibling ? form.siblingName : "",
     current_grade: form.currentGrade,
+    resides_in_state: form.residesInState,
     e_signature_name: form.signatureName,
     guardian_relationship_other:
       form.guardianRelationship === "other" ? form.guardianRelationshipOther : "",
@@ -443,6 +459,8 @@ export function NewApplicationForm({
 
   const campusWindows = windows.filter((w) => w.campus_id === form.campusId && w.is_open);
   const campusGrades = gradeLevels.filter((g) => g.campus_id === form.campusId);
+  // The state the selected campus operates in — drives the residency question.
+  const campusState = campuses.find((c) => c.id === form.campusId)?.state ?? "";
 
   // The extra lottery questions follow the selected campus, so they appear and
   // disappear when the family changes their mind on step 1.
@@ -593,6 +611,7 @@ export function NewApplicationForm({
     student:
       !!form.firstName &&
       !!form.lastName &&
+      !!form.residesInState &&
       !!form.guardianFirstName &&
       !!form.guardianLastName &&
       !!form.guardianRelationship &&
@@ -863,6 +882,22 @@ export function NewApplicationForm({
                 />
               </Field>
             </div>
+            <Field
+              label={`${t("appForm.residencyLabel")} ${stateName(campusState)}?`}
+              required
+              id="resides-in-state"
+            >
+              <Select
+                id="resides-in-state"
+                value={form.residesInState}
+                onChange={(e) => update({ residesInState: e.target.value as "" | YesNo })}
+              >
+                <option value="">{t("common.select")}</option>
+                <option value="yes">{t("common.yes")}</option>
+                <option value="no">{t("common.no")}</option>
+              </Select>
+              <p className="text-xs text-stone-text mt-1">{t("appForm.residencyNote")}</p>
+            </Field>
           </CardContent>
         </Card>
       )}

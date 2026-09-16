@@ -137,6 +137,19 @@ export function ContextRail({ detail, noteText, setNoteText, isPending, onAddNot
         )}
       </div>
 
+      {/* Residency-eligibility flag: the family said they do NOT live in the
+          state this charter operates in. A charter can only enroll in-state
+          students, so this is surfaced for staff review before advancing. */}
+      {detail.resides_in_state === "no" && (
+        <div className="rounded-[12px] border border-warn/40 bg-warn/10 p-4">
+          <p className="text-sm font-medium text-warn-text">Out-of-state applicant</p>
+          <p className="text-xs text-ink/70 mt-0.5">
+            This family indicated they do not reside in {detail.campus_name}&apos;s state. A charter
+            can only enroll students who live in-state — verify residency before advancing.
+          </p>
+        </div>
+      )}
+
       {/* Sibling / priority callout — derived from the real has_sibling_enrolled flag only */}
       {detail.has_sibling_enrolled && (
         <div className="rounded-[12px] border border-rooted-green/30 bg-rooted-green/5 p-4">
