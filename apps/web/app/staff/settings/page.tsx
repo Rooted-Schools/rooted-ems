@@ -1,6 +1,7 @@
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { getStaffEnrollmentWindows, getStaffUsers, getCampuses, getStaffPacketRequirements } from "@/lib/queries";
 import { SettingsClient } from "./settings-client";
@@ -146,6 +147,19 @@ export default async function StaffSettingsPage({
           toEmail={session.email ?? null}
         />
       )}
+      <Link
+        href="/staff/settings/policies"
+        className="flex items-center justify-between rounded-[6px] border border-line bg-white px-4 py-3 hover:bg-sunken/40"
+      >
+        <div>
+          <p className="text-sm font-semibold text-ink">Registration policies</p>
+          <p className="mt-0.5 text-xs text-stone">
+            Edit the policy text families read and sign (handbook, discipline, media release, and
+            more), per campus.
+          </p>
+        </div>
+        <span className="text-sm text-rooted-green">Edit &rarr;</span>
+      </Link>
       {hasMinRole(session, "system_admin") && <LeadSyncCard />}
       <SettingsClient
       campuses={campuses}

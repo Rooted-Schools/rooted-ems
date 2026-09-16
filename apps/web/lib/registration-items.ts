@@ -387,3 +387,18 @@ export function getCompletionConfig(itemType: string): CompletionConfig {
     descKey: "reg.item.fallback.desc",
   };
 }
+
+/**
+ * The registration items that are policy acknowledgements (a family reads the
+ * text and signs) — i.e. the ones a campus can author its own wording for in
+ * the Settings policy editor.
+ */
+export function acknowledgementItems(): {
+  itemType: string;
+  titleKey: TranslationKey;
+  descKey: TranslationKey;
+}[] {
+  return Object.entries(ITEM_COMPLETION_CONFIG)
+    .filter(([, c]) => c.mode === "acknowledge")
+    .map(([itemType, c]) => ({ itemType, titleKey: c.titleKey, descKey: c.descKey }));
+}

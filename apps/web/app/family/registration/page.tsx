@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { redirect } from "next/navigation";
 import { RegistrationClient, type EnrollmentRegistration } from "./registration-client";
+import { getCampusPolicyOverrides } from "@/lib/queries/policy-overrides";
 import { initializeRegistrationPacket, seedMissingRegistrationItems } from "@/lib/mutations/registration";
 
 /** Application guardian_relationship → emergency-contact Relationship option. */
@@ -59,7 +60,7 @@ export default async function FamilyRegistrationPage() {
     .eq("user_id", user.id);
 
   if (!guardians || guardians.length === 0) {
-    return <RegistrationClient enrollments={[]} userId={user.id} />;
+    return <RegistrationClient enrollments={[]} userId={user.id} policyOverrides={{}} />;
   }
 
   const guardianIds = guardians.map((g: Record<string, string>) => g.id);
@@ -87,7 +88,7 @@ export default async function FamilyRegistrationPage() {
     .order("updated_at", { ascending: false });
 
   if (!acceptedApps || acceptedApps.length === 0) {
-    return <RegistrationClient enrollments={[]} userId={user.id} />;
+    return <RegistrationClient enrollments={[]} userId={user.id} policyOverrides={{}} />;
   }
 
   // For each accepted application, find or create an enrollment record
@@ -206,5 +207,15 @@ export default async function FamilyRegistrationPage() {
     })
   );
 
-  return <RegistrationClient enrollments={enrollmentData as EnrollmentRegistration[]} userId={user.id} />;
+  // Per-campus policy overrides (migration 00066) for the campuses this family
+  // is registering with. Empty/failed -> registration uses the built-in policy
+  // text, so this never blocks registration.
+  const enrollments = enrollmentData as EnrollmentRegistration[];
+  const policyOverrides = await getCampusPolicyOverrides(
+    Array.from(new Set(enrollments.map((e) => e.campus_id).filter(Boolean)))
+  );
+
+  return (
+    <RegistrationClient enrollments={enrollments} userId={user.id} policyOverrides={policyOverrides} />
+  );
 }

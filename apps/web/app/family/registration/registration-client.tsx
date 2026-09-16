@@ -20,6 +20,7 @@ import {
   familySubmitRegistrationPacket,
 } from "./actions";
 import { getPolicyText } from "./policy-content";
+import type { PolicyOverrideMap } from "@/lib/queries/policy-overrides";
 import { SignaturePad } from "@/components/ui/signature-pad";
 import { useLocale } from "@/lib/i18n/locale-context";
 import { type TranslationKey } from "@/lib/i18n/translations";
@@ -82,6 +83,8 @@ export interface EnrollmentRegistration {
 interface RegistrationClientProps {
   enrollments: EnrollmentRegistration[];
   userId: string;
+  /** Per-campus policy text overrides (migration 00066). Empty = use built-in. */
+  policyOverrides: PolicyOverrideMap;
 }
 
 /* ─── Category icons (labels come from translations) ─── */
@@ -139,7 +142,7 @@ function getButtonLabel(itemType: string, t: (key: TranslationKey) => string): s
   return t("reg.btn.reviewAgree");
 }
 
-export function RegistrationClient({ enrollments, userId }: RegistrationClientProps) {
+export function RegistrationClient({ enrollments, userId, policyOverrides }: RegistrationClientProps) {
   const router = useRouter();
   const { t, locale } = useLocale();
   const localeTag = locale === "es" ? "es-US" : "en-US";
@@ -805,8 +808,14 @@ export function RegistrationClient({ enrollments, userId }: RegistrationClientPr
 
                 {config.mode === "acknowledge" && (() => {
                   // Families e-sign this text, so it must be in the language
-                  // they are reading the packet in.
-                  const policyText = getPolicyText(enrollment.campus_id, completionTarget.itemType, locale);
+                  // they are reading the packet in. A campus that has authored
+                  // its own policy (migration 00066) wins; otherwise the
+                  // built-in default in policy-content.ts is used.
+                  const override = policyOverrides[enrollment.campus_id]?.[completionTarget.itemType];
+                  const overrideText = override ? (locale === "es" ? override.body_es : override.body_en) : "";
+                  const policyText = overrideText.trim()
+                    ? overrideText
+                    : getPolicyText(enrollment.campus_id, completionTarget.itemType, locale);
                   return (
                     <>
                       {policyText && (
