@@ -57,6 +57,15 @@ type StepId = (typeof STEPS)[number]["id"];
 
 /* ───────────── form state ───────────── */
 
+/** 2-letter state code -> full name, for the campus-aware residency question. */
+const STATE_NAMES: Record<string, string> = {
+  WA: "Washington",
+  SC: "South Carolina",
+  OH: "Ohio",
+  LA: "Louisiana",
+};
+const stateName = (code: string): string => STATE_NAMES[code] ?? code;
+
 interface FormData {
   campusId: string;
   enrollmentWindowId: string;
@@ -78,6 +87,7 @@ interface FormData {
   guardianPhone: string;
   hasSibling: boolean;
   siblingName: string;
+  residesInState: "" | YesNo;
   isStaffChild: YesNo;
   isFrlQualifying: YesNo;
   dataSharingConsent: boolean;
@@ -116,6 +126,12 @@ function draftToFormData(d: DraftApplicationData): FormData {
     guardianPhone: d.guardian.phone ?? "",
     hasSibling: isAffirmativeAnswer(d.answers.has_sibling_at_school),
     siblingName: answerAsText(d.answers.sibling_name),
+    residesInState:
+      answerAsText(d.answers.resides_in_state) === "yes"
+        ? "yes"
+        : answerAsText(d.answers.resides_in_state) === "no"
+          ? "no"
+          : "",
     isStaffChild: isAffirmativeAnswer(d.answers.is_staff_child) ? "yes" : "no",
     isFrlQualifying: isAffirmativeAnswer(d.answers.is_frl_qualifying) ? "yes" : "no",
     dataSharingConsent: isAffirmativeAnswer(d.answers.data_sharing_consent),
@@ -283,6 +299,7 @@ function buildUpdateInput(
     has_sibling_at_school: form.hasSibling,
     sibling_name: form.hasSibling ? form.siblingName : "",
     current_grade: form.currentGrade,
+    resides_in_state: form.residesInState,
     e_signature_name: form.signatureName,
     guardian_relationship_other:
       form.guardianRelationship === "other" ? form.guardianRelationshipOther : "",
@@ -346,6 +363,7 @@ export function EditApplicationClient({
 
   const campusWindows = windows.filter((w) => w.campus_id === form.campusId && w.is_open);
   const campusGrades = gradeLevels.filter((g) => g.campus_id === form.campusId);
+  const campusState = campuses.find((c) => c.id === form.campusId)?.state ?? "";
   const studentName =
     [form.firstName, form.lastName].filter(Boolean).join(" ") || t("appForm.untitled");
 
@@ -422,6 +440,7 @@ export function EditApplicationClient({
     student:
       !!form.firstName &&
       !!form.lastName &&
+      !!form.residesInState &&
       !!form.guardianFirstName &&
       !!form.guardianLastName &&
       !!form.guardianRelationship &&
@@ -672,6 +691,17 @@ export function EditApplicationClient({
                 />
               </Field>
             </div>
+            <Field label={`${t("appForm.residencyLabel")} ${stateName(campusState)}?`} required>
+              <Select
+                value={form.residesInState}
+                onChange={(e) => update({ residesInState: e.target.value as "" | YesNo })}
+              >
+                <option value="">{t("common.select")}</option>
+                <option value="yes">{t("common.yes")}</option>
+                <option value="no">{t("common.no")}</option>
+              </Select>
+              <p className="text-xs text-stone-text mt-1">{t("appForm.residencyNote")}</p>
+            </Field>
           </CardContent>
         </Card>
       )}
