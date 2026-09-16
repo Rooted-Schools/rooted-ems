@@ -257,6 +257,12 @@ const dict = {
   "reg.item.emergency_contact.field.phone.placeholder":         { en: "(555) 555-5555", es: "(555) 555-5555" },
   "reg.item.emergency_contact.field.alt_phone.label":           { en: "Alternate Phone", es: "Teléfono Alternativo" },
   "reg.item.emergency_contact.field.alt_phone.placeholder":     { en: "(555) 555-5555", es: "(555) 555-5555" },
+  "reg.item.emergency_contact.field.contact2_name.label":         { en: "Second Contact Name", es: "Nombre del Segundo Contacto" },
+  "reg.item.emergency_contact.field.contact2_relationship.label": { en: "Second Contact Relationship", es: "Relación del Segundo Contacto" },
+  "reg.item.emergency_contact.field.contact2_phone.label":        { en: "Second Contact Phone", es: "Teléfono del Segundo Contacto" },
+  "reg.item.emergency_contact.field.contact3_name.label":         { en: "Third Contact Name", es: "Nombre del Tercer Contacto" },
+  "reg.item.emergency_contact.field.contact3_relationship.label": { en: "Third Contact Relationship", es: "Relación del Tercer Contacto" },
+  "reg.item.emergency_contact.field.contact3_phone.label":        { en: "Third Contact Phone", es: "Teléfono del Tercer Contacto" },
 
   // -- medical_info --
   "reg.item.medical_info.title": { en: "Medical Information", es: "Información Médica" },
@@ -273,6 +279,12 @@ const dict = {
   "reg.item.medical_info.field.allergies.placeholder": { en: "List any known allergies (or write None)", es: "Enumere las alergias conocidas (o escriba Ninguna)" },
   "reg.item.medical_info.field.conditions.label":       { en: "Medical Conditions", es: "Condiciones Médicas" },
   "reg.item.medical_info.field.conditions.placeholder": { en: "List any conditions or special needs (or write None)", es: "Enumere condiciones o necesidades especiales (o escriba Ninguna)" },
+  "reg.item.medical_info.field.asthma.label":           { en: "Student has asthma", es: "El estudiante tiene asma" },
+  "reg.item.medical_info.field.diabetes.label":         { en: "Student has diabetes", es: "El estudiante tiene diabetes" },
+  "reg.item.medical_info.field.seizure_disorder.label": { en: "Student has a seizure disorder", es: "El estudiante tiene un trastorno convulsivo" },
+  "reg.item.medical_info.field.life_threatening.label": { en: "Student has another life-threatening condition", es: "El estudiante tiene otra afección potencialmente mortal" },
+  "reg.item.medical_info.field.wears_glasses.label":    { en: "Student wears glasses or contacts", es: "El estudiante usa gafas o lentes de contacto" },
+  "reg.item.medical_info.field.hearing_loss.label":     { en: "Student has hearing loss", es: "El estudiante tiene pérdida auditiva" },
 
   // -- medication_auth --
   "reg.item.medication_auth.title": { en: "Medication Authorization", es: "Autorización de Medicamentos" },
