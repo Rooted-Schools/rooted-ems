@@ -160,6 +160,18 @@ export default async function StaffSettingsPage({
         </div>
         <span className="text-sm text-rooted-green">Edit &rarr;</span>
       </Link>
+      <Link
+        href="/staff/settings/application-preview"
+        className="flex items-center justify-between rounded-[6px] border border-line bg-white px-4 py-3 hover:bg-sunken/40"
+      >
+        <div>
+          <p className="text-sm font-semibold text-ink">Application preview</p>
+          <p className="mt-0.5 text-xs text-stone">
+            See every question the enrollment application asks a family, for reference.
+          </p>
+        </div>
+        <span className="text-sm text-rooted-green">View &rarr;</span>
+      </Link>
       {hasMinRole(session, "system_admin") && <LeadSyncCard />}
       <SettingsClient
       campuses={campuses}
