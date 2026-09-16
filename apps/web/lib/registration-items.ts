@@ -52,6 +52,38 @@ export const ITEM_COMPLETION_CONFIG: Record<string, CompletionConfig> = {
       },
       { key: "phone", labelKey: "reg.item.emergency_contact.field.phone.label", type: "tel", placeholderKey: "reg.item.emergency_contact.field.phone.placeholder", required: true },
       { key: "alt_phone", labelKey: "reg.item.emergency_contact.field.alt_phone.label", type: "tel", placeholderKey: "reg.item.emergency_contact.field.alt_phone.placeholder" },
+      // Second and third emergency contacts (optional) — schools like RSV
+      // collect up to three. The relationship options reuse the same labels.
+      { key: "contact2_name", labelKey: "reg.item.emergency_contact.field.contact2_name.label", type: "text", placeholderKey: "reg.item.emergency_contact.field.contact_name.placeholder" },
+      {
+        key: "contact2_relationship",
+        labelKey: "reg.item.emergency_contact.field.contact2_relationship.label",
+        type: "select",
+        options: [
+          { value: "Parent", labelKey: "reg.item.emergency_contact.field.relationship.opt.parent" },
+          { value: "Grandparent", labelKey: "reg.item.emergency_contact.field.relationship.opt.grandparent" },
+          { value: "Aunt/Uncle", labelKey: "reg.item.emergency_contact.field.relationship.opt.aunt_uncle" },
+          { value: "Sibling", labelKey: "reg.item.emergency_contact.field.relationship.opt.sibling" },
+          { value: "Family Friend", labelKey: "reg.item.emergency_contact.field.relationship.opt.family_friend" },
+          { value: "Other", labelKey: "reg.item.emergency_contact.field.relationship.opt.other" },
+        ],
+      },
+      { key: "contact2_phone", labelKey: "reg.item.emergency_contact.field.contact2_phone.label", type: "tel", placeholderKey: "reg.item.emergency_contact.field.phone.placeholder" },
+      { key: "contact3_name", labelKey: "reg.item.emergency_contact.field.contact3_name.label", type: "text", placeholderKey: "reg.item.emergency_contact.field.contact_name.placeholder" },
+      {
+        key: "contact3_relationship",
+        labelKey: "reg.item.emergency_contact.field.contact3_relationship.label",
+        type: "select",
+        options: [
+          { value: "Parent", labelKey: "reg.item.emergency_contact.field.relationship.opt.parent" },
+          { value: "Grandparent", labelKey: "reg.item.emergency_contact.field.relationship.opt.grandparent" },
+          { value: "Aunt/Uncle", labelKey: "reg.item.emergency_contact.field.relationship.opt.aunt_uncle" },
+          { value: "Sibling", labelKey: "reg.item.emergency_contact.field.relationship.opt.sibling" },
+          { value: "Family Friend", labelKey: "reg.item.emergency_contact.field.relationship.opt.family_friend" },
+          { value: "Other", labelKey: "reg.item.emergency_contact.field.relationship.opt.other" },
+        ],
+      },
+      { key: "contact3_phone", labelKey: "reg.item.emergency_contact.field.contact3_phone.label", type: "tel", placeholderKey: "reg.item.emergency_contact.field.phone.placeholder" },
     ],
   },
   medical_info: {
@@ -65,6 +97,14 @@ export const ITEM_COMPLETION_CONFIG: Record<string, CompletionConfig> = {
       { key: "policy_number", labelKey: "reg.item.medical_info.field.policy_number.label", type: "text", placeholderKey: "reg.item.medical_info.field.policy_number.placeholder" },
       { key: "allergies", labelKey: "reg.item.medical_info.field.allergies.label", type: "textarea", placeholderKey: "reg.item.medical_info.field.allergies.placeholder" },
       { key: "conditions", labelKey: "reg.item.medical_info.field.conditions.label", type: "textarea", placeholderKey: "reg.item.medical_info.field.conditions.placeholder" },
+      // Structured health-condition checkboxes (check any that apply) — RSV and
+      // other campuses collect these discretely for nurse/health planning.
+      { key: "asthma", labelKey: "reg.item.medical_info.field.asthma.label", type: "checkbox" },
+      { key: "diabetes", labelKey: "reg.item.medical_info.field.diabetes.label", type: "checkbox" },
+      { key: "seizure_disorder", labelKey: "reg.item.medical_info.field.seizure_disorder.label", type: "checkbox" },
+      { key: "life_threatening_condition", labelKey: "reg.item.medical_info.field.life_threatening.label", type: "checkbox" },
+      { key: "wears_glasses", labelKey: "reg.item.medical_info.field.wears_glasses.label", type: "checkbox" },
+      { key: "hearing_loss", labelKey: "reg.item.medical_info.field.hearing_loss.label", type: "checkbox" },
     ],
   },
   medication_auth: {
