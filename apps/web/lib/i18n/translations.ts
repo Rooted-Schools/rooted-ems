@@ -712,6 +712,8 @@ const dict = {
   "appForm.currentSchoolPlaceholder": { en: "School they attend now", es: "Escuela a la que asiste actualmente" },
   "appForm.siblingName":        { en: "Sibling's Name",       es: "Nombre del hermano/a" },
   "appForm.siblingNamePlaceholder": { en: "Sibling's full name", es: "Nombre completo del hermano/a" },
+  "appForm.residencyLabel":     { en: "Do you reside in",     es: "¿Reside en" },
+  "appForm.residencyNote":      { en: "A charter school can only enroll students who live in the state where it operates.", es: "Una escuela chárter solo puede matricular a estudiantes que residan en el estado donde opera." },
   "appForm.firstPlaceholder":   { en: "First",                es: "Nombre" },
   "appForm.lastPlaceholder":    { en: "Last",                 es: "Apellido" },
   "appForm.dob":                { en: "Date of Birth",        es: "Fecha de Nacimiento" },

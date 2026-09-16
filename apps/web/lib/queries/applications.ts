@@ -27,6 +27,9 @@ export interface ApplicationDetail extends ApplicationRow {
   reviewed_at: string | null;
   review_notes: string | null;
   has_sibling_enrolled: boolean;
+  /** "yes" | "no" | null — the residency-eligibility answer. "no" = the family
+   *  said they do NOT reside in the campus's state, which flags the application. */
+  resides_in_state: string | null;
   locked_at: string | null;
   offer_id: string | null;
   offer_expires_at: string | null;
@@ -435,6 +438,18 @@ export async function getApplicationDetail(
   const grade = app.grade_level as Record<string, string> | null;
   const window = app.enrollment_window as Record<string, string> | null;
 
+  // Residency-eligibility flag: a charter can only enroll students who live in
+  // the state it operates in. The application asks this campus-aware question;
+  // an explicit "no" flags the application for staff review.
+  const { data: residencyRow } = await supabase
+    .from("application_answer")
+    .select("value")
+    .eq("application_id", applicationId)
+    .eq("field_key", "resides_in_state")
+    .maybeSingle();
+  const residesInState =
+    residencyRow?.value != null ? String(residencyRow.value) : null;
+
   return {
     id: app.id,
     student_id: app.student_id,
@@ -461,6 +476,7 @@ export async function getApplicationDetail(
     reviewed_at: app.reviewed_at,
     review_notes: userId && app.status !== "needs_info" ? null : app.review_notes,
     has_sibling_enrolled: app.has_sibling_enrolled,
+    resides_in_state: residesInState,
     locked_at: app.locked_at,
     offer_id: pendingOffer?.id ?? null,
     offer_expires_at: pendingOffer?.expires_at ?? null,
