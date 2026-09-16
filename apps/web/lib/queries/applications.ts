@@ -537,6 +537,7 @@ export interface DraftApplicationData {
   student: {
     first_name: string;
     middle_name: string | null;
+    preferred_name: string | null;
     last_name: string;
     suffix: string | null;
     date_of_birth: string | null;
@@ -601,7 +602,7 @@ export async function getDraftApplicationForEdit(
       id, status, campus_id, enrollment_window_id, grade_level_id,
       has_sibling_enrolled, source,
       student:student_id (
-        first_name, middle_name, last_name, suffix,
+        first_name, middle_name, preferred_name, last_name, suffix,
         date_of_birth, gender, race_ethnicity, primary_language, home_language,
         previous_school_name, previous_school_phone,
         has_iep, has_504, special_services_notes,
@@ -677,6 +678,7 @@ export async function getDraftApplicationForEdit(
     student: {
       first_name: (student?.first_name as string) ?? "",
       middle_name: (student?.middle_name as string) ?? null,
+      preferred_name: (student?.preferred_name as string) ?? null,
       last_name: (student?.last_name as string) ?? "",
       suffix: (student?.suffix as string) ?? null,
       date_of_birth: (student?.date_of_birth as string) ?? null,

@@ -63,9 +63,13 @@ interface FormData {
   gradeLevelId: string;
   gradeLevel: string;
   firstName: string;
+  middleName: string;
   lastName: string;
+  preferredName: string;
   dateOfBirth: string;
   gender: string;
+  currentGrade: string;
+  currentSchool: string;
   guardianFirstName: string;
   guardianLastName: string;
   guardianRelationship: string;
@@ -73,6 +77,7 @@ interface FormData {
   guardianEmail: string;
   guardianPhone: string;
   hasSibling: boolean;
+  siblingName: string;
   isStaffChild: YesNo;
   isFrlQualifying: YesNo;
   dataSharingConsent: boolean;
@@ -96,9 +101,13 @@ function draftToFormData(d: DraftApplicationData): FormData {
     gradeLevelId: d.grade_level_id,
     gradeLevel: d.grade,
     firstName: d.student.first_name,
+    middleName: d.student.middle_name ?? "",
     lastName: d.student.last_name,
+    preferredName: d.student.preferred_name ?? "",
     dateOfBirth: d.student.date_of_birth ?? "",
     gender: d.student.gender ?? "",
+    currentGrade: answerAsText(d.answers.current_grade),
+    currentSchool: d.student.previous_school_name ?? "",
     guardianFirstName: d.guardian.first_name,
     guardianLastName: d.guardian.last_name,
     guardianRelationship: d.guardian.relationship,
@@ -106,6 +115,7 @@ function draftToFormData(d: DraftApplicationData): FormData {
     guardianEmail: d.guardian.email ?? "",
     guardianPhone: d.guardian.phone ?? "",
     hasSibling: isAffirmativeAnswer(d.answers.has_sibling_at_school),
+    siblingName: answerAsText(d.answers.sibling_name),
     isStaffChild: isAffirmativeAnswer(d.answers.is_staff_child) ? "yes" : "no",
     isFrlQualifying: isAffirmativeAnswer(d.answers.is_frl_qualifying) ? "yes" : "no",
     dataSharingConsent: isAffirmativeAnswer(d.answers.data_sharing_consent),
@@ -271,6 +281,8 @@ function buildUpdateInput(
     data_sharing_consent: form.dataSharingConsent,
     agree_terms: form.agreeTerms,
     has_sibling_at_school: form.hasSibling,
+    sibling_name: form.hasSibling ? form.siblingName : "",
+    current_grade: form.currentGrade,
     e_signature_name: form.signatureName,
     guardian_relationship_other:
       form.guardianRelationship === "other" ? form.guardianRelationshipOther : "",
@@ -299,7 +311,10 @@ function buildUpdateInput(
     application_id: applicationId,
     ...placement,
     student_first_name: form.firstName,
+    student_middle_name: form.middleName || undefined,
     student_last_name: form.lastName,
+    student_preferred_name: form.preferredName || undefined,
+    student_previous_school: form.currentSchool || undefined,
     student_date_of_birth: form.dateOfBirth || undefined,
     student_gender: form.gender || undefined,
     guardian_first_name: form.guardianFirstName,
@@ -535,6 +550,15 @@ export function EditApplicationClient({
                 </span>
               </label>
             </div>
+            {form.hasSibling && (
+              <Field label={t("appForm.siblingName")}>
+                <Input
+                  value={form.siblingName}
+                  onChange={(e) => update({ siblingName: e.target.value })}
+                  placeholder={t("appForm.siblingNamePlaceholder")}
+                />
+              </Field>
+            )}
 
             {/* Policy-driven lottery questions. Rendered only where the
                 selected campus's board has ADOPTED a policy declaring the
@@ -598,6 +622,20 @@ export function EditApplicationClient({
               </Field>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label={t("appForm.middleName")}>
+                <Input
+                  value={form.middleName}
+                  onChange={(e) => update({ middleName: e.target.value })}
+                />
+              </Field>
+              <Field label={t("appForm.preferredName")}>
+                <Input
+                  value={form.preferredName}
+                  onChange={(e) => update({ preferredName: e.target.value })}
+                />
+              </Field>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label={t("appForm.dob")}>
                 <Input
                   type="date"
@@ -616,6 +654,22 @@ export function EditApplicationClient({
                   <option value="non_binary">{t("appForm.gender.non_binary")}</option>
                   <option value="prefer_not">{t("appForm.gender.prefer_not")}</option>
                 </Select>
+              </Field>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label={t("appForm.currentGrade")}>
+                <Input
+                  value={form.currentGrade}
+                  onChange={(e) => update({ currentGrade: e.target.value })}
+                  placeholder={t("appForm.currentGradePlaceholder")}
+                />
+              </Field>
+              <Field label={t("appForm.currentSchool")}>
+                <Input
+                  value={form.currentSchool}
+                  onChange={(e) => update({ currentSchool: e.target.value })}
+                  placeholder={t("appForm.currentSchoolPlaceholder")}
+                />
               </Field>
             </div>
           </CardContent>
