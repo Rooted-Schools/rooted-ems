@@ -78,9 +78,13 @@ interface FormData {
   gradeLevel: string;
   // Step 2: Student essentials
   firstName: string;
+  middleName: string;
   lastName: string;
+  preferredName: string;
   dateOfBirth: string;
   gender: string;
+  currentGrade: string;
+  currentSchool: string;
   // Step 2: Guardian essentials
   guardianFirstName: string;
   guardianLastName: string;
@@ -93,6 +97,7 @@ interface FormData {
   smsConsent: boolean;
   // Sibling priority (affects lottery weighting)
   hasSibling: boolean;
+  siblingName: string;
   // Policy-driven lottery questions (only asked where the campus's adopted
   // policy declares the matching weighted tier)
   isStaffChild: YesNo;
@@ -109,9 +114,13 @@ const INITIAL: FormData = {
   gradeLevelId: "",
   gradeLevel: "",
   firstName: "",
+  middleName: "",
   lastName: "",
+  preferredName: "",
   dateOfBirth: "",
   gender: "",
+  currentGrade: "",
+  currentSchool: "",
   guardianFirstName: "",
   guardianLastName: "",
   guardianRelationship: "",
@@ -120,6 +129,7 @@ const INITIAL: FormData = {
   guardianPhone: "",
   smsConsent: false,
   hasSibling: false,
+  siblingName: "",
   isStaffChild: "no",
   isFrlQualifying: "no",
   dataSharingConsent: false,
@@ -307,13 +317,18 @@ function buildCreateInput(
   }
   // Sibling priority — stored in answers so the lottery can weight accordingly
   answers.has_sibling_at_school = form.hasSibling;
+  if (form.hasSibling && form.siblingName.trim()) answers.sibling_name = form.siblingName.trim();
+  if (form.currentGrade.trim()) answers.current_grade = form.currentGrade.trim();
 
   return {
     enrollment_window_id: windowId,
     campus_id: form.campusId,
     grade_level_id: form.gradeLevelId,
     student_first_name: form.firstName,
+    student_middle_name: form.middleName || undefined,
     student_last_name: form.lastName,
+    student_preferred_name: form.preferredName || undefined,
+    student_previous_school: form.currentSchool || undefined,
     student_date_of_birth: form.dateOfBirth || undefined,
     student_gender: form.gender || undefined,
     guardian_first_name: form.guardianFirstName,
@@ -339,6 +354,8 @@ function buildAutosaveInput(
     data_sharing_consent: form.dataSharingConsent,
     agree_terms: form.agreeTerms,
     has_sibling_at_school: form.hasSibling,
+    sibling_name: form.hasSibling ? form.siblingName : "",
+    current_grade: form.currentGrade,
     e_signature_name: form.signatureName,
     guardian_relationship_other:
       form.guardianRelationship === "other" ? form.guardianRelationshipOther : "",
@@ -365,7 +382,10 @@ function buildAutosaveInput(
     application_id: applicationId,
     ...placement,
     student_first_name: form.firstName,
+    student_middle_name: form.middleName || undefined,
     student_last_name: form.lastName,
+    student_preferred_name: form.preferredName || undefined,
+    student_previous_school: form.currentSchool || undefined,
     student_date_of_birth: form.dateOfBirth || undefined,
     student_gender: form.gender || undefined,
     guardian_first_name: form.guardianFirstName,
@@ -706,6 +726,16 @@ export function NewApplicationForm({
                 </label>
               </div>
             )}
+            {form.hasSibling && (
+              <Field label={t("appForm.siblingName")} id="sibling-name">
+                <Input
+                  id="sibling-name"
+                  value={form.siblingName}
+                  onChange={(e) => update({ siblingName: e.target.value })}
+                  placeholder={t("appForm.siblingNamePlaceholder")}
+                />
+              </Field>
+            )}
 
             {/* Policy-driven lottery questions. Rendered only where the
                 selected campus's board has ADOPTED a policy declaring the
@@ -779,6 +809,22 @@ export function NewApplicationForm({
               </Field>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label={t("appForm.middleName")} id="student-middle-name">
+                <Input
+                  id="student-middle-name"
+                  value={form.middleName}
+                  onChange={(e) => update({ middleName: e.target.value })}
+                />
+              </Field>
+              <Field label={t("appForm.preferredName")} id="student-preferred-name">
+                <Input
+                  id="student-preferred-name"
+                  value={form.preferredName}
+                  onChange={(e) => update({ preferredName: e.target.value })}
+                />
+              </Field>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label={t("appForm.dob")}>
                 <Input
                   type="date"
@@ -797,6 +843,24 @@ export function NewApplicationForm({
                   <option value="non_binary">{t("appForm.gender.non_binary")}</option>
                   <option value="prefer_not">{t("appForm.gender.prefer_not")}</option>
                 </Select>
+              </Field>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label={t("appForm.currentGrade")} id="student-current-grade">
+                <Input
+                  id="student-current-grade"
+                  value={form.currentGrade}
+                  onChange={(e) => update({ currentGrade: e.target.value })}
+                  placeholder={t("appForm.currentGradePlaceholder")}
+                />
+              </Field>
+              <Field label={t("appForm.currentSchool")} id="student-current-school">
+                <Input
+                  id="student-current-school"
+                  value={form.currentSchool}
+                  onChange={(e) => update({ currentSchool: e.target.value })}
+                  placeholder={t("appForm.currentSchoolPlaceholder")}
+                />
               </Field>
             </div>
           </CardContent>
