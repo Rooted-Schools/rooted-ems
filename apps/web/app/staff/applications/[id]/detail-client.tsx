@@ -56,6 +56,7 @@ import {
   IconSprout,
 } from "@/components/ui/icons";
 import { ReviewHeader, type HeaderAction } from "./_components/review-header";
+import { ApplicantDetails } from "./_components/applicant-details";
 import { ExceptionList } from "./_components/exception-list";
 import { RequirementList } from "./_components/requirement-list";
 import { ContextRail } from "./_components/context-rail";
@@ -554,6 +555,7 @@ export function StaffApplicationDetailClient({ detail, userId, registrationPacke
       {/* Main review layout: exceptions + satisfied documents on the left, context on the right */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
+          <ApplicantDetails detail={detail} />
           <ExceptionList
             pendingDocs={pendingDocs}
             rejectedDocs={rejectedDocs}

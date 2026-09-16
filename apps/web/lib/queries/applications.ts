@@ -30,6 +30,21 @@ export interface ApplicationDetail extends ApplicationRow {
   /** "yes" | "no" | null — the residency-eligibility answer. "no" = the family
    *  said they do NOT reside in the campus's state, which flags the application. */
   resides_in_state: string | null;
+  // Applicant details captured on the family application. Surfaced read-only to
+  // staff so they can see exactly what the family entered (name, DOB, prior
+  // school, sibling) without opening the family portal. Any field may be null
+  // for older applications submitted before it was collected.
+  student_first_name: string | null;
+  student_last_name: string | null;
+  student_middle_name: string | null;
+  student_preferred_name: string | null;
+  student_date_of_birth: string | null;
+  student_gender: string | null;
+  student_previous_school: string | null;
+  /** Free-text grade the student is currently in (application answer). */
+  current_grade: string | null;
+  /** Name of an enrolled sibling, if the family named one (application answer). */
+  sibling_name: string | null;
   locked_at: string | null;
   offer_id: string | null;
   offer_expires_at: string | null;
@@ -438,17 +453,24 @@ export async function getApplicationDetail(
   const grade = app.grade_level as Record<string, string> | null;
   const window = app.enrollment_window as Record<string, string> | null;
 
-  // Residency-eligibility flag: a charter can only enroll students who live in
-  // the state it operates in. The application asks this campus-aware question;
-  // an explicit "no" flags the application for staff review.
-  const { data: residencyRow } = await supabase
+  // Application answers surfaced on the staff detail. resides_in_state is the
+  // residency-eligibility flag (a charter can only enroll students in its own
+  // state; an explicit "no" flags the application for staff review);
+  // current_grade and sibling_name round out the read-only applicant panel.
+  const { data: answerRows } = await supabase
     .from("application_answer")
-    .select("value")
+    .select("field_key, value")
     .eq("application_id", applicationId)
-    .eq("field_key", "resides_in_state")
-    .maybeSingle();
-  const residesInState =
-    residencyRow?.value != null ? String(residencyRow.value) : null;
+    .in("field_key", ["resides_in_state", "current_grade", "sibling_name"]);
+  const answerByKey = new Map(
+    (answerRows ?? []).map((r: { field_key: string; value: unknown }) => [
+      r.field_key,
+      r.value != null ? String(r.value) : null,
+    ])
+  );
+  const residesInState = answerByKey.get("resides_in_state") ?? null;
+  const currentGrade = answerByKey.get("current_grade") ?? null;
+  const siblingName = answerByKey.get("sibling_name") ?? null;
 
   return {
     id: app.id,
@@ -477,6 +499,15 @@ export async function getApplicationDetail(
     review_notes: userId && app.status !== "needs_info" ? null : app.review_notes,
     has_sibling_enrolled: app.has_sibling_enrolled,
     resides_in_state: residesInState,
+    student_first_name: (student?.first_name as string) ?? null,
+    student_last_name: (student?.last_name as string) ?? null,
+    student_middle_name: (student?.middle_name as string) ?? null,
+    student_preferred_name: (student?.preferred_name as string) ?? null,
+    student_date_of_birth: (student?.date_of_birth as string) ?? null,
+    student_gender: (student?.gender as string) ?? null,
+    student_previous_school: (student?.previous_school_name as string) ?? null,
+    current_grade: currentGrade,
+    sibling_name: siblingName,
     locked_at: app.locked_at,
     offer_id: pendingOffer?.id ?? null,
     offer_expires_at: pendingOffer?.expires_at ?? null,
