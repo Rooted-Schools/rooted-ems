@@ -57,15 +57,28 @@ type StepId = (typeof STEPS)[number]["id"];
 
 /* ───────────── form state ───────────── */
 
+/** 2-letter state code -> full name, for the campus-aware residency question. */
+const STATE_NAMES: Record<string, string> = {
+  WA: "Washington",
+  SC: "South Carolina",
+  OH: "Ohio",
+  LA: "Louisiana",
+};
+const stateName = (code: string): string => STATE_NAMES[code] ?? code;
+
 interface FormData {
   campusId: string;
   enrollmentWindowId: string;
   gradeLevelId: string;
   gradeLevel: string;
   firstName: string;
+  middleName: string;
   lastName: string;
+  preferredName: string;
   dateOfBirth: string;
   gender: string;
+  currentGrade: string;
+  currentSchool: string;
   guardianFirstName: string;
   guardianLastName: string;
   guardianRelationship: string;
@@ -73,6 +86,8 @@ interface FormData {
   guardianEmail: string;
   guardianPhone: string;
   hasSibling: boolean;
+  siblingName: string;
+  residesInState: "" | YesNo;
   isStaffChild: YesNo;
   isFrlQualifying: YesNo;
   dataSharingConsent: boolean;
@@ -96,9 +111,13 @@ function draftToFormData(d: DraftApplicationData): FormData {
     gradeLevelId: d.grade_level_id,
     gradeLevel: d.grade,
     firstName: d.student.first_name,
+    middleName: d.student.middle_name ?? "",
     lastName: d.student.last_name,
+    preferredName: d.student.preferred_name ?? "",
     dateOfBirth: d.student.date_of_birth ?? "",
     gender: d.student.gender ?? "",
+    currentGrade: answerAsText(d.answers.current_grade),
+    currentSchool: d.student.previous_school_name ?? "",
     guardianFirstName: d.guardian.first_name,
     guardianLastName: d.guardian.last_name,
     guardianRelationship: d.guardian.relationship,
@@ -106,6 +125,13 @@ function draftToFormData(d: DraftApplicationData): FormData {
     guardianEmail: d.guardian.email ?? "",
     guardianPhone: d.guardian.phone ?? "",
     hasSibling: isAffirmativeAnswer(d.answers.has_sibling_at_school),
+    siblingName: answerAsText(d.answers.sibling_name),
+    residesInState:
+      answerAsText(d.answers.resides_in_state) === "yes"
+        ? "yes"
+        : answerAsText(d.answers.resides_in_state) === "no"
+          ? "no"
+          : "",
     isStaffChild: isAffirmativeAnswer(d.answers.is_staff_child) ? "yes" : "no",
     isFrlQualifying: isAffirmativeAnswer(d.answers.is_frl_qualifying) ? "yes" : "no",
     dataSharingConsent: isAffirmativeAnswer(d.answers.data_sharing_consent),
@@ -271,6 +297,9 @@ function buildUpdateInput(
     data_sharing_consent: form.dataSharingConsent,
     agree_terms: form.agreeTerms,
     has_sibling_at_school: form.hasSibling,
+    sibling_name: form.hasSibling ? form.siblingName : "",
+    current_grade: form.currentGrade,
+    resides_in_state: form.residesInState,
     e_signature_name: form.signatureName,
     guardian_relationship_other:
       form.guardianRelationship === "other" ? form.guardianRelationshipOther : "",
@@ -299,7 +328,10 @@ function buildUpdateInput(
     application_id: applicationId,
     ...placement,
     student_first_name: form.firstName,
+    student_middle_name: form.middleName || undefined,
     student_last_name: form.lastName,
+    student_preferred_name: form.preferredName || undefined,
+    student_previous_school: form.currentSchool || undefined,
     student_date_of_birth: form.dateOfBirth || undefined,
     student_gender: form.gender || undefined,
     guardian_first_name: form.guardianFirstName,
@@ -331,6 +363,7 @@ export function EditApplicationClient({
 
   const campusWindows = windows.filter((w) => w.campus_id === form.campusId && w.is_open);
   const campusGrades = gradeLevels.filter((g) => g.campus_id === form.campusId);
+  const campusState = campuses.find((c) => c.id === form.campusId)?.state ?? "";
   const studentName =
     [form.firstName, form.lastName].filter(Boolean).join(" ") || t("appForm.untitled");
 
@@ -407,6 +440,7 @@ export function EditApplicationClient({
     student:
       !!form.firstName &&
       !!form.lastName &&
+      !!form.residesInState &&
       !!form.guardianFirstName &&
       !!form.guardianLastName &&
       !!form.guardianRelationship &&
@@ -535,6 +569,15 @@ export function EditApplicationClient({
                 </span>
               </label>
             </div>
+            {form.hasSibling && (
+              <Field label={t("appForm.siblingName")}>
+                <Input
+                  value={form.siblingName}
+                  onChange={(e) => update({ siblingName: e.target.value })}
+                  placeholder={t("appForm.siblingNamePlaceholder")}
+                />
+              </Field>
+            )}
 
             {/* Policy-driven lottery questions. Rendered only where the
                 selected campus's board has ADOPTED a policy declaring the
@@ -598,6 +641,20 @@ export function EditApplicationClient({
               </Field>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label={t("appForm.middleName")}>
+                <Input
+                  value={form.middleName}
+                  onChange={(e) => update({ middleName: e.target.value })}
+                />
+              </Field>
+              <Field label={t("appForm.preferredName")}>
+                <Input
+                  value={form.preferredName}
+                  onChange={(e) => update({ preferredName: e.target.value })}
+                />
+              </Field>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label={t("appForm.dob")}>
                 <Input
                   type="date"
@@ -618,6 +675,33 @@ export function EditApplicationClient({
                 </Select>
               </Field>
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label={t("appForm.currentGrade")}>
+                <Input
+                  value={form.currentGrade}
+                  onChange={(e) => update({ currentGrade: e.target.value })}
+                  placeholder={t("appForm.currentGradePlaceholder")}
+                />
+              </Field>
+              <Field label={t("appForm.currentSchool")}>
+                <Input
+                  value={form.currentSchool}
+                  onChange={(e) => update({ currentSchool: e.target.value })}
+                  placeholder={t("appForm.currentSchoolPlaceholder")}
+                />
+              </Field>
+            </div>
+            <Field label={`${t("appForm.residencyLabel")} ${stateName(campusState)}?`} required>
+              <Select
+                value={form.residesInState}
+                onChange={(e) => update({ residesInState: e.target.value as "" | YesNo })}
+              >
+                <option value="">{t("common.select")}</option>
+                <option value="yes">{t("common.yes")}</option>
+                <option value="no">{t("common.no")}</option>
+              </Select>
+              <p className="text-xs text-stone-text mt-1">{t("appForm.residencyNote")}</p>
+            </Field>
           </CardContent>
         </Card>
       )}
