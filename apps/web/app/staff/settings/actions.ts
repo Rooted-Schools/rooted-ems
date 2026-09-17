@@ -255,6 +255,23 @@ export async function staffSetWelcomeMessages(enabled: boolean) {
  * Same network-access gate as the welcome switch — a network-wide kill switch,
  * not a per-campus operational toggle.
  */
+/**
+ * Save a campus's own registration-policy text. Gated to enrollment_manager;
+ * RLS independently enforces the caller manages THIS campus.
+ */
+export async function staffSetCampusPolicy(
+  campusId: string,
+  itemType: string,
+  bodyEn: string,
+  bodyEs: string
+) {
+  const session = await requireMinRole("enrollment_manager");
+  const { setCampusPolicyOverride } = await import("@/lib/mutations/policy-overrides");
+  const result = await setCampusPolicyOverride(campusId, itemType, bodyEn, bodyEs, session.user_id);
+  if (!result.error) revalidatePath("/staff/settings/policies");
+  return result;
+}
+
 export async function staffSetAutomatedOutreach(enabled: boolean) {
   const session = await requireNetworkAccess();
   const result = await setAutomatedOutreachEnabled(enabled, session.user_id);
