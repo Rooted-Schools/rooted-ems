@@ -190,6 +190,18 @@ export function RecruitmentClient({ queue, summary, studentSummary, leads, campa
   );
   const callbacksDueCount = useMemo(() => queue.filter((l) => l.is_callback).length, [queue]);
 
+  // The follow-up queue only shows families someone already scheduled. After a
+  // bulk import that is almost nobody, so the queue can look finished while
+  // most of the pipeline has never been touched — surface that explicitly
+  // rather than letting an empty queue read as "done".
+  const unscheduledCount = useMemo(
+    () =>
+      leads.filter(
+        (l) => ["new", "contacted", "engaged"].includes(l.stage) && !l.next_follow_up_at
+      ).length,
+    [leads]
+  );
+
   function cancelCampaign(campaignId: string) {
     startTransition(async () => {
       await staffCancelCampaign(campaignId, staffUserId);
@@ -226,8 +238,16 @@ export function RecruitmentClient({ queue, summary, studentSummary, leads, campa
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return leads.filter((lead) => {
-      if (stageFilter === "open" && !["new", "contacted", "engaged"].includes(lead.stage)) return false;
-      if (stageFilter !== "all" && stageFilter !== "open" && lead.stage !== stageFilter) return false;
+      // "unscheduled" is not a stage — it's every open lead with nothing on
+      // anyone's calendar, i.e. the families the follow-up queue can never
+      // surface because no one has scheduled them yet.
+      if (stageFilter === "unscheduled") {
+        if (!["new", "contacted", "engaged"].includes(lead.stage)) return false;
+        if (lead.next_follow_up_at) return false;
+      } else {
+        if (stageFilter === "open" && !["new", "contacted", "engaged"].includes(lead.stage)) return false;
+        if (stageFilter !== "all" && stageFilter !== "open" && lead.stage !== stageFilter) return false;
+      }
       if (!term) return true;
       return (
         `${lead.first_name} ${lead.last_name}`.toLowerCase().includes(term) ||
@@ -371,15 +391,18 @@ export function RecruitmentClient({ queue, summary, studentSummary, leads, campa
       </div>
 
       {/* Follow-up queue — the morning triage */}
-      {queue.length > 0 && (
+      {(queue.length > 0 || unscheduledCount > 0) && (
         <Card className="border-warn/30 bg-warn/10">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-1.5">
               <IconPhone size={16} /> Follow up today ({queue.length})
             </CardTitle>
             <CardDescription>
-              Fast follow-up wins families — these leads are due (or overdue) for a touch.
-              {callbacksDueCount > 0 &&
+              {queue.length > 0
+                ? "Fast follow-up wins families — these leads are due (or overdue) for a touch."
+                : "Nothing is scheduled for today."}
+              {queue.length > 0 &&
+                callbacksDueCount > 0 &&
                 ` ${callbacksDueCount} ${callbacksDueCount === 1 ? "is" : "are"} a promised callback.`}
             </CardDescription>
           </CardHeader>
@@ -426,6 +449,28 @@ export function RecruitmentClient({ queue, summary, studentSummary, leads, campa
               <p className="text-xs text-stone text-center pt-1">
                 + {queue.length - 8} more in the table below
               </p>
+            )}
+            {unscheduledCount > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warn/30 bg-white px-3 py-2">
+                <p className="text-xs text-stone">
+                  <span className="font-medium text-ink">
+                    {unscheduledCount.toLocaleString()}
+                  </span>{" "}
+                  open {unscheduledCount === 1 ? "family has" : "families have"} no follow-up
+                  scheduled, so {unscheduledCount === 1 ? "it" : "they"} will never appear here on
+                  {unscheduledCount === 1 ? " its" : " their"} own.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setStageFilter("unscheduled");
+                    setSearch("");
+                  }}
+                >
+                  Start working the list
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -586,6 +631,7 @@ export function RecruitmentClient({ queue, summary, studentSummary, leads, campa
               className="sm:w-44"
             >
               <option value="open">Open leads</option>
+              <option value="unscheduled">Not yet scheduled</option>
               <option value="all">All stages</option>
               <option value="new">New</option>
               <option value="contacted">Contacted</option>

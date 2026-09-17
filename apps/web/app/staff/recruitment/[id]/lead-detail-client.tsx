@@ -30,7 +30,14 @@ import {
   IconAlertTriangle,
 } from "@/components/ui/icons";
 import type { LeadDetail } from "@/lib/queries/leads";
-import { CALL_OUTCOMES, buildCallOutcomeBody, bodyHasOutcome } from "@/lib/lead-call-outcomes";
+import {
+  CALL_OUTCOMES,
+  FOLLOW_UP_OPTIONS,
+  buildCallOutcomeBody,
+  bodyHasOutcome,
+  computeNextFollowUp,
+  defaultFollowUpDaysFor,
+} from "@/lib/lead-call-outcomes";
 import { formatRelativeTime } from "@/lib/queries/utils";
 import { staffDeleteLead, staffGetReferralLink, staffLogLeadActivity, staffUpdateLead } from "../actions";
 import { PATHWAY_LABELS, INTENT_LABELS, SOURCE_LABELS, STAGE_CONFIG } from "../recruitment-client";
@@ -47,13 +54,6 @@ const ACTIVITY_ICONS: Record<string, ReactNode> = {
   converted: <IconCheckCircle size={16} />,
 };
 
-const FOLLOW_UP_OPTIONS = [
-  { label: "Tomorrow", days: 1 },
-  { label: "In 3 days", days: 3 },
-  { label: "Next week", days: 7 },
-  { label: "No follow-up needed", days: null },
-] as const;
-
 export function LeadDetailClient({
   lead,
   staffUserId,
@@ -69,6 +69,9 @@ export function LeadDetailClient({
   const [logFollowUpDays, setLogFollowUpDays] = useState<number | null>(3);
   const [logOutcome, setLogOutcome] = useState<string>(CALL_OUTCOMES[0].key);
   const [logCallbackDate, setLogCallbackDate] = useState("");
+  // undefined = "use whatever this outcome defaults to"; an explicit value
+  // is the recruiter overriding the cadence for this one call.
+  const [logFollowUpOverride, setLogFollowUpOverride] = useState<number | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -115,6 +118,7 @@ export function LeadDetailClient({
     setLogFollowUpDays(type === "call" ? 3 : null);
     setLogOutcome(CALL_OUTCOMES[0].key);
     setLogCallbackDate("");
+    setLogFollowUpOverride(undefined);
     setError(null);
     setLogOpen(true);
   }
@@ -160,10 +164,16 @@ export function LeadDetailClient({
         setError(result.error);
         return;
       }
-      // Reaching the family — any outcome — resolves whatever follow-up was
-      // pending; "Call back later" then schedules a fresh, specific one.
-      const next =
-        logOutcome === "callback" ? new Date(`${logCallbackDate}T09:00:00`).toISOString() : null;
+      // The outcome decides when this family is called again: a voicemail
+      // comes back around in a couple of days, a real conversation moves to a
+      // nurture cadence, a wrong number stops until someone fixes it, and
+      // "Call back later" uses the date the family actually named. The
+      // recruiter can override any of it for this one call.
+      const next = computeNextFollowUp({
+        outcomeKey: logOutcome,
+        callbackDate: logCallbackDate,
+        overrideDays: logFollowUpOverride,
+      });
       await staffUpdateLead(lead.id, { next_follow_up_at: next }, staffUserId);
       setLogOpen(false);
       router.refresh();
@@ -521,7 +531,10 @@ export function LeadDetailClient({
                   <Select
                     id="call-outcome-select"
                     value={logOutcome}
-                    onChange={(e) => setLogOutcome(e.target.value)}
+                    onChange={(e) => {
+                      setLogOutcome(e.target.value);
+                      setLogFollowUpOverride(undefined);
+                    }}
                   >
                     {CALL_OUTCOMES.map((o) => (
                       <option key={o.key} value={o.key}>
@@ -550,6 +563,38 @@ export function LeadDetailClient({
                       min={new Date().toISOString().split("T")[0]}
                       onChange={(e) => setLogCallbackDate(e.target.value)}
                     />
+                  </div>
+                )}
+                {logOutcome !== "callback" && (
+                  <div>
+                    <label
+                      htmlFor="call-follow-up-select"
+                      className="block text-sm font-medium text-ink/70 mb-1"
+                    >
+                      Next follow-up
+                    </label>
+                    <Select
+                      id="call-follow-up-select"
+                      value={String(
+                        logFollowUpOverride !== undefined
+                          ? logFollowUpOverride
+                          : defaultFollowUpDaysFor(logOutcome)
+                      )}
+                      onChange={(e) =>
+                        setLogFollowUpOverride(
+                          e.target.value === "null" ? null : Number(e.target.value)
+                        )
+                      }
+                    >
+                      {FOLLOW_UP_OPTIONS.map((opt) => (
+                        <option key={opt.label} value={String(opt.days)}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </Select>
+                    <p className="mt-1 text-xs text-stone">
+                      Set from the outcome. Change it if this family needs something different.
+                    </p>
                   </div>
                 )}
               </>
