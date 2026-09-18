@@ -6,6 +6,14 @@ import { createServiceRoleClient } from "@rooted-ems/database/server";
 /** Same shape the unsubscribe/survey links use — see page.tsx. */
 const TOKEN_RE = /^[0-9a-f-]{36}$/i;
 
+// This is an unauthenticated write path: anyone holding a forwarded link
+// can post to it. The token still scopes the write to one lead, but the
+// text itself is unbounded user input that staff later read in the console,
+// so cap it at a length a real answer never exceeds rather than storing
+// whatever arrives.
+const MAX_NAME = 100;
+const MAX_NOTE = 1000;
+
 /**
  * Records the optional follow-up details (scholar's first name, and the
  * "tell us more" free text when the family picked "other") after they've
@@ -35,8 +43,8 @@ export async function submitInterestDetails(formData: FormData): Promise<void> {
 
     if (lead) {
       const patch: Record<string, string> = {};
-      if (studentFirstName) patch.student_first_name = studentFirstName;
-      if (otherText) patch.interest_focus_other = otherText;
+      if (studentFirstName) patch.student_first_name = studentFirstName.slice(0, MAX_NAME);
+      if (otherText) patch.interest_focus_other = otherText.slice(0, MAX_NOTE);
       if (Object.keys(patch).length > 0) {
         await supabase.from("lead").update(patch).eq("id", lead.id);
       }
