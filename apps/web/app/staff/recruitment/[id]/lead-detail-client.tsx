@@ -37,6 +37,7 @@ import {
   bodyHasOutcome,
   computeNextFollowUp,
   defaultFollowUpDaysFor,
+  DEFAULT_FOLLOW_UP_TIME,
 } from "@/lib/lead-call-outcomes";
 import { formatRelativeTime } from "@/lib/queries/utils";
 import { staffDeleteLead, staffGetReferralLink, staffLogLeadActivity, staffUpdateLead } from "../actions";
@@ -69,6 +70,8 @@ export function LeadDetailClient({
   const [logFollowUpDays, setLogFollowUpDays] = useState<number | null>(3);
   const [logOutcome, setLogOutcome] = useState<string>(CALL_OUTCOMES[0].key);
   const [logCallbackDate, setLogCallbackDate] = useState("");
+  // The family often names an hour ("call me back at 2"), not just a day.
+  const [logCallbackTime, setLogCallbackTime] = useState(DEFAULT_FOLLOW_UP_TIME);
   // undefined = "use whatever this outcome defaults to"; an explicit value
   // is the recruiter overriding the cadence for this one call.
   const [logFollowUpOverride, setLogFollowUpOverride] = useState<number | null | undefined>(undefined);
@@ -118,6 +121,7 @@ export function LeadDetailClient({
     setLogFollowUpDays(type === "call" ? 3 : null);
     setLogOutcome(CALL_OUTCOMES[0].key);
     setLogCallbackDate("");
+    setLogCallbackTime(DEFAULT_FOLLOW_UP_TIME);
     setLogFollowUpOverride(undefined);
     setError(null);
     setLogOpen(true);
@@ -172,6 +176,7 @@ export function LeadDetailClient({
       const next = computeNextFollowUp({
         outcomeKey: logOutcome,
         callbackDate: logCallbackDate,
+        callbackTime: logCallbackTime,
         overrideDays: logFollowUpOverride,
       });
       await staffUpdateLead(lead.id, { next_follow_up_at: next }, staffUserId);
@@ -563,6 +568,21 @@ export function LeadDetailClient({
                       min={new Date().toISOString().split("T")[0]}
                       onChange={(e) => setLogCallbackDate(e.target.value)}
                     />
+                    <label
+                      htmlFor="callback-time"
+                      className="mt-2 block text-sm font-medium text-ink/70 mb-1"
+                    >
+                      At
+                    </label>
+                    <Input
+                      id="callback-time"
+                      type="time"
+                      value={logCallbackTime}
+                      onChange={(e) => setLogCallbackTime(e.target.value)}
+                    />
+                    <p className="mt-1 text-xs text-stone">
+                      If the family named a time, put it here so the callback lands then.
+                    </p>
                   </div>
                 )}
                 {logOutcome !== "callback" && (

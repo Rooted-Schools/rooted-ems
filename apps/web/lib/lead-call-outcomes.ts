@@ -77,19 +77,26 @@ function toLocalYmd(d: Date): string {
   return `${d.getFullYear()}-${month}-${day}`;
 }
 
-/** 9am local on the given yyyy-mm-dd. Every scheduled follow-up lands at the
- *  start of that day so it shows up in the morning queue — an interval
- *  measured from the exact moment of the call would hide a "in 2 days" lead
- *  until mid-afternoon of the day it's due, after the recruiter has already
- *  worked their list. */
-function atNineLocal(ymd: string): string {
-  return new Date(`${ymd}T09:00:00`).toISOString();
+/** Interval-based follow-ups land at the start of the day so they show up in
+ *  the morning queue — an interval measured from the exact moment of the call
+ *  would hide an "in 2 days" lead until mid-afternoon of the day it's due,
+ *  after the recruiter has already worked their list. */
+export const DEFAULT_FOLLOW_UP_TIME = "09:00";
+
+/** Local timestamp for a yyyy-mm-dd at an HH:MM (24h) wall-clock time. */
+function atLocalTime(ymd: string, hhmm: string = DEFAULT_FOLLOW_UP_TIME): string {
+  const time = /^\d{2}:\d{2}$/.test(hhmm) ? hhmm : DEFAULT_FOLLOW_UP_TIME;
+  return new Date(`${ymd}T${time}:00`).toISOString();
 }
 
 export interface NextFollowUpInput {
   outcomeKey: string;
   /** yyyy-mm-dd the recruiter picked; only read for the "callback" outcome. */
   callbackDate?: string;
+  /** HH:MM (24h) the family actually named, e.g. "14:00" for "call me back at
+   *  2pm". Only read for the "callback" outcome; defaults to the start of the
+   *  day when the family named a day but not an hour. */
+  callbackTime?: string;
   /** Recruiter's per-call override. `undefined` means "use the outcome
    *  default"; an explicit `null` means "no follow-up". */
   overrideDays?: number | null;
@@ -106,11 +113,12 @@ export interface NextFollowUpInput {
 export function computeNextFollowUp({
   outcomeKey,
   callbackDate,
+  callbackTime,
   overrideDays,
   now = new Date(),
 }: NextFollowUpInput): string | null {
   if (outcomeKey === "callback") {
-    return callbackDate ? atNineLocal(callbackDate) : null;
+    return callbackDate ? atLocalTime(callbackDate, callbackTime) : null;
   }
 
   const days = overrideDays !== undefined ? overrideDays : defaultFollowUpDaysFor(outcomeKey);
@@ -118,5 +126,5 @@ export function computeNextFollowUp({
 
   const target = new Date(now.getTime());
   target.setDate(target.getDate() + days);
-  return atNineLocal(toLocalYmd(target));
+  return atLocalTime(toLocalYmd(target));
 }
