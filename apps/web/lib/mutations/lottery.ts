@@ -456,6 +456,8 @@ export async function createLotteryRun(
 interface BuiltEntries {
   entries: DrawEntry[];
   summary: Record<string, unknown>;
+  /** Enabled weighted tiers' capPercent, keyed by tier key. 0/undefined omitted — see DrawOptions.capPercents. */
+  capPercents: Record<string, number>;
 }
 
 async function buildPolicyDrawEntries(
@@ -479,6 +481,14 @@ async function buildPolicyDrawEntries(
 
   const tiers = enabledWeightedTiers(config);
   const tierMatch = await matchWeightedTiers(supabase, applicationIds, tiers, config.defaultWeight);
+
+  // capPercent of 0 or undefined means no cap (lottery-policy.ts: "0 = none
+  // set"); only tiers with a real, positive cap are passed to the draw so
+  // they constrain seats.
+  const capPercents: Record<string, number> = {};
+  for (const tier of tiers) {
+    if (tier.capPercent && tier.capPercent > 0) capPercents[tier.key] = tier.capPercent;
+  }
 
   const inRun = new Set(applicationIds);
 
@@ -510,7 +520,7 @@ async function buildPolicyDrawEntries(
     default_weight: config.defaultWeight,
   };
 
-  return { entries, summary };
+  return { entries, summary, capPercents };
 }
 
 // ─── Run Preview (Deterministic — Seeded & Reproducible) ───────────────────
@@ -600,6 +610,7 @@ export async function runLotteryPreview(runId: string): Promise<
       siblingAutoOffer: preference?.autoOfferBeforeDraw ?? false,
       siblingOverflowPriority: preference?.overflowToPriorityWaitlist ?? false,
       linkedSiblingActivation: binding.config.linkedSiblingActivation,
+      capPercents: built.capPercents,
     });
 
     summary = {
@@ -612,6 +623,9 @@ export async function runLotteryPreview(runId: string): Promise<
       sibling_auto_placed: result.siblingAutoPlaced,
       sibling_priority_waitlisted: result.siblingPriorityWaitlisted,
       linked_sibling_activated: result.linkedSiblingActivated,
+      // Per-tier cap enforcement, one row per tier with an active capPercent
+      // — empty when no enabled tier carries a cap. See DrawResult.capAccounting.
+      cap_accounting: result.capAccounting,
       drawn_at: now,
     };
 

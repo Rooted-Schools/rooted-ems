@@ -26,6 +26,16 @@
  *      the others are pulled in immediately behind the drawn sibling, for the
  *      remaining seats and for waitlist order alike.
  *
+ *   4. PER-TIER PERCENTAGE CAPS. A weighted tier the board has capped (e.g.
+ *      "founders' children, capped at 20 percent of enrollment") may occupy
+ *      at most floor(totalSeats * capPercent / 100) SELECTED seats. The cap
+ *      is applied AFTER ranking, on the final order produced by rules 1-3: it
+ *      never changes anyone's random number or final_rank, it only decides
+ *      is_selected. An entry that would have been selected on rank alone but
+ *      finds its capped tier already full keeps its rank and is marked not
+ *      selected; the seat passes to the next eligible entry. See
+ *      DrawOptions.capPercents and DrawResult.capAccounting.
+ *
  * DETERMINISM CONTRACT
  *
  * The hash below is the same djb2 used by packages/utils/src/lottery-service.ts,
@@ -114,6 +124,28 @@ export interface DrawTierCount {
   entries: number;
 }
 
+/**
+ * Per-tier cap enforcement accounting, one row per tier that carried an
+ * active (>0) capPercent in this draw. Written so an authorizer can see the
+ * cap actually operated: how many seats the tier was allowed, how many it
+ * got, and how many otherwise-qualifying entries it turned away.
+ */
+export interface DrawTierCapAccounting {
+  key: string;
+  capPercent: number;
+  /** floor(totalSeats * capPercent / 100) — the tier's seat ceiling. */
+  seatLimit: number;
+  /** Seats this tier actually occupied once the cap was applied. */
+  selectedCount: number;
+  /**
+   * Entries that belong to this tier, ranked within the seat count, and
+   * would have been selected on rank alone, but were skipped because this
+   * tier had already reached seatLimit. Each keeps its final_rank; the seat
+   * it would have taken passed to the next eligible entry.
+   */
+  displacedCount: number;
+}
+
 export interface DrawResult {
   ranked: DrawnEntry[];
   totalSeats: number;
@@ -131,6 +163,8 @@ export interface DrawResult {
   siblingPriorityWaitlisted: number;
   linkedSiblingActivated: number;
   tierCounts: DrawTierCount[];
+  /** Cap enforcement accounting, one row per tier with an active cap. */
+  capAccounting: DrawTierCapAccounting[];
 }
 
 export interface DrawOptions {
@@ -140,6 +174,23 @@ export interface DrawOptions {
   siblingOverflowPriority: boolean;
   /** Pull co-applying siblings in behind a drawn applicant. */
   linkedSiblingActivation: boolean;
+  /**
+   * Per-tier percentage caps, keyed by the same tier key carried in
+   * DrawEntry.tierKeys (LotteryPolicyWeightedTier.key). Consistent with the
+   * "0 = none set" convention in lottery-policy.ts: a key that is absent, or
+   * whose value is 0 or undefined, means NO cap for that tier.
+   *
+   * A tier capped at C percent may occupy at most
+   * floor(totalSeats * C / 100) SELECTED seats. The cap is enforced by
+   * walking the final ranked order (after the sibling pre-pass and
+   * linked-sibling activation, so it sees every entry regardless of how it
+   * got there): an entry is selected only while seats remain overall AND
+   * none of its capped tiers has already reached its limit. An entry
+   * skipped for a full tier KEEPS its final_rank — capping never
+   * renumbers anyone — it is simply not selected, and the seat passes to
+   * the next eligible entry in rank order.
+   */
+  capPercents?: Record<string, number>;
 }
 
 // ─── Weighted pool expansion ───────────────────────────────────────────────
@@ -283,16 +334,66 @@ export function runPolicyDraw(
     }
   }
 
-  // ── 4. Ranks and seats ───────────────────────────────────────────────────
-  const ranked: DrawnEntry[] = ordered.map((item, index) => {
+  // ── 4. Ranks ──────────────────────────────────────────────────────────────
+  // Rank is purely positional — where an entry landed in the sibling
+  // pre-pass / weighted-draw / linked-sibling order above. Capping (below)
+  // must never renumber this; it only decides is_selected.
+  const positioned = ordered.map((item, index) => {
     const rank = index + 1;
-    const isSelected = rank <= seats;
     let tier = TIER_GENERAL;
     if (item.placement === "sibling_auto" || item.placement === "sibling_priority_waitlist") {
       tier = TIER_SIBLING_ABSOLUTE;
     } else if (item.placement === "linked_sibling") {
       tier = TIER_LINKED_SIBLING;
     }
+    return { item, rank, tier };
+  });
+
+  // ── 5. Cap-aware seat selection ──────────────────────────────────────────
+  //
+  // Per-tier caps are enforced here, on the FINAL rank order, so a capped
+  // tier's seats are counted the same way regardless of whether an entry
+  // arrived via the sibling pre-pass, linked-sibling activation, or the
+  // weighted draw. capPercent 0/undefined for a key means no cap: such keys
+  // are simply never added to capLimits below and never constrain anyone.
+  const capLimits = new Map<string, number>(); // tier key -> seat ceiling
+  for (const [key, pct] of Object.entries(options.capPercents ?? {})) {
+    if (!pct || pct <= 0) continue;
+    capLimits.set(key, Math.floor(seats * pct / 100));
+  }
+  const capSelected = new Map<string, number>();
+  const capDisplaced = new Map<string, number>();
+  for (const key of capLimits.keys()) {
+    capSelected.set(key, 0);
+    capDisplaced.set(key, 0);
+  }
+
+  let seatsFilled = 0;
+  const ranked: DrawnEntry[] = positioned.map(({ item, rank, tier }) => {
+    let isSelected = false;
+
+    if (seatsFilled < seats) {
+      // A tier this entry belongs to is at its cap if it has a limit and is
+      // already there. If ANY capped tier the entry belongs to is full, the
+      // entry is displaced — it keeps its rank, the seat passes on.
+      const fullTierKeys = item.entry.tierKeys.filter((key) => {
+        const limit = capLimits.get(key);
+        return limit !== undefined && (capSelected.get(key) ?? 0) >= limit;
+      });
+
+      if (fullTierKeys.length === 0) {
+        isSelected = true;
+        seatsFilled++;
+        for (const key of item.entry.tierKeys) {
+          if (capLimits.has(key)) capSelected.set(key, (capSelected.get(key) ?? 0) + 1);
+        }
+      } else {
+        for (const key of fullTierKeys) {
+          capDisplaced.set(key, (capDisplaced.get(key) ?? 0) + 1);
+        }
+      }
+    }
+
     return {
       id: item.entry.id,
       applicationId: item.entry.applicationId,
@@ -305,6 +406,14 @@ export function runPolicyDraw(
       tierKeys: item.entry.tierKeys,
     };
   });
+
+  const capAccounting: DrawTierCapAccounting[] = [...capLimits.entries()].map(([key, seatLimit]) => ({
+    key,
+    capPercent: options.capPercents?.[key] ?? 0,
+    seatLimit,
+    selectedCount: capSelected.get(key) ?? 0,
+    displacedCount: capDisplaced.get(key) ?? 0,
+  }));
 
   // ── Honest counts ────────────────────────────────────────────────────────
   const tierTotals = new Map<string, { applicants: number; entries: number }>();
@@ -329,5 +438,6 @@ export function runPolicyDraw(
       .length,
     linkedSiblingActivated,
     tierCounts: [...tierTotals.entries()].map(([key, v]) => ({ key, ...v })),
+    capAccounting,
   };
 }
