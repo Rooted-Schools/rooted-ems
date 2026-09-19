@@ -51,6 +51,10 @@ export const SAMPLE = {
   nextEventStartsAtIso: "2026-11-12T18:00:00.000Z",
   nextSchoolYearName: "2027-28",
   documentTypeReadable: "Immunization Records",
+  /** Illustrative family surname (interest survey campaign block). */
+  familyLastName: "Rivera",
+  /** Illustrative survey_token (interest survey campaign block) — not a real lead. */
+  surveyTokenSample: "00000000-0000-0000-0000-000000000000",
 } as const;
 
 /** Same fallback pattern as lib/notify.ts and lib/email-templates.ts. */
@@ -466,7 +470,7 @@ export const AUTOMATED_MESSAGES: AutomatedMessageEntry[] = [
   // app/api/cron/run-journeys) — never automatically to an individual family
   // the way every entry above is. Staff pick a building block and fill in the
   // blanks; renderCampaignEmail is the one function every campaign send goes
-  // through, so these four samples cover the full CampaignTemplateKey union.
+  // through, so these five samples cover the full CampaignTemplateKey union.
   {
     key: "campaignReintroduction",
     label: "Campaign block: Reintroduction / Apply Now",
@@ -516,6 +520,23 @@ export const AUTOMATED_MESSAGES: AutomatedMessageEntry[] = [
           bodyEs: "Queríamos consultar si tiene alguna pregunta sobre la solicitud.",
           ctaLabel: "Learn more",
           ctaUrl: `${APP_URL}/login`,
+        },
+        SAMPLE.campusName
+      ),
+  },
+  {
+    key: "campaignInterestSurvey",
+    label: "Campaign block: Interest Survey (first touch)",
+    funnelStage: "Campaign building blocks",
+    trigger: "Sent only as part of a staff-created campaign or nurture journey step.",
+    channels: ["email"],
+    renderEmail: () =>
+      emailTemplates.renderCampaignEmail(
+        "interest_survey",
+        {
+          lastName: SAMPLE.familyLastName,
+          studentFirstName: SAMPLE.studentFirstName,
+          surveyToken: SAMPLE.surveyTokenSample,
         },
         SAMPLE.campusName
       ),

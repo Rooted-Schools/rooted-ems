@@ -9,6 +9,8 @@
  * inline styles only, no external assets, max-width 600px.
  */
 
+import { INTEREST_FOCUS_OPTIONS, scholarReference } from "./lead-interest-survey";
+
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://enroll.rootedschool.org";
 
 const BRAND_GREEN = "#81A780";
@@ -598,7 +600,12 @@ function withCampaignFooter(t: EmailTemplate): EmailTemplate {
   };
 }
 
-export type CampaignTemplateKey = "reintroduction" | "event_invite" | "deadline" | "custom";
+export type CampaignTemplateKey =
+  | "reintroduction"
+  | "event_invite"
+  | "deadline"
+  | "custom"
+  | "interest_survey";
 
 export interface CampaignPayload {
   // event_invite
@@ -613,6 +620,14 @@ export interface CampaignPayload {
   bodyEs?: string;
   ctaLabel?: string;
   ctaUrl?: string;
+  // interest_survey — unlike every other campaign template, this one is
+  // personalised per lead (family last name, the scholar's first name when
+  // known, and a survey link carrying that lead's own survey_token), so it
+  // is meant to be rendered once per lead rather than once per campaign and
+  // reused with the UNSUB_PLACEHOLDER-style swap the other templates use.
+  lastName?: string;
+  studentFirstName?: string;
+  surveyToken?: string;
 }
 
 export const CAMPAIGN_TEMPLATES: Record<CampaignTemplateKey, { label: string; description: string }> = {
@@ -631,6 +646,11 @@ export const CAMPAIGN_TEMPLATES: Record<CampaignTemplateKey, { label: string; de
   custom: {
     label: "Custom Message",
     description: "Write your own message. It's delivered inside the Rooted-branded bilingual wrapper.",
+  },
+  interest_survey: {
+    label: "Interest Survey (first touch)",
+    description:
+      "One-question survey asking what matters most to the family, with a link per option. Personalise per lead with lastName, studentFirstName, and surveyToken.",
   },
 };
 
@@ -744,6 +764,88 @@ export function renderCampaignEmail(
         subject: `Applications close ${deadline} at ${campusName} / Las solicitudes cierran pronto`,
         html,
         text,
+      });
+    }
+
+    case "interest_survey": {
+      const familyEn = payload.lastName ? `${payload.lastName} Family` : "there";
+      const familyEs = payload.lastName ? `Familia ${payload.lastName}` : "";
+      const scholarEn = scholarReference(payload.studentFirstName);
+      // Spanish keeps the same graceful fallback ("su estudiante") rather
+      // than an empty bracket — see scholarReference's doc comment on why
+      // this matters: only 9 of 1,316 C.R. Neal leads have a name on file.
+      const scholarEs = payload.studentFirstName?.trim() || "su estudiante";
+      const token = payload.surveyToken ?? "";
+
+      const optionLabelsEs: Record<string, string> = {
+        career_connected: "Aprendizaje conectado con la carrera profesional en toda su educación",
+        hbcu_authorized: "Ser la primera escuela chárter pública del país autorizada por una HBCU",
+        career_majors: "Especializaciones en Salud, Tecnología de la Información y Manufactura Avanzada",
+        financial_literacy: "Educación financiera y construcción de riqueza integradas en el plan de estudios",
+        other: "Algo más",
+      };
+
+      const optionLink = (key: string) => `${APP_URL}/interest?t=${encodeURIComponent(token)}&c=${key}`;
+
+      const optionsListHtml = (labels: (key: string) => string) =>
+        `<div style="margin:8px 0 20px 0;">
+          ${INTEREST_FOCUS_OPTIONS.map(
+            (o) =>
+              `<p style="margin:0 0 10px 0;">
+                <a href="${optionLink(o.key)}" style="color:${BRAND_GREEN};font-weight:bold;text-decoration:none;">→ ${escapeHtml(labels(o.key))}</a>
+              </p>`
+          ).join("\n")}
+        </div>`;
+
+      const optionsListText = (labels: (key: string) => string) =>
+        INTEREST_FOCUS_OPTIONS.map((o) => `- ${labels(o.key)}: ${optionLink(o.key)}`).join("\n");
+
+      // Two placeholder paragraphs, one per language, swapped for a raw HTML
+      // options block after renderEmail runs. Paragraph text is escaped by
+      // renderEmail, but escapeHtml only touches & < > " — none of which
+      // appear in these placeholder tokens — so they survive the render
+      // untouched and are safe to find-and-replace afterward, the same
+      // "render once, cheap string swap" trick UNSUB_PLACEHOLDER uses above.
+      const OPTIONS_EN = "%%INTEREST_OPTIONS_EN%%";
+      const OPTIONS_ES = "%%INTEREST_OPTIONS_ES%%";
+
+      const { html, text } = renderEmail(
+        {
+          greeting: `Hi ${familyEn},`,
+          paragraphs: [
+            `As you get to know ${campusName}, we'd love to hear what matters most to your family for ${scholarEn}. Pick whichever one speaks to you — there's no wrong answer, and it just takes one click.`,
+            OPTIONS_EN,
+          ],
+          closing: `Looking forward to hearing from you. The ${campusName} Enrollment Team`,
+        },
+        {
+          greeting: familyEs ? `Hola ${familyEs},` : "Hola,",
+          paragraphs: [
+            `Mientras conoce ${campusName}, nos encantaría saber qué es lo más importante para su familia pensando en ${scholarEs}. Elija la opción que más le hable — no hay una respuesta incorrecta, y solo toma un clic.`,
+            OPTIONS_ES,
+          ],
+          closing: `Esperamos saber de usted. El Equipo de Inscripción de ${campusName}`,
+        },
+        header
+      );
+
+      const htmlWithOptions = html
+        .replace(
+          `<p style="margin:0 0 16px 0;">${OPTIONS_EN}</p>`,
+          optionsListHtml((key) => INTEREST_FOCUS_OPTIONS.find((o) => o.key === key)!.label)
+        )
+        .replace(
+          `<p style="margin:0 0 16px 0;">${OPTIONS_ES}</p>`,
+          optionsListHtml((key) => optionLabelsEs[key])
+        );
+      const textWithOptions = text
+        .replace(OPTIONS_EN, optionsListText((key) => INTEREST_FOCUS_OPTIONS.find((o) => o.key === key)!.label))
+        .replace(OPTIONS_ES, optionsListText((key) => optionLabelsEs[key]));
+
+      return withCampaignFooter({
+        subject: `What matters most to your family? / ¿Qué es lo más importante para su familia?`,
+        html: htmlWithOptions,
+        text: textWithOptions,
       });
     }
 

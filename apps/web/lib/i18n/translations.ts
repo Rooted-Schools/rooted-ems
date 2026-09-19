@@ -1254,6 +1254,24 @@ const dict = {
   "unsubscribe.confirmedBody":  { en: "We won't send you any more recruitment emails. If you applied or enroll, we'll still send the messages your application needs (offers, deadlines, registration).", es: "No le enviaremos más correos de reclutamiento. Si aplicó o se inscribe, aún le enviaremos los mensajes que su solicitud necesita (ofertas, fechas límite, registro)." },
   "unsubscribe.failedTitle":    { en: "This link didn't work", es: "Este enlace no funcionó" },
   "unsubscribe.failedBody":     { en: "The unsubscribe link looks incomplete. Reply to any email from us and a real person will remove you right away.", es: "El enlace para cancelar la suscripción parece incompleto. Responda a cualquier correo nuestro y una persona real le dará de baja de inmediato." },
+
+  // ─── Interest survey landing (email link — locale may be unresolved) ──────
+  "interest.questionTitle":       { en: "What matters most to your family?", es: "¿Qué es lo más importante para su familia?" },
+  "interest.questionBody":        { en: "Pick whichever one speaks to you most — there's no wrong answer.", es: "Elija la opción que más le hable — no hay una respuesta incorrecta." },
+  "interest.optionCareerConnected":  { en: "Career-connected learning woven throughout their education", es: "Aprendizaje conectado con la carrera profesional en toda su educación" },
+  "interest.optionHbcuAuthorized":   { en: "Being the first public charter school in the country authorized by an HBCU", es: "Ser la primera escuela chárter pública del país autorizada por una HBCU" },
+  "interest.optionCareerMajors":     { en: "Majors in Healthcare, Information Technology, and Advanced Manufacturing", es: "Especializaciones en Salud, Tecnología de la Información y Manufactura Avanzada" },
+  "interest.optionFinancialLiteracy":{ en: "Financial literacy and wealth-building woven throughout the curriculum", es: "Educación financiera y construcción de riqueza integradas en el plan de estudios" },
+  "interest.optionOther":            { en: "Something else", es: "Algo más" },
+  "interest.confirmTitle":        { en: "One more click to confirm", es: "Un clic más para confirmar" },
+  "interest.confirmBody":         { en: "You picked:", es: "Usted eligió:" },
+  "interest.confirmButton":       { en: "Yes, that's my answer", es: "Sí, esa es mi respuesta" },
+  "interest.thanksTitle":         { en: "Thanks for sharing!", es: "¡Gracias por compartir!" },
+  "interest.thanksBody":          { en: "We'll use this to send you the things that actually matter to your family. You can change your answer anytime by clicking a different option in the email.", es: "Usaremos esto para enviarle lo que realmente le importa a su familia. Puede cambiar su respuesta en cualquier momento haciendo clic en una opción diferente en el correo." },
+  "interest.studentNameLabel":    { en: "Scholar's first name (optional)", es: "Nombre del estudiante (opcional)" },
+  "interest.otherLabel":          { en: "Tell us more (optional)", es: "Cuéntenos más (opcional)" },
+  "interest.saveButton":          { en: "Save", es: "Guardar" },
+  "interest.savedNote":           { en: "Saved.", es: "Guardado." },
 } satisfies Record<string, Record<Locale, string>>;
 
 export type TranslationKey = keyof typeof dict;

@@ -31,6 +31,12 @@ export interface LeadRow {
   pathway_interest: string | null;
   /** "What are you interested in?" answer: 'apply_when_open' | 'learn_more' | null. */
   inquiry_intent: string | null;
+  /** Answer to the one-question interest survey sent in the first nurture
+   *  email: 'career_connected' | 'hbcu_authorized' | 'career_majors' |
+   *  'financial_literacy' | 'other' | null (not answered yet). */
+  interest_focus: string | null;
+  /** Free text collected when interest_focus = 'other'. */
+  interest_focus_other: string | null;
   stage: string;
   source: string;
   assigned_to: string | null;
@@ -75,6 +81,7 @@ export interface LeadPipelineSummary {
 const LEAD_LIST_SELECT = `
   id, campus_id, first_name, last_name, email, phone,
   student_first_name, entry_grade, pathway_interest, inquiry_intent,
+  interest_focus, interest_focus_other,
   stage, source, assigned_to, next_follow_up_at, last_contact_at, created_at,
   campus:campus_id (name)
 `;
@@ -94,6 +101,8 @@ function toLeadRow(row: Record<string, unknown>): LeadRow {
     student_grades: [],
     pathway_interest: (row.pathway_interest as string | null) ?? null,
     inquiry_intent: (row.inquiry_intent as string | null) ?? null,
+    interest_focus: (row.interest_focus as string | null) ?? null,
+    interest_focus_other: (row.interest_focus_other as string | null) ?? null,
     stage: row.stage as string,
     source: row.source as string,
     assigned_to: (row.assigned_to as string | null) ?? null,

@@ -32,6 +32,7 @@ import { staffCancelCampaign, staffCreateLead, staffSyncLeadSheets } from "./act
 import { CampaignDialog } from "./campaign-dialog";
 import { ShareDialog } from "./share-dialog";
 import { CAMPAIGN_TEMPLATES, type CampaignTemplateKey } from "@/lib/email-templates";
+import { INTEREST_FOCUS_OPTIONS, INTEREST_FOCUS_LABELS } from "@/lib/lead-interest-survey";
 
 /* ─── Display config ─── */
 
@@ -174,6 +175,7 @@ export function RecruitmentClient({ queue, queueTotalDue, summary, studentSummar
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("open");
+  const [interestFilter, setInterestFilter] = useState("all");
   const [addOpen, setAddOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
   // Individually selected leads to message, and the set handed to the dialog
@@ -251,6 +253,7 @@ export function RecruitmentClient({ queue, queueTotalDue, summary, studentSummar
         if (stageFilter === "open" && !["new", "contacted", "engaged"].includes(lead.stage)) return false;
         if (stageFilter !== "all" && stageFilter !== "open" && lead.stage !== stageFilter) return false;
       }
+      if (interestFilter !== "all" && lead.interest_focus !== interestFilter) return false;
       if (!term) return true;
       return (
         `${lead.first_name} ${lead.last_name}`.toLowerCase().includes(term) ||
@@ -258,7 +261,7 @@ export function RecruitmentClient({ queue, queueTotalDue, summary, studentSummar
         (lead.student_first_name ?? "").toLowerCase().includes(term)
       );
     });
-  }, [leads, search, stageFilter]);
+  }, [leads, search, stageFilter, interestFilter]);
 
   // Column sorting (pilot feedback, Tim CLE: make the recruitment columns
   // sortable). Click a header to sort by it; click again to flip direction.
@@ -643,6 +646,19 @@ export function RecruitmentClient({ queue, queueTotalDue, summary, studentSummar
               <option value="engaged">Engaged</option>
               <option value="applied">Applied</option>
               <option value="closed">Closed</option>
+            </Select>
+            <Select
+              value={interestFilter}
+              onChange={(e) => setInterestFilter(e.target.value)}
+              className="sm:w-48"
+              aria-label="Filter by interest survey answer"
+            >
+              <option value="all">Any interest answer</option>
+              {INTEREST_FOCUS_OPTIONS.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {INTEREST_FOCUS_LABELS[o.key]}
+                </option>
+              ))}
             </Select>
             {selectedIds.size > 0 && (
               <Button

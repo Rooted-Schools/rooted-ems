@@ -40,6 +40,7 @@ import {
   DEFAULT_FOLLOW_UP_TIME,
   todayLocalYmd,
 } from "@/lib/lead-call-outcomes";
+import { INTEREST_FOCUS_LABELS } from "@/lib/lead-interest-survey";
 import { formatRelativeTime } from "@/lib/queries/utils";
 import { staffDeleteLead, staffGetReferralLink, staffLogLeadActivity, staffUpdateLead } from "../actions";
 import { PATHWAY_LABELS, INTENT_LABELS, SOURCE_LABELS, STAGE_CONFIG } from "../recruitment-client";
@@ -361,6 +362,17 @@ export function LeadDetailClient({
                 <p className="text-ink">
                   {INTENT_LABELS[lead.inquiry_intent] ?? lead.inquiry_intent}
                 </p>
+              </div>
+            )}
+            {lead.interest_focus && (
+              <div>
+                <p className="text-xs text-stone">Survey answer</p>
+                <p className="text-ink">
+                  {INTEREST_FOCUS_LABELS[lead.interest_focus as keyof typeof INTEREST_FOCUS_LABELS] ?? lead.interest_focus}
+                </p>
+                {lead.interest_focus_other && (
+                  <p className="text-xs text-ink/70 mt-0.5">&ldquo;{lead.interest_focus_other}&rdquo;</p>
+                )}
               </div>
             )}
             {lead.zip && (
