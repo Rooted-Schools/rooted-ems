@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   CALL_OUTCOMES,
+  DEFAULT_FOLLOW_UP_TIME,
   FOLLOW_UP_OPTIONS,
   computeNextFollowUp,
   defaultFollowUpDaysFor,
@@ -62,6 +63,50 @@ describe("computeNextFollowUp", () => {
     expect(
       parts(computeNextFollowUp({ outcomeKey: "callback", callbackDate: "2026-10-02", now })).hour
     ).toBe(9);
+  });
+
+
+  it("keeps the hour the family actually named for a callback", () => {
+    // "Call me back Thursday at 2pm" has to land at 2pm, not at the start of
+    // the day — scheduling the day and losing the hour is what made the
+    // promise unkeepable.
+    const got = parts(
+      computeNextFollowUp({
+        outcomeKey: "callback",
+        callbackDate: "2026-10-02",
+        callbackTime: "14:00",
+        now,
+      })
+    );
+    expect([got.y, got.m, got.day, got.hour]).toEqual([2026, 10, 2, 14]);
+  });
+
+  it("falls back to the start of the day when the family named no hour", () => {
+    const got = parts(
+      computeNextFollowUp({ outcomeKey: "callback", callbackDate: "2026-10-02", now })
+    );
+    expect(got.hour).toBe(Number(DEFAULT_FOLLOW_UP_TIME.split(":")[0]));
+  });
+
+  it("ignores a malformed time rather than producing an invalid date", () => {
+    const got = parts(
+      computeNextFollowUp({
+        outcomeKey: "callback",
+        callbackDate: "2026-10-02",
+        callbackTime: "not-a-time",
+        now,
+      })
+    );
+    expect([got.y, got.m, got.day, got.hour]).toEqual([2026, 10, 2, 9]);
+  });
+
+  it("applies a named time only to callbacks, never to interval outcomes", () => {
+    // A voicemail retry is a morning-queue item; an hour typed for a
+    // different outcome must not leak into it.
+    const got = parts(
+      computeNextFollowUp({ outcomeKey: "voicemail", callbackTime: "14:00", now })
+    );
+    expect(got.hour).toBe(9);
   });
 
   it("lets the recruiter override the outcome default for one call", () => {
