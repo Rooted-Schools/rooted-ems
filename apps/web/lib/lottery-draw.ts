@@ -26,6 +26,32 @@
  *      the others are pulled in immediately behind the drawn sibling, for the
  *      remaining seats and for waitlist order alike.
  *
+ *   4. PER-TIER PERCENTAGE CAPS. A weighted tier the board has capped (e.g.
+ *      "founders' children, capped at 20 percent of enrollment") may occupy
+ *      at most floor(totalSeats * capPercent / 100) SELECTED seats. The cap
+ *      is applied AFTER ranking, on the final order produced by rules 1-3: it
+ *      never changes anyone's random number or final_rank, it only decides
+ *      is_selected. An entry that would have been selected on rank alone but
+ *      finds its capped tier already full keeps its rank and is marked not
+ *      selected; the seat passes to the next eligible entry.
+ *
+ *      CRITICAL SCOPE LIMIT — a percentage cap bounds admissions GRANTED
+ *      UNDER THAT WEIGHTED PREFERENCE. It is not a population quota on every
+ *      applicant who happens to match the tier's criteria. Absolute sibling
+ *      preference (rule 1) and linked-sibling activation (rule 3) are a
+ *      separate, uncapped, absolute preference — a seat awarded on sibling
+ *      grounds was never "granted under" the capped tier, even when that same
+ *      child also matches it (e.g. a staff member's child who is also an
+ *      enrolled student's sibling). So entries placed "sibling_auto",
+ *      "sibling_priority_waitlist", or "linked_sibling" are EXEMPT from every
+ *      weighted-tier cap: a full cap never displaces them, and they never
+ *      count toward a cap's selectedCount. Only placement "draw" — admitted
+ *      through the weighted lottery itself — is subject to caps. Do not
+ *      "simplify" this by capping every matching entry regardless of
+ *      placement; that would silently deny an absolute, uncapped preference
+ *      and is the exact defect an authorizer review would flag. See
+ *      DrawOptions.capPercents and DrawResult.capAccounting.
+ *
  * DETERMINISM CONTRACT
  *
  * The hash below is the same djb2 used by packages/utils/src/lottery-service.ts,
@@ -114,6 +140,45 @@ export interface DrawTierCount {
   entries: number;
 }
 
+/**
+ * Per-tier cap enforcement accounting, one row per tier that carried an
+ * active (>0) capPercent in this draw. Written so an authorizer can see the
+ * cap actually operated: how many seats the tier was allowed, how many it
+ * got, and how many otherwise-qualifying entries it turned away.
+ */
+export interface DrawTierCapAccounting {
+  key: string;
+  capPercent: number;
+  /** floor(totalSeats * capPercent / 100) — the tier's seat ceiling. */
+  seatLimit: number;
+  /**
+   * Seats this tier actually occupied once the cap was applied. Counts only
+   * placement "draw" entries — a seat granted under this weighted
+   * preference. Sibling-placed entries matching this tier never count here;
+   * see siblingExemptCount.
+   */
+  selectedCount: number;
+  /**
+   * placement "draw" entries that belong to this tier, ranked within the
+   * seat count, and would have been selected on rank alone, but were
+   * skipped because this tier had already reached seatLimit. Each keeps its
+   * final_rank; the seat it would have taken passed to the next eligible
+   * entry.
+   */
+  displacedCount: number;
+  /**
+   * Entries that matched this tier's key but were seated on absolute
+   * sibling grounds — placement "sibling_auto", "sibling_priority_waitlist",
+   * or "linked_sibling" — rather than under this weighted preference.
+   * Sibling preference is separate, uncapped, and absolute: these entries
+   * were never candidates for this cap, could never be displaced by it, and
+   * never counted toward selectedCount, regardless of whether they were
+   * ultimately selected. Reported here so an auditor can see exactly who
+   * matched the tier's criteria but was excluded from its cap, and why.
+   */
+  siblingExemptCount: number;
+}
+
 export interface DrawResult {
   ranked: DrawnEntry[];
   totalSeats: number;
@@ -131,6 +196,8 @@ export interface DrawResult {
   siblingPriorityWaitlisted: number;
   linkedSiblingActivated: number;
   tierCounts: DrawTierCount[];
+  /** Cap enforcement accounting, one row per tier with an active cap. */
+  capAccounting: DrawTierCapAccounting[];
 }
 
 export interface DrawOptions {
@@ -140,6 +207,31 @@ export interface DrawOptions {
   siblingOverflowPriority: boolean;
   /** Pull co-applying siblings in behind a drawn applicant. */
   linkedSiblingActivation: boolean;
+  /**
+   * Per-tier percentage caps, keyed by the same tier key carried in
+   * DrawEntry.tierKeys (LotteryPolicyWeightedTier.key). Consistent with the
+   * "0 = none set" convention in lottery-policy.ts: a key that is absent, or
+   * whose value is 0 or undefined, means NO cap for that tier.
+   *
+   * A tier capped at C percent may occupy at most
+   * floor(totalSeats * C / 100) SELECTED seats — but ONLY seats granted
+   * under that weighted preference, i.e. entries with placement "draw". The
+   * cap is enforced by walking the final ranked order (after the sibling
+   * pre-pass and linked-sibling activation, so it sees every entry
+   * regardless of how it got there): a "draw"-placed entry is selected only
+   * while seats remain overall AND none of its capped tiers has already
+   * reached its limit. An entry skipped for a full tier KEEPS its
+   * final_rank — capping never renumbers anyone — it is simply not
+   * selected, and the seat passes to the next eligible entry in rank order.
+   *
+   * Entries placed "sibling_auto", "sibling_priority_waitlist", or
+   * "linked_sibling" are EXEMPT, even when their tierKeys also match a
+   * capped tier: absolute sibling preference is a separate, uncapped rule,
+   * not a seat "granted under" the weighted tier. Exempt entries are never
+   * displaced by a full cap and never count toward its limit. See the
+   * module doc (rule 4) and DrawResult.capAccounting.siblingExemptCount.
+   */
+  capPercents?: Record<string, number>;
 }
 
 // ─── Weighted pool expansion ───────────────────────────────────────────────
@@ -283,16 +375,95 @@ export function runPolicyDraw(
     }
   }
 
-  // ── 4. Ranks and seats ───────────────────────────────────────────────────
-  const ranked: DrawnEntry[] = ordered.map((item, index) => {
+  // ── 4. Ranks ──────────────────────────────────────────────────────────────
+  // Rank is purely positional — where an entry landed in the sibling
+  // pre-pass / weighted-draw / linked-sibling order above. Capping (below)
+  // must never renumber this; it only decides is_selected.
+  const positioned = ordered.map((item, index) => {
     const rank = index + 1;
-    const isSelected = rank <= seats;
     let tier = TIER_GENERAL;
     if (item.placement === "sibling_auto" || item.placement === "sibling_priority_waitlist") {
       tier = TIER_SIBLING_ABSOLUTE;
     } else if (item.placement === "linked_sibling") {
       tier = TIER_LINKED_SIBLING;
     }
+    return { item, rank, tier };
+  });
+
+  // ── 5. Cap-aware seat selection ──────────────────────────────────────────
+  //
+  // Per-tier caps are enforced here, on the FINAL rank order, so a capped
+  // tier's seats are counted the same way regardless of where in that order
+  // a "draw"-placed entry landed. capPercent 0/undefined for a key means no
+  // cap: such keys are simply never added to capLimits below and never
+  // constrain anyone.
+  //
+  // SIBLING EXEMPTION (see the module doc, rule 4, for the full rationale):
+  // a cap bounds seats granted UNDER THE WEIGHTED TIER, not every applicant
+  // who happens to match its criteria. Placement "sibling_auto",
+  // "sibling_priority_waitlist", and "linked_sibling" are seats granted
+  // under the separate, uncapped, absolute sibling preference — never under
+  // a capped tier, even when the same child also matches one. Those three
+  // placements are therefore skipped by the cap check entirely: they are
+  // never displaced by a full tier and never increment capSelected. Only
+  // placement "draw" is evaluated against capLimits below.
+  const capLimits = new Map<string, number>(); // tier key -> seat ceiling
+  for (const [key, pct] of Object.entries(options.capPercents ?? {})) {
+    if (!pct || pct <= 0) continue;
+    capLimits.set(key, Math.floor(seats * pct / 100));
+  }
+  const capSelected = new Map<string, number>();
+  const capDisplaced = new Map<string, number>();
+  const capSiblingExempt = new Map<string, number>();
+  for (const key of capLimits.keys()) {
+    capSelected.set(key, 0);
+    capDisplaced.set(key, 0);
+    capSiblingExempt.set(key, 0);
+  }
+
+  let seatsFilled = 0;
+  const ranked: DrawnEntry[] = positioned.map(({ item, rank, tier }) => {
+    let isSelected = false;
+    const siblingGrounds = item.placement !== "draw";
+
+    // Sibling-exemption accounting is independent of whether seats remain —
+    // an entry either matches a capped tier's criteria under sibling
+    // grounds or it doesn't, regardless of the eventual seat outcome.
+    if (siblingGrounds) {
+      for (const key of item.entry.tierKeys) {
+        if (capLimits.has(key)) capSiblingExempt.set(key, (capSiblingExempt.get(key) ?? 0) + 1);
+      }
+    }
+
+    if (seatsFilled < seats) {
+      if (siblingGrounds) {
+        // Absolute sibling preference: never subject to a weighted-tier cap.
+        isSelected = true;
+        seatsFilled++;
+      } else {
+        // A tier this entry belongs to is at its cap if it has a limit and
+        // is already there. If ANY capped tier the entry belongs to is
+        // full, the entry is displaced — it keeps its rank, the seat passes
+        // on.
+        const fullTierKeys = item.entry.tierKeys.filter((key) => {
+          const limit = capLimits.get(key);
+          return limit !== undefined && (capSelected.get(key) ?? 0) >= limit;
+        });
+
+        if (fullTierKeys.length === 0) {
+          isSelected = true;
+          seatsFilled++;
+          for (const key of item.entry.tierKeys) {
+            if (capLimits.has(key)) capSelected.set(key, (capSelected.get(key) ?? 0) + 1);
+          }
+        } else {
+          for (const key of fullTierKeys) {
+            capDisplaced.set(key, (capDisplaced.get(key) ?? 0) + 1);
+          }
+        }
+      }
+    }
+
     return {
       id: item.entry.id,
       applicationId: item.entry.applicationId,
@@ -305,6 +476,15 @@ export function runPolicyDraw(
       tierKeys: item.entry.tierKeys,
     };
   });
+
+  const capAccounting: DrawTierCapAccounting[] = [...capLimits.entries()].map(([key, seatLimit]) => ({
+    key,
+    capPercent: options.capPercents?.[key] ?? 0,
+    seatLimit,
+    selectedCount: capSelected.get(key) ?? 0,
+    displacedCount: capDisplaced.get(key) ?? 0,
+    siblingExemptCount: capSiblingExempt.get(key) ?? 0,
+  }));
 
   // ── Honest counts ────────────────────────────────────────────────────────
   const tierTotals = new Map<string, { applicants: number; entries: number }>();
@@ -329,5 +509,6 @@ export function runPolicyDraw(
       .length,
     linkedSiblingActivated,
     tierCounts: [...tierTotals.entries()].map(([key, v]) => ({ key, ...v })),
+    capAccounting,
   };
 }
