@@ -223,6 +223,47 @@ export interface FollowUpQueueResult {
   totalDue: number;
 }
 
+/**
+ * Ownership lens shared by the recruitment list and the follow-up queue.
+ * "mine_or_unassigned" is the queue's default (see getFollowUpQueue): a
+ * recruiter's own leads plus every unowned lead, so unassigned work never
+ * quietly disappears from view. Omitting the filter entirely means
+ * "everyone" — no ownership predicate at all.
+ */
+export type OwnershipFilter =
+  | { mode: "mine"; userId: string }
+  | { mode: "unassigned" }
+  | { mode: "user"; userId: string }
+  | { mode: "mine_or_unassigned"; userId: string };
+
+/**
+ * Applies an OwnershipFilter to a Supabase query builder. Loosely typed on
+ * purpose — see the `scoped` helper below for why threading the exact
+ * PostgREST builder generics through a conditional here blows TS's
+ * instantiation-depth limit.
+ *
+ * Chaining `.or()` a second time (restQuery already has one for the
+ * callback/non-callback split) is deliberate: PostgREST ANDs separate `or=`
+ * query params together, so this composes as
+ * (existing OR) AND (assigned_to = me OR assigned_to IS NULL) rather than
+ * overwriting the first `.or()`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyOwnership(query: any, ownership?: OwnershipFilter): any {
+  if (!ownership) return query;
+  switch (ownership.mode) {
+    case "mine":
+    case "user":
+      return query.eq("assigned_to", ownership.userId);
+    case "unassigned":
+      return query.is("assigned_to", null);
+    case "mine_or_unassigned":
+      return query.or(`assigned_to.eq.${ownership.userId},assigned_to.is.null`);
+    default:
+      return query;
+  }
+}
+
 const FOLLOW_UP_QUEUE_STAGES = ["new", "contacted", "engaged"] as const;
 const FOLLOW_UP_QUEUE_DEFAULT_LIMIT = 200;
 
@@ -239,10 +280,17 @@ const FOLLOW_UP_QUEUE_DEFAULT_LIMIT = 200;
  * separate honest count of everything due, uncapped, so the queue can never
  * silently hide work the way `.limit(50)` used to — the caller shows
  * "showing N of M" whenever items.length < totalDue.
+ *
+ * `ownership` gates all three internal queries (count, due-callbacks,
+ * due-non-callbacks) identically, so `totalDue` can never disagree with
+ * `items` — an ownership lens that only narrowed the item queries would
+ * reintroduce exactly the "count ignores what's actually shown" bug this
+ * queue's callback/non-callback split was built to fix.
  */
 export async function getFollowUpQueue(
   campusId?: string,
-  limit: number = FOLLOW_UP_QUEUE_DEFAULT_LIMIT
+  limit: number = FOLLOW_UP_QUEUE_DEFAULT_LIMIT,
+  ownership?: OwnershipFilter
 ): Promise<FollowUpQueueResult> {
   const supabase = await createServerClient();
   const nowIso = new Date().toISOString();
@@ -253,6 +301,7 @@ export async function getFollowUpQueue(
     .in("stage", FOLLOW_UP_QUEUE_STAGES)
     .lte("next_follow_up_at", nowIso);
   if (campusId) countQuery = countQuery.eq("campus_id", campusId);
+  countQuery = applyOwnership(countQuery, ownership);
   const { count: totalDue, error: countError } = await countQuery;
   if (countError) console.error("[getFollowUpQueue] count", countError.message);
 
@@ -265,6 +314,7 @@ export async function getFollowUpQueue(
     .order("next_follow_up_at", { ascending: true })
     .limit(limit);
   if (campusId) callbackQuery = callbackQuery.eq("campus_id", campusId);
+  callbackQuery = applyOwnership(callbackQuery, ownership);
 
   const { data: callbackData, error: callbackError } = await callbackQuery;
   if (callbackError) {
@@ -294,6 +344,7 @@ export async function getFollowUpQueue(
       .order("next_follow_up_at", { ascending: true })
       .limit(remaining);
     if (campusId) restQuery = restQuery.eq("campus_id", campusId);
+    restQuery = applyOwnership(restQuery, ownership);
 
     const { data: restData, error: restError } = await restQuery;
     if (restError) {

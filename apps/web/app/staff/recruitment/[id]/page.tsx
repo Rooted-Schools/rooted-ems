@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
-import { getLeadDetail } from "@/lib/queries";
+import { getLeadDetail, getStaffUsers } from "@/lib/queries";
 import { requireStaffSession, getAccessibleCampusIds } from "@/lib/auth/get-session";
 import { LeadDetailClient } from "./lead-detail-client";
 
@@ -23,5 +23,9 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
     redirect("/staff/recruitment");
   }
 
-  return <LeadDetailClient lead={lead} staffUserId={session.user_id} />;
+  // Scoped to THIS lead's campus specifically — the assignment picker must
+  // only ever offer staff who could actually be validly assigned here.
+  const campusStaff = lead ? await getStaffUsers(lead.campus_id) : [];
+
+  return <LeadDetailClient lead={lead} staffUserId={session.user_id} campusStaff={campusStaff} />;
 }

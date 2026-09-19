@@ -25,10 +25,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { CampaignRow, LeadPipelineSummary, LeadRow } from "@/lib/queries/leads";
+import type { StaffUserRow } from "@/lib/queries/staff";
 import type { JourneySummary } from "@/lib/queries/journeys";
 import { formatRelativeTime } from "@/lib/queries/utils";
 import { IconCalendar, IconBarChart, IconLink, IconRefreshCw, IconMail, IconPhone, IconSprout, IconAlertTriangle } from "@/components/ui/icons";
-import { staffCancelCampaign, staffCreateLead, staffSyncLeadSheets } from "./actions";
+import { staffBulkAssignLeads, staffCancelCampaign, staffCreateLead, staffSyncLeadSheets } from "./actions";
 import { CampaignDialog } from "./campaign-dialog";
 import { ShareDialog } from "./share-dialog";
 import { CAMPAIGN_TEMPLATES, type CampaignTemplateKey } from "@/lib/email-templates";
@@ -102,7 +103,12 @@ function isDueToday(dateStr: string): boolean {
 }
 
 /** Sortable recruitment-table columns. */
-type SortKey = "family" | "student" | "campus" | "source" | "stage" | "last_contact";
+type SortKey = "family" | "student" | "campus" | "source" | "stage" | "last_contact" | "owner";
+
+/** Ownership lens for the recruitment list filter. "everyone" applies no
+ *  filter; any other value besides "mine"/"unassigned" is a staff user_id,
+ *  targeting that specific staff member. */
+type OwnerLens = string;
 
 /** A clickable table header that sorts by its column; shows the active direction. */
 function SortHead({
@@ -143,6 +149,10 @@ interface RecruitmentClientProps {
   /** Honest total of every open lead due right now, uncapped — may exceed
    *  queue.length when the server-side cap truncated the list. */
   queueTotalDue: number;
+  /** "mine" (default: mine + unassigned) or "all" (whole campus, no
+   *  ownership filter) — driven by ?queueScope= and applied server-side so
+   *  totalDue always agrees with the items shown. */
+  queueScope: "mine" | "all";
   summary: LeadPipelineSummary;
   /** Student-level counts for this campus: how many prospective students exist
    *  and how many families carry more than one. */
@@ -151,6 +161,11 @@ interface RecruitmentClientProps {
   campaigns: CampaignRow[];
   journeys: JourneySummary[];
   campuses: { id: string; name: string; short_code: string }[];
+  /** Every staff user_id/campus_id pairing this session can see — a staff
+   *  member holding roles at more than one campus appears once per campus.
+   *  Used to resolve owner names, and to scope the owner-filter and
+   *  assignment pickers to the right campus. */
+  staffUsers: StaffUserRow[];
   /** Campus filter from ?campus= — "all" when viewing every campus. */
   activeCampusId: string;
   staffUserId: string;
@@ -170,12 +185,13 @@ const EMPTY_LEAD = {
   notes: "",
 };
 
-export function RecruitmentClient({ queue, queueTotalDue, summary, studentSummary, leads, campaigns, journeys, campuses, activeCampusId, staffUserId }: RecruitmentClientProps) {
+export function RecruitmentClient({ queue, queueTotalDue, queueScope, summary, studentSummary, leads, campaigns, journeys, campuses, staffUsers, activeCampusId, staffUserId }: RecruitmentClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("open");
   const [interestFilter, setInterestFilter] = useState("all");
+  const [ownerFilter, setOwnerFilter] = useState<OwnerLens>("everyone");
   const [addOpen, setAddOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
   // Individually selected leads to message, and the set handed to the dialog
@@ -185,6 +201,79 @@ export function RecruitmentClient({ queue, queueTotalDue, summary, studentSummar
   const [shareOpen, setShareOpen] = useState(false);
   const [newLead, setNewLead] = useState({ ...EMPTY_LEAD });
   const [error, setError] = useState<string | null>(null);
+
+  // Assign-to dialog for bulk assignment (single-lead assignment lives on the
+  // lead detail page).
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignTargetId, setAssignTargetId] = useState("");
+  const [assignResults, setAssignResults] = useState<{ ok: boolean; error?: string }[] | null>(null);
+
+  // Owner name lookup — the staff directory per campus is small, so mapping
+  // it client-side is simpler than a PostgREST FK embed on every lead row,
+  // and it's the same data source (getStaffUsers) the assignment pickers use.
+  const staffNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of staffUsers) map.set(s.user_id, s.full_name);
+    return map;
+  }, [staffUsers]);
+
+  // Staff relevant to the owner-filter dropdown: scoped to the active campus
+  // when one is selected, otherwise every staff member visible to this
+  // session, deduplicated (a staff member with roles at 2+ campuses appears
+  // once per campus in staffUsers).
+  const ownerOptions = useMemo(() => {
+    const relevant =
+      activeCampusId === "all" ? staffUsers : staffUsers.filter((s) => s.campus_id === activeCampusId);
+    const seen = new Set<string>();
+    const options: StaffUserRow[] = [];
+    for (const s of relevant) {
+      if (seen.has(s.user_id)) continue;
+      seen.add(s.user_id);
+      options.push(s);
+    }
+    return options.sort((a, b) => a.full_name.localeCompare(b.full_name));
+  }, [staffUsers, activeCampusId]);
+
+  // Staff eligible for the bulk-assign dialog: anyone with a role at ANY
+  // campus among the currently selected leads. The mutation still checks
+  // each lead against the assignee's actual campus roles server-side — this
+  // is only what's worth offering in the dropdown.
+  const bulkAssignOptions = useMemo(() => {
+    const campusIds = new Set(leads.filter((l) => selectedIds.has(l.id)).map((l) => l.campus_id));
+    const seen = new Set<string>();
+    const options: StaffUserRow[] = [];
+    for (const s of staffUsers) {
+      if (!campusIds.has(s.campus_id) || seen.has(s.user_id)) continue;
+      seen.add(s.user_id);
+      options.push(s);
+    }
+    return options.sort((a, b) => a.full_name.localeCompare(b.full_name));
+  }, [staffUsers, leads, selectedIds]);
+
+  function submitBulkAssign() {
+    if (!assignTargetId || selectedIds.size === 0) return;
+    setAssignResults(null);
+    startTransition(async () => {
+      const results = await staffBulkAssignLeads([...selectedIds], assignTargetId);
+      setAssignResults(results);
+      if (results.length > 0 && results.every((r) => r.ok)) {
+        setAssignOpen(false);
+        setAssignTargetId("");
+        setSelectedIds(new Set());
+      }
+      router.refresh();
+    });
+  }
+
+  /** Toggle the follow-up queue between "mine + unassigned" and "whole
+   *  campus", preserving the campus filter. Server-driven — see page.tsx. */
+  function setQueueScope(all: boolean) {
+    const params = new URLSearchParams();
+    if (activeCampusId !== "all") params.set("campus", activeCampusId);
+    if (all) params.set("queueScope", "all");
+    const qs = params.toString();
+    router.push(qs ? `/staff/recruitment?${qs}` : "/staff/recruitment");
+  }
 
   // Scheduled "Call back later" outcomes surface first — a promised callback
   // is a harder commitment than a generic follow-up date. Stable sort keeps
@@ -254,6 +343,11 @@ export function RecruitmentClient({ queue, queueTotalDue, summary, studentSummar
         if (stageFilter !== "all" && stageFilter !== "open" && lead.stage !== stageFilter) return false;
       }
       if (interestFilter !== "all" && lead.interest_focus !== interestFilter) return false;
+      if (ownerFilter === "mine" && lead.assigned_to !== staffUserId) return false;
+      if (ownerFilter === "unassigned" && lead.assigned_to !== null) return false;
+      if (ownerFilter !== "everyone" && ownerFilter !== "mine" && ownerFilter !== "unassigned" && lead.assigned_to !== ownerFilter) {
+        return false;
+      }
       if (!term) return true;
       return (
         `${lead.first_name} ${lead.last_name}`.toLowerCase().includes(term) ||
@@ -261,7 +355,7 @@ export function RecruitmentClient({ queue, queueTotalDue, summary, studentSummar
         (lead.student_first_name ?? "").toLowerCase().includes(term)
       );
     });
-  }, [leads, search, stageFilter, interestFilter]);
+  }, [leads, search, stageFilter, interestFilter, ownerFilter, staffUserId]);
 
   // Column sorting (pilot feedback, Tim CLE: make the recruitment columns
   // sortable). Click a header to sort by it; click again to flip direction.
@@ -283,6 +377,8 @@ export function RecruitmentClient({ queue, queueTotalDue, summary, studentSummar
         case "source": return (l.source ?? "").toLowerCase();
         case "stage": return l.stage.toLowerCase();
         case "last_contact": return l.last_contact_at ? new Date(l.last_contact_at).getTime() : 0;
+        // Sorts to the end ascending — "Unassigned" reads like a stage, not a name.
+        case "owner": return (l.assigned_to ? staffNameById.get(l.assigned_to) : undefined)?.toLowerCase() ?? "￿";
       }
     };
     const dir = sort.dir === "asc" ? 1 : -1;
@@ -293,7 +389,7 @@ export function RecruitmentClient({ queue, queueTotalDue, summary, studentSummar
       if (av > bv) return dir;
       return 0;
     });
-  }, [filtered, sort]);
+  }, [filtered, sort, staffNameById]);
 
   // Selection helpers for messaging hand-picked families. Selection is scoped
   // to the currently filtered rows (status filter + search), so "both" ways of
@@ -400,19 +496,39 @@ export function RecruitmentClient({ queue, queueTotalDue, summary, studentSummar
       {(queue.length > 0 || unscheduledCount > 0) && (
         <Card className="border-warn/30 bg-warn/10">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-1.5">
-              <IconPhone size={16} /> Follow up today ({queueTotalDue})
-            </CardTitle>
-            <CardDescription>
-              {queue.length > 0
-                ? "Fast follow-up wins families — these leads are due (or overdue) for a touch."
-                : "Nothing is scheduled for today."}
-              {queue.length > 0 &&
-                callbacksDueCount > 0 &&
-                ` ${callbacksDueCount} ${callbacksDueCount === 1 ? "is" : "are"} a promised callback.`}
-              {queue.length < queueTotalDue &&
-                ` Showing ${queue.length} of ${queueTotalDue} due — callbacks first.`}
-            </CardDescription>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <CardTitle className="text-base flex items-center gap-1.5">
+                  <IconPhone size={16} /> Follow up today ({queueTotalDue})
+                </CardTitle>
+                <CardDescription>
+                  {queue.length > 0
+                    ? "Fast follow-up wins families — these leads are due (or overdue) for a touch."
+                    : "Nothing is scheduled for today."}
+                  {queue.length > 0 &&
+                    callbacksDueCount > 0 &&
+                    ` ${callbacksDueCount} ${callbacksDueCount === 1 ? "is" : "are"} a promised callback.`}
+                  {queue.length < queueTotalDue &&
+                    ` Showing ${queue.length} of ${queueTotalDue} due — callbacks first.`}
+                </CardDescription>
+              </div>
+              <div className="flex shrink-0 items-center gap-1 rounded-md border border-warn/30 bg-white p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setQueueScope(false)}
+                  className={`rounded px-2 py-1 font-medium ${queueScope === "mine" ? "bg-warn/20 text-warn-text" : "text-stone hover:text-ink"}`}
+                >
+                  Mine + Unassigned
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQueueScope(true)}
+                  className={`rounded px-2 py-1 font-medium ${queueScope === "all" ? "bg-warn/20 text-warn-text" : "text-stone hover:text-ink"}`}
+                >
+                  Whole campus
+                </button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-2">
             {sortedQueue.slice(0, 8).map((lead) => {
@@ -660,17 +776,44 @@ export function RecruitmentClient({ queue, queueTotalDue, summary, studentSummar
                 </option>
               ))}
             </Select>
+            <Select
+              value={ownerFilter}
+              onChange={(e) => setOwnerFilter(e.target.value)}
+              className="sm:w-48"
+              aria-label="Filter by owner"
+            >
+              <option value="everyone">Everyone</option>
+              <option value="mine">Mine</option>
+              <option value="unassigned">Unassigned</option>
+              {ownerOptions.map((s) => (
+                <option key={s.user_id} value={s.user_id}>{s.full_name}</option>
+              ))}
+            </Select>
             {selectedIds.size > 0 && (
-              <Button
-                size="sm"
-                onClick={() => {
-                  setSendSelectedIds([...selectedIds]);
-                  setCampaignOpen(true);
-                }}
-                className="self-center sm:ml-auto whitespace-nowrap bg-rooted-green hover:bg-rooted-green/90 text-white"
-              >
-                Message {selectedIds.size} selected
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setAssignResults(null);
+                    setAssignTargetId("");
+                    setAssignOpen(true);
+                  }}
+                  className="self-center whitespace-nowrap"
+                >
+                  Assign {selectedIds.size} selected
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setSendSelectedIds([...selectedIds]);
+                    setCampaignOpen(true);
+                  }}
+                  className="self-center sm:ml-auto whitespace-nowrap bg-rooted-green hover:bg-rooted-green/90 text-white"
+                >
+                  Message {selectedIds.size} selected
+                </Button>
+              </>
             )}
             <span className={`text-xs text-stone self-center whitespace-nowrap ${selectedIds.size > 0 ? "" : "sm:ml-auto"}`}>
               {filtered.length.toLocaleString()} lead{filtered.length === 1 ? "" : "s"}
@@ -705,6 +848,7 @@ export function RecruitmentClient({ queue, queueTotalDue, summary, studentSummar
                   <SortHead label="Campus" sortKey="campus" sort={sort} onSort={toggleSort} className="hidden lg:table-cell" />
                   <SortHead label="Source" sortKey="source" sort={sort} onSort={toggleSort} className="hidden md:table-cell" />
                   <SortHead label="Stage" sortKey="stage" sort={sort} onSort={toggleSort} />
+                  <SortHead label="Owner" sortKey="owner" sort={sort} onSort={toggleSort} className="hidden lg:table-cell" />
                   <SortHead label="Last contact" sortKey="last_contact" sort={sort} onSort={toggleSort} className="hidden lg:table-cell" />
                   <TableHead />
                 </TableRow>
@@ -762,6 +906,13 @@ export function RecruitmentClient({ queue, queueTotalDue, summary, studentSummar
                       <TableCell>
                         <Badge variant={cfg.variant}>{cfg.label}</Badge>
                       </TableCell>
+                      <TableCell className="hidden lg:table-cell text-sm">
+                        {lead.assigned_to ? (
+                          staffNameById.get(lead.assigned_to) ?? "Unknown"
+                        ) : (
+                          <span className="text-stone">Unassigned</span>
+                        )}
+                      </TableCell>
                       <TableCell className="hidden lg:table-cell text-sm text-stone">
                         {lead.last_contact_at ? formatRelativeTime(lead.last_contact_at) : "Never"}
                       </TableCell>
@@ -800,6 +951,53 @@ export function RecruitmentClient({ queue, queueTotalDue, summary, studentSummar
 
       {/* Share & QR generator (Capture Kit) */}
       <ShareDialog open={shareOpen} onOpenChange={setShareOpen} campuses={campuses} />
+
+      {/* Bulk assign dialog */}
+      <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign {selectedIds.size} lead{selectedIds.size === 1 ? "" : "s"}</DialogTitle>
+            <DialogDescription>
+              Every selected lead moves to this staff member. A lead whose campus they don&apos;t
+              cover is skipped and reported below — the rest still go through.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Select
+              value={assignTargetId}
+              onChange={(e) => setAssignTargetId(e.target.value)}
+              aria-label="Assign to"
+            >
+              <option value="">Choose a staff member…</option>
+              {bulkAssignOptions.map((s) => (
+                <option key={s.user_id} value={s.user_id}>
+                  {s.full_name} · {s.campus_name}
+                </option>
+              ))}
+            </Select>
+            {assignResults && (
+              <div className="text-xs space-y-1">
+                <p className="text-ink/80">
+                  {assignResults.filter((r) => r.ok).length} assigned successfully.
+                </p>
+                {assignResults.some((r) => !r.ok) && (
+                  <p className="text-error">
+                    {assignResults.filter((r) => !r.ok).length} could not be assigned (different campus, or no longer exist).
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignOpen(false)} disabled={isPending}>
+              Close
+            </Button>
+            <Button onClick={submitBulkAssign} disabled={isPending || !assignTargetId}>
+              {isPending ? "Assigning…" : "Assign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Lead dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>

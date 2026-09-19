@@ -30,6 +30,7 @@ import {
   IconAlertTriangle,
 } from "@/components/ui/icons";
 import type { LeadDetail } from "@/lib/queries/leads";
+import type { StaffUserRow } from "@/lib/queries/staff";
 import {
   CALL_OUTCOMES,
   FOLLOW_UP_OPTIONS,
@@ -42,7 +43,13 @@ import {
 } from "@/lib/lead-call-outcomes";
 import { INTEREST_FOCUS_LABELS } from "@/lib/lead-interest-survey";
 import { formatRelativeTime } from "@/lib/queries/utils";
-import { staffDeleteLead, staffGetReferralLink, staffLogLeadActivity, staffUpdateLead } from "../actions";
+import {
+  staffAssignLead,
+  staffDeleteLead,
+  staffGetReferralLink,
+  staffLogLeadActivity,
+  staffUpdateLead,
+} from "../actions";
 import { PATHWAY_LABELS, INTENT_LABELS, SOURCE_LABELS, STAGE_CONFIG } from "../recruitment-client";
 import { ComposeEmailDialog } from "@/components/staff/compose-email-dialog";
 
@@ -60,12 +67,15 @@ const ACTIVITY_ICONS: Record<string, ReactNode> = {
 export function LeadDetailClient({
   lead,
   staffUserId,
+  campusStaff,
 }: {
   lead: LeadDetail | null;
   staffUserId: string;
+  campusStaff: StaffUserRow[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [ownerError, setOwnerError] = useState<string | null>(null);
   const [logOpen, setLogOpen] = useState(false);
   const [logType, setLogType] = useState<"call" | "note">("call");
   const [logBody, setLogBody] = useState("");
@@ -224,6 +234,19 @@ export function LeadDetailClient({
         { stage: stage as "new" | "contacted" | "engaged" | "applied" | "closed" },
         staffUserId
       );
+      router.refresh();
+    });
+  }
+
+  function changeOwner(assigneeId: string | null) {
+    if (!lead) return;
+    setOwnerError(null);
+    startTransition(async () => {
+      const result = await staffAssignLead(lead.id, assigneeId);
+      if (result.error) {
+        setOwnerError(result.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -447,6 +470,21 @@ export function LeadDetailClient({
                   {lead.referral_applied > 0 && ` · ${lead.referral_applied} applied`}
                 </p>
               )}
+            </div>
+            <div className="pt-2 border-t border-stone/10">
+              <label htmlFor="owner-select" className="text-xs text-stone block mb-1">Owner</label>
+              <Select
+                id="owner-select"
+                value={lead.assigned_to ?? ""}
+                onChange={(e) => changeOwner(e.target.value || null)}
+                disabled={isPending}
+              >
+                <option value="">Unassigned</option>
+                {campusStaff.map((s) => (
+                  <option key={s.user_id} value={s.user_id}>{s.full_name}</option>
+                ))}
+              </Select>
+              {ownerError && <p className="text-xs text-error mt-1">{ownerError}</p>}
             </div>
             <div className="pt-2 border-t border-stone/10">
               <label htmlFor="stage-select" className="text-xs text-stone block mb-1">Stage</label>

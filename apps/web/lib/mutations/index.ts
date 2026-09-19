@@ -108,6 +108,8 @@ export {
   logLeadActivity,
   updateLead,
   deleteLead,
+  assignLead,
+  bulkAssignLeads,
   ensureReferralCode,
   stitchLeadToApplication,
   LEAD_STAGES,
@@ -115,6 +117,7 @@ export {
   type CreateLeadInput,
   type UpdateLeadInput,
   type LeadStage,
+  type BulkAssignResult,
 } from "./leads";
 
 // Event + RSVP mutations
