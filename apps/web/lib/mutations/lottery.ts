@@ -18,6 +18,8 @@ import {
   parseLotteryPolicyConfig,
   siblingAbsolutePreference,
   enabledWeightedTiers,
+  enabledAutoOfferAbsolutePreferencesInOrder,
+  governedBandLabels,
   acceptanceExpiryFrom,
   NO_ADOPTED_POLICY_MESSAGE,
   type LotteryPolicyConfig,
@@ -28,14 +30,9 @@ import {
   deriveSiblingOfEnrolled,
   deriveLinkedSiblings,
   matchWeightedTiers,
+  matchAbsolutePreferences,
 } from "@/lib/lottery-eligibility";
-import {
-  runPolicyDraw,
-  TIER_GENERAL,
-  TIER_LINKED_SIBLING,
-  TIER_SIBLING_ABSOLUTE,
-  type DrawEntry,
-} from "@/lib/lottery-draw";
+import { runPolicyDraw, type DrawEntry, type DrawAbsoluteBand } from "@/lib/lottery-draw";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -458,6 +455,8 @@ interface BuiltEntries {
   summary: Record<string, unknown>;
   /** Enabled weighted tiers' capPercent, keyed by tier key. 0/undefined omitted — see DrawOptions.capPercents. */
   capPercents: Record<string, number>;
+  /** Ordered absolute-preference bands for this run — see DrawOptions.absoluteBands. */
+  absoluteBands: DrawAbsoluteBand[];
 }
 
 async function buildPolicyDrawEntries(
@@ -484,22 +483,46 @@ async function buildPolicyDrawEntries(
 
   // capPercent of 0 or undefined means no cap (lottery-policy.ts: "0 = none
   // set"); only tiers with a real, positive cap are passed to the draw so
-  // they constrain seats.
+  // they constrain seats. This is the pre-existing WEIGHTED-TIER cap
+  // mechanism — see lib/lottery-draw.ts module doc for how it differs from
+  // the absolute-preference-band caps built below.
   const capPercents: Record<string, number> = {};
   for (const tier of tiers) {
     if (tier.capPercent && tier.capPercent > 0) capPercents[tier.key] = tier.capPercent;
   }
 
+  // ── Absolute-preference bands, in the campus's configured (discretionary)
+  // order. "sibling_current_enrolled" is evidenced by deriveSiblingOfEnrolled
+  // above; every other enabled, auto-offer preference is matched generically
+  // against its declared source, exactly like a weighted tier.
+  const absolutePreferencesInOrder = enabledAutoOfferAbsolutePreferencesInOrder(config);
+  const absolutePreferenceMatch = await matchAbsolutePreferences(
+    supabase,
+    applicationIds,
+    absolutePreferencesInOrder
+  );
+  const absoluteBands: DrawAbsoluteBand[] = absolutePreferencesInOrder.map((pref) => ({
+    key: pref.key,
+    overflowToPriorityWaitlist: pref.overflowToPriorityWaitlist,
+    capPercent: pref.capPercent && pref.capPercent > 0 ? pref.capPercent : undefined,
+  }));
+
   const inRun = new Set(applicationIds);
 
-  const entries: DrawEntry[] = rawEntries.map((raw) => ({
-    id: raw.id,
-    applicationId: raw.application_id,
-    weight: tierMatch.weightByApplication.get(raw.application_id) ?? config.defaultWeight,
-    tierKeys: tierMatch.tierKeysByApplication.get(raw.application_id) ?? [],
-    siblingOfEnrolled: sibling.qualified.has(raw.application_id),
-    linkedSiblingApplicationIds: (linked.get(raw.application_id) ?? []).filter((id) => inRun.has(id)),
-  }));
+  const entries: DrawEntry[] = rawEntries.map((raw) => {
+    const absolutePreferenceKeys = [
+      ...(sibling.qualified.has(raw.application_id) ? ["sibling_current_enrolled"] : []),
+      ...(absolutePreferenceMatch.preferenceKeysByApplication.get(raw.application_id) ?? []),
+    ];
+    return {
+      id: raw.id,
+      applicationId: raw.application_id,
+      weight: tierMatch.weightByApplication.get(raw.application_id) ?? config.defaultWeight,
+      tierKeys: tierMatch.tierKeysByApplication.get(raw.application_id) ?? [],
+      absolutePreferenceKeys,
+      linkedSiblingApplicationIds: (linked.get(raw.application_id) ?? []).filter((id) => inRun.has(id)),
+    };
+  });
 
   const summary: Record<string, unknown> = {
     sibling_method: sibling.method,
@@ -518,9 +541,15 @@ async function buildPolicyDrawEntries(
     })),
     unsourced_tiers: tierMatch.unsourcedTierKeys,
     default_weight: config.defaultWeight,
+    absolute_preference_bands: absolutePreferencesInOrder.map((pref) => ({
+      key: pref.key,
+      label: pref.label,
+      cap_percent: pref.capPercent && pref.capPercent > 0 ? pref.capPercent : null,
+    })),
+    unsourced_absolute_preferences: absolutePreferenceMatch.unsourcedPreferenceKeys,
   };
 
-  return { entries, summary, capPercents };
+  return { entries, summary, capPercents, absoluteBands };
 }
 
 // ─── Run Preview (Deterministic — Seeded & Reproducible) ───────────────────
@@ -597,7 +626,6 @@ export async function runLotteryPreview(runId: string): Promise<
   const now = new Date().toISOString();
 
   if (binding.config) {
-    const preference = siblingAbsolutePreference(binding.config);
     const built = await buildPolicyDrawEntries(
       supabase,
       runId,
@@ -607,8 +635,7 @@ export async function runLotteryPreview(runId: string): Promise<
     );
 
     const result = runPolicyDraw(seed, built.entries, run.total_seats as number, {
-      siblingAutoOffer: preference?.autoOfferBeforeDraw ?? false,
-      siblingOverflowPriority: preference?.overflowToPriorityWaitlist ?? false,
+      absoluteBands: built.absoluteBands,
       linkedSiblingActivation: binding.config.linkedSiblingActivation,
       capPercents: built.capPercents,
     });
@@ -623,8 +650,11 @@ export async function runLotteryPreview(runId: string): Promise<
       sibling_auto_placed: result.siblingAutoPlaced,
       sibling_priority_waitlisted: result.siblingPriorityWaitlisted,
       linked_sibling_activated: result.linkedSiblingActivated,
-      // Per-tier cap enforcement, one row per tier with an active capPercent
-      // — empty when no enabled tier carries a cap. See DrawResult.capAccounting.
+      // Per-band accounting (seated / priority-waitlisted / demoted by cap /
+      // recovered after demotion) for every configured absolute preference.
+      absolute_band_counts: result.absoluteBandCounts,
+      // Per-tier/per-band cap enforcement — empty when nothing carries an
+      // active capPercent. See DrawResult.capAccounting.
       cap_accounting: result.capAccounting,
       drawn_at: now,
     };
@@ -752,12 +782,6 @@ export interface LotterySimulation {
   governed_by: string | null;
 }
 
-const GOVERNED_BAND_LABELS: Record<number, string> = {
-  [TIER_SIBLING_ABSOLUTE]: "Sibling of a currently enrolled student",
-  [TIER_LINKED_SIBLING]: "Sibling pulled in by the linked-sibling rule",
-  [TIER_GENERAL]: "General weighted pool",
-};
-
 export async function simulateLotteryRun(
   runId: string,
   seatsOverride?: number
@@ -792,8 +816,13 @@ export async function simulateLotteryRun(
     (run.lottery_rule_set_id as string | null) ?? undefined
   );
 
+  // Built from THIS run's own governing config, not a fixed three-row
+  // table — a multi-band SC/OH policy gets one label per configured band,
+  // not just "sibling / linked / general." See governedBandLabels doc.
+  const governedLabels = binding.config ? governedBandLabels(binding.config) : null;
+
   const labelFor = (tier: number) => {
-    if (binding.config) return GOVERNED_BAND_LABELS[tier] ?? "General weighted pool";
+    if (governedLabels) return governedLabels[tier] ?? "General weighted pool";
     return tiers[tier]?.label ?? "General pool";
   };
 

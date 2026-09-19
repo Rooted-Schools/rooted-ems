@@ -12,6 +12,8 @@ import {
   isLotteryPolicyConfigValid,
   enabledWeightedTiers,
   siblingAbsolutePreference,
+  enabledAutoOfferAbsolutePreferencesInOrder,
+  governedBandLabels,
   unsourcedWeightedTiers,
   acceptanceExpiryFrom,
   waitlistOfferExpiryFrom,
@@ -303,6 +305,72 @@ describe("parseLotteryPolicyConfig — refusals", () => {
     (raw.absolutePreferences as Array<Record<string, unknown>>)[0].authorityNote = "";
     const { errors } = parseLotteryPolicyConfig(raw);
     expect(errors.some((e) => /no authority citation/i.test(e))).toBe(true);
+  });
+
+  it("rejects an absolute-preference cap outside 0 to 100 percent", () => {
+    const raw = rsvConfig();
+    (raw.absolutePreferences as Array<Record<string, unknown>>)[0].capPercent = 140;
+    const { errors } = parseLotteryPolicyConfig(raw);
+    expect(errors.some((e) => /cap must be between 0 and 100/i.test(e))).toBe(true);
+  });
+
+  it("parses an absolute preference with no capPercent as uncapped (undefined, not 0)", () => {
+    const { config } = parseLotteryPolicyConfig(rsvConfig());
+    expect(config!.absolutePreferences[0].capPercent).toBeUndefined();
+  });
+
+  it("parses a multi-band, capped absolute-preference config (SC-shaped) without inventing a global cap", () => {
+    const raw = rsvConfig();
+    raw.absolutePreferences = [
+      { key: "returning_student", label: "Returning student", enabled: true, autoOfferBeforeDraw: true, overflowToPriorityWaitlist: true, siblingDefinition: "shared_legal_guardian", definition: "", fosterExcludedUntilLegalGuardianship: false, verificationMayBeRequired: false, falseClaimForfeitsSeat: false, authorityNote: "SC Code 59-40-50(B)(8)" },
+      { key: "sibling_current_enrolled", label: "Sibling", enabled: true, autoOfferBeforeDraw: true, overflowToPriorityWaitlist: true, siblingDefinition: "shared_legal_guardian", definition: "", fosterExcludedUntilLegalGuardianship: true, verificationMayBeRequired: true, falseClaimForfeitsSeat: true, authorityNote: "SC Code 59-40-50(B)(8)" },
+      { key: "staff_or_board_child", label: "Employee or board member child", enabled: true, autoOfferBeforeDraw: true, overflowToPriorityWaitlist: true, siblingDefinition: "shared_legal_guardian", definition: "", fosterExcludedUntilLegalGuardianship: false, verificationMayBeRequired: false, falseClaimForfeitsSeat: false, authorityNote: "SC Code 59-40-50(B)(8)", capPercent: 20, source: { kind: "application_answer", field: "is_staff_child" } },
+      { key: "military_dependent", label: "Active-duty military dependent", enabled: true, autoOfferBeforeDraw: true, overflowToPriorityWaitlist: true, siblingDefinition: "shared_legal_guardian", definition: "", fosterExcludedUntilLegalGuardianship: false, verificationMayBeRequired: false, falseClaimForfeitsSeat: false, authorityNote: "SC Code 59-40-50(B)(8)", capPercent: 10 },
+    ];
+    const { config, errors } = parseLotteryPolicyConfig(raw);
+    // military_dependent declares no source at all — that is a config-
+    // authoring gap to flag via unsourcedAbsolutePreferences, not a parse
+    // error; parsing itself must still succeed.
+    expect(errors).toEqual([]);
+    expect(config!.absolutePreferences.map((p) => p.capPercent)).toEqual([
+      undefined,
+      undefined,
+      20,
+      10,
+    ]);
+  });
+});
+
+describe("ordered absolute preferences — helpers used by the draw", () => {
+  it("returns absolute preferences in configured order, filtering to enabled + auto-offer only", () => {
+    const raw = rsvConfig();
+    raw.absolutePreferences = [
+      { key: "returning_student", label: "Returning student", enabled: true, autoOfferBeforeDraw: true, overflowToPriorityWaitlist: true, siblingDefinition: "shared_legal_guardian", definition: "", fosterExcludedUntilLegalGuardianship: false, verificationMayBeRequired: false, falseClaimForfeitsSeat: false, authorityNote: "cite" },
+      { key: "sibling_current_enrolled", label: "Sibling", enabled: true, autoOfferBeforeDraw: false, overflowToPriorityWaitlist: true, siblingDefinition: "shared_legal_guardian", definition: "", fosterExcludedUntilLegalGuardianship: true, verificationMayBeRequired: true, falseClaimForfeitsSeat: true, authorityNote: "cite" },
+      { key: "military_dependent", label: "Military dependent", enabled: false, autoOfferBeforeDraw: true, overflowToPriorityWaitlist: true, siblingDefinition: "shared_legal_guardian", definition: "", fosterExcludedUntilLegalGuardianship: false, verificationMayBeRequired: false, falseClaimForfeitsSeat: false, authorityNote: "cite", capPercent: 10 },
+    ];
+    const { config } = parseLotteryPolicyConfig(raw);
+    // sibling is enabled but NOT auto-offer (excluded), military is
+    // auto-offer but NOT enabled (excluded) — only returning_student remains.
+    expect(enabledAutoOfferAbsolutePreferencesInOrder(config!).map((p) => p.key)).toEqual([
+      "returning_student",
+    ]);
+  });
+
+  it("builds governed band labels in tier order: bands, then linked-sibling, then general", () => {
+    const { config } = parseLotteryPolicyConfig(rsvConfig());
+    expect(governedBandLabels(config!)).toEqual([
+      "Sibling of a currently enrolled student",
+      "Linked-sibling activation",
+      "General weighted pool",
+    ]);
+  });
+
+  it("falls back to a single general-pool label when no absolute preference is configured", () => {
+    const raw = rsvConfig();
+    raw.absolutePreferences = [];
+    const { config } = parseLotteryPolicyConfig(raw);
+    expect(governedBandLabels(config!)).toEqual(["Linked-sibling activation", "General weighted pool"]);
   });
 });
 

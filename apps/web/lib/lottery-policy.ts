@@ -167,13 +167,36 @@ export interface LotteryPolicyAbsolutePreference {
   autoOfferBeforeDraw: boolean;
   /** Overflow goes to a priority waitlist band ahead of the general waitlist. */
   overflowToPriorityWaitlist: boolean;
-  /** How the sibling relationship is established in the data. */
+  /** How the sibling relationship is established in the data. Only meaningful for key "sibling_current_enrolled". */
   siblingDefinition: "shared_legal_guardian" | "shared_household";
   definition: string;
   fosterExcludedUntilLegalGuardianship: boolean;
   verificationMayBeRequired: boolean;
   falseClaimForfeitsSeat: boolean;
   authorityNote: string;
+  /**
+   * Founders'/staff'/military-style cap: share of seats THIS preference may
+   * seat, 0/undefined = none set — same "0 = no cap" convention as
+   * LotteryPolicyWeightedTier.capPercent. See lib/lottery-draw.ts
+   * (DrawAbsoluteBand.capPercent and the equal-footing fix) for how a cap
+   * on an absolute preference is enforced: an applicant beyond the cap is
+   * NOT merely turned away — they compete for a general seat on exactly the
+   * footing they would have had if they had never claimed the preference.
+   * Two preferences sharing ONE combined cap (e.g. SC's "employees AND
+   * board members, capped together at 20%") are expressed as a single
+   * absolutePreferences entry whose match criteria cover both — the engine
+   * only ever sees one key, one cap.
+   */
+  capPercent?: number;
+  /**
+   * How this preference is evidenced beyond "sibling_current_enrolled"
+   * (whose evidence is the guardian/enrollment linkage in
+   * lib/lottery-eligibility.ts, not this field). Optional: a preference
+   * declared without a usable source reports as unsourced rather than
+   * fabricating a match, exactly like an unsourced weighted tier — see
+   * unsourcedWeightedTiers below, and its absolute-preference counterpart.
+   */
+  source?: LotteryPolicySource;
 }
 
 // ─── Weighted tiers ────────────────────────────────────────────────────────
@@ -425,6 +448,10 @@ export function parseLotteryPolicyConfig(raw: unknown): LotteryPolicyParseResult
         `absolutePreferences[${idx}] ("${asString(a.label, key)}") is enabled but carries no authority citation.`
       );
     }
+    const capPercent = a.capPercent === undefined ? undefined : asNumber(a.capPercent, 0);
+    if (capPercent !== undefined && (capPercent < 0 || capPercent > 100)) {
+      errors.push(`absolutePreferences[${idx}] ("${asString(a.label, key)}") cap must be between 0 and 100 percent.`);
+    }
     absolutePreferences.push({
       key,
       label: asString(a.label, key),
@@ -438,6 +465,8 @@ export function parseLotteryPolicyConfig(raw: unknown): LotteryPolicyParseResult
       verificationMayBeRequired: asBool(a.verificationMayBeRequired, false),
       falseClaimForfeitsSeat: asBool(a.falseClaimForfeitsSeat, false),
       authorityNote,
+      capPercent,
+      source: a.source === undefined ? undefined : parseSource(a.source, `absolutePreferences[${idx}]`, errors),
     });
   });
 
@@ -665,6 +694,63 @@ export function siblingAbsolutePreference(
   return (
     config.absolutePreferences.find((p) => p.key === "sibling_current_enrolled" && p.enabled) ?? null
   );
+}
+
+/**
+ * Every enabled, auto-offer-before-draw absolute preference, IN THE ORDER
+ * THE POLICY DECLARES THEM. That order is the draw's absolute-preference
+ * band order (lib/lottery-draw.ts, DrawOptions.absoluteBands) — for a
+ * campus like SC whose adopted policy states a student "eligible for more
+ * than one preference is enrolled under only one, at the school's
+ * discretion," this configured order IS that discretion, exercised in
+ * advance rather than case by case. A preference that is enabled but not
+ * configured to auto-offer before the draw is deliberately excluded here,
+ * matching the pre-generalization engine's behavior for a disabled sibling
+ * preference (it never became a band either).
+ */
+export function enabledAutoOfferAbsolutePreferencesInOrder(
+  config: LotteryPolicyConfig
+): LotteryPolicyAbsolutePreference[] {
+  return config.absolutePreferences.filter((p) => p.enabled && p.autoOfferBeforeDraw);
+}
+
+/**
+ * Plain-English labels for every governed priority_tier number a draw can
+ * produce for this policy, in tier order: one per absolute-preference band,
+ * then linked-sibling activation, then the general pool. Shared by the
+ * staff simulate-run label lookup (lib/mutations/lottery.ts) and the family
+ * result label lookup (lib/queries/family.ts) so the two never drift, and so
+ * a multi-band SC/OH policy is labeled correctly instead of falling back to
+ * a hardcoded three-row RSV-shaped table.
+ */
+export function governedBandLabels(config: LotteryPolicyConfig): string[] {
+  const bands = enabledAutoOfferAbsolutePreferencesInOrder(config);
+  return [
+    ...bands.map((b) => b.label),
+    "Linked-sibling activation",
+    "General weighted pool",
+  ];
+}
+
+/**
+ * Absolute preferences (other than "sibling_current_enrolled", which is
+ * evidenced through the guardian/enrollment linkage in
+ * lib/lottery-eligibility.ts, not through a declared source) whose source is
+ * not something the application forms actually collect. Mirrors
+ * unsourcedWeightedTiers: reported honestly rather than silently treated as
+ * "nobody qualified."
+ */
+export function unsourcedAbsolutePreferences(
+  config: LotteryPolicyConfig
+): LotteryPolicyAbsolutePreference[] {
+  return enabledAutoOfferAbsolutePreferencesInOrder(config).filter((pref) => {
+    if (pref.key === "sibling_current_enrolled") return false;
+    if (!pref.source || pref.source.kind === "unavailable") return true;
+    if (pref.source.kind === "application_column") {
+      return !POLICY_MATCHABLE_APPLICATION_COLUMNS.includes(pref.source.field);
+    }
+    return !POLICY_COLLECTED_ANSWER_KEYS.includes(pref.source.field);
+  });
 }
 
 /**

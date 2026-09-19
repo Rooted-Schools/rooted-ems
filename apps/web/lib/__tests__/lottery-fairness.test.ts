@@ -46,15 +46,14 @@ function population(count: number, next: () => number): DrawEntry[] {
       applicationId: id,
       weight: 1,
       tierKeys: [] as string[],
-      siblingOfEnrolled: false,
+      absolutePreferenceKeys: [] as string[],
       linkedSiblingApplicationIds: [] as string[],
     };
   });
 }
 
 const OPTIONS = {
-  siblingAutoOffer: true,
-  siblingOverflowPriority: true,
+  absoluteBands: [{ key: "sibling_current_enrolled", overflowToPriorityWaitlist: true }],
   linkedSiblingActivation: true,
 };
 
