@@ -139,6 +139,9 @@ function SortHead({
 
 interface RecruitmentClientProps {
   queue: LeadRow[];
+  /** Honest total of every open lead due right now, uncapped — may exceed
+   *  queue.length when the server-side cap truncated the list. */
+  queueTotalDue: number;
   summary: LeadPipelineSummary;
   /** Student-level counts for this campus: how many prospective students exist
    *  and how many families carry more than one. */
@@ -166,7 +169,7 @@ const EMPTY_LEAD = {
   notes: "",
 };
 
-export function RecruitmentClient({ queue, summary, studentSummary, leads, campaigns, journeys, campuses, activeCampusId, staffUserId }: RecruitmentClientProps) {
+export function RecruitmentClient({ queue, queueTotalDue, summary, studentSummary, leads, campaigns, journeys, campuses, activeCampusId, staffUserId }: RecruitmentClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
@@ -395,7 +398,7 @@ export function RecruitmentClient({ queue, summary, studentSummary, leads, campa
         <Card className="border-warn/30 bg-warn/10">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-1.5">
-              <IconPhone size={16} /> Follow up today ({queue.length})
+              <IconPhone size={16} /> Follow up today ({queueTotalDue})
             </CardTitle>
             <CardDescription>
               {queue.length > 0
@@ -404,6 +407,8 @@ export function RecruitmentClient({ queue, summary, studentSummary, leads, campa
               {queue.length > 0 &&
                 callbacksDueCount > 0 &&
                 ` ${callbacksDueCount} ${callbacksDueCount === 1 ? "is" : "are"} a promised callback.`}
+              {queue.length < queueTotalDue &&
+                ` Showing ${queue.length} of ${queueTotalDue} due — callbacks first.`}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">

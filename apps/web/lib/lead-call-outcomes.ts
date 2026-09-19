@@ -4,9 +4,15 @@
  * truth for the outcome labels, the follow-up cadence each one implies, and
  * how they're encoded into a lead_activity.body ("[Reached] ...") so the
  * timeline stays human-readable while still being machine-derivable. The
- * "wrong number" phone flag and the follow-up queue's "callback due"
- * grouping (lib/queries/leads.ts getFollowUpQueue) both read the same prefix
- * back out via bodyHasOutcome instead of trusting a second, driftable signal.
+ * lead detail page's "wrong number" phone flag and "callback" timeline badge
+ * read that prefix back out via bodyHasOutcome. The follow-up queue
+ * (lib/queries/leads.ts getFollowUpQueue) does NOT: sorting "callbacks due
+ * first" ahead of older non-callbacks isn't expressible against a value
+ * derived from a joined table, so that grouping is instead backed by the
+ * lead.next_follow_up_reason column, written in the same update as
+ * next_follow_up_at (see submitLog in
+ * app/staff/recruitment/[id]/lead-detail-client.tsx) so it can't drift from
+ * what was actually logged either.
  *
  * Why outcomes carry a cadence: a recruiter works from "who do I call today",
  * so the outcome of one call has to decide when the next one happens. Before
@@ -75,6 +81,18 @@ function toLocalYmd(d: Date): string {
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${month}-${day}`;
+}
+
+/**
+ * Today's date as a local yyyy-mm-dd, for the callback date picker's `min`.
+ * `new Date().toISOString().split("T")[0]` looks equivalent but isn't: it
+ * reads the UTC calendar date, which is already tomorrow for a US recruiter
+ * once UTC has rolled over (as early as 7pm ET) — the picker then refuses to
+ * let them pick today. getFullYear/getMonth/getDate read the browser's local
+ * calendar date instead.
+ */
+export function todayLocalYmd(now: Date = new Date()): string {
+  return toLocalYmd(now);
 }
 
 /** Interval-based follow-ups land at the start of the day so they show up in

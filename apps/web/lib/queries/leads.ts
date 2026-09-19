@@ -1,5 +1,4 @@
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
-import { bodyHasOutcome } from "@/lib/lead-call-outcomes";
 
 // Re-exported for existing importers — the vocabulary itself now lives in
 // lib/lead-call-outcomes.ts (dependency-free, so "use client" components can
@@ -205,56 +204,102 @@ export async function getLeadStudentSummary(
   return { prospective_students: prospective, families_multi_student: multi };
 }
 
+export interface FollowUpQueueResult {
+  /** Due leads to show, callbacks first, each group oldest-first, capped at
+   *  `limit`. Never a silent truncation — see `totalDue`. */
+  items: LeadRow[];
+  /** Honest count of every open lead whose follow-up is currently due,
+   *  regardless of `limit`, so the UI can say "showing N of M" instead of
+   *  quietly dropping whatever didn't fit. */
+  totalDue: number;
+}
+
+const FOLLOW_UP_QUEUE_STAGES = ["new", "contacted", "engaged"] as const;
+const FOLLOW_UP_QUEUE_DEFAULT_LIMIT = 200;
+
 /**
- * The exception queue: open leads whose follow-up date has arrived, ordered
- * oldest-first so the most overdue family is always on top.
+ * The exception queue: open leads whose follow-up date has arrived.
+ *
+ * Due callbacks (next_follow_up_reason = 'callback' — the family named a
+ * time) always surface ahead of older non-callbacks: a promised callback due
+ * today is a harder commitment than a stale "Left voicemail" cadence, and
+ * burying it under 50-oldest-first was exactly the bug this replaced.
+ * PostgREST can't express "callbacks first, then everything else" inside one
+ * ORDER BY, so this runs two ordered (oldest-first within each group)
+ * queries and merges them, capped at `limit` combined. `totalDue` is a
+ * separate honest count of everything due, uncapped, so the queue can never
+ * silently hide work the way `.limit(50)` used to — the caller shows
+ * "showing N of M" whenever items.length < totalDue.
  */
-export async function getFollowUpQueue(campusId?: string): Promise<LeadRow[]> {
+export async function getFollowUpQueue(
+  campusId?: string,
+  limit: number = FOLLOW_UP_QUEUE_DEFAULT_LIMIT
+): Promise<FollowUpQueueResult> {
   const supabase = await createServerClient();
   const nowIso = new Date().toISOString();
 
-  let query = supabase
+  let countQuery = supabase
+    .from("lead")
+    .select("id", { count: "exact", head: true })
+    .in("stage", FOLLOW_UP_QUEUE_STAGES)
+    .lte("next_follow_up_at", nowIso);
+  if (campusId) countQuery = countQuery.eq("campus_id", campusId);
+  const { count: totalDue, error: countError } = await countQuery;
+  if (countError) console.error("[getFollowUpQueue] count", countError.message);
+
+  let callbackQuery = supabase
     .from("lead")
     .select(LEAD_LIST_SELECT)
-    .in("stage", ["new", "contacted", "engaged"])
+    .in("stage", FOLLOW_UP_QUEUE_STAGES)
     .lte("next_follow_up_at", nowIso)
+    .eq("next_follow_up_reason", "callback")
     .order("next_follow_up_at", { ascending: true })
-    .limit(50);
-  if (campusId) query = query.eq("campus_id", campusId);
+    .limit(limit);
+  if (campusId) callbackQuery = callbackQuery.eq("campus_id", campusId);
 
-  const { data, error } = await query;
-  if (error) {
-    console.error("[getFollowUpQueue]", error.message);
-    return [];
-  }
-  const rows = (data ?? []).map((row: Record<string, unknown>) => toLeadRow(row));
-  if (rows.length === 0) return rows;
-
-  // A due follow-up is specifically a "callback" when it was set by the
-  // structured "Call back later" outcome — derived from each lead's most
-  // recent call activity body, one batch query (no N+1), never a second
-  // column that could drift from what was actually logged.
-  const { data: callActivities, error: callError } = await supabase
-    .from("lead_activity")
-    .select("lead_id, body, created_at")
-    .in("lead_id", rows.map((r) => r.id))
-    .eq("activity_type", "call")
-    .order("created_at", { ascending: false });
-
-  if (callError) {
-    console.error("[getFollowUpQueue] call activities", callError.message);
-    return rows;
+  const { data: callbackData, error: callbackError } = await callbackQuery;
+  if (callbackError) {
+    console.error("[getFollowUpQueue] callbacks", callbackError.message);
+    return { items: [], totalDue: totalDue ?? 0 };
   }
 
-  const latestCallBodyByLead = new Map<string, string | null>();
-  for (const a of (callActivities ?? []) as { lead_id: string; body: string | null }[]) {
-    if (!latestCallBodyByLead.has(a.lead_id)) latestCallBodyByLead.set(a.lead_id, a.body);
-  }
-
-  return rows.map((r) => ({
-    ...r,
-    is_callback: bodyHasOutcome(latestCallBodyByLead.get(r.id), "callback"),
+  const callbacks = (callbackData ?? []).map((row: Record<string, unknown>) => ({
+    ...toLeadRow(row),
+    is_callback: true,
   }));
+
+  const remaining = Math.max(0, limit - callbacks.length);
+  let items = callbacks;
+
+  if (remaining > 0) {
+    // NULL semantics trap: `.not("next_follow_up_reason", "eq", "callback")`
+    // would also drop every row where the column is NULL (the vast majority
+    // of leads, which never had a structured call outcome logged), leaving
+    // this query almost empty. `.or(...)` states both cases explicitly.
+    let restQuery = supabase
+      .from("lead")
+      .select(LEAD_LIST_SELECT)
+      .in("stage", FOLLOW_UP_QUEUE_STAGES)
+      .lte("next_follow_up_at", nowIso)
+      .or("next_follow_up_reason.is.null,next_follow_up_reason.neq.callback")
+      .order("next_follow_up_at", { ascending: true })
+      .limit(remaining);
+    if (campusId) restQuery = restQuery.eq("campus_id", campusId);
+
+    const { data: restData, error: restError } = await restQuery;
+    if (restError) {
+      console.error("[getFollowUpQueue] non-callbacks", restError.message);
+    } else {
+      items = items.concat(
+        (restData ?? []).map((row: Record<string, unknown>) => ({
+          ...toLeadRow(row),
+          is_callback: false,
+        }))
+      );
+    }
+  }
+
+  return { items, totalDue: totalDue ?? items.length };
 }
 
 const ALL_STAGES = ["new", "contacted", "engaged", "applied", "closed"] as const;

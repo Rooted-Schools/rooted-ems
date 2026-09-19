@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { recordCronRun } from "@/lib/cron-heartbeat";
 import { notifyLeadReengagement } from "@/lib/notify";
 import { isAutomatedOutreachEnabled } from "@/lib/messaging-flags";
+import { isEligibleForReengagement } from "@/lib/lead-reengagement";
 
 /**
  * Cron endpoint that re-engages gone-quiet leads: open leads with no
@@ -47,13 +48,34 @@ export async function GET(request: NextRequest) {
 
   // Open, never-re-engaged leads whose last contact (or creation, if never
   // contacted) is older than the quiet window.
+  //
+  // Two human decisions this must never overwrite:
+  //  - next_follow_up_at in the future: a recruiter already promised this
+  //    family a specific time (a "Call back later" further out than
+  //    QUIET_DAYS, or any other scheduled touch). `.is(...).or(...)` covers
+  //    "never scheduled" OR "scheduled for the past/now" — NOT scheduled for
+  //    later — without excluding the (common) leads with no follow-up date
+  //    at all, which a plain `.lt("next_follow_up_at", nowIso)` would do.
+  //  - next_follow_up_reason = 'wrong_number': logging that outcome already
+  //    sets last_contact_at (call is a CONTACT_ACTIVITY_TYPE), so this lead
+  //    would otherwise look "quiet" again exactly QUIET_DAYS later and get
+  //    an automated email/SMS blasted at a number staff just flagged as bad.
+  //    `.not("next_follow_up_reason", "eq", "wrong_number")` would look
+  //    equivalent but silently drops every NULL row too (PostgREST NULL
+  //    semantics: NULL is neither equal nor not-equal to anything), which is
+  //    nearly every lead — `.or(...)` states "no reason set, or some other
+  //    reason" explicitly instead.
   const { data: leads, error: fetchErr } = await supabase
     .from("lead")
-    .select("id, campus_id, first_name, email, phone, sms_consent, last_contact_at, created_at, unsubscribe_token")
+    .select(
+      "id, campus_id, first_name, email, phone, sms_consent, last_contact_at, created_at, unsubscribe_token, next_follow_up_at, next_follow_up_reason"
+    )
     .in("stage", ["new", "contacted", "engaged"])
     .is("application_id", null)
     .is("reengaged_at", null)
     .is("unsubscribed_at", null) // LG-0.1: never re-engage an unsubscribed family
+    .or(`next_follow_up_at.is.null,next_follow_up_at.lte.${nowIso}`)
+    .or("next_follow_up_reason.is.null,next_follow_up_reason.neq.wrong_number")
     .or(`last_contact_at.lt.${quietCutoff},and(last_contact_at.is.null,created_at.lt.${quietCutoff})`);
 
   if (fetchErr) {
@@ -72,6 +94,21 @@ export async function GET(request: NextRequest) {
 
   for (const lead of leads ?? []) {
     try {
+      // Second, independently-testable gate on top of the query-level
+      // filters above — see lib/lead-reengagement.ts for why this is
+      // deliberately redundant rather than trusted-once-at-the-query-layer.
+      if (
+        !isEligibleForReengagement(
+          {
+            next_follow_up_at: (lead.next_follow_up_at as string | null) ?? null,
+            next_follow_up_reason: (lead.next_follow_up_reason as string | null) ?? null,
+          },
+          now
+        )
+      ) {
+        continue;
+      }
+
       // Atomic claim: only one runner flips reengaged_at from NULL.
       const { data: claimed, error: claimErr } = await supabase
         .from("lead")

@@ -38,6 +38,7 @@ import {
   computeNextFollowUp,
   defaultFollowUpDaysFor,
   DEFAULT_FOLLOW_UP_TIME,
+  todayLocalYmd,
 } from "@/lib/lead-call-outcomes";
 import { formatRelativeTime } from "@/lib/queries/utils";
 import { staffDeleteLead, staffGetReferralLink, staffLogLeadActivity, staffUpdateLead } from "../actions";
@@ -147,7 +148,14 @@ export function LeadDetailClient({
             logFollowUpDays === null
               ? null
               : new Date(Date.now() + logFollowUpDays * 24 * 60 * 60 * 1000).toISOString();
-          await staffUpdateLead(lead.id, { next_follow_up_at: next }, staffUserId);
+          // A note's follow-up date isn't a structured call outcome — clear
+          // any stale reason (e.g. a prior "callback") so this lead doesn't
+          // keep jumping the queue for a promise that's no longer live.
+          await staffUpdateLead(
+            lead.id,
+            { next_follow_up_at: next, next_follow_up_reason: null },
+            staffUserId
+          );
         }
         setLogOpen(false);
         router.refresh();
@@ -179,7 +187,16 @@ export function LeadDetailClient({
         callbackTime: logCallbackTime,
         overrideDays: logFollowUpOverride,
       });
-      await staffUpdateLead(lead.id, { next_follow_up_at: next }, staffUserId);
+      // Written in the same update as next_follow_up_at so the two can never
+      // drift — this is what lets the follow-up queue sort due callbacks
+      // ahead of older non-callbacks, and lets the re-engage cron refuse to
+      // overwrite a lead someone just flagged as a wrong number even after
+      // next_follow_up_at itself has gone back to null.
+      await staffUpdateLead(
+        lead.id,
+        { next_follow_up_at: next, next_follow_up_reason: logOutcome },
+        staffUserId
+      );
       setLogOpen(false);
       router.refresh();
     });
@@ -565,7 +582,7 @@ export function LeadDetailClient({
                       id="callback-date"
                       type="date"
                       value={logCallbackDate}
-                      min={new Date().toISOString().split("T")[0]}
+                      min={todayLocalYmd()}
                       onChange={(e) => setLogCallbackDate(e.target.value)}
                     />
                     <label

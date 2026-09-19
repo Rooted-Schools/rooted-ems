@@ -28,7 +28,7 @@ export default async function StaffRecruitmentPage({
   const lensCampusId = await getCampusLensId(accessibleIds);
   const activeCampus = resolveActiveCampus(session, searchParams?.campus, lensCampusId);
   const supabase = await createServerClient();
-  const [queue, summary, studentSummary, leads, campaigns, journeys, { data: campusRows }] = await Promise.all([
+  const [followUpQueue, summary, studentSummary, leads, campaigns, journeys, { data: campusRows }] = await Promise.all([
     getFollowUpQueue(activeCampus),
     getLeadPipelineSummary(activeCampus),
     getLeadStudentSummary(activeCampus),
@@ -47,7 +47,8 @@ export default async function StaffRecruitmentPage({
 
   return (
     <RecruitmentClient
-      queue={queue}
+      queue={followUpQueue.items}
+      queueTotalDue={followUpQueue.totalDue}
       summary={summary}
       studentSummary={studentSummary}
       leads={leads}
