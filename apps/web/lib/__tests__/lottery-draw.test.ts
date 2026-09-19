@@ -452,7 +452,14 @@ describe("per-tier percentage caps", () => {
 
     // Accounting is exact and auditable.
     expect(result.capAccounting).toEqual([
-      { key: CAPPED_KEY, capPercent: 20, seatLimit: 3, selectedCount: 3, displacedCount: 2 },
+      {
+        key: CAPPED_KEY,
+        capPercent: 20,
+        seatLimit: 3,
+        selectedCount: 3,
+        displacedCount: 2,
+        siblingExemptCount: 0,
+      },
     ]);
   });
 
@@ -501,10 +508,13 @@ describe("per-tier percentage caps", () => {
     expect(a.capAccounting).toEqual(b.capAccounting);
   });
 
-  it("bounds a tier seated through the absolute sibling pre-pass, not just the weighted draw", () => {
-    // Five siblings all match the capped tier. The sibling pre-pass gives
-    // them absolute ORDER (they rank 1-5, ahead of everyone), but capPercent
-    // still bounds how many of them can be SELECTED.
+  it("exempts entries seated through the absolute sibling pre-pass from a weighted-tier cap", () => {
+    // Five siblings all match the capped tier — e.g. each is also an
+    // employee's child, and the employee-child tier is capped at 20%. A cap
+    // bounds seats granted UNDER THAT WEIGHTED TIER; sibling preference is a
+    // separate, uncapped, absolute preference, so none of these five may be
+    // displaced by the cap, and none of them counts toward it, even though
+    // their tierKeys match it.
     const siblingEntries = Array.from({ length: 5 }, (_, i) =>
       entry(`sib${i + 1}`, { siblingOfEnrolled: true, tierKeys: [CAPPED_KEY] })
     );
@@ -512,7 +522,7 @@ describe("per-tier percentage caps", () => {
       siblingAutoOffer: true,
       siblingOverflowPriority: true,
       linkedSiblingActivation: false,
-      capPercents: { [CAPPED_KEY]: 20 }, // limit = 2
+      capPercents: { [CAPPED_KEY]: 20 }, // limit = 2 — irrelevant to these five
     });
 
     const siblingRows = result.ranked.filter((r) => r.id.startsWith("sib"));
@@ -520,26 +530,41 @@ describe("per-tier percentage caps", () => {
     expect(siblingRows.map((r) => r.final_rank).sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5]);
     expect(result.siblingPriorityWaitlisted).toBe(0);
 
-    // But only 2 of the 5 are actually selected; the honest "seated" count
-    // (siblingAutoPlaced) reflects the cap, not the raw sibling count.
-    expect(siblingRows.filter((r) => r.is_selected)).toHaveLength(2);
-    expect(siblingRows.filter((r) => !r.is_selected)).toHaveLength(3);
-    expect(result.siblingAutoPlaced).toBe(2);
+    // All five are selected. None is displaced by the cap.
+    expect(siblingRows.every((r) => r.is_selected)).toBe(true);
+    expect(result.siblingAutoPlaced).toBe(5);
 
-    // The vacated sibling seats still go to the general pool.
+    // The general pool fills the remaining 5 seats exactly as it would with
+    // no cap at all.
     expect(result.selectedCount).toBe(10);
+
+    // The cap's own accounting shows it never touched these five: zero
+    // selected under it, zero displaced by it. They are recorded instead as
+    // exempt, so an auditor can see the cap operated correctly by NOT
+    // applying to an absolute preference.
     expect(result.capAccounting).toEqual([
-      { key: CAPPED_KEY, capPercent: 20, seatLimit: 2, selectedCount: 2, displacedCount: 3 },
+      {
+        key: CAPPED_KEY,
+        capPercent: 20,
+        seatLimit: 2,
+        selectedCount: 0,
+        displacedCount: 0,
+        siblingExemptCount: 5,
+      },
     ]);
   });
 
-  it("counts a linked-in sibling against the same cap as the applicant who activated them", () => {
+  it("exempts a linked-in sibling while the applicant actually drawn remains subject to the cap", () => {
     // "a" and "b" are co-applying siblings who both match the capped tier.
-    // Whichever is drawn first activates the other immediately behind it
-    // (existing linked-sibling behavior, untouched). With the tier capped at
-    // exactly one seat, at most one of the pair can ever be selected: the
-    // moment either fills the tier's single slot, the other — ranked
-    // adjacent to it — finds the tier already full.
+    // Whichever is drawn first is admitted (or not) as a normal placement
+    // "draw" entry — subject to the cap like anyone else in the tier. The
+    // other is pulled in on linked-sibling grounds, not under the capped
+    // preference, so it is exempt for the same reason an absolute-sibling
+    // entry is exempt: never displaced by the cap, never counted toward it.
+    //
+    // Seats == total entries (2 pair + 3 extra + 10 plain = 15), so — as in
+    // the seats-vs-entries tests above — every entry is walked and the cap
+    // is the only possible reason anything is left unselected.
     const entries = [
       entry("a", {
         applicationId: "app-a",
@@ -554,25 +579,46 @@ describe("per-tier percentage caps", () => {
       ...Array.from({ length: 3 }, (_, i) => entry(`extra${i + 1}`, { tierKeys: [CAPPED_KEY] })),
       ...PLAIN_TEN,
     ];
+    expect(entries).toHaveLength(15);
 
-    const result = runPolicyDraw(SEED, entries, 12, {
+    const result = runPolicyDraw(SEED, entries, 15, {
       siblingAutoOffer: false,
       siblingOverflowPriority: false,
       linkedSiblingActivation: true,
-      capPercents: { [CAPPED_KEY]: 10 }, // limit = floor(12 * 10/100) = 1
+      capPercents: { [CAPPED_KEY]: 10 }, // limit = floor(15 * 10/100) = 1
     });
 
     const rankOf = (id: string) => result.ranked.find((r) => r.id === id)!.final_rank;
     expect(Math.abs(rankOf("a") - rankOf("b"))).toBe(1);
     expect(result.linkedSiblingActivated).toBe(1);
 
-    const aRow = result.ranked.find((r) => r.id === "a")!;
-    const bRow = result.ranked.find((r) => r.id === "b")!;
-    expect(aRow.is_selected && bRow.is_selected).toBe(false);
+    const pairRows = result.ranked.filter((r) => r.id === "a" || r.id === "b");
+    const linkedRow = pairRows.find((r) => r.placement === "linked_sibling")!;
+    const drawnRow = pairRows.find((r) => r.placement === "draw")!;
+    expect(linkedRow).toBeDefined();
+    expect(drawnRow).toBeDefined();
 
-    const acc = result.capAccounting.find((c) => c.key === CAPPED_KEY)!;
-    expect(acc.seatLimit).toBe(1);
-    expect(acc.selectedCount).toBeLessThanOrEqual(1);
+    // The linked-in sibling is exempt: with seats == total entries, it is
+    // always selected regardless of the capped tier's fill state.
+    expect(linkedRow.is_selected).toBe(true);
+
+    // Exactly one seat in the capped tier goes to a placement "draw" entry —
+    // extra1-3 plus whichever of a/b was actually drawn are the four
+    // candidates subject to the cap; the linked-in sibling is not among them.
+    expect(result.capAccounting).toEqual([
+      {
+        key: CAPPED_KEY,
+        capPercent: 10,
+        seatLimit: 1,
+        selectedCount: 1,
+        displacedCount: 3,
+        siblingExemptCount: 1, // exactly the linked-in half of the pair
+      },
+    ]);
+
+    // 1 (the cap's single seat) + 10 (uncapped plain) + 1 (exempt linked
+    // sibling) = 12; the other 3 draw-placement candidates are displaced.
+    expect(result.selectedCount).toBe(12);
   });
 
   it("tallies displacement accurately when two different tiers are both capped", () => {
@@ -587,8 +633,22 @@ describe("per-tier percentage caps", () => {
 
     const alphaAcc = result.capAccounting.find((a) => a.key === "alpha")!;
     const betaAcc = result.capAccounting.find((a) => a.key === "beta")!;
-    expect(alphaAcc).toEqual({ key: "alpha", capPercent: 10, seatLimit: 1, selectedCount: 1, displacedCount: 3 });
-    expect(betaAcc).toEqual({ key: "beta", capPercent: 20, seatLimit: 3, selectedCount: 3, displacedCount: 1 });
+    expect(alphaAcc).toEqual({
+      key: "alpha",
+      capPercent: 10,
+      seatLimit: 1,
+      selectedCount: 1,
+      displacedCount: 3,
+      siblingExemptCount: 0,
+    });
+    expect(betaAcc).toEqual({
+      key: "beta",
+      capPercent: 20,
+      seatLimit: 3,
+      selectedCount: 3,
+      displacedCount: 1,
+      siblingExemptCount: 0,
+    });
 
     // 1 (alpha) + 3 (beta) + 10 (plain, uncapped) = 14; the 4 displaced seats
     // (3 alpha + 1 beta) go unused rather than being handed to either capped
