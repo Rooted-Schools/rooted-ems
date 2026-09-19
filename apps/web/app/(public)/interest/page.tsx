@@ -2,18 +2,15 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { headers } from "next/headers";
-import { createServiceRoleClient } from "@rooted-ems/database/server";
 import { IconCheckCircle, IconHelpCircle } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { getLocaleCookie } from "@/lib/i18n/get-locale";
 import { tx, type Locale, type TranslationKey } from "@/lib/i18n/translations";
 import { INTEREST_FOCUS_OPTIONS, isInterestFocusKey, type InterestFocusKey } from "@/lib/lead-interest-survey";
-import { submitInterestDetails } from "./actions";
+import { confirmInterestChoice, submitInterestDetails } from "./actions";
 
 export const metadata = { title: "What matters most? — Rooted Schools" };
-
-const TOKEN_RE = /^[0-9a-f-]{36}$/i;
 
 /**
  * Same best-effort Accept-Language fallback as the unsubscribe page — this
@@ -40,59 +37,41 @@ const OPTION_LABEL_KEYS: Record<InterestFocusKey, TranslationKey> = {
 /**
  * Public, unauthenticated one-question interest survey (LG-0.2 style — same
  * shape as /unsubscribe). Reached from a link in the first nurture email:
- * `?t=<survey_token>&c=<choice>`. The token is the only capability, no login,
- * and survey_token is intentionally never the same value as unsubscribe_token
- * (see 00067_lead_interest_survey.sql) — clicking or forwarding this link
- * must never be able to silence the family's recruitment email.
+ * `?t=<survey_token>&c=<choice>`. The token is the only capability, no login.
  *
- * An unknown/invalid token, and an unknown/missing choice, are both treated
- * as "nothing to write yet" rather than an error: the page always renders
- * the same way regardless of whether the token maps to a real lead, so it
- * never reveals whether a given token exists. Only a real lead + a valid
- * choice ever results in a write.
+ * IMPORTANT — this GET handler never touches the database and never writes
+ * anything. Email security gateways (Microsoft Safe Links, Proofpoint,
+ * Barracuda, etc.) routinely prefetch every link in an inbound message,
+ * which would silently fabricate a survey answer for a family that never
+ * clicked anything if a bare GET could write. Landing here from the email
+ * only shows the family which option they picked and asks for one explicit
+ * confirmation click, submitted as a real POST (see confirmInterestChoice in
+ * ./actions) — that POST is the only thing that ever writes interest_focus.
+ * This costs one extra click on a survey whose value depends on low
+ * friction; that tradeoff is deliberate — integrity of the field beats
+ * response rate. Keep the confirm step to a single, obvious button.
+ *
+ * Because this page never queries the lead table, it renders byte-for-byte
+ * identically whether or not the token maps to a real lead — there is no
+ * code path here that could leak whether a given token exists. Do not add
+ * one; any existence check belongs (already exists) inside the server
+ * action that performs the write, which is silent on an unknown token for
+ * the same reason.
  */
 export default async function InterestPage({
   searchParams,
 }: {
-  searchParams: { t?: string; c?: string; saved?: string };
+  searchParams: { t?: string; c?: string; confirmed?: string; saved?: string };
 }) {
   const token = searchParams?.t;
-  const tokenLooksValid = typeof token === "string" && TOKEN_RE.test(token);
   const choice = isInterestFocusKey(searchParams?.c) ? searchParams.c : null;
+  const confirmed = searchParams?.confirmed === "1";
   const justSaved = searchParams?.saved === "1";
-
-  if (tokenLooksValid && choice) {
-    const supabase = createServiceRoleClient();
-    const { data: lead } = await supabase
-      .from("lead")
-      .select("id")
-      .eq("survey_token", token)
-      .maybeSingle();
-
-    if (lead) {
-      // Always write on a valid (token, choice) pair — re-picking the same
-      // option or a different one both re-stamp answered_at, since a family
-      // changing their mind later is legitimate, not an error.
-      await supabase
-        .from("lead")
-        .update({
-          interest_focus: choice,
-          interest_focus_answered_at: new Date().toISOString(),
-          // Clear a stale "other" note when the family switches to a
-          // different option, so it doesn't linger under the new choice.
-          ...(choice === "other" ? {} : { interest_focus_other: null }),
-        })
-        .eq("id", lead.id);
-    }
-    // No `else`: an unknown token silently does nothing and falls through to
-    // exactly the same confirmation render as a real one.
-  }
 
   const cookieLocale = await getLocaleCookie();
   const h = await headers();
   const locale: Locale | undefined = cookieLocale ?? resolveLocaleFromAcceptLanguage(h.get("accept-language"));
 
-  const answered = Boolean(choice);
   const showOtherField = choice === "other";
 
   function renderQuestion(loc: Locale) {
@@ -111,6 +90,32 @@ export default async function InterestPage({
             </Link>
           ))}
         </div>
+      </>
+    );
+  }
+
+  /**
+   * Landed on directly from the email link: shows which option was picked
+   * and asks for one explicit, no-JS-required POST before anything is
+   * written. A plain <form action={serverAction}> degrades to a normal HTML
+   * form submission with JavaScript disabled — families reading email on
+   * locked-down or older devices still get a working confirm button.
+   */
+  function renderConfirm(loc: Locale) {
+    return (
+      <>
+        <h1 className="text-xl font-bold text-ink">{tx("interest.confirmTitle", loc)}</h1>
+        <p className="text-sm text-ink/70">
+          {tx("interest.confirmBody", loc)}{" "}
+          <span className="font-semibold text-ink">{choice ? tx(OPTION_LABEL_KEYS[choice], loc) : ""}</span>
+        </p>
+        <form action={confirmInterestChoice} className="pt-2">
+          <input type="hidden" name="t" value={token ?? ""} />
+          <input type="hidden" name="c" value={choice ?? ""} />
+          <Button type="submit" size="lg" className="w-full">
+            {tx("interest.confirmButton", loc)}
+          </Button>
+        </form>
       </>
     );
   }
@@ -151,13 +156,20 @@ export default async function InterestPage({
     );
   }
 
-  const render = answered ? renderThanks : renderQuestion;
+  // Three states, gated only on the (client-supplied, validated-against-the-
+  // fixed-option-list) `choice` and `confirmed` query params — never on
+  // whether the token resolves to anything real:
+  //   1. no valid choice yet            -> the picker (renderQuestion)
+  //   2. valid choice, not confirmed    -> the one-click confirm screen
+  //   3. valid choice, confirmed        -> the thanks screen
+  const render = choice ? (confirmed ? renderThanks : renderConfirm) : renderQuestion;
+  const showCheck = Boolean(choice) && confirmed;
 
   return (
     <div className="min-h-screen bg-warm-white flex items-center justify-center px-4 py-10">
       <div className="max-w-md w-full text-center bg-white border border-stone/20 rounded-xl px-6 py-10 space-y-4">
         <div className="flex justify-center text-rooted-green">
-          {answered ? <IconCheckCircle size={40} /> : <IconHelpCircle size={40} />}
+          {showCheck ? <IconCheckCircle size={40} /> : <IconHelpCircle size={40} />}
         </div>
         {locale ? (
           render(locale)
