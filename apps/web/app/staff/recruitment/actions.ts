@@ -6,18 +6,22 @@ import {
   requireStaffSession,
   requireMinRole,
   requireRoleOnCampus,
+  hasRoleOnCampus,
 } from "@/lib/auth/get-session";
 import {
   createLeadByStaff,
   logLeadActivity,
   updateLead,
   deleteLead,
+  assignLead,
+  bulkAssignLeads,
   createCampaign,
   cancelCampaign,
   sendCampaignTest,
   type CreateLeadInput,
   type UpdateLeadInput,
   type CreateCampaignInput,
+  type BulkAssignResult,
 } from "@/lib/mutations";
 import type { CampaignPayload, CampaignTemplateKey } from "@/lib/email-templates";
 
@@ -46,6 +50,15 @@ async function leadCampus(leadId: string): Promise<string | null> {
   const supabase = createServiceRoleClient();
   const { data } = await supabase.from("lead").select("campus_id").eq("id", leadId).single();
   return (data?.campus_id as string | null) ?? null;
+}
+
+/** Resolve the distinct campuses among a set of leads — for bulk actions
+ *  where the selection can legitimately span more than one campus. */
+async function leadCampuses(leadIds: string[]): Promise<string[]> {
+  if (leadIds.length === 0) return [];
+  const supabase = createServiceRoleClient();
+  const { data } = await supabase.from("lead").select("campus_id").in("id", leadIds);
+  return Array.from(new Set((data ?? []).map((r: Record<string, string>) => r.campus_id)));
 }
 
 /** Resolve an event's campus. Null when the event does not exist. */
@@ -133,6 +146,45 @@ export async function staffDeleteLead(leadId: string, _actorId?: string) {
   const result = await deleteLead(leadId, session.user_id);
   if (!result.error) revalidatePath("/staff/recruitment");
   return result;
+}
+
+/** Assign, reassign, or clear (assigneeId = null) a single lead's owner. */
+export async function staffAssignLead(leadId: string, assigneeId: string | null) {
+  const session = await requireRoleOnCampus(await leadCampus(leadId), "enrollment_staff");
+  const result = await assignLead(leadId, assigneeId, session.user_id);
+  if (!result.error) {
+    revalidatePath("/staff/recruitment");
+    revalidatePath(`/staff/recruitment/${leadId}`);
+  }
+  return result;
+}
+
+/**
+ * Bulk assign — the one that matters at scale: a leader splitting hundreds
+ * of unowned leads across a team in a single action.
+ *
+ * A bulk selection can span more than one campus (e.g. an "All campuses"
+ * Unassigned view), so requireRoleOnCampus's single-campus check isn't
+ * enough here — the actor must hold enrollment_staff on EVERY campus among
+ * the selected leads, checked directly against the full set.
+ */
+export async function staffBulkAssignLeads(
+  leadIds: string[],
+  assigneeId: string
+): Promise<BulkAssignResult[]> {
+  const session = await requireStaffSession();
+  const campusIds = await leadCampuses(leadIds);
+  const deniedCampus = campusIds.find((c) => !hasRoleOnCampus(session, c, "enrollment_staff"));
+  if (deniedCampus) {
+    return leadIds.map((id) => ({
+      leadId: id,
+      ok: false,
+      error: "You don't have access to one or more of these leads' campuses.",
+    }));
+  }
+  const results = await bulkAssignLeads(leadIds, assigneeId, session.user_id);
+  if (results.some((r) => r.ok)) revalidatePath("/staff/recruitment");
+  return results;
 }
 
 // ─── Capture Kit: tagged link + QR (LG-1) ──────────────

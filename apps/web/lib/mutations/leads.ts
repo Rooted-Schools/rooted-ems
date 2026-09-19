@@ -403,6 +403,26 @@ export async function logLeadActivity(
       .update({ stage: "contacted" })
       .eq("id", leadId)
       .eq("stage", "new");
+
+    // Claim on contact: the first staff member to log a real touchpoint
+    // (call/sms/email) becomes the owner of a lead nobody owns yet. Never
+    // reassigns a lead that already has an owner — the read-then-write here
+    // checks that explicitly, and the `.is("assigned_to", null)` guard on
+    // the write itself is a second, DB-level backstop against a concurrent
+    // claim racing in between.
+    const { data: current } = await supabase
+      .from("lead")
+      .select("assigned_to")
+      .eq("id", leadId)
+      .single();
+    if (current && current.assigned_to === null) {
+      await supabase
+        .from("lead")
+        .update({ assigned_to: actorId })
+        .eq("id", leadId)
+        .is("assigned_to", null);
+    }
+
     // LG-2: a real staff call ends the automated drip — a human has it now.
     if (activityType === "call") {
       const { exitJourneys } = await import("./journeys");
@@ -415,7 +435,11 @@ export async function logLeadActivity(
 
 export interface UpdateLeadInput {
   stage?: LeadStage;
-  assigned_to?: string | null;
+  // Ownership changes do NOT go through this generic update: assignLead and
+  // bulkAssignLeads below are the only writers of assigned_to, because they
+  // enforce that the assignee actually holds a role at the lead's campus.
+  // Folding assigned_to into this untyped pass-through would bypass that
+  // check for anyone calling staffUpdateLead directly.
   next_follow_up_at?: string | null;
   /** Which structured call outcome (CallOutcomeKey) set next_follow_up_at, or
    *  null when it wasn't a call outcome (manual note follow-up, etc). Always
@@ -476,6 +500,167 @@ export async function updateLead(
   }
 
   return { data: null, error: null };
+}
+
+// ─── Ownership: assign / reassign / bulk assign ────────
+
+/**
+ * Confirms `assigneeId` actually holds a staff role at `campusId` — the
+ * server-side half of "a lead may only be assigned to a staff member who
+ * has a role at that lead's campus." A client-side dropdown scoped to the
+ * right campus is not enough on its own; this is what a direct server
+ * action call can't get past.
+ *
+ * getStaffUsers(campusId) is the same staff-directory read the assignment
+ * pickers use, so "who is eligible" can never drift between what the UI
+ * offers and what the server accepts.
+ */
+async function assigneeAuthorizedForCampus(
+  assigneeId: string,
+  campusId: string
+): Promise<boolean> {
+  const { getStaffUsers } = await import("../queries/staff");
+  const campusStaff = await getStaffUsers(campusId);
+  return campusStaff.some((s) => s.user_id === assigneeId);
+}
+
+/**
+ * Assign, reassign, or clear (assigneeId = null) a single lead's owner.
+ * Clearing never needs the campus check; assigning does, every time.
+ */
+export async function assignLead(
+  leadId: string,
+  assigneeId: string | null,
+  actorId: string
+): Promise<MutationResult> {
+  const supabase = await createServerClient();
+
+  const { data: lead, error: leadError } = await supabase
+    .from("lead")
+    .select("campus_id, assigned_to")
+    .eq("id", leadId)
+    .single();
+  if (leadError || !lead) return { data: null, error: "Lead not found." };
+
+  // No-op: nothing to write or log if the assignment isn't actually changing.
+  if (assigneeId === ((lead.assigned_to as string | null) ?? null)) {
+    return { data: null, error: null };
+  }
+
+  if (assigneeId) {
+    const authorized = await assigneeAuthorizedForCampus(assigneeId, lead.campus_id as string);
+    if (!authorized) {
+      return {
+        data: null,
+        error: "That staff member doesn't have a role at this lead's campus.",
+      };
+    }
+  }
+
+  const { error } = await supabase
+    .from("lead")
+    .update({ assigned_to: assigneeId })
+    .eq("id", leadId);
+  if (error) {
+    console.error("[assignLead]", error.message);
+    return { data: null, error: "Failed to update the assignment." };
+  }
+
+  await supabase.from("lead_activity").insert({
+    lead_id: leadId,
+    activity_type: "note",
+    body: assigneeId ? "Lead assigned to a staff member." : "Lead unassigned.",
+    actor_id: actorId,
+  });
+
+  return { data: null, error: null };
+}
+
+export interface BulkAssignResult {
+  leadId: string;
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Assign every listed lead to ONE staff member in a single action — the
+ * operationally important case: a school leader splitting hundreds of
+ * unowned leads across a recruiting team, where one-at-a-time assignment is
+ * useless at that scale.
+ *
+ * A bulk selection can legitimately span more than one campus (e.g. an
+ * "All campuses" Unassigned view), so each lead is checked against the
+ * assignee's OWN campus independently. A lead whose campus the assignee
+ * doesn't cover is skipped and reported per-lead — it never silently drops
+ * out and never fails leads that ARE valid.
+ */
+export async function bulkAssignLeads(
+  leadIds: string[],
+  assigneeId: string,
+  actorId: string
+): Promise<BulkAssignResult[]> {
+  if (leadIds.length === 0) return [];
+  const supabase = await createServerClient();
+
+  const { data: leads, error } = await supabase
+    .from("lead")
+    .select("id, campus_id")
+    .in("id", leadIds);
+  if (error || !leads) {
+    console.error("[bulkAssignLeads]", error?.message);
+    return leadIds.map((id) => ({ leadId: id, ok: false, error: "Failed to load leads." }));
+  }
+
+  const results: BulkAssignResult[] = [];
+  const foundIds = new Set(leads.map((l) => l.id as string));
+  for (const id of leadIds) {
+    if (!foundIds.has(id)) results.push({ leadId: id, ok: false, error: "Lead not found." });
+  }
+
+  // Resolve authorization once per distinct campus, not once per lead.
+  const campusIds = Array.from(new Set(leads.map((l) => l.campus_id as string)));
+  const authorizedCampuses = new Set<string>();
+  for (const campusId of campusIds) {
+    if (await assigneeAuthorizedForCampus(assigneeId, campusId)) {
+      authorizedCampuses.add(campusId);
+    }
+  }
+
+  const assignable = leads.filter((l) => authorizedCampuses.has(l.campus_id as string));
+  const unauthorized = leads.filter((l) => !authorizedCampuses.has(l.campus_id as string));
+  for (const l of unauthorized) {
+    results.push({
+      leadId: l.id as string,
+      ok: false,
+      error: "That staff member doesn't have a role at this lead's campus.",
+    });
+  }
+
+  if (assignable.length > 0) {
+    const assignableIds = assignable.map((l) => l.id as string);
+    const { error: updateError } = await supabase
+      .from("lead")
+      .update({ assigned_to: assigneeId })
+      .in("id", assignableIds);
+    if (updateError) {
+      console.error("[bulkAssignLeads]", updateError.message);
+      for (const id of assignableIds) {
+        results.push({ leadId: id, ok: false, error: "Failed to update the assignment." });
+      }
+    } else {
+      await supabase.from("lead_activity").insert(
+        assignableIds.map((id) => ({
+          lead_id: id,
+          activity_type: "note",
+          body: "Lead assigned to a staff member (bulk assignment).",
+          actor_id: actorId,
+        }))
+      );
+      for (const id of assignableIds) results.push({ leadId: id, ok: true });
+    }
+  }
+
+  return results;
 }
 
 /**

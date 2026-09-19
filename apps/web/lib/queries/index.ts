@@ -179,6 +179,8 @@ export {
   type CampaignRow,
   type JourneyStat,
   type LeaderStripStats,
+  type OwnershipFilter,
+  type FollowUpQueueResult,
 } from "./leads";
 
 // Events + RSVP
