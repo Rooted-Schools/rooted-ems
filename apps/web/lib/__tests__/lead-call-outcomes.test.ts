@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import {
   CALL_OUTCOMES,
   DEFAULT_FOLLOW_UP_TIME,
@@ -7,6 +7,7 @@ import {
   defaultFollowUpDaysFor,
   buildCallOutcomeBody,
   bodyHasOutcome,
+  todayLocalYmd,
 } from "../lead-call-outcomes";
 
 /**
@@ -138,5 +139,29 @@ describe("outcome body encoding still round-trips", () => {
     expect(body).toBe("[Left voicemail] no answer, mailbox full");
     expect(bodyHasOutcome(body, "voicemail")).toBe(true);
     expect(bodyHasOutcome(body, "reached")).toBe(false);
+  });
+});
+
+describe("todayLocalYmd — callback date picker min", () => {
+  const originalTZ = process.env.TZ;
+  afterEach(() => {
+    process.env.TZ = originalTZ;
+  });
+
+  it("reads the local calendar date, not the UTC one, once UTC has rolled over", () => {
+    process.env.TZ = "America/New_York";
+    // 11:30 PM EST on Jan 15 is 04:30 UTC on Jan 16 — the exact moment (as
+    // early as 7pm ET) the old `new Date().toISOString().split("T")[0]`
+    // min-date logic started refusing to let a recruiter pick "today".
+    const now = new Date("2026-01-16T04:30:00.000Z");
+    expect(now.toISOString().split("T")[0]).toBe("2026-01-16"); // the old, wrong value
+    expect(todayLocalYmd(now)).toBe("2026-01-15"); // the fix
+  });
+
+  it("still agrees with the UTC date when local time hasn't crossed midnight", () => {
+    process.env.TZ = "America/New_York";
+    // Noon EST has no UTC/local skew for the calendar date.
+    const now = new Date("2026-01-15T17:00:00.000Z");
+    expect(todayLocalYmd(now)).toBe(now.toISOString().split("T")[0]);
   });
 });

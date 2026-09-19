@@ -417,6 +417,11 @@ export interface UpdateLeadInput {
   stage?: LeadStage;
   assigned_to?: string | null;
   next_follow_up_at?: string | null;
+  /** Which structured call outcome (CallOutcomeKey) set next_follow_up_at, or
+   *  null when it wasn't a call outcome (manual note follow-up, etc). Always
+   *  set in the same call as next_follow_up_at so the two can never drift —
+   *  see lib/lead-call-outcomes.ts and getFollowUpQueue. */
+  next_follow_up_reason?: string | null;
   pathway_interest?: string | null;
   entry_grade?: string | null;
   notes?: string | null;
