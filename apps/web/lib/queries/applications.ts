@@ -30,6 +30,16 @@ export interface ApplicationDetail extends ApplicationRow {
   /** "yes" | "no" | null — the residency-eligibility answer. "no" = the family
    *  said they do NOT reside in the campus's state, which flags the application. */
   resides_in_state: string | null;
+  /**
+   * "yes" | "no" | null — self-declared, campus-gated preference answers.
+   * Present only when the campus's adopted policy declares the matching
+   * absolute preference/weighted tier (see policyQuestionFlags in
+   * lib/lottery-policy.ts); null on every other campus and on applications
+   * submitted before the question existed.
+   */
+  resides_in_district: string | null;
+  is_employee_or_board_child: string | null;
+  is_military_dependent: string | null;
   // Applicant details captured on the family application. Surfaced read-only to
   // staff so they can see exactly what the family entered (name, DOB, prior
   // school, sibling) without opening the family portal. Any field may be null
@@ -457,11 +467,22 @@ export async function getApplicationDetail(
   // residency-eligibility flag (a charter can only enroll students in its own
   // state; an explicit "no" flags the application for staff review);
   // current_grade and sibling_name round out the read-only applicant panel.
+  // resides_in_district / is_employee_or_board_child / is_military_dependent
+  // are the same pattern for the newer, campus-gated absolute-preference
+  // questions (Cleveland/OH and C.R. Neal/SC) — present only where that
+  // campus's adopted policy declares the matching preference.
   const { data: answerRows } = await supabase
     .from("application_answer")
     .select("field_key, value")
     .eq("application_id", applicationId)
-    .in("field_key", ["resides_in_state", "current_grade", "sibling_name"]);
+    .in("field_key", [
+      "resides_in_state",
+      "current_grade",
+      "sibling_name",
+      "resides_in_district",
+      "is_employee_or_board_child",
+      "is_military_dependent",
+    ]);
   const answerByKey = new Map(
     (answerRows ?? []).map((r: { field_key: string; value: unknown }) => [
       r.field_key,
@@ -471,6 +492,9 @@ export async function getApplicationDetail(
   const residesInState = answerByKey.get("resides_in_state") ?? null;
   const currentGrade = answerByKey.get("current_grade") ?? null;
   const siblingName = answerByKey.get("sibling_name") ?? null;
+  const residesInDistrict = answerByKey.get("resides_in_district") ?? null;
+  const isEmployeeOrBoardChild = answerByKey.get("is_employee_or_board_child") ?? null;
+  const isMilitaryDependent = answerByKey.get("is_military_dependent") ?? null;
 
   return {
     id: app.id,
@@ -499,6 +523,9 @@ export async function getApplicationDetail(
     review_notes: userId && app.status !== "needs_info" ? null : app.review_notes,
     has_sibling_enrolled: app.has_sibling_enrolled,
     resides_in_state: residesInState,
+    resides_in_district: residesInDistrict,
+    is_employee_or_board_child: isEmployeeOrBoardChild,
+    is_military_dependent: isMilitaryDependent,
     student_first_name: (student?.first_name as string) ?? null,
     student_last_name: (student?.last_name as string) ?? null,
     student_middle_name: (student?.middle_name as string) ?? null,

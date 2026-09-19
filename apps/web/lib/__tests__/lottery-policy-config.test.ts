@@ -15,6 +15,7 @@ import {
   enabledAutoOfferAbsolutePreferencesInOrder,
   governedBandLabels,
   unsourcedWeightedTiers,
+  unsourcedAbsolutePreferences,
   acceptanceExpiryFrom,
   waitlistOfferExpiryFrom,
   renderPolicyStatements,
@@ -371,6 +372,94 @@ describe("ordered absolute preferences — helpers used by the draw", () => {
     raw.absolutePreferences = [];
     const { config } = parseLotteryPolicyConfig(raw);
     expect(governedBandLabels(config!)).toEqual(["Linked-sibling activation", "General weighted pool"]);
+  });
+});
+
+describe("unsourcedAbsolutePreferences — the absolute-preference counterpart to unsourcedWeightedTiers", () => {
+  it("reports RSV's live adopted policy as green: its only absolute preference is sibling_current_enrolled, which is evidenced elsewhere and is NEVER reported as unsourced", () => {
+    const { config } = parseLotteryPolicyConfig(rsvConfig());
+    expect(unsourcedAbsolutePreferences(config!)).toEqual([]);
+  });
+
+  it("flags an enabled, auto-offer absolute preference that declares no source at all", () => {
+    const raw = rsvConfig();
+    raw.absolutePreferences = [
+      { key: "sibling_current_enrolled", label: "Sibling", enabled: true, autoOfferBeforeDraw: true, overflowToPriorityWaitlist: true, siblingDefinition: "shared_legal_guardian", definition: "", fosterExcludedUntilLegalGuardianship: true, verificationMayBeRequired: true, falseClaimForfeitsSeat: true, authorityNote: "cite" },
+      { key: "military_dependent", label: "Active-duty military dependent", enabled: true, autoOfferBeforeDraw: true, overflowToPriorityWaitlist: true, siblingDefinition: "shared_legal_guardian", definition: "", fosterExcludedUntilLegalGuardianship: false, verificationMayBeRequired: false, falseClaimForfeitsSeat: false, authorityNote: "SC Code 59-40-50(B)(8)(c)(iii)", capPercent: 10 },
+    ];
+    const { config } = parseLotteryPolicyConfig(raw);
+    // sibling_current_enrolled is excluded by key even though it also has no
+    // source; military_dependent has no source declared and IS reported.
+    expect(unsourcedAbsolutePreferences(config!).map((p) => p.key)).toEqual(["military_dependent"]);
+  });
+
+  it("flags an enabled, auto-offer absolute preference whose declared source field the application does not collect", () => {
+    const raw = rsvConfig();
+    raw.absolutePreferences = [
+      {
+        key: "staff_or_board_child",
+        label: "Employee or board member child",
+        enabled: true,
+        autoOfferBeforeDraw: true,
+        overflowToPriorityWaitlist: true,
+        siblingDefinition: "shared_legal_guardian",
+        definition: "",
+        fosterExcludedUntilLegalGuardianship: false,
+        verificationMayBeRequired: false,
+        falseClaimForfeitsSeat: false,
+        authorityNote: "SC Code 59-40-50(B)(8)(c)(ii)",
+        capPercent: 20,
+        source: { kind: "application_answer", field: "not_a_real_field" },
+      },
+    ];
+    const { config } = parseLotteryPolicyConfig(raw);
+    expect(unsourcedAbsolutePreferences(config!).map((p) => p.key)).toEqual(["staff_or_board_child"]);
+  });
+
+  it("does NOT flag an absolute preference whose declared source field the application genuinely collects", () => {
+    const raw = rsvConfig();
+    raw.absolutePreferences = [
+      {
+        key: "staff_or_board_child",
+        label: "Employee or board member child",
+        enabled: true,
+        autoOfferBeforeDraw: true,
+        overflowToPriorityWaitlist: true,
+        siblingDefinition: "shared_legal_guardian",
+        definition: "",
+        fosterExcludedUntilLegalGuardianship: false,
+        verificationMayBeRequired: false,
+        falseClaimForfeitsSeat: false,
+        authorityNote: "SC Code 59-40-50(B)(8)(c)(ii)",
+        capPercent: 20,
+        source: { kind: "application_answer", field: "is_employee_or_board_child" },
+      },
+    ];
+    const { config } = parseLotteryPolicyConfig(raw);
+    expect(unsourcedAbsolutePreferences(config!)).toEqual([]);
+  });
+
+  it("does not flag a preference the board has not enabled — a preference that has not been turned on cannot silently fail", () => {
+    const raw = rsvConfig();
+    raw.absolutePreferences = [
+      {
+        key: "military_dependent",
+        label: "Active-duty military dependent",
+        enabled: false,
+        autoOfferBeforeDraw: true,
+        overflowToPriorityWaitlist: true,
+        siblingDefinition: "shared_legal_guardian",
+        definition: "",
+        fosterExcludedUntilLegalGuardianship: false,
+        verificationMayBeRequired: false,
+        falseClaimForfeitsSeat: false,
+        authorityNote: "SC Code 59-40-50(B)(8)(c)(iii)",
+        capPercent: 10,
+        // No source declared either — still must not be reported while disabled.
+      },
+    ];
+    const { config } = parseLotteryPolicyConfig(raw);
+    expect(unsourcedAbsolutePreferences(config!)).toEqual([]);
   });
 });
 

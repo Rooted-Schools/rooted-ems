@@ -112,9 +112,12 @@ interface FormData {
   // for staff (see resides_in_state answer + the staff out-of-state flag).
   residesInState: "" | YesNo;
   // Policy-driven lottery questions (only asked where the campus's adopted
-  // policy declares the matching weighted tier)
+  // policy declares the matching weighted tier or absolute preference)
   isStaffChild: YesNo;
   isFrlQualifying: YesNo;
+  residesInDistrict: YesNo;
+  isEmployeeOrBoardChild: YesNo;
+  isMilitaryDependent: YesNo;
   // Step 3: Consent
   dataSharingConsent: boolean;
   agreeTerms: boolean;
@@ -146,6 +149,9 @@ const INITIAL: FormData = {
   residesInState: "",
   isStaffChild: "no",
   isFrlQualifying: "no",
+  residesInDistrict: "no",
+  isEmployeeOrBoardChild: "no",
+  isMilitaryDependent: "no",
   dataSharingConsent: false,
   agreeTerms: false,
   signatureName: "",
@@ -293,16 +299,21 @@ function YesNoQuestion({
 /* ───────────── build mutation input ───────────── */
 
 /**
- * The two policy-driven answers, keyed exactly as the weighted tiers read them.
+ * The policy-driven answers, keyed exactly as the weighted tiers / absolute
+ * preferences read them.
  *
  * A campus that does not ask a question writes "" rather than leaving the key
  * out: a family who picked Vancouver, answered yes, then switched campuses
- * must not carry that answer to a school whose board never adopted the tier.
+ * must not carry that answer to a school whose board never adopted the
+ * tier/preference.
  */
 function policyAnswerValues(form: FormData, flags: PolicyQuestionFlags) {
   return {
     is_staff_child: flags.is_staff_child ? form.isStaffChild : "",
     is_frl_qualifying: flags.is_frl_qualifying ? form.isFrlQualifying : "",
+    resides_in_district: flags.resides_in_district ? form.residesInDistrict : "",
+    is_employee_or_board_child: flags.is_employee_or_board_child ? form.isEmployeeOrBoardChild : "",
+    is_military_dependent: flags.is_military_dependent ? form.isMilitaryDependent : "",
   };
 }
 
@@ -461,11 +472,21 @@ export function NewApplicationForm({
   const campusGrades = gradeLevels.filter((g) => g.campus_id === form.campusId);
   // The state the selected campus operates in — drives the residency question.
   const campusState = campuses.find((c) => c.id === form.campusId)?.state ?? "";
+  // The selected campus's name — used to phrase the district/employer
+  // questions in neutral, campus-aware language (no dedicated "district name"
+  // field exists in policy config; the campus name is the best available
+  // stand-in for the plain-language question).
+  const campusName = campuses.find((c) => c.id === form.campusId)?.name ?? "";
 
   // The extra lottery questions follow the selected campus, so they appear and
   // disappear when the family changes their mind on step 1.
   const questionFlags = questionFlagsFor(policyQuestions, form.campusId);
-  const showPolicyQuestions = questionFlags.is_staff_child || questionFlags.is_frl_qualifying;
+  const showPolicyQuestions =
+    questionFlags.is_staff_child ||
+    questionFlags.is_frl_qualifying ||
+    questionFlags.resides_in_district ||
+    questionFlags.is_employee_or_board_child ||
+    questionFlags.is_military_dependent;
   // Only ask about siblings where the selected campus's board adopted a sibling
   // preference. Elsewhere the question is hidden so nothing on the application
   // implies a priority or admission criterion.
@@ -780,6 +801,33 @@ export function NewApplicationForm({
                     onChange={(v) => update({ isFrlQualifying: v })}
                   />
                 )}
+                {questionFlags.resides_in_district && (
+                  <YesNoQuestion
+                    name="resides-in-district"
+                    label={`${t("appForm.districtLabel")} ${campusName} ${t("appForm.districtLabelSuffix")}`}
+                    note={t("appForm.districtNote")}
+                    value={form.residesInDistrict}
+                    onChange={(v) => update({ residesInDistrict: v })}
+                  />
+                )}
+                {questionFlags.is_employee_or_board_child && (
+                  <YesNoQuestion
+                    name="is-employee-or-board-child"
+                    label={`${t("appForm.employeeOrBoardChildLabel")} ${campusName}${t("appForm.employeeOrBoardChildLabelSuffix")}`}
+                    note={t("appForm.employeeOrBoardChildNote")}
+                    value={form.isEmployeeOrBoardChild}
+                    onChange={(v) => update({ isEmployeeOrBoardChild: v })}
+                  />
+                )}
+                {questionFlags.is_military_dependent && (
+                  <YesNoQuestion
+                    name="is-military-dependent"
+                    label={t("appForm.militaryDependentLabel")}
+                    note={t("appForm.militaryDependentNote")}
+                    value={form.isMilitaryDependent}
+                    onChange={(v) => update({ isMilitaryDependent: v })}
+                  />
+                )}
               </div>
             )}
 
@@ -1036,6 +1084,24 @@ export function NewApplicationForm({
                   <ReviewRow
                     label={t("appForm.review.frl")}
                     value={form.isFrlQualifying === "yes" ? t("common.yes") : t("common.no")}
+                  />
+                )}
+                {questionFlags.resides_in_district && (
+                  <ReviewRow
+                    label={t("appForm.review.residesInDistrict")}
+                    value={form.residesInDistrict === "yes" ? t("common.yes") : t("common.no")}
+                  />
+                )}
+                {questionFlags.is_employee_or_board_child && (
+                  <ReviewRow
+                    label={t("appForm.review.employeeOrBoardChild")}
+                    value={form.isEmployeeOrBoardChild === "yes" ? t("common.yes") : t("common.no")}
+                  />
+                )}
+                {questionFlags.is_military_dependent && (
+                  <ReviewRow
+                    label={t("appForm.review.militaryDependent")}
+                    value={form.isMilitaryDependent === "yes" ? t("common.yes") : t("common.no")}
                   />
                 )}
               </ReviewSection>

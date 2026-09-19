@@ -69,26 +69,52 @@ export const POLICY_COLLECTED_ANSWER_KEYS: readonly string[] = [
   "guardian_relationship_other",
   "is_staff_child",
   "is_frl_qualifying",
+  // Declared by board-adopted ABSOLUTE PREFERENCES (Cleveland/OH,
+  // C.R. Neal/SC). Collected only on a campus whose adopted policy declares
+  // them — see policyQuestionFlags below, which now covers both weighted
+  // tiers and absolute preferences.
+  "resides_in_district",
+  "is_employee_or_board_child",
+  "is_military_dependent",
 ];
 
 /**
  * Answer keys that exist ONLY because a board-adopted policy declares a
- * weighted tier sourced from them. The family form asks these questions on a
- * campus whose adopted policy declares them, and nowhere else: a campus whose
- * board has not adopted the tier must not be quietly collecting the data for
- * it. See policyQuestionFlags below for the gate.
+ * weighted tier OR an absolute preference sourced from them. The family form
+ * asks these questions on a campus whose adopted policy declares them, and
+ * nowhere else: a campus whose board has not adopted the tier/preference must
+ * not be quietly collecting the data for it. See policyQuestionFlags below
+ * for the gate, which checks both weightedTiers and absolutePreferences.
  */
-export const POLICY_TIER_QUESTION_KEYS = ["is_staff_child", "is_frl_qualifying"] as const;
+export const POLICY_TIER_QUESTION_KEYS = [
+  "is_staff_child",
+  "is_frl_qualifying",
+  // Ohio ORC 3314.06(H): in-district residence preference (absolute
+  // preference, Cleveland only — never for a campus whose adopted policy
+  // does not declare it, such as C.R. Neal Academy under SC's board policy
+  // JBC, which prohibits geographic preference).
+  "resides_in_district",
+  // S.C. Code Ann. 59-40-50(B)(8)(c)(ii): employees AND charter committee
+  // (board) members under one combined cap. Deliberately a separate key from
+  // is_staff_child, whose "contracted full-time staff" meaning RSV's live
+  // adopted policy depends on — do not conflate the two.
+  "is_employee_or_board_child",
+  // S.C. Code Ann. 59-40-50(B)(8)(c)(iii): dependents of active-duty military.
+  "is_military_dependent",
+] as const;
 
 export type PolicyTierQuestionKey = (typeof POLICY_TIER_QUESTION_KEYS)[number];
 
 /** Which policy-driven questions a campus's form should render. */
 export type PolicyQuestionFlags = Record<PolicyTierQuestionKey, boolean>;
 
-/** No adopted policy, or an adopted policy that declares neither tier. */
+/** No adopted policy, or an adopted policy that declares none of these. */
 export const NO_POLICY_QUESTIONS: PolicyQuestionFlags = {
   is_staff_child: false,
   is_frl_qualifying: false,
+  resides_in_district: false,
+  is_employee_or_board_child: false,
+  is_military_dependent: false,
 };
 
 // ─── Answer value encoding ─────────────────────────────────────────────────
@@ -656,17 +682,33 @@ export function enabledWeightedTiers(config: LotteryPolicyConfig): LotteryPolicy
 }
 
 /**
- * True when an enabled weighted tier in this policy is sourced from the named
- * application_answer key. This is the ONLY thing that turns a policy-driven
- * question on in the family form: the question follows the board's adopted
- * text, not a hard-coded campus list.
+ * True when an enabled weighted tier OR an enabled absolute preference in
+ * this policy is sourced from the named application_answer key. This is the
+ * ONLY thing that turns a policy-driven question on in the family form: the
+ * question follows the board's adopted text, not a hard-coded campus list.
+ *
+ * Generalized (PR adding resides_in_district) beyond weighted tiers because
+ * an absolute preference — an ordered band, not a thumb on the scale — can
+ * be sourced from an application_answer key exactly the same way a weighted
+ * tier can (see LotteryPolicyAbsolutePreference.source). A campus whose board
+ * has not enabled either kind of preference from a given key must not ask the
+ * question, and a campus that enables it via EITHER mechanism must.
  */
 export function policyDeclaresAnswerField(
   config: LotteryPolicyConfig,
   field: string
 ): boolean {
-  return enabledWeightedTiers(config).some(
+  const fromWeightedTier = enabledWeightedTiers(config).some(
     (tier) => tier.source.kind === "application_answer" && tier.source.field === field
+  );
+  if (fromWeightedTier) return true;
+
+  return config.absolutePreferences.some(
+    (pref) =>
+      pref.enabled &&
+      pref.source !== undefined &&
+      pref.source.kind === "application_answer" &&
+      pref.source.field === field
   );
 }
 
@@ -674,17 +716,22 @@ export function policyDeclaresAnswerField(
  * Which policy-driven questions the family form should ask for a campus.
  *
  * Pass the campus's ADOPTED policy config, or null. A draft policy is not a
- * policy: a board that has not adopted the tier has not authorized asking the
- * question, so a null config asks nothing.
+ * policy: a board that has not adopted the tier/preference has not authorized
+ * asking the question, so a null config asks nothing.
+ *
+ * Built generically off POLICY_TIER_QUESTION_KEYS so a newly declared
+ * tier/preference question key needs no changes here — see
+ * policyDeclaresAnswerField for the underlying gate.
  */
 export function policyQuestionFlags(
   config: LotteryPolicyConfig | null | undefined
 ): PolicyQuestionFlags {
   if (!config) return { ...NO_POLICY_QUESTIONS };
-  return {
-    is_staff_child: policyDeclaresAnswerField(config, "is_staff_child"),
-    is_frl_qualifying: policyDeclaresAnswerField(config, "is_frl_qualifying"),
-  };
+  const flags = {} as PolicyQuestionFlags;
+  for (const key of POLICY_TIER_QUESTION_KEYS) {
+    flags[key] = policyDeclaresAnswerField(config, key);
+  }
+  return flags;
 }
 
 /** The sibling absolute preference, when the policy has one enabled. */
