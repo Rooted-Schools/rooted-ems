@@ -82,6 +82,22 @@ export interface PreflightFacts {
    * just cannot reach those applicants.
    */
   tiersMissingAnswers?: Array<{ label: string; fieldKey: string; applicationsMissing: number }>;
+
+  /**
+   * Enabled, auto-offer absolute preferences whose declared source field
+   * nothing collects — the absolute-preference counterpart to
+   * unsourcedTierLabels, fed from unsourcedAbsolutePreferences in
+   * lib/lottery-policy.ts. NEVER includes "sibling_current_enrolled": that
+   * preference is evidenced through the guardian/enrollment linkage in
+   * lib/lottery-eligibility.ts, not a declared source, so it is excluded by
+   * unsourcedAbsolutePreferences itself and must never be reported here.
+   */
+  unsourcedAbsolutePreferenceLabels: string[];
+  /**
+   * The same preferences with the exact field key each one needs. Optional;
+   * when absent the labels above are used on their own.
+   */
+  unsourcedAbsolutePreferenceFields?: Array<{ label: string; fieldKey: string }>;
 }
 
 // ─── The gating logic (pure) ───────────────────────────────────────────────
@@ -317,25 +333,52 @@ export function evaluatePreflight(facts: PreflightFacts): PreflightCheck[] {
     });
   }
 
-  // 9. Weighted tier sources
+  // 9. Weighted tier AND absolute-preference sources
   //
-  // RED, not amber. An enabled weighted tier whose source field is collected
-  // nowhere means the board adopted a preference that the draw silently did
-  // not apply: every applicant who should have had five entries got one, and
-  // the result reads as a lawful weighted lottery. That is the exact failure
-  // an authorizer challenge is made of, so it blocks Finalize as Official.
-  if (facts.unsourcedTierLabels.length > 0) {
-    const named =
-      facts.unsourcedTierFields && facts.unsourcedTierFields.length > 0
-        ? facts.unsourcedTierFields
-            .map((t) => `${t.label} (needs the field "${t.fieldKey}")`)
-            .join("; ")
-        : facts.unsourcedTierLabels.join("; ");
+  // RED, not amber, for both. An enabled weighted tier whose source field is
+  // collected nowhere means the board adopted a preference that the draw
+  // silently did not apply: every applicant who should have had five entries
+  // got one, and the result reads as a lawful weighted lottery. That is the
+  // exact failure an authorizer challenge is made of, so it blocks Finalize
+  // as Official.
+  //
+  // An unsourced ABSOLUTE PREFERENCE is the same failure with a sharper
+  // consequence: the band is not a thumb on the scale, it is an ordered
+  // group of seats awarded before the general draw even runs. A preference
+  // nothing can evidence would seat nobody, silently, and the lottery
+  // produced would not be the one the board adopted.
+  const tierProblem = facts.unsourcedTierLabels.length > 0;
+  const absProblem = facts.unsourcedAbsolutePreferenceLabels.length > 0;
+  if (tierProblem || absProblem) {
+    const parts: string[] = [];
+    if (tierProblem) {
+      const named =
+        facts.unsourcedTierFields && facts.unsourcedTierFields.length > 0
+          ? facts.unsourcedTierFields
+              .map((t) => `${t.label} (needs the field "${t.fieldKey}")`)
+              .join("; ")
+          : facts.unsourcedTierLabels.join("; ");
+      parts.push(
+        `The policy weights these tiers but the application collects nothing they can read: ${named}. Every applicant would be drawn at the default weight, so the lottery would not be the one the board adopted.`
+      );
+    }
+    if (absProblem) {
+      const named =
+        facts.unsourcedAbsolutePreferenceFields && facts.unsourcedAbsolutePreferenceFields.length > 0
+          ? facts.unsourcedAbsolutePreferenceFields
+              .map((p) => `${p.label} (needs the field "${p.fieldKey}")`)
+              .join("; ")
+          : facts.unsourcedAbsolutePreferenceLabels.join("; ");
+      parts.push(
+        `The policy declares these absolute preferences but the application collects nothing they can read: ${named}. Each band would seat nobody, and the lottery would not be the one the board adopted.`
+      );
+    }
+    parts.push("Add the field to the application, or disable the tier or preference in the policy, before finalizing.");
     checks.push({
       key: "tier_sources",
       label: "Weighted entry data",
       status: "red",
-      message: `The policy weights these tiers but the application collects nothing they can read: ${named}. Every applicant would be drawn at the default weight, so the lottery would not be the one the board adopted. Add the field to the application, or disable the tier in the policy, before finalizing.`,
+      message: parts.join(" "),
     });
   } else if (facts.tiersMissingAnswers && facts.tiersMissingAnswers.length > 0) {
     const named = facts.tiersMissingAnswers
@@ -352,7 +395,7 @@ export function evaluatePreflight(facts: PreflightFacts): PreflightCheck[] {
       key: "tier_sources",
       label: "Weighted entry data",
       status: "green",
-      message: "Every weighted entry tier in the policy reads a field the application actually collects.",
+      message: "Every weighted entry tier and absolute preference in the policy reads a field the application actually collects.",
     });
   }
 

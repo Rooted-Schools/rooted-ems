@@ -127,14 +127,20 @@ describe("answerAsText", () => {
 // ─── Key allowlists ────────────────────────────────────────────────────────
 
 describe("answer key allowlists", () => {
-  it("accepts writes for the two board-declared tier questions", () => {
+  it("accepts writes for the board-declared tier/preference questions", () => {
     expect(ALLOWED_ANSWER_KEYS.has("is_staff_child")).toBe(true);
     expect(ALLOWED_ANSWER_KEYS.has("is_frl_qualifying")).toBe(true);
+    expect(ALLOWED_ANSWER_KEYS.has("resides_in_district")).toBe(true);
+    expect(ALLOWED_ANSWER_KEYS.has("is_employee_or_board_child")).toBe(true);
+    expect(ALLOWED_ANSWER_KEYS.has("is_military_dependent")).toBe(true);
   });
 
-  it("reports those same keys as collected, so their tiers are not unsourced", () => {
+  it("reports those same keys as collected, so their tiers/preferences are not unsourced", () => {
     expect(POLICY_COLLECTED_ANSWER_KEYS).toContain("is_staff_child");
     expect(POLICY_COLLECTED_ANSWER_KEYS).toContain("is_frl_qualifying");
+    expect(POLICY_COLLECTED_ANSWER_KEYS).toContain("resides_in_district");
+    expect(POLICY_COLLECTED_ANSWER_KEYS).toContain("is_employee_or_board_child");
+    expect(POLICY_COLLECTED_ANSWER_KEYS).toContain("is_military_dependent");
   });
 
   it("keeps the write allowlist and the collected list in step", () => {
@@ -150,20 +156,42 @@ describe("answer key allowlists", () => {
     expect(ALLOWED_ANSWER_KEYS.has("immigration_status")).toBe(false);
   });
 
-  it("names both policy-driven questions", () => {
-    expect([...POLICY_TIER_QUESTION_KEYS]).toEqual(["is_staff_child", "is_frl_qualifying"]);
+  it("does NOT reuse is_staff_child for the SC employee-or-board-member category: RSV's live adopted policy depends on is_staff_child meaning contracted full-time staff only", () => {
+    expect(POLICY_TIER_QUESTION_KEYS).toContain("is_staff_child");
+    expect(POLICY_TIER_QUESTION_KEYS).toContain("is_employee_or_board_child");
+    expect("is_staff_child").not.toEqual("is_employee_or_board_child");
+  });
+
+  it("names all five policy-driven questions", () => {
+    expect([...POLICY_TIER_QUESTION_KEYS]).toEqual([
+      "is_staff_child",
+      "is_frl_qualifying",
+      "resides_in_district",
+      "is_employee_or_board_child",
+      "is_military_dependent",
+    ]);
+  });
+
+  it("never invents a returning_students source key: C.R. Neal opens 2027-28 with no previous-year students, and returning-student status must come from enrollment records, not a self-declared question", () => {
+    expect(ALLOWED_ANSWER_KEYS.has("returning_students")).toBe(false);
+    expect(POLICY_COLLECTED_ANSWER_KEYS).not.toContain("returning_students");
+    expect(POLICY_TIER_QUESTION_KEYS as readonly string[]).not.toContain("returning_students");
   });
 });
 
 // ─── Form visibility predicate ─────────────────────────────────────────────
 
-function configWith(tiers: Array<Record<string, unknown>>): LotteryPolicyConfig {
+function configWith(
+  tiers: Array<Record<string, unknown>>,
+  absolutePreferences: Array<Record<string, unknown>> = []
+): LotteryPolicyConfig {
   const { config } = parseLotteryPolicyConfig({
     schemaVersion: 1,
     defaultWeight: 1,
     acceptanceWindowDays: 14,
     waitlistOfferWindow: { days: 2, cutoffTime: "16:00", note: "" },
     weightedTiers: tiers,
+    absolutePreferences,
   });
   return config as LotteryPolicyConfig;
 }
@@ -204,6 +232,7 @@ describe("policyQuestionFlags — a question is asked only where a board adopted
 
   it("asks both questions for a policy declaring both tiers", () => {
     expect(policyQuestionFlags(configWith([staffChildTier, frlTier]))).toEqual({
+      ...NO_POLICY_QUESTIONS,
       is_staff_child: true,
       is_frl_qualifying: true,
     });
@@ -211,8 +240,8 @@ describe("policyQuestionFlags — a question is asked only where a board adopted
 
   it("asks only the question the policy actually declares", () => {
     expect(policyQuestionFlags(configWith([staffChildTier]))).toEqual({
+      ...NO_POLICY_QUESTIONS,
       is_staff_child: true,
-      is_frl_qualifying: false,
     });
   });
 
@@ -238,6 +267,144 @@ describe("policyQuestionFlags — a question is asked only where a board adopted
   it("asks nothing for a policy with no weighted tiers at all", () => {
     // Columbia and Cleveland until their boards adopt one.
     expect(policyQuestionFlags(configWith([]))).toEqual(NO_POLICY_QUESTIONS);
+  });
+});
+
+// ─── The gate, generalized to absolute preferences ─────────────────────────
+//
+// resides_in_district, is_employee_or_board_child, and is_military_dependent
+// are sourced from ABSOLUTE PREFERENCES (ordered bands), not weighted tiers —
+// the case policyDeclaresAnswerField/policyQuestionFlags did not originally
+// cover. These tests exercise the mechanism generically, the same way the
+// weighted-tier tests above do, and never special-case any one key.
+
+const districtPreference = {
+  key: "in_district_resident",
+  label: "Student resides in the district",
+  enabled: true,
+  autoOfferBeforeDraw: true,
+  overflowToPriorityWaitlist: true,
+  siblingDefinition: "shared_legal_guardian",
+  definition: "The student resides within the district in which the school is located.",
+  fosterExcludedUntilLegalGuardianship: false,
+  verificationMayBeRequired: true,
+  falseClaimForfeitsSeat: true,
+  authorityNote: "ORC 3314.06(H).",
+  source: { kind: "application_answer", field: "resides_in_district" },
+};
+
+const employeeOrBoardChildPreference = {
+  key: "staff_or_board_child",
+  label: "Employee or board member child",
+  enabled: true,
+  autoOfferBeforeDraw: true,
+  overflowToPriorityWaitlist: true,
+  siblingDefinition: "shared_legal_guardian",
+  definition: "The student is the child of an employee or a governing board member.",
+  fosterExcludedUntilLegalGuardianship: false,
+  verificationMayBeRequired: false,
+  falseClaimForfeitsSeat: false,
+  authorityNote: "S.C. Code Ann. 59-40-50(B)(8)(c)(ii).",
+  capPercent: 20,
+  source: { kind: "application_answer", field: "is_employee_or_board_child" },
+};
+
+const militaryDependentPreference = {
+  key: "military_dependent",
+  label: "Active-duty military dependent",
+  enabled: true,
+  autoOfferBeforeDraw: true,
+  overflowToPriorityWaitlist: true,
+  siblingDefinition: "shared_legal_guardian",
+  definition: "The student is a dependent of an active-duty member of the military.",
+  fosterExcludedUntilLegalGuardianship: false,
+  verificationMayBeRequired: false,
+  falseClaimForfeitsSeat: false,
+  authorityNote: "S.C. Code Ann. 59-40-50(B)(8)(c)(iii).",
+  capPercent: 10,
+  source: { kind: "application_answer", field: "is_military_dependent" },
+};
+
+describe("policyDeclaresAnswerField / policyQuestionFlags — generalized to absolute-preference-sourced questions", () => {
+  it("asks resides_in_district when an ENABLED absolute preference declares it as source (Cleveland/OH)", () => {
+    expect(policyDeclaresAnswerField(configWith([], [districtPreference]), "resides_in_district")).toBe(
+      true
+    );
+    expect(policyQuestionFlags(configWith([], [districtPreference]))).toEqual({
+      ...NO_POLICY_QUESTIONS,
+      resides_in_district: true,
+    });
+  });
+
+  it("asks is_employee_or_board_child when an ENABLED absolute preference declares it as source", () => {
+    expect(
+      policyQuestionFlags(configWith([], [employeeOrBoardChildPreference]))
+    ).toEqual({ ...NO_POLICY_QUESTIONS, is_employee_or_board_child: true });
+  });
+
+  it("asks is_military_dependent when an ENABLED absolute preference declares it as source", () => {
+    expect(policyQuestionFlags(configWith([], [militaryDependentPreference]))).toEqual({
+      ...NO_POLICY_QUESTIONS,
+      is_military_dependent: true,
+    });
+  });
+
+  it("asks both SC absolute-preference questions together when a policy adopts both (never the geographic one, which SC prohibits)", () => {
+    expect(
+      policyQuestionFlags(
+        configWith([], [employeeOrBoardChildPreference, militaryDependentPreference])
+      )
+    ).toEqual({
+      ...NO_POLICY_QUESTIONS,
+      is_employee_or_board_child: true,
+      is_military_dependent: true,
+    });
+  });
+
+  it("does not ask when the absolute preference is enabled but declares no source at all", () => {
+    const noSource = { ...districtPreference, source: undefined };
+    expect(policyQuestionFlags(configWith([], [noSource]))).toEqual(NO_POLICY_QUESTIONS);
+  });
+
+  it("does not ask when the absolute preference declaring the key is DISABLED — a board that has not turned it on has not authorized the question", () => {
+    expect(
+      policyQuestionFlags(configWith([], [{ ...districtPreference, enabled: false }]))
+    ).toEqual(NO_POLICY_QUESTIONS);
+  });
+
+  it("does not ask when the absolute preference reads a column rather than an application_answer", () => {
+    const columnPreference = {
+      ...districtPreference,
+      source: { kind: "application_column", field: "has_sibling_enrolled" },
+    };
+    expect(
+      policyDeclaresAnswerField(configWith([], [columnPreference]), "resides_in_district")
+    ).toBe(false);
+  });
+
+  it("THE SOUTH CAROLINA PROTECTION: returns false for resides_in_district on a policy that declares neither a weighted tier nor an absolute preference sourced from it — C.R. Neal Academy's board-adopted Policy JBC grants no geographic preference, and the question must be structurally incapable of appearing there", () => {
+    // A realistic C.R. Neal-shaped policy: it adopts the SC preferences state
+    // law allows (employee/board, military) but explicitly does NOT adopt
+    // any geographic/residence preference, because SC law prohibits one.
+    const crNealShaped = configWith([], [employeeOrBoardChildPreference, militaryDependentPreference]);
+    expect(policyDeclaresAnswerField(crNealShaped, "resides_in_district")).toBe(false);
+    expect(policyQuestionFlags(crNealShaped)).toEqual({
+      ...NO_POLICY_QUESTIONS,
+      is_employee_or_board_child: true,
+      is_military_dependent: true,
+    });
+    // Explicitly: the district question itself stays off.
+    expect(policyQuestionFlags(crNealShaped).resides_in_district).toBe(false);
+  });
+
+  it("does not confuse is_staff_child (RSV: contracted full-time staff, a weighted tier) with is_employee_or_board_child (SC: employees AND board members, an absolute preference) — a policy declaring one must not imply the other", () => {
+    const config = configWith([staffChildTier], [militaryDependentPreference]);
+    expect(policyQuestionFlags(config)).toEqual({
+      ...NO_POLICY_QUESTIONS,
+      is_staff_child: true,
+      is_military_dependent: true,
+    });
+    expect(policyQuestionFlags(config).is_employee_or_board_child).toBe(false);
   });
 });
 

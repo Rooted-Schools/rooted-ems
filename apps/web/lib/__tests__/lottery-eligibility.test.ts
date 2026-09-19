@@ -25,6 +25,7 @@ import {
   deriveSiblingOfEnrolled,
   deriveLinkedSiblings,
   matchWeightedTiers,
+  matchAbsolutePreferences,
   normalizeAnswer,
 } from "@/lib/lottery-eligibility";
 import type {
@@ -536,6 +537,102 @@ describe("matchWeightedTiers", () => {
     expect(result.weightByApplication.get("app-1")).toBe(1);
     expect(result.weightByApplication.get("app-2")).toBe(1);
     expect(result.unsourcedTierKeys).toEqual([]);
+  });
+});
+
+// ─── Absolute-preference matching (PR #136's ordered bands, made sourceable) ──
+
+describe("matchAbsolutePreferences", () => {
+  const districtPreference: LotteryPolicyAbsolutePreference = {
+    key: "in_district_resident",
+    label: "Student resides in the district",
+    enabled: true,
+    autoOfferBeforeDraw: true,
+    overflowToPriorityWaitlist: true,
+    siblingDefinition: "shared_legal_guardian",
+    definition: "The student resides within the district in which the school is located.",
+    fosterExcludedUntilLegalGuardianship: false,
+    verificationMayBeRequired: true,
+    falseClaimForfeitsSeat: true,
+    authorityNote: "ORC 3314.06(H).",
+    source: { kind: "application_answer", field: "resides_in_district" },
+  };
+
+  it("matches a preference sourced from resides_in_district, because the family form now collects it for campuses whose policy declares it", async () => {
+    supabaseMock.queueResult("application_answer", {
+      data: [{ application_id: "app-1", value: "true" }],
+      error: null,
+    });
+
+    const result = await matchAbsolutePreferences(
+      client(),
+      ["app-1", "app-2"],
+      [districtPreference]
+    );
+
+    expect(result.unsourcedPreferenceKeys).toEqual([]);
+    expect(result.preferenceKeysByApplication.get("app-1")).toEqual(["in_district_resident"]);
+    expect(result.preferenceKeysByApplication.get("app-2")).toEqual([]);
+  });
+
+  it("reports a preference as unsourced when its declared field is not actually collected", async () => {
+    const uncollected: LotteryPolicyAbsolutePreference = {
+      ...districtPreference,
+      key: "uncollected_pref",
+      source: { kind: "application_answer", field: "not_a_real_field" },
+    };
+
+    const result = await matchAbsolutePreferences(client(), ["app-1"], [uncollected]);
+
+    expect(result.unsourcedPreferenceKeys).toEqual(["uncollected_pref"]);
+    expect(result.preferenceKeysByApplication.get("app-1")).toEqual([]);
+    // No query issued pretending to look for a field nobody collects.
+    expect(supabaseMock.ops.some((o) => o.table === "application_answer")).toBe(false);
+  });
+
+  it("NEVER reports sibling_current_enrolled as unsourced, even with no source declared — its evidence is the guardian/enrollment linkage above, not a declared source", async () => {
+    const result = await matchAbsolutePreferences(client(), ["app-1"], [SIBLING_PREFERENCE]);
+
+    expect(result.unsourcedPreferenceKeys).toEqual([]);
+    expect(result.preferenceKeysByApplication.get("app-1")).toEqual([]);
+    expect(supabaseMock.ops.some((o) => o.table === "application_answer")).toBe(false);
+  });
+
+  it("matches more than one sourced preference for the same applicant", async () => {
+    const militaryPreference: LotteryPolicyAbsolutePreference = {
+      ...districtPreference,
+      key: "military_dependent",
+      label: "Active-duty military dependent",
+      source: { kind: "application_answer", field: "is_military_dependent" },
+    };
+
+    supabaseMock.queueResult("application_answer", {
+      data: [{ application_id: "app-1", value: "true" }],
+      error: null,
+    });
+    supabaseMock.queueResult("application_answer", {
+      data: [{ application_id: "app-1", value: "true" }],
+      error: null,
+    });
+
+    const result = await matchAbsolutePreferences(
+      client(),
+      ["app-1"],
+      [districtPreference, militaryPreference]
+    );
+
+    expect(result.unsourcedPreferenceKeys).toEqual([]);
+    expect(result.preferenceKeysByApplication.get("app-1")).toEqual([
+      "in_district_resident",
+      "military_dependent",
+    ]);
+  });
+
+  it("gives every application an empty preference list when there are no preferences at all", async () => {
+    const result = await matchAbsolutePreferences(client(), ["app-1", "app-2"], []);
+    expect(result.preferenceKeysByApplication.get("app-1")).toEqual([]);
+    expect(result.preferenceKeysByApplication.get("app-2")).toEqual([]);
+    expect(result.unsourcedPreferenceKeys).toEqual([]);
   });
 });
 

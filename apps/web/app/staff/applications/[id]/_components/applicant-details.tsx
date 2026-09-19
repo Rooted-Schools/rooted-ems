@@ -41,6 +41,13 @@ function humanize(value: string | null): string | null {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
+/** "yes"/"no" -> "Yes"/"No"; anything else (including null) is omitted. */
+function yesNo(value: string | null): string | null {
+  if (value === "yes") return "Yes";
+  if (value === "no") return "No";
+  return null;
+}
+
 interface Row {
   label: string;
   value: string | null;
@@ -67,6 +74,13 @@ export function ApplicantDetails({ detail }: ApplicantDetailsProps) {
     { label: "Current grade", value: detail.current_grade },
     { label: "Current school", value: detail.student_previous_school },
     { label: "Sibling at school", value: detail.sibling_name },
+    // Self-declared, campus-gated preference answers (see resides_in_state
+    // above for the residency-eligibility flag, which is handled separately
+    // via a callout in context-rail.tsx). These three exist only on a campus
+    // whose adopted policy declares the matching absolute preference.
+    { label: "Lives in district", value: yesNo(detail.resides_in_district) },
+    { label: "Employee or board member child", value: yesNo(detail.is_employee_or_board_child) },
+    { label: "Military dependent", value: yesNo(detail.is_military_dependent) },
   ].filter((r) => r.value);
 
   return (

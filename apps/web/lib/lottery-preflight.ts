@@ -22,6 +22,7 @@ import {
   enabledWeightedTiers,
   parseLotteryPolicyConfig,
   siblingAbsolutePreference,
+  unsourcedAbsolutePreferences,
   unsourcedWeightedTiers,
 } from "@/lib/lottery-policy";
 import { deriveSiblingOfEnrolled } from "@/lib/lottery-eligibility";
@@ -183,6 +184,12 @@ export async function gatherPreflightFacts(runId: string): Promise<PreflightFact
   // the older applications in this run never answered.
   const unsourced = policyConfig ? unsourcedWeightedTiers(policyConfig) : [];
   const unsourcedKeys = new Set(unsourced.map((t) => t.key));
+
+  // Absolute-preference sources — the same question for the ordered bands
+  // PR #136 made sourceable. unsourcedAbsolutePreferences already excludes
+  // "sibling_current_enrolled", whose evidence is the guardian/enrollment
+  // linkage above, not a declared source.
+  const unsourcedAbsPrefs = policyConfig ? unsourcedAbsolutePreferences(policyConfig) : [];
   const tiersMissingAnswers: Array<{
     label: string;
     fieldKey: string;
@@ -255,6 +262,12 @@ export async function gatherPreflightFacts(runId: string): Promise<PreflightFact
       fieldKey: t.source.field || "(no field declared)",
     })),
     tiersMissingAnswers,
+
+    unsourcedAbsolutePreferenceLabels: unsourcedAbsPrefs.map((p) => p.label),
+    unsourcedAbsolutePreferenceFields: unsourcedAbsPrefs.map((p) => ({
+      label: p.label,
+      fieldKey: p.source?.field || "(no field declared)",
+    })),
   };
 }
 

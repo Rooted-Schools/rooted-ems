@@ -50,6 +50,7 @@ function readyFacts(overrides: Partial<PreflightFacts> = {}): PreflightFacts {
     offerExpiryCadenceMinutes: 24 * 60,
 
     unsourcedTierLabels: [],
+    unsourcedAbsolutePreferenceLabels: [],
     ...overrides,
   };
 }
@@ -251,6 +252,64 @@ describe("evaluatePreflight — weighted entry data", () => {
     expect(check.message).toMatch(/Economically disadvantaged/);
     expect(check.message).toMatch(/drawn at the default weight/);
     expect(preflightBlocks(evaluatePreflight(facts))).toBe(true);
+  });
+});
+
+describe("evaluatePreflight — absolute preference sources", () => {
+  it("blocks when an ENABLED absolute preference's source field is not collected — the band would seat nobody, and the lottery would not be the one the board adopted", () => {
+    const facts = readyFacts({
+      unsourcedAbsolutePreferenceLabels: ["Employee or board member child"],
+    });
+    const check = statusOf(facts, "tier_sources");
+    expect(check.status).toBe("red");
+    expect(check.message).toMatch(/Employee or board member child/);
+    expect(check.message).toMatch(/would seat nobody/);
+    expect(check.message).toMatch(/would not be the one the board adopted/);
+    expect(preflightBlocks(evaluatePreflight(facts))).toBe(true);
+  });
+
+  it("names the missing field when unsourcedAbsolutePreferenceFields is provided", () => {
+    const facts = readyFacts({
+      unsourcedAbsolutePreferenceLabels: ["Employee or board member child"],
+      unsourcedAbsolutePreferenceFields: [
+        { label: "Employee or board member child", fieldKey: "is_employee_or_board_child" },
+      ],
+    });
+    const check = statusOf(facts, "tier_sources");
+    expect(check.message).toMatch(/needs the field "is_employee_or_board_child"/);
+  });
+
+  it("reports both an unsourced weighted tier and an unsourced absolute preference in one red check", () => {
+    const facts = readyFacts({
+      unsourcedTierLabels: ["Economically disadvantaged (FRL-qualifying)"],
+      unsourcedAbsolutePreferenceLabels: ["Employee or board member child"],
+    });
+    const check = statusOf(facts, "tier_sources");
+    expect(check.status).toBe("red");
+    expect(check.message).toMatch(/Economically disadvantaged/);
+    expect(check.message).toMatch(/Employee or board member child/);
+  });
+
+  it("does not report — and does not block on — a preference the board has not turned on: a disabled preference cannot silently fail", () => {
+    // A disabled absolute preference never reaches unsourcedAbsolutePreferenceLabels
+    // in the first place (see unsourcedAbsolutePreferences in lib/lottery-policy.ts,
+    // which filters to enabled + auto-offer preferences before checking sourcing).
+    // The ready case is exactly that scenario: nothing enabled, nothing unsourced.
+    const facts = readyFacts();
+    const check = statusOf(facts, "tier_sources");
+    expect(check.status).toBe("green");
+    expect(preflightBlocks(evaluatePreflight(facts))).toBe(false);
+  });
+
+  it("never reports sibling_current_enrolled as unsourced — its evidence is the guardian/enrollment linkage, not a declared source, so RSV's live adopted policy (sibling preference only) stays green", () => {
+    // RSV's real adopted policy declares exactly one absolute preference,
+    // sibling_current_enrolled, which carries no `source` at all. Wired
+    // through lib/lottery-policy.ts's unsourcedAbsolutePreferences, that
+    // preference is filtered out by key before the source check ever runs
+    // (see lottery-policy-config.test.ts for the direct unit test), so the
+    // fact this rule reads is an empty array — exactly the ready-case default.
+    const facts = readyFacts({ unsourcedAbsolutePreferenceLabels: [] });
+    expect(statusOf(facts, "tier_sources").status).toBe("green");
   });
 });
 

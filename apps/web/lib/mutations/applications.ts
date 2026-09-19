@@ -36,6 +36,12 @@ export const ALLOWED_ANSWER_KEYS = new Set([
   // whose adopted policy declares them — see policyQuestionFlags.
   "is_staff_child",
   "is_frl_qualifying",
+  // Declared by board-adopted ABSOLUTE PREFERENCES (Cleveland/OH,
+  // C.R. Neal/SC). Same gate: collected only on a campus whose adopted
+  // policy declares them.
+  "resides_in_district",
+  "is_employee_or_board_child",
+  "is_military_dependent",
 ]);
 
 /**

@@ -90,6 +90,9 @@ interface FormData {
   residesInState: "" | YesNo;
   isStaffChild: YesNo;
   isFrlQualifying: YesNo;
+  residesInDistrict: YesNo;
+  isEmployeeOrBoardChild: YesNo;
+  isMilitaryDependent: YesNo;
   dataSharingConsent: boolean;
   agreeTerms: boolean;
   signatureName: string;
@@ -134,6 +137,9 @@ function draftToFormData(d: DraftApplicationData): FormData {
           : "",
     isStaffChild: isAffirmativeAnswer(d.answers.is_staff_child) ? "yes" : "no",
     isFrlQualifying: isAffirmativeAnswer(d.answers.is_frl_qualifying) ? "yes" : "no",
+    residesInDistrict: isAffirmativeAnswer(d.answers.resides_in_district) ? "yes" : "no",
+    isEmployeeOrBoardChild: isAffirmativeAnswer(d.answers.is_employee_or_board_child) ? "yes" : "no",
+    isMilitaryDependent: isAffirmativeAnswer(d.answers.is_military_dependent) ? "yes" : "no",
     dataSharingConsent: isAffirmativeAnswer(d.answers.data_sharing_consent),
     agreeTerms: isAffirmativeAnswer(d.answers.agree_terms),
     signatureName: answerAsText(d.answers.e_signature_name),
@@ -307,6 +313,9 @@ function buildUpdateInput(
     // leaves another school's affirmative answer on the application.
     is_staff_child: flags.is_staff_child ? form.isStaffChild : "",
     is_frl_qualifying: flags.is_frl_qualifying ? form.isFrlQualifying : "",
+    resides_in_district: flags.resides_in_district ? form.residesInDistrict : "",
+    is_employee_or_board_child: flags.is_employee_or_board_child ? form.isEmployeeOrBoardChild : "",
+    is_military_dependent: flags.is_military_dependent ? form.isMilitaryDependent : "",
   };
   if (form.signatureName) {
     answers.e_signature_date = new Date().toISOString().split("T")[0];
@@ -364,13 +373,21 @@ export function EditApplicationClient({
   const campusWindows = windows.filter((w) => w.campus_id === form.campusId && w.is_open);
   const campusGrades = gradeLevels.filter((g) => g.campus_id === form.campusId);
   const campusState = campuses.find((c) => c.id === form.campusId)?.state ?? "";
+  // See new-application-form.tsx for why the campus name stands in for a
+  // dedicated "district name" field that policy config does not carry.
+  const campusName = campuses.find((c) => c.id === form.campusId)?.name ?? "";
   const studentName =
     [form.firstName, form.lastName].filter(Boolean).join(" ") || t("appForm.untitled");
 
   // The extra lottery questions follow the selected campus, so they appear and
   // disappear when the family changes campus on step 1.
   const questionFlags = questionFlagsFor(policyQuestions, form.campusId);
-  const showPolicyQuestions = questionFlags.is_staff_child || questionFlags.is_frl_qualifying;
+  const showPolicyQuestions =
+    questionFlags.is_staff_child ||
+    questionFlags.is_frl_qualifying ||
+    questionFlags.resides_in_district ||
+    questionFlags.is_employee_or_board_child ||
+    questionFlags.is_military_dependent;
 
   // Debounced auto-save (~2s after the last change). The server action
   // re-verifies auth + guardian ownership on every save.
@@ -602,6 +619,33 @@ export function EditApplicationClient({
                     onChange={(v) => update({ isFrlQualifying: v })}
                   />
                 )}
+                {questionFlags.resides_in_district && (
+                  <YesNoQuestion
+                    name="resides-in-district"
+                    label={`${t("appForm.districtLabel")} ${campusName} ${t("appForm.districtLabelSuffix")}`}
+                    note={t("appForm.districtNote")}
+                    value={form.residesInDistrict}
+                    onChange={(v) => update({ residesInDistrict: v })}
+                  />
+                )}
+                {questionFlags.is_employee_or_board_child && (
+                  <YesNoQuestion
+                    name="is-employee-or-board-child"
+                    label={`${t("appForm.employeeOrBoardChildLabel")} ${campusName}${t("appForm.employeeOrBoardChildLabelSuffix")}`}
+                    note={t("appForm.employeeOrBoardChildNote")}
+                    value={form.isEmployeeOrBoardChild}
+                    onChange={(v) => update({ isEmployeeOrBoardChild: v })}
+                  />
+                )}
+                {questionFlags.is_military_dependent && (
+                  <YesNoQuestion
+                    name="is-military-dependent"
+                    label={t("appForm.militaryDependentLabel")}
+                    note={t("appForm.militaryDependentNote")}
+                    value={form.isMilitaryDependent}
+                    onChange={(v) => update({ isMilitaryDependent: v })}
+                  />
+                )}
               </div>
             )}
 
@@ -816,6 +860,24 @@ export function EditApplicationClient({
                   <ReviewRow
                     label={t("appForm.review.frl")}
                     value={form.isFrlQualifying === "yes" ? t("common.yes") : t("common.no")}
+                  />
+                )}
+                {questionFlags.resides_in_district && (
+                  <ReviewRow
+                    label={t("appForm.review.residesInDistrict")}
+                    value={form.residesInDistrict === "yes" ? t("common.yes") : t("common.no")}
+                  />
+                )}
+                {questionFlags.is_employee_or_board_child && (
+                  <ReviewRow
+                    label={t("appForm.review.employeeOrBoardChild")}
+                    value={form.isEmployeeOrBoardChild === "yes" ? t("common.yes") : t("common.no")}
+                  />
+                )}
+                {questionFlags.is_military_dependent && (
+                  <ReviewRow
+                    label={t("appForm.review.militaryDependent")}
+                    value={form.isMilitaryDependent === "yes" ? t("common.yes") : t("common.no")}
                   />
                 )}
               </ReviewSection>
