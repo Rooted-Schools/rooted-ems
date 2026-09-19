@@ -2,11 +2,7 @@ import { cache } from "react";
 import { createServerClient, createServiceRoleClient } from "@rooted-ems/database/server";
 import { formatRelativeTime } from "./utils";
 import { getGradeLabel } from "@/lib/application-helpers";
-import {
-  TIER_SIBLING_ABSOLUTE,
-  TIER_LINKED_SIBLING,
-  TIER_GENERAL,
-} from "@/lib/lottery-draw";
+import { parseLotteryPolicyConfig, governedBandLabels } from "@/lib/lottery-policy";
 
 // ─── Document Types ─────────────────────────────────────
 
@@ -1084,22 +1080,26 @@ const DEFAULT_TIER_LABEL = "Sibling enrolled at campus";
 
 /**
  * Band labels for a GOVERNED run — one whose lottery_run.policy_snapshot is
- * set. A governed run draws in three fixed bands keyed by the tier constants
- * in lib/lottery-draw.ts, not in the free-form tiers of a lottery_rule_set,
- * so reading its priority_tier through extractTierLabels below mislabels the
- * family's own result (a linked sibling shown as the rule set's second
- * custom tier, and so on).
+ * set. A governed run draws in bands keyed by priority_tier numbers assigned
+ * per THIS run's own absolute-preference configuration (lib/lottery-draw.ts),
+ * not in the free-form tiers of a lottery_rule_set, so reading its
+ * priority_tier through extractTierLabels below mislabels the family's own
+ * result (a linked sibling shown as the rule set's second custom tier, and
+ * so on).
  *
- * Deliberately re-declared here rather than imported from
- * lib/mutations/lottery.ts: a query module must not depend on a mutation
- * module. The constants themselves come from lib/lottery-draw.ts, which both
- * sides already share, so the band numbering cannot drift.
+ * Built from the run's own stored policy_snapshot via governedBandLabels
+ * (lib/lottery-policy.ts) rather than a fixed three-row table: a campus
+ * whose adopted policy declares more than one absolute preference (e.g. a
+ * future South Carolina or Ohio policy) gets one label per configured band,
+ * not just "sibling / linked / general." lib/lottery-policy.ts is a pure
+ * lib module, not a mutation module, so depending on it here does not
+ * reintroduce the query-depends-on-mutation problem this comment used to
+ * warn about.
  */
-const GOVERNED_BAND_LABELS: Record<number, string> = {
-  [TIER_SIBLING_ABSOLUTE]: "Sibling of a currently enrolled student",
-  [TIER_LINKED_SIBLING]: "Sibling pulled in by the linked-sibling rule",
-  [TIER_GENERAL]: "General weighted pool",
-};
+function governedBandLabelsForSnapshot(policySnapshot: unknown): string[] {
+  const { config } = parseLotteryPolicyConfig(policySnapshot);
+  return config ? governedBandLabels(config) : ["General weighted pool"];
+}
 
 /**
  * Defensively pull tier labels out of a rule set's priority_tiers JSONB.
@@ -1243,9 +1243,11 @@ export async function getLotteryOutcome(
   let tierLabel: string;
 
   if (runRow.policy_snapshot) {
-    // Governed run: priority_tier is a fixed band, not an index into the
-    // rule set's custom tier array. See GOVERNED_BAND_LABELS above.
-    tierLabel = GOVERNED_BAND_LABELS[tierIndex] ?? GOVERNED_BAND_LABELS[TIER_GENERAL];
+    // Governed run: priority_tier is a band index into THIS run's own
+    // absolute-preference configuration, not an index into the rule set's
+    // custom tier array. See governedBandLabelsForSnapshot above.
+    const labels = governedBandLabelsForSnapshot(runRow.policy_snapshot);
+    tierLabel = labels[tierIndex] ?? labels[labels.length - 1] ?? "General weighted pool";
   } else {
     let tierLabels: string[] = [DEFAULT_TIER_LABEL];
     if (runRow.lottery_rule_set_id) {

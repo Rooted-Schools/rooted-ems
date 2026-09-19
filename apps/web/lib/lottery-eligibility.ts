@@ -47,6 +47,7 @@
 
 import type {
   LotteryPolicyAbsolutePreference,
+  LotteryPolicySource,
   LotteryPolicyWeightedTier,
 } from "@/lib/lottery-policy";
 import {
@@ -479,6 +480,104 @@ function recordMatches(
     if (tier.weight > current) weightByApplication.set(applicationId, tier.weight);
   }
   matchedCountByTier.set(tier.key, count);
+}
+
+// ─── Absolute-preference matching (beyond "sibling_current_enrolled") ──────
+
+export interface AbsolutePreferenceMatchResult {
+  /** application.id -> keys of every declared-source absolute preference it matched. */
+  preferenceKeysByApplication: Map<string, string[]>;
+  /** Preference keys whose declared source is not collected anywhere. */
+  unsourcedPreferenceKeys: string[];
+}
+
+/**
+ * Match applicants against every ENABLED, auto-offer absolute preference
+ * that declares a generic `source` — i.e. every band the draw needs BESIDES
+ * "sibling_current_enrolled", whose evidence is the guardian/enrollment
+ * linkage derived by deriveSiblingOfEnrolled above, not a declared source.
+ *
+ * Unlike matchWeightedTiers, there is no weight to resolve and no "highest
+ * wins" rule: a preference either matches or it does not, and which ONE
+ * preference actually governs an applicant who matches several is decided
+ * by band order in lib/lottery-draw.ts, not here. This function only
+ * reports the honest facts: which keys did this application's record match.
+ *
+ * A preference declared without a usable source (kind "unavailable", or a
+ * field this system does not actually collect) is reported as unsourced —
+ * matched by nobody — rather than fabricating a match. See
+ * unsourcedAbsolutePreferences in lib/lottery-policy.ts, which this mirrors.
+ */
+export async function matchAbsolutePreferences(
+  supabase: QueryClient,
+  applicationIds: string[],
+  preferences: LotteryPolicyAbsolutePreference[]
+): Promise<AbsolutePreferenceMatchResult> {
+  const preferenceKeysByApplication = new Map<string, string[]>();
+  for (const id of applicationIds) preferenceKeysByApplication.set(id, []);
+
+  const unsourcedPreferenceKeys: string[] = [];
+  const sourced = preferences.filter((p) => p.key !== "sibling_current_enrolled" && p.source);
+
+  if (applicationIds.length === 0) {
+    for (const pref of sourced) if (!pref.source) unsourcedPreferenceKeys.push(pref.key);
+    return { preferenceKeysByApplication, unsourcedPreferenceKeys };
+  }
+
+  for (const pref of sourced) {
+    const source = pref.source as LotteryPolicySource;
+    const matched = await matchBooleanSource(supabase, applicationIds, source);
+    if (matched === null) {
+      unsourcedPreferenceKeys.push(pref.key);
+      continue;
+    }
+    for (const applicationId of matched) {
+      const keys = preferenceKeysByApplication.get(applicationId);
+      if (keys) keys.push(pref.key);
+    }
+  }
+
+  return { preferenceKeysByApplication, unsourcedPreferenceKeys };
+}
+
+/**
+ * Resolve one LotteryPolicySource against a set of application ids. Returns
+ * null (not an empty set) when the source is not actually collected
+ * anywhere, so a caller can tell "unsourced" apart from "sourced, matched
+ * nobody" — the same distinction matchWeightedTiers preserves via
+ * unsourcedTierKeys. Shared by matchWeightedTiers's weighted-tier path
+ * (inlined there for its weight bookkeeping) and matchAbsolutePreferences.
+ */
+async function matchBooleanSource(
+  supabase: QueryClient,
+  applicationIds: string[],
+  source: LotteryPolicySource
+): Promise<string[] | null> {
+  if (source.kind === "unavailable") return null;
+
+  if (source.kind === "application_column") {
+    if (!POLICY_MATCHABLE_APPLICATION_COLUMNS.includes(source.field)) return null;
+    const { data } = await supabase
+      .from("application")
+      .select("id")
+      .in("id", applicationIds)
+      .eq(source.field, true);
+    return ((data ?? []) as Array<Record<string, unknown>>).map((r) => r.id as string);
+  }
+
+  // application_answer
+  if (!POLICY_COLLECTED_ANSWER_KEYS.includes(source.field)) return null;
+
+  const accepted = (source.matchValues ?? ["yes", "true"]).map((v) => v.toLowerCase());
+  const { data } = await supabase
+    .from("application_answer")
+    .select("application_id, value")
+    .in("application_id", applicationIds)
+    .eq("field_key", source.field);
+
+  return ((data ?? []) as Array<Record<string, unknown>>)
+    .filter((row) => accepted.includes(normalizeAnswer(row.value)))
+    .map((row) => row.application_id as string);
 }
 
 /**
